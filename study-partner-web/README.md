@@ -1,5 +1,18 @@
-# Study Partner Web — reusable EdNova foundation
+# EdNova web
 
-Next.js frontend in the parent pnpm workspace. From root: `pnpm install --frozen-lockfile`, `pnpm --filter study-partner-web dev` (:5173). API and web share database/auth secret; configure `BACKEND_URL` and a direct backend WebSocket URL or nginx edge. See [development](../DEVELOPMENT.md), [frontend guide](../docs-repo/docs/frontend-web.md) and [actual validation](../audit/2026-10-18/VALIDATION.md).
+Native Next.js 16 App Router with React 19, TypeScript, shadcn/ui and Tailwind CSS 4.
 
-Better Auth engine runs in Next; Nest enforces backend sessions/domain policy. Institutional roles/official publication/facilitator UI are PLANNED. This audit changed no UI/runtime behavior. [Product specification](../docs-repo/docs/product-specification.md) records target flows and evidence limits.
+From the repository root:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm dev:setup
+pnpm dev:infra:up
+pnpm dev
+```
+
+Routes and layouts live in `src/app`; domain queries/actions/components live in `src/features`. Shared primitives are in `src/components/ui`. Read [frontend architecture and migration scope](../docs/frontend-web.md), the [team plan](../docs/team-delivery-plan.md), and [current validation/limits](../docs/audit/cleanup.md).
+
+Use server reads for initial data and authenticated Server Actions for mutations. Keep client components small. Use `next/link`/`next/navigation` directly; add Tailwind utilities instead of screen CSS. Keep identity, cookies and service credentials on the server.
+
+Run `pnpm --filter study-partner-web build`, `typecheck`, `lint`, `test`; `pnpm test:e2e` verifies the browser journey against the real local API/Mongo/Mailpit stack. AI workers/models have separate setup and acceptance gates.

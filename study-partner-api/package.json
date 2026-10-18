@@ -9,7 +9,7 @@
     "start": "node dist/main.js",
     "build": "tsc",
     "lint": "eslint modules shared scripts tests src --ignore-pattern \"**/node_modules/**\" --ext .ts",
-    "test": "jest --runInBand && pnpm test:auth",
+    "test": "pnpm test:routes && jest --runInBand && pnpm test:auth",
     "test:unit": "jest modules src shared --runInBand",
     "test:integration": "jest tests/integration --runInBand",
     "format": "prettier --write \"{src,modules,shared,scripts,tests}/**/*.{ts,json,md}\"",
@@ -21,7 +21,9 @@
     "test:auth": "pnpm build && npx tsx --test tests/better-auth.lifecycle.ts tests/better-auth.nest.ts",
     "auth:migrate": "npx tsx scripts/migrate-auth.ts",
     "typecheck": "tsc -p tsconfig.check.json",
-    "pretest": "pnpm build"
+    "pretest": "pnpm build",
+    "generate:contracts": "tsx scripts/generate-http-contracts.ts",
+    "test:routes": "tsx --test tests/routes.node.ts"
   },
   "devDependencies": {
     "@types/amqplib": "^0.10.8",

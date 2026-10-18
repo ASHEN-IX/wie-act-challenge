@@ -25,5 +25,3 @@ export const AI_JOB_TIERS: Record<string, readonly string[]> = {
   'study.search.query': ['vip', 'vip_plus', 'trial'],
   'study.coach.nudge': ['vip_plus', 'trial']
 };
-
-module.exports = { effectiveTier, AI_JOB_TIERS };

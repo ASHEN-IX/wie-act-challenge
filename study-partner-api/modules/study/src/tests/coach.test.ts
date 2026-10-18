@@ -55,7 +55,7 @@ const { createSession: generateToken } = require('../../../../tests/sessionFixtu
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const app = require('../app');
 
-const token = `mindflow.test_session=${generateToken({ userId: 'user-123', role: 'student', tier: 'vip' })}`;
+const token = `mindflow.test_session=${generateToken({ userId: 'user-123', role: 'student', tier: 'vip_plus' })}`;
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -63,6 +63,14 @@ beforeEach(() => {
 });
 
 describe('POST /api/v1/coach/nudge', () => {
+  it('denies the lower vip tier before loading private session data', async () => {
+    const lowerTier = `mindflow.test_session=${generateToken({ userId: 'user-123', role: 'student', tier: 'vip' })}`;
+    const res = await request(app).post('/api/v1/coach/nudge').set('Cookie', lowerTier);
+    expect(res.status).toBe(403);
+    expect(StudySession.findOne).not.toHaveBeenCalled();
+    expect(moduleClient.post).not.toHaveBeenCalled();
+  });
+
   it('returns 401 for an unauthenticated request (COACH-11 negative)', async () => {
     const res = await request(app).post('/api/v1/coach/nudge').send({ focus_score: 0.5 });
 

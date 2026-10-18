@@ -209,7 +209,7 @@ describe('BLOOM-12 end-to-end loop (real Mongo + real services)', () => {
     // profile untouched (no double-count).
     const redelivered = await EvalResultRecord.findOne({ correlationId: 'corr-loop-1' }).lean();
     const replayOut = await processEvalResult(redelivered);
-    expect(replayOut.skipped).toBe('already_processed');
+    expect(replayOut.skipped).toBe('already_processing');
 
     const after = await CompetencyProfile.findOne({ userId: USER, topicId: TOPIC_A }).lean();
     expect(after.score).toBe(before.score); // unchanged — no double-count

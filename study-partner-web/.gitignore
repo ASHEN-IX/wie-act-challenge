@@ -36,3 +36,7 @@ yarn-error.log*
 .next/
 
 /logs/
+
+# Next generates this for the current dev/build output
+next-env.d.ts
+*.tsbuildinfo

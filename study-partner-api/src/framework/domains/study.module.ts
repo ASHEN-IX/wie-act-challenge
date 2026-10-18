@@ -201,7 +201,7 @@ export class StudyController {
   get_api_v1_study_plans_calendar_821a9057(@Req() req: DomainRequest, @Res() res: Response): Promise<void> {
     return this.service.execute("GET /api/v1/study/plans/calendar", req, res);
   }
-  @Get("/api/v1/study/plans/:planId([0-9a-fA-F]{24})")
+  @Get("/api/v1/study/plans/:planId")
   get_api_v1_study_plans_d85754b8(@Req() req: DomainRequest, @Res() res: Response): Promise<void> {
     return this.service.execute("GET /api/v1/study/plans/:planId([0-9a-fA-F]{24})", req, res);
   }

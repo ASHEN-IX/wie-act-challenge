@@ -10,7 +10,6 @@
 **/playwright-report
 study-partner-ai
 docs
-docs-repo
 __pycache__
 
 .migration-cache

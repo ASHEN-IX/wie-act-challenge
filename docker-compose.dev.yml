@@ -1,0 +1,38 @@
+name: ednova-dev
+services:
+  mongodb:
+    image: mongo:7
+    ports: ["127.0.0.1:27018:27017"]
+    volumes: ["mongo-data:/data/db"]
+    healthcheck:
+      test: [CMD, mongosh, --quiet, --eval, "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+  rabbitmq:
+    image: rabbitmq:3-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ednova
+      RABBITMQ_DEFAULT_PASS: ednova-local
+      RABBITMQ_DEFAULT_VHOST: ednova
+    ports: ["127.0.0.1:5673:5672", "127.0.0.1:15673:15672"]
+    volumes: ["rabbit-data:/var/lib/rabbitmq"]
+    healthcheck:
+      test: [CMD, rabbitmq-diagnostics, -q, ping]
+      interval: 5s
+      timeout: 10s
+      retries: 12
+  redis:
+    image: redis:7-alpine
+    ports: ["127.0.0.1:6381:6379"]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+  mailpit:
+    image: axllent/mailpit:v1.31.4
+    ports: ["127.0.0.1:1026:1025", "127.0.0.1:8026:8025"]
+volumes:
+  mongo-data:
+  rabbit-data:

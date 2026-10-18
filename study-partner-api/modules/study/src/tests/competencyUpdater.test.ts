@@ -3,10 +3,7 @@
  */
 
 jest.mock('../models/index', () => ({
-  EvalResultRecord: { find: jest.fn() },
-  CompetencyProcessing: {
-    create: jest.fn()
-  },
+  EvalResultRecord: { find: jest.fn(), findOneAndUpdate: jest.fn(), updateOne: jest.fn() },
   LearningObjective: { findOne: jest.fn() },
   CompetencyProfile: {}
 }));
@@ -16,7 +13,7 @@ jest.mock('../services/competency', () => ({
 }));
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { EvalResultRecord, CompetencyProcessing, LearningObjective } = require('../models/index');
+const { EvalResultRecord, LearningObjective } = require('../models/index');
 import { upsertProfile } from '../services/competency';
 
 import {
@@ -29,24 +26,34 @@ import {
 // ── claimResult ─────────────────────────────────────────────────────────────
 
 describe('claimResult', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => jest.resetAllMocks());
 
-  test('returns true when claim is newly created', async () => {
-    CompetencyProcessing.create.mockResolvedValue({ correlationId: 'c1' });
-    expect(await claimResult('c1')).toBe(true);
-    expect(CompetencyProcessing.create).toHaveBeenCalledWith({ correlationId: 'c1' });
+  test('returns a lease token when an unprocessed result is claimed', async () => {
+    EvalResultRecord.findOneAndUpdate.mockResolvedValue({ correlationId: 'c1' });
+    expect(await claimResult('c1')).toEqual(expect.any(String));
+    expect(EvalResultRecord.findOneAndUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        correlationId: 'c1',
+        competencyProcessedAt: null,
+        $or: expect.any(Array)
+      }),
+      {
+        $set: { competencyLeaseToken: expect.any(String), competencyLeaseUntil: expect.any(Date) }
+      },
+      { new: true }
+    );
   });
 
-  test('returns false when correlationId already exists (duplicate key)', async () => {
+  test('returns null when processed or currently leased', async () => {
     const dupErr: any = new Error('duplicate key');
     dupErr.code = 11000;
-    CompetencyProcessing.create.mockRejectedValue(dupErr);
-    expect(await claimResult('c1')).toBe(false);
+    EvalResultRecord.findOneAndUpdate.mockResolvedValue(null);
+    expect(await claimResult('c1')).toBeNull();
   });
 
   test('re-throws non-duplicate errors', async () => {
     const dbErr = new Error('connection lost');
-    CompetencyProcessing.create.mockRejectedValue(dbErr);
+    EvalResultRecord.findOneAndUpdate.mockRejectedValue(dbErr);
     await expect(claimResult('c1')).rejects.toThrow('connection lost');
   });
 });
@@ -54,7 +61,7 @@ describe('claimResult', () => {
 // ── resolveCompetencyKey ─────────────────────────────────────────────────────
 
 describe('resolveCompetencyKey', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => jest.resetAllMocks());
 
   test('returns topicId + knowledgeType from the objective', async () => {
     LearningObjective.findOne.mockReturnValue({
@@ -108,10 +115,10 @@ describe('processEvalResult', () => {
     createdAt: new Date('2026-01-01')
   };
 
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => jest.resetAllMocks());
 
   test('claims, resolves, and calls upsertProfile with the evidence item', async () => {
-    CompetencyProcessing.create.mockResolvedValue({ correlationId: 'corr-1' });
+    EvalResultRecord.findOneAndUpdate.mockResolvedValue({ correlationId: 'corr-1' });
     LearningObjective.findOne.mockReturnValue({
       lean: jest.fn().mockResolvedValue({ topicId: 'topic-1', knowledgeType: 'conceptual' })
     });
@@ -139,7 +146,7 @@ describe('processEvalResult', () => {
   test('skips when demonstratedBloomLevel is absent', async () => {
     const result = await processEvalResult({ ...baseResult, demonstratedBloomLevel: null });
     expect(result.skipped).toBe('no_skill_level');
-    expect(CompetencyProcessing.create).not.toHaveBeenCalled();
+    expect(EvalResultRecord.findOneAndUpdate).not.toHaveBeenCalled();
   });
 
   test('skips when demonstratedBloomLevel is undefined', async () => {
@@ -147,18 +154,18 @@ describe('processEvalResult', () => {
     expect(result.skipped).toBe('no_skill_level');
   });
 
-  test('skips when already processed (duplicate claim)', async () => {
+  test('skips when the result cannot be claimed', async () => {
     const dupErr: any = new Error('dup');
     dupErr.code = 11000;
-    CompetencyProcessing.create.mockRejectedValue(dupErr);
+    EvalResultRecord.findOneAndUpdate.mockResolvedValue(null);
 
     const result = await processEvalResult(baseResult);
-    expect(result.skipped).toBe('already_processed');
+    expect(result.skipped).toBe('already_processing');
     expect(upsertProfile).not.toHaveBeenCalled();
   });
 
   test('skips with no_objective when objective is missing', async () => {
-    CompetencyProcessing.create.mockResolvedValue({ correlationId: 'corr-1' });
+    EvalResultRecord.findOneAndUpdate.mockResolvedValue({ correlationId: 'corr-1' });
     LearningObjective.findOne.mockReturnValue({
       lean: jest.fn().mockResolvedValue(null)
     });
@@ -173,7 +180,7 @@ describe('processEvalResult', () => {
 // ── runOnce ──────────────────────────────────────────────────────────────────
 
 describe('runOnce', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => jest.resetAllMocks());
 
   test('processes multiple candidates in order and returns totals', async () => {
     const candidates = [
@@ -205,7 +212,7 @@ describe('runOnce', () => {
       lean: jest.fn().mockResolvedValue(candidates)
     });
 
-    CompetencyProcessing.create
+    EvalResultRecord.findOneAndUpdate
       .mockResolvedValueOnce({ correlationId: 'c1' })
       .mockResolvedValueOnce({ correlationId: 'c2' });
 
@@ -257,8 +264,8 @@ describe('runOnce', () => {
     });
 
     // c1 already claimed, c2 is new
-    CompetencyProcessing.create
-      .mockRejectedValueOnce(dupErr)
+    EvalResultRecord.findOneAndUpdate
+      .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ correlationId: 'c2' });
 
     LearningObjective.findOne.mockReturnValue({
@@ -284,7 +291,7 @@ describe('runOnce', () => {
 
     const stats = await runOnce();
     expect(stats).toEqual({ total: 0, processed: 0, skipped: 0, errors: 0 });
-    expect(CompetencyProcessing.create).not.toHaveBeenCalled();
+    expect(EvalResultRecord.findOneAndUpdate).not.toHaveBeenCalled();
   });
 
   test('continues processing remaining candidates when one errors', async () => {
@@ -318,7 +325,7 @@ describe('runOnce', () => {
     });
 
     const dbErr = new Error('connection lost');
-    CompetencyProcessing.create
+    EvalResultRecord.findOneAndUpdate
       .mockRejectedValueOnce(dbErr)
       .mockResolvedValueOnce({ correlationId: 'c2' });
 

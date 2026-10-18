@@ -63,18 +63,21 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
+      - name: Install locked Python environment
         run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
+          python -m pip install 'poetry>=2,<3'
+          poetry check --lock
+          poetry install --with dev --no-interaction
 
       - name: Syntax check
-        run: python -m py_compile services/api/main.py
+        run: poetry run python -m compileall -q agents bloom messaging models services utils workers
 
-      - name: Lint (flake8)
-        run: flake8 services/api/main.py --max-line-length=120 --count --show-source --statistics
-        continue-on-error: true
-
-      - name: SSRF guard tests
-        run: python -m pytest tests/test_url_validator.py -v
-        continue-on-error: true
+      - name: Worker, contract, inference configuration and SSRF checks
+        env:
+          LLM_MOCK: "1"
+        run: >-
+          poetry run python -m pytest
+          tests/test_base_worker.py tests/test_session_store.py
+          tests/test_ai_envelope_contract.py tests/test_topology_parity.py
+          tests/test_prompt_guard.py tests/test_llm_client.py
+          tests/test_search_ssrf.py -q

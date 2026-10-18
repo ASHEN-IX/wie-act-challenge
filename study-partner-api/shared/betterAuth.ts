@@ -308,7 +308,3 @@ export async function resolveIdentity(headers: any, auth?: any, db?: Db) {
     }
   };
 }
-
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { trustedOrigins, createAuth, getAuth, closeAuth, resolveIdentity };
-}

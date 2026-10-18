@@ -35,3 +35,7 @@ __pycache__/
 **/.vscode/
 **/.idea/
 **/.DS_Store
+
+# Local agent state and generated knowledge graph
+.serena/
+graphify-out/

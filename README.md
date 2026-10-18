@@ -1,67 +1,52 @@
-# EdNova — legacy Study Partner / MindFlow workspace
+# EdNova
 
-EdNova's proposed direction is an AI learning companion for individual and peer learning, with institution-managed courses and independent personal courses. This repository contains the reusable **MindFlow / Study Partner implementation**. Institutional roles, Course Studio review/publication, schema-selected interactive activities and AI-facilitated Study Together rooms are **PLANNED**, not delivered features. Existing gamification needs adaptation for verified learning evidence. Latest product direction: **v1.2**.
+AI-assisted university learning: instructor-reviewed courses, individual practice and peer study rooms. The repository contains reusable legacy features; the [backlog](docs/sprint-backlog.md) distinguishes existing code from unfinished EdNova requirements.
 
-The 18 October 2026 audit changed documentation only. Existing UI names, packages, APIs and infrastructure identifiers remain unchanged. The baseline has build, lint, typecheck and test failures; see [executed validation](audit/2026-10-18/VALIDATION.md) before relying on older completion claims.
+## Start here
 
-## Read first
-
-| Need | Source of truth |
-|---|---|
-| v1.2 changes and implemented/missing matrix | [v1.2 alignment report](audit/2026-10-18/EDNOVA_V1_2_UPDATE.md) |
-| Three-member task split and interface handoffs | [Team delivery plan](docs-repo/docs/team-delivery-plan.md) |
-| Full audit, reuse/removal decisions and gaps | [Audit report](audit/2026-10-18/EDNOVA_AUDIT.md) |
-| Product, scope and functional acceptance | [Product specification](docs-repo/docs/product-specification.md) |
-| Current vs proposed permissions | [Roles and permissions](docs-repo/docs/roles-and-permissions.md) |
-| Actual architecture / target adaptations | [Current architecture](ARCHITECTURE.md) / [target architecture](TARGET_ARCHITECTURE.md) |
-| Actual schemas / conceptual additions | [Data model](docs-repo/docs/data-model.md) |
-| Complete learner and instructor journeys | [Workflows](docs-repo/docs/workflows.md) |
-| Agents, model categories, grounding and fallback | [AI specification](docs-repo/docs/ai-specification.md) |
-| Prioritized work and evidence-based status | [Backlog](docs-repo/docs/sprint-backlog.md) |
-| Tests to run / actual results | [Validation plan](docs-repo/docs/testing-plan.md) / [audit results](audit/2026-10-18/VALIDATION.md) |
-| Organizer rules, artifacts, timing and business proposal | [Hackathon delivery](docs-repo/docs/hackathon-delivery.md) |
-| Original PDF and full team brief | [Source references](docs-repo/docs/reference/README.md) |
-| Setup / deployment | [Development](DEVELOPMENT.md) / [deployment](DEPLOYMENT.md) |
-
-## Workspace
-
-- `study-partner-web`: Next.js 16 App Router, React 18, TypeScript, Tailwind, Zustand and React Query; uploads, planning, evaluation, team study and legacy administration.
-- `study-partner-api`: NestJS 12 shell on Express, seven in-process domains, MongoDB/Mongoose, cookie-session authorization, Redis and RabbitMQ integration.
-- `study-partner-ai`: independent Python FastAPI service and separately launched RabbitMQ workers; ingestion, planner, scheduler, coach, evaluator, search and reflection.
-- `docs-repo`: maintained documentation directory inside this repository. `docs/` retains AI contracts and operational runbooks.
-
-Declared versions come from manifests, not a guarantee of external service availability. No framework, database or authentication migration is proposed for this audit.
-
-## Local setup
-
-Use Node **>=24**, pnpm **11.3.0**, Docker, and a separate compatible Python **>=3.11,<3.15** environment for AI. From the repository root:
+Requirements: Node **24+**, pnpm **11.3.0**, Docker Compose. Python AI runs separately with **Python 3.11–3.14 and Poetry 2**.
 
 ```bash
 pnpm install --frozen-lockfile
-cp .env.example study-partner-api/.env
-cp study-partner-web/.env.example study-partner-web/.env.local
-pnpm test:infra:up
+pnpm dev:setup
+pnpm dev:infra:up
+pnpm dev:doctor
+pnpm dev
 ```
 
-Before `pnpm dev`, follow [development configuration](DEVELOPMENT.md): test MongoDB/Mailpit listen on **27018/1026**, while examples default to **27017/1025**. Set matching database, auth secret, origins and mail settings in API and web. The API also requires broker configuration; test infrastructure alone does not supply RabbitMQ or Redis. Real AI requires the independently configured service **and** appropriate workers and model credentials. Without provider keys some existing AI paths mock or use deterministic fallbacks.
+Open [localhost:5173](http://localhost:5173). Setup creates missing local environment files with shared random service/auth secrets and preserves existing files. Resolve any `doctor` failures before continuing. Infrastructure ports: Mongo **27018**, RabbitMQ **5673** (management **15673**), Redis **6381**, SMTP **1026**, Mailpit UI **8026**. Stop an existing test stack before starting the dev stack; their Mongo/Mailpit ports overlap.
 
-Web: `http://localhost:5173`; API health: `http://localhost:3000/api/v1/health`; OpenAPI: `http://localhost:3000/api/v1/docs`. These are configured endpoints, not a claim that the app has booted successfully here.
+`pnpm dev` starts the API and web only. See [development](docs/development.md) for Python HTTP/workers, provider configuration, uploads and testing. Local setup explicitly uses mock inference; real approved model access remains required for feature acceptance.
 
-## Commands
+## Team
 
-| Command | Actual scope |
+| Owner | Complete module |
 |---|---|
-| `pnpm dev` | API and web development processes; does not start Python |
-| `pnpm build` | API TypeScript and Next webpack production build |
-| `pnpm lint` / `pnpm typecheck` | API and web checks; neither covers Python |
-| `pnpm test` | API Jest + auth lifecycle, then web Vitest |
-| `pnpm test:integration` | API integration suite; live-broker cases have opt-in gates |
-| `pnpm test:e2e` | Auth/smoke Playwright launcher, not all browser specs |
-| `pnpm test:infra:up` / `pnpm test:infra:down` | Dedicated test MongoDB and Mailpit |
-| `pnpm docker:up` / `pnpm docker:down` | Main Compose stack using API env; separate AI lifecycle |
+| **Habib** | Course Studio, Content & Access |
+| **Tasnim** | Individual Learning & Progress |
+| **Aziz** | Study Together & Collaboration |
 
-There is no root `pnpm format` script. See package manifests for package-level format commands. [Documentation index](docs-repo/docs/index.md) distinguishes maintained documentation from historical migration records; past checkmarks are not current validation.
+Each owns UI, API, data, AI and tests. Read the [team plan](docs/team-delivery-plan.md), pick a task from the [canonical backlog](docs/sprint-backlog.md), then follow its technical execution notes. Agree on shared contracts before dependent implementations and review changes with consuming module owners.
 
-## Confirmed team and next implementation
+## Repository
 
-Habib owns Course Studio, Content and Access; Tasnim owns Individual Learning and Progress; Aziz owns Study Together and Collaboration. Each owns UI, API, data, AI and tests. The [named delivery plan](docs-repo/docs/team-delivery-plan.md) covers starting packages/reviews, the [canonical backlog](docs-repo/docs/sprint-backlog.md) gives technical steps for every task, and [target architecture](TARGET_ARCHITECTURE.md) records system choices, proposed interfaces, recovery and recommended improvements. No implementation dates are assumed.
+```text
+study-partner-web/    Next.js App Router frontend (React 19, shadcn/ui, Tailwind 4)
+study-partner-api/    NestJS API, domain modules and shared Node packages
+study-partner-ai/     Python AI HTTP service and workers (Poetry)
+docs/                All project documentation, reference inputs and contracts
+scripts/             Local setup and configuration checks
+```
+
+This **already is a pnpm workspace**. Install Node dependencies once from the root; internal packages use `workspace:*` and one `pnpm-lock.yaml`. Python keeps its own Poetry environment/lockfile. Existing app paths are retained to preserve imports, scripts and deployments.
+
+| Command | Purpose |
+|---|---|
+| `pnpm dev:setup` / `pnpm dev:doctor` | Create missing local config / check prerequisites and shared settings |
+| `pnpm dev:infra:up` / `pnpm dev:infra:down` | Start/stop local dependencies; volumes persist |
+| `pnpm dev` / `pnpm dev:api` / `pnpm dev:web` | Run Node apps together or separately |
+| `pnpm build` / `pnpm typecheck` / `pnpm lint` | Build and quality gates |
+| `pnpm test` / `pnpm test:integration` / `pnpm test:e2e` | Node unit/auth, integration and browser tests |
+| `pnpm generate:contracts` | Regenerate Nest adapters after domain-route changes |
+
+[Frontend structure and migration scope](docs/frontend-web.md) · [Documentation](docs/README.md) · [Current architecture](docs/architecture.md) · [Target architecture](docs/target-architecture.md) · [Preparation results and remaining blockers](docs/audit/cleanup.md)

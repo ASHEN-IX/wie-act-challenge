@@ -1,0 +1,30 @@
+import { PageHeader } from "@/components/shared/page-header";
+import { DataError } from "@/components/shared/states";
+import { UploadForm, SubjectForm } from "@/features/courses/upload-form";
+import { getSubjects } from "@/features/courses/queries";
+export const metadata = { title: "Upload course" };
+export default async function NewCourse() {
+  const subjects = await getSubjects();
+  return (
+    <>
+      <PageHeader
+        title="Bring your course material"
+        description="Keep your original sources and organize them by subject."
+      />
+      <DataError message={subjects.error} />
+      <div className="max-w-xl">
+        <UploadForm subjects={subjects.data?.subjects || []} />
+        {Boolean(subjects.data?.subjects.length) && (
+          <details className="mt-10 border-t pt-6">
+            <summary className="cursor-pointer text-sm font-medium">
+              Create another subject
+            </summary>
+            <div className="mt-5">
+              <SubjectForm />
+            </div>
+          </details>
+        )}
+      </div>
+    </>
+  );
+}
