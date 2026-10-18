@@ -73,7 +73,7 @@ async function connectMongoWithRetry(maxAttempts = 10) {
 }
 
 function spawnCoachWorker() {
-  const aiRoot = path.join(__dirname, '../../../study-partner-ai');
+  const aiRoot = path.join(__dirname, '../../../ai');
   const child = spawn('python3', ['-m', 'tests.e2e_coach_worker'], {
     cwd: aiRoot,
     env: {

@@ -1,8 +1,8 @@
 packages:
-  - study-partner-api
-  - study-partner-api/modules/*
-  - study-partner-api/shared
-  - study-partner-web
+  - apps/api
+  - apps/api/modules/*
+  - apps/api/shared
+  - apps/web
 
 allowBuilds:
   esbuild: true

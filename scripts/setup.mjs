@@ -10,8 +10,8 @@ const readEnv = (name) => {
     .filter((line) => /^[A-Z_][A-Z_0-9]*=/.test(line))
     .map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)])) : {};
 };
-const existingApi = readEnv('study-partner-api/.env');
-const existingWeb = readEnv('study-partner-web/.env.local');
+const existingApi = readEnv('apps/api/.env');
+const existingWeb = readEnv('apps/web/.env.local');
 const secret = () => randomBytes(32).toString('hex');
 const common = {
   MONGODB_URI: existingApi.MONGODB_URI || existingWeb.MONGODB_URI || 'mongodb://127.0.0.1:27018/ednova_dev',
@@ -22,14 +22,14 @@ const common = {
 };
 const broker = existingApi.RABBITMQ_URL || 'amqp://ednova:ednova-local@127.0.0.1:5673/ednova';
 const redis = existingApi.REDIS_URL || 'redis://127.0.0.1:6381';
-const serviceKey = existingApi.AI_SERVICE_API_KEY || readEnv('study-partner-ai/.env').AI_SERVICE_API_KEY || secret();
+const serviceKey = existingApi.AI_SERVICE_API_KEY || readEnv('apps/ai/.env').AI_SERVICE_API_KEY || secret();
 function create(name, values) {
   const file = path.join(root, name);
   if (existsSync(file)) { console.log(`Kept existing ${name}`); return; }
   writeFileSync(file, Object.entries(values).map(([key, value]) => `${key}=${value}`).join('\n') + '\n', { mode: 0o600, flag: 'wx' });
   console.log(`Created ${name}`);
 }
-create('study-partner-api/.env', {
+create('apps/api/.env', {
   ...readEnv('.env.example'), ...common,
   NODE_ENV: 'development', PORT: '3000', INTERNAL_API_SECRET: secret(),
   FRONTEND_URL: 'http://localhost:5173', APP_URL: 'http://localhost:5173', CORS_ORIGIN: 'http://localhost:5173',
@@ -37,17 +37,17 @@ create('study-partner-api/.env', {
   RABBITMQ_USER: 'ednova', RABBITMQ_PASS: 'ednova-local', RABBITMQ_VHOST: 'ednova',
   REDIS_URL: redis, AI_SERVICE_API_KEY: serviceKey
 });
-create('study-partner-web/.env.local', {
-  ...readEnv('study-partner-web/.env.example'), ...common,
+create('apps/web/.env.local', {
+  ...readEnv('apps/web/.env.example'), ...common,
   BACKEND_URL: 'http://localhost:3000', NEXT_PUBLIC_WS_URL: 'ws://localhost:3000'
 });
-create('study-partner-ai/.env', {
+create('apps/ai/.env', {
   MONGODB_URI: common.MONGODB_URI,
   MONGO_URI: common.MONGODB_URI,
   DB_NAME: new URL(common.MONGODB_URI).pathname.slice(1) || "study_partner",
   RABBITMQ_URL: broker,
   REDIS_URL: redis, AI_SERVICE_API_KEY: serviceKey,
-  INGEST_UPLOADS_DIR: path.join(root, 'study-partner-api/uploads'),
+  INGEST_UPLOADS_DIR: path.join(root, 'apps/api/uploads'),
   LLM_MOCK: '1'
 });
 console.log('Local setup uses mock inference explicitly. Configure approved providers before real-model acceptance. Run pnpm dev:doctor next.');

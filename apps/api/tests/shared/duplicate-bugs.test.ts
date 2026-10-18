@@ -24,7 +24,7 @@ describe("badge key regression ('use' key bug, leaderboardService)", () => {
   });
 
   test('unknown division falls back to an asset that exists in every division tier', () => {
-    const webPublic = path.join(__dirname, '../../../study-partner-web/public/ranking-badges');
+    const webPublic = path.join(__dirname, '../../../web/public/ranking-badges');
     const fallback = getBadgeKey({ tier: 'Novice', division: 'unknown' });
     const SINGLE_BADGE_TIERS = new Set(['grandmaster', 'legend']);
     for (const tier of fs.readdirSync(webPublic)) {
@@ -38,14 +38,14 @@ describe('duplicate-method regressions (audit §1-6)', () => {
   const py = (rel: string) => fs.readFileSync(path.join(__dirname, rel), 'utf8');
 
   test('signal_processing service defines is_ready exactly once', () => {
-    const src = py('../../../study-partner-ai/services/signal_processing_service/service.py');
+    const src = py('../../../ai/services/signal_processing_service/service.py');
     expect(src.match(/^\s*def is_ready\(/gm) || []).toHaveLength(1);
     // The surviving definition must be the real initialization check
     expect(src).toMatch(/getattr\(self,\s*["']_initialized["']/);
   });
 
   test('planner retriever defines retrieve/add_documents exactly once', () => {
-    const src = py('../../../study-partner-ai/agents/planner/rag/retriever.py');
+    const src = py('../../../ai/agents/planner/rag/retriever.py');
     expect(src.match(/^\s*def retrieve\(/gm) || []).toHaveLength(1);
     expect(src.match(/^\s*def add_documents\(/gm) || []).toHaveLength(1);
     // Keep the structured-logging variants, not the print() ones

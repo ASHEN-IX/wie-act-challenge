@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-const cwd = fileURLToPath(new URL('../study-partner-ai/', import.meta.url));
+const cwd = fileURLToPath(new URL('../apps/ai/', import.meta.url));
 const envFile = path.join(cwd, '.env');
 if (existsSync(envFile)) process.loadEnvFile(envFile);
 const workers = ['ingestion', 'planner', 'schedule', 'coach', 'evaluator', 'search'];

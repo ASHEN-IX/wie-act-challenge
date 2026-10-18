@@ -31,14 +31,14 @@ Each owns UI, API, data, AI and tests. Read the [team plan](docs/team-delivery-p
 ## Repository
 
 ```text
-study-partner-web/    Next.js App Router frontend (React 19, shadcn/ui, Tailwind 4)
-study-partner-api/    NestJS API, domain modules and shared Node packages
-study-partner-ai/     Python AI HTTP service and workers (Poetry)
+apps/web/            Next.js App Router frontend (React 19, shadcn/ui, Tailwind 4)
+apps/api/            NestJS API, domain modules and shared Node packages
+apps/ai/             Python AI HTTP service and workers (Poetry)
 docs/                All project documentation, reference inputs and contracts
 scripts/             Local setup and configuration checks
 ```
 
-This **already is a pnpm workspace**. Install Node dependencies once from the root; internal packages use `workspace:*` and one `pnpm-lock.yaml`. Python keeps its own Poetry environment/lockfile. Existing app paths are retained to preserve imports, scripts and deployments.
+This is a **pnpm workspace** with applications organized cleanly under `apps/` (`apps/web`, `apps/api`, `apps/ai`). Install Node dependencies once from the root; internal packages use `workspace:*` and one `pnpm-lock.yaml`. Python keeps its own Poetry environment/lockfile in `apps/ai`.
 
 | Command | Purpose |
 |---|---|

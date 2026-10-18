@@ -11,7 +11,7 @@ const path = require('path');
 const t = require('../../shared/bloom/taxonomy');
 
 const fixture = JSON.parse(
-  fs.readFileSync(path.join(__dirname, '../../../docs/contracts/bloom-fixture.json'), 'utf8')
+  fs.readFileSync(path.join(__dirname, '../../../../docs/contracts/bloom-fixture.json'), 'utf8')
 );
 
 describe('Bloom taxonomy parity (Node ↔ fixture ↔ Python)', () => {

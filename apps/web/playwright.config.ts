@@ -35,7 +35,7 @@ export default defineConfig({
     ? [
         {
           command:
-            "pnpm --filter study-partner-api build && pnpm --filter study-partner-api exec tsx tests/browser-server.ts",
+            "pnpm --filter api build && pnpm --filter api exec tsx tests/browser-server.ts",
           url: "http://localhost:3001/api/v1/health",
           timeout: 60000,
         },

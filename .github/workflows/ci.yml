@@ -28,7 +28,7 @@ jobs:
       - run: pnpm test
       - run: pnpm build
       - run: docker build -t mindflow-api .
-      - run: docker build -f study-partner-web/Dockerfile -t mindflow-web .
+      - run: docker build -f apps/web/Dockerfile -t mindflow-web .
   e2e:
     runs-on: ubuntu-latest
     services:
@@ -48,14 +48,14 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter study-partner-web exec playwright install --with-deps chromium
+      - run: pnpm --filter web exec playwright install --with-deps chromium
       - run: pnpm test:e2e
   ai:
     name: AI (Python)
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: study-partner-ai
+        working-directory: apps/ai
     steps:
       - uses: actions/checkout@v4
 

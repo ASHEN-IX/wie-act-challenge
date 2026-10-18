@@ -14,7 +14,7 @@ jest.resetModules();
 const t = require('../../shared/ai-messaging/topology');
 
 const fixture = JSON.parse(
-  fs.readFileSync(path.join(__dirname, '../../../docs/contracts/topology-fixture.json'), 'utf8')
+  fs.readFileSync(path.join(__dirname, '../../../../docs/contracts/topology-fixture.json'), 'utf8')
 );
 
 describe('RabbitMQ topology parity (Node ↔ fixture ↔ Python)', () => {

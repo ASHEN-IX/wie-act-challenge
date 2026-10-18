@@ -9,13 +9,13 @@ check(Number(process.versions.node.split('.')[0]) >= 24, 'Node >=24');
 const pnpm = spawnSync('pnpm', ['--version'], { encoding: 'utf8', cwd: root });
 check(pnpm.status === 0 && pnpm.stdout.trim() === '11.3.0', 'pnpm 11.3.0');
 const envs = {};
-for (const name of ['study-partner-api/.env', 'study-partner-web/.env.local', 'study-partner-ai/.env']) {
+for (const name of ['apps/api/.env', 'apps/web/.env.local', 'apps/ai/.env']) {
   const file = path.join(root, name); check(existsSync(file), `${name} exists (pnpm dev:setup)`);
   envs[name] = existsSync(file) ? Object.fromEntries(readFileSync(file, 'utf8').split('\n')
     .filter((line) => /^[A-Z_][A-Z_0-9]*=/.test(line))
     .map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)])) : {};
 }
-const api = envs['study-partner-api/.env']; const web = envs['study-partner-web/.env.local']; const ai = envs['study-partner-ai/.env'];
+const api = envs['apps/api/.env']; const web = envs['apps/web/.env.local']; const ai = envs['apps/ai/.env'];
 for (const key of ['MONGODB_URI', 'BETTER_AUTH_SECRET', 'BETTER_AUTH_URL']) {
   check(Boolean(api[key]) && api[key] === web[key], `API/web ${key} matches`);
 }

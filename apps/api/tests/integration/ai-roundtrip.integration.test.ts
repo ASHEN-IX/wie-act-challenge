@@ -62,7 +62,7 @@ async function connectMongoWithRetry(maxAttempts = 10) {
 }
 
 function spawnStubWorker(jobType, behavior) {
-  const aiRoot = path.join(__dirname, '../../../study-partner-ai');
+  const aiRoot = path.join(__dirname, '../../../ai');
   const child = spawn('python3', ['-m', 'tests.e2e_stub_worker'], {
     cwd: aiRoot,
     env: {
@@ -221,7 +221,7 @@ describe('Independent AI deployment contract', () => {
   const fs = require('fs');
   const yaml = require('yaml');
   const load = (file) =>
-    yaml.parse(fs.readFileSync(path.join(__dirname, '../../../', file), 'utf8'));
+    yaml.parse(fs.readFileSync(path.join(__dirname, '../../../../', file), 'utf8'));
   test('core stack only deploys the monolith and infrastructure', () => {
     const compose = load('docker-compose.yml');
     expect(Object.keys(compose.services).sort()).toEqual([
@@ -238,8 +238,8 @@ describe('Independent AI deployment contract', () => {
   });
   test('Python deployment is separate from the Node workspace', () => {
     expect(load('docker-compose.ai.yml').services['ai-service'].build.context).toBe(
-      './study-partner-ai'
+      './apps/ai'
     );
-    expect(load('pnpm-workspace.yaml').packages).not.toContain('study-partner-ai');
+    expect(load('pnpm-workspace.yaml').packages).not.toContain('apps/ai');
   });
 });

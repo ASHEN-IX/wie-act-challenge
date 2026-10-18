@@ -8,7 +8,7 @@
 **/logs
 **/test-results
 **/playwright-report
-study-partner-ai
+apps/ai
 docs
 __pycache__
 
