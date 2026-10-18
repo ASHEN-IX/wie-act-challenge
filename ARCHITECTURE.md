@@ -1,84 +1,67 @@
-# Mindflow System Architecture
+# CURRENT architecture — verified source, 18 October 2026
 
-This document describes the production architecture of the Mindflow full-stack platform following the completed migration from React + Express to Next.js + NestJS.
+This describes code present in this checkout, not certification of production behavior. Read [validation](audit/2026-10-18/VALIDATION.md) for failures and [target architecture](TARGET_ARCHITECTURE.md) for PLANNED EdNova adaptations.
 
----
+## Boundaries and technologies
 
-## 1. Architectural Overview
+One Git repository contains a pnpm workspace: API shell, web, shared package and seven domain packages (11 packages total). Python is separately operated and uses Poetry; it is not a pnpm package. `docs-repo` is a directory in this checkout. Manifests declare Next ^16.4, React ^18.2, Nest ^12.1, MongoDB driver ^7.7, Mongoose ^8, Better Auth ^1.7.7, Node >=24 and pnpm 11.3.0. Python supports >=3.11,<3.15; Compose uses MongoDB 7, Redis 7 and RabbitMQ 3.
 
-Mindflow is structured as a **pnpm monorepo workspace** composed of:
-1. **Frontend (`study-partner-web`)**: Next.js 16 App Router application running in `standalone` server mode.
-2. **Backend (`study-partner-api`)**: NestJS 12 Modular Monolith exposing unified REST and WebSocket endpoints.
-3. **Shared Contracts & Utilities (`study-partner-api/shared`)**: Workspace package providing common logger, cache, auth, and schema utilities.
-4. **External AI Service (`study-partner-ai`)**: Independent Python FastAPI service handling specialized ML/LLM workloads.
-
----
-
-## 2. Monorepo Organization
-
-```
-mindflow/
-├── apps & services/
-│   ├── study-partner-web/          # Next.js 16 Frontend
-│   │   ├── app/                    # Next.js App Router (28 pages + /api/auth)
-│   │   ├── src/                    # Screens, components, stores, hooks, styles
-│   │   ├── e2e/                    # Playwright E2E browser tests
-│   │   ├── Dockerfile              # Multi-stage standalone build
-│   │   └── next.config.mjs         # Next.js configuration and API rewrites
-│   │
-│   ├── study-partner-api/          # NestJS 12 Backend Modular Monolith
-│   │   ├── src/                    # Main entrypoint, NestJS AppModule, bootstrap
-│   │   ├── modules/                # Domain packages
-│   │   │   ├── auth/               # User accounts, billing, Stripe, admin
-│   │   │   ├── user-profile/       # Profiles, availability, gamification, quests, friends
-│   │   │   ├── study/              # Tasks, sessions, subjects, courses, plans, competencies
-│   │   │   ├── ai-orchestrator/    # AI jobs, evaluations, search, coach integration
-│   │   │   ├── signal-processing/  # Focus sessions, telemetry
-│   │   │   ├── analytics/          # Event tracking, timelines, insights
-│   │   │   └── notification/       # Notifications, session chat, voice, WebSockets
-│   │   ├── shared/                 # In-process domain client, database, cache, auth
-│   │   └── tests/                  # Integration, lifecycle, and architecture tests
-│   │
-│   └── study-partner-ai/           # Independent Python FastAPI AI Service
-│       ├── services/api/           # FastAPI routers (ingest, plan, coach, search)
-│       ├── agents/                 # Evaluator, coach, and planner agents
-│       ├── workers/                # RabbitMQ job consumers
-│       └── Dockerfile              # Python 3.11 Alpine/Debian container
-│
-├── .github/workflows/ci.yml        # Unified CI/CD pipeline
-├── docker-compose.yml              # Core service composition
-├── docker-compose.prod.yml         # Production resource & security overrides
-├── docker-compose.ai.yml           # Optional independent AI service composition
-├── pnpm-workspace.yaml             # Monorepo packages manifest
-└── package.json                    # Workspace root scripts
+```text
+Browser -> Next (:5173) -> /api/auth -> Better Auth -> Mongo auth_* collections
+        -> /api/v1 rewrite or nginx -> Nest (:3000) -> domain contracts -> Mongo
+        -> /ws/realtime, /ws/notifications -> notification module
+Browser <-> peer browser: WebRTC audio; WS carries signaling, not audio packets
+Nest -> independent FastAPI (:8000): authenticated HTTP
+Nest -> RabbitMQ -> separately launched Python worker -> result/progress -> Mongo
+Redis: cache/rate state; optional Python idempotency and evaluation session state
 ```
 
----
+## Application and domains
 
-## 3. Communication Patterns
+`study-partner-api/src/main.ts` starts Nest through `framework/bootstrap.ts`, owns lifecycle, connects persistence, attaches realtime, starts result consumers and study pollers, and drains them on stop. `src/framework/app.module.ts` loads auth, users, study, AI, signals, analytics and notifications. Generated controllers call `DomainService`, which dispatches operations loaded from `src/domain-definitions.ts`. Existing route files export `createContracts()` operations; this is not a wholesale rewrite into independent Nest business services.
 
-### 3.1. Browser → Frontend & Backend
-- Browser traffic arrives at the Nginx edge proxy (port 80/443).
-- Web routes (`/`, `/dashboard`, `/sessions`, etc.) are routed to Next.js (`:5173`).
-- Authentication requests (`/api/auth/*`) execute inside the Next.js Route Handler powered by Better Auth.
-- API requests (`/api/v1/*`) are routed to NestJS (`:3000`), preserving cookie authentication.
-- WebSocket requests (`/ws/*`) upgrade directly to the NestJS HTTP listener.
+`shared/moduleClient.ts` routes `module://` requests in process with request context, identity and handler execution. Non-module URLs use `shared/aiClient.ts`; do not replace module calls with a service fleet. `src/app.ts` retains an Express-compatible application exercised by legacy tests; it is not the production entrypoint and is not proven dead.
 
-### 3.2. Cross-Module Communication (In-Process)
-- Rather than making remote HTTP calls between domains, NestJS modules register contracts with `moduleClient`.
-- Calls between domains (e.g. `study` awarding XP in `user-profile`) run **in-memory** within the same Node process, eliminating network latency while enforcing parameter validation and identity propagation.
+| Domain | Actual public surfaces | Main persistence / responsibilities |
+|---|---|---|
+| Auth | `/api/v1/auth`, `/api/v1/auth/admin`, `/api/v1/auth/stripe` | Domain User, payments/coupons, profile/account administration and entitlements; Better Auth HTTP engine is separate |
+| Users | `/api/v1/users/profile`, `/api/v1/users/availability`, `/api/v1/users/gamification`, `/api/v1/users/quests`, `/api/v1/users/friends` | Profiles, ranks, XP, quests, availability and friendships |
+| Study | `/api/v1/study/*`, `/api/v1/competencies`, `/api/v1/coach` | Tasks, subjects, courses, solo/team sessions, plans, objectives and competency updates |
+| AI | `/api/v1/ai/*`, `/api/v1/eval`, `/api/v1/search` | AI jobs, evaluation outputs, external AI requests and results |
+| Signals | `/api/v1/signals/focus` | Focus sessions and telemetry |
+| Analytics | `/api/v1/analytics` | Events/insights; not an institution-scoped instructor dashboard |
+| Notifications | `/api/v1/notifications`, `/api/v1/session-chat`, `/api/v1/voice`; `/ws/*` | Mail, notifications, search-style session chat and voice signaling |
 
-### 3.3. NestJS → Independent Python AI Service
-- The Python AI service runs as a completely independent process.
-- **Synchronous REST**: `aiClient` in NestJS sends validated HTTP requests to `AI_SERVICE_URL` with timeouts and retry safety.
-- **Asynchronous Message Bus**: Long-running ingestion, planning, and evaluation tasks are dispatched to RabbitMQ queues (`ai.jobs.*`). Python workers process jobs and publish outcomes to result queues (`ai.results.*`), which NestJS consumers ingest and broadcast.
+Authoritative endpoint registration is `src/domain-definitions.ts` and generated `src/framework/domains/*.module.ts`; old `.js` route maps are historical.
 
----
+## Frontend
 
-## 4. Data Layer Architecture
+`app/**/page.tsx` defines routes; `app/api/auth/[...all]/route.ts` hosts Better Auth. Server pages call `src/server/identity.ts` for access redirects; `src/next-entry.tsx`, `src/App.tsx` and `src/navigation.tsx` retain client screens and navigation adaptation. Features include auth, subjects/upload, tasks/planner/calendar, competency/review/search, live sessions/team lobby, friends/ranking, analytics, pricing and admin. Zustand stores own auth/session/notifications/friends/gamification; React Query and Axios support data calls. `src/services/aiJobs.ts` and screens poll async jobs. `proxy.ts` adds CSP/nonce and headers; Next rewrites API/uploads, while production edge forwards WS explicitly.
 
-- **MongoDB 7**: Shared database instance storing all business entities.
-  - Better Auth collections (`user`, `session`, `account`, `verification`) reside alongside existing business collections.
-  - ObjectIds and user entity relationships are preserved.
-- **Redis 7**: Distributed caching and token-bucket rate limiting state.
-- **RabbitMQ 3**: Durable message broker for asynchronous AI tasks and Dead Letter Queues (DLQ).
+No separate university/instructor application exists. Frontend `teacher` permissions are not backend roles. Global App calls gamification, presence and notifications, so cosmetic/social code cannot safely be deleted merely because it is outside P0.
+
+## Identity, authorization and storage
+
+Better Auth uses `auth_users`, `auth_accounts`, `auth_sessions`, `auth_verifications` and `auth_rate_limits` alongside preserved domain `users`. Session identity is resolved from Mongo-backed cookies; bcrypt compatibility supports old passwords. API SessionGuard authenticates; domain roles and tier gates restrict operations. `operationPolicy.ts` scopes AI actor/resource references and namespaces evaluation conversation IDs. Existing global roles are student/admin; there are no institution membership or course enrollment schemas.
+
+Owner filters exist on personal course reads/downloads. Team creation's course lookup, session-chat/voice HTTP resource checks and generic static `/uploads` mounts require review: presence of authentication is not proof of content isolation. WebSocket connect and inbound messages check identity and team membership; session broadcast/heartbeat behavior must also be tested under revocation. See ED-02 and [roles](docs-repo/docs/roles-and-permissions.md).
+
+MongoDB stores business and auth state; Python repositories use configured Mongo databases/collections and derived course IDs. FAISS indexes and embeddings are also stored on disk; uploads use local/Compose volumes. Multiple schema views of learning objectives/eval results are intentional read/write boundaries, not automatically duplicate dead models. [Data model](docs-repo/docs/data-model.md) records relationships and unresolved ownership boundaries.
+
+## AI and background flow
+
+Upload -> validated file staging -> course/job identifiers -> RabbitMQ ingestion worker -> parsing/OCR/enrichment/chunks/embeddings/objectives -> results/progress -> course status and topics. Planner retrieves course context, decomposes goals, adds reviews/buffers and generates task graphs; scheduler places tasks into availability. Evaluator supports individual multi-turn Socratic checks; competency pollers consume evaluation evidence. Coach uses signals/rules and optional LLM decisions. Search retrieves web sources and synthesizes answers; reflection aggregates learning metrics.
+
+Shared LiteLLM aliases are per agent; **no challenge compact/capable policy is implemented**. Missing credentials can trigger mocks. Provider fallbacks do not establish challenge-compliant degraded pedagogy. Broker contracts retain typed payloads, correlations, idempotency leases, retry TTL queues, DLQs and result consumers. Ingest/planner/coach/evaluator/search/schedule workers are separate entrypoints. FastAPI's Compose command starts HTTP only; workers need independent launch. See [AI specification](docs-repo/docs/ai-specification.md) and [message contract](docs/contracts/ai-message-contract.md).
+
+## Realtime and infrastructure
+
+Team sessions support invite codes, participant lists and task progress. Realtime handles `chat_query`, voice signaling, mute and speaking updates. SessionChat stores query/result/coach messages, not a full peer-discussion/facilitation model. Browser WebRTC uses STUN; no managed SFU/TURN service is supplied. No tested synchronized PDF/page/exercise protocol, group misconception state machine or private tutor channel exists.
+
+Main Compose defines API, Next web, nginx edge (:8080), Mongo (:27017), Redis, RabbitMQ and Mailpit (:1025/:8025). Test Compose provides Mongo (:27018) and Mailpit (:1026/:8026). AI Compose is separate and mounts an external upload volume; path/DB/broker/secret alignment requires explicit configuration. Production override plus `deploy/Caddyfile` and nginx config require validation; there is no evidence for zero-downtime or deployed-state claims.
+
+Root CI declares Node checks, E2E and AI checks, but its AI install references absent `requirements.txt`. The nested Python workflow reflects former repository layout and is not automatically a root GitHub Actions workflow. Python Docker dependencies differ from Poetry, and the HTTP image does not constitute worker deployment. These remain ED-01 work, without changes to infrastructure in this audit.
+
+## v1.2 source verification addendum
+
+Rechecked ingestion/course routes, SocraticEvaluation, Gamification, reward route, awardService and RankEventLedger against the new brief. CURRENT extraction and XP/levels/achievements exist; TODO: reviewed editable Studio revisions, versioned trusted activity registry/selector, private attempts shared across solo/group and learning-evidence XP. The XP method adds totals/history; ranking's sparse unique eventKey and anti-farming KP logic are a separate path. Do not describe ranking replay protection as XP exactly-once protection. No runtime changes or tests were executed for this documentation update; prior validation results retain their original scope. See [v1.2 report](audit/2026-10-18/EDNOVA_V1_2_UPDATE.md) and [team implementation plan](docs-repo/docs/team-delivery-plan.md).

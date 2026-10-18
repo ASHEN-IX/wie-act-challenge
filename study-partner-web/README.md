@@ -1,7 +1,5 @@
-# Study Partner Web
+# Study Partner Web — reusable EdNova foundation
 
-Next.js frontend in the parent pnpm workspace. From the parent folder run `pnpm install --frozen-lockfile` and `pnpm --filter study-partner-web dev`. Build with `pnpm --filter study-partner-web build`; test with `pnpm --filter study-partner-web test`.
+Next.js frontend in the parent pnpm workspace. From root: `pnpm install --frozen-lockfile`, `pnpm --filter study-partner-web dev` (:5173). API and web share database/auth secret; configure `BACKEND_URL` and a direct backend WebSocket URL or nginx edge. See [development](../DEVELOPMENT.md), [frontend guide](../docs-repo/docs/frontend-web.md) and [actual validation](../audit/2026-10-18/VALIDATION.md).
 
-API and WebSocket requests both target the main backend on port 3000. nginx proxies both paths to the `app` container. See [workspace development guide](../DEVELOPMENT.md).
-
-Authentication now uses Better Auth hosted by Next.js, with NestJS session guards and application authorization. See [AUTH_MIGRATION.md](../AUTH_MIGRATION.md) for setup, database migration, endpoint replacements and validation. Python AI remains independent.
+Better Auth engine runs in Next; Nest enforces backend sessions/domain policy. Institutional roles/official publication/facilitator UI are PLANNED. This audit changed no UI/runtime behavior. [Product specification](../docs-repo/docs/product-specification.md) records target flows and evidence limits.

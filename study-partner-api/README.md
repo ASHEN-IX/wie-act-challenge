@@ -1,7 +1,5 @@
-# Study Partner API
+# Study Partner API — reusable EdNova foundation
 
-This project is now a modular monolith in the parent pnpm workspace. Run `pnpm --filter study-partner-api dev` from the parent folder. The single entrypoint is `src/main.js`; modules have no independent startup scripts. See [workspace README](../README.md) and [migration](../MIGRATION.md).
+NestJS modular API in the parent pnpm workspace. From root: `pnpm install --frozen-lockfile`, then `pnpm --filter study-partner-api dev`. Source entrypoint: `src/main.ts`; compiled entrypoint: `dist/main.js`. Configuration, database/broker requirements and known startup blockers: [development](../DEVELOPMENT.md) and [validation](../audit/2026-10-18/VALIDATION.md).
 
-MongoDB collections and public API routes are preserved. AI remains an independent Python server. Redis and RabbitMQ remain required by the corresponding cache/job flows. Characters are removed.
-
-Authentication now uses Better Auth hosted by Next.js, with NestJS session guards and application authorization. See [AUTH_MIGRATION.md](../AUTH_MIGRATION.md) for setup, database migration, endpoint replacements and validation. Python AI remains independent.
+[Backend guide](../docs-repo/docs/backend-api.md) describes contracts/modules and cookie-session authorization. [Current architecture](../ARCHITECTURE.md) and [target](../TARGET_ARCHITECTURE.md) distinguish existing source from PLANNED institutional/facilitation work. Runtime identifiers/auth behavior were preserved in the documentation audit.

@@ -1,3 +1,5 @@
+> **Retained technical/educational reference.** Existing score formulas are implementation mechanics, not empirical validation of mastery or fixed learning styles. EdNova uses provisional evidence-limited feedback; see [AI specification](../ai-specification.md) and [product](../product-specification.md). Prior task checkmarks are historical.
+
 # Bloom's Taxonomy — Technical & Educational Reference (F14 / BLOOM-DOC)
 
 > **Primary reference:** Anderson, L. W., & Krathwohl, D. R. (Eds.) (2001). *A Taxonomy for Learning, Teaching, and Assessing: A Revision of Bloom's Taxonomy of Educational Objectives.* New York: Longman.
@@ -42,7 +44,7 @@ Ordered low → high. This is the "thinking" axis.
 | 5 | `evaluate` | Higher-order thinking |
 | 6 | `create` | Higher-order thinking |
 
-The canonical ordered tuple, as implemented in [`bloom/taxonomy.py`](study-partner-ai/bloom/taxonomy.py) (Python) and mirrored in `study-partner-api/shared/bloom/taxonomy.js` (Node):
+The canonical ordered tuple, as implemented in [`bloom/taxonomy.py`](../../../study-partner-ai/bloom/taxonomy.py) (Python) and mirrored in `study-partner-api/shared/bloom/taxonomy.ts` (Node):
 
 ```text
 remember, understand, apply, analyze, evaluate, create
@@ -240,7 +242,7 @@ A `procedural` `apply` score and a `metacognitive` `apply` score are different c
 
 | Concern | Location |
 |---|---|
-| Shared taxonomy constants (levels/types/verb map/unlock) | `bloom/taxonomy.py` · `study-partner-api/shared/bloom/taxonomy.js` |
+| Shared taxonomy constants (levels/types/verb map/unlock) | `bloom/taxonomy.py` · `study-partner-api/shared/bloom/taxonomy.ts` |
 | Objective classification | `bloom/classifier.py` |
 | Objective extraction | `objective_extractor.py`, `learning_objective.py` |
 | Competency estimator (EWMA) | `study-partner-api/services/study/src/services/competency.js` |

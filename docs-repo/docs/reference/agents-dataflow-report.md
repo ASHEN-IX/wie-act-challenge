@@ -1,3 +1,5 @@
+> **HISTORICAL / INACTIVE.** Retained MindFlow technical history; checkmarks, paths, counts and future infrastructure plans below do not describe completed EdNova work. Use the [active backlog](../sprint-backlog.md), [CURRENT architecture](../../../ARCHITECTURE.md) and [actual validation](../../../audit/2026-10-18/VALIDATION.md).
+
 **Agents Data Flow & Structure Report**
 
 - **Scope:** This document summarizes the new/modified agents, services, data models, and runtime data flows introduced during the recent enhancement work. It focuses on architecture, persistence, observability, and integration points between agents and services.
@@ -122,19 +124,19 @@
 - LLM provider: `google.generativeai` usage shows a deprecation warning; migrate to `google-genai` or another supported LLM SDK in future work.
 
 **Files of interest**
-- [agents/course_ingestion/enrichment/chunk_embedder.py](agents/course_ingestion/enrichment/chunk_embedder.py)
-- [agents/course_ingestion/enrichment/deduplicator.py](agents/course_ingestion/enrichment/deduplicator.py)
-- [services/vector_store/embedder.py](services/vector_store/embedder.py)
-- [services/vector_store/adapter.py](services/vector_store/adapter.py)
-- [agents/planner/rag/index_store.py](agents/planner/rag/index_store.py)
-- [agents/planner/rag/retriever.py](agents/planner/rag/retriever.py)
-- [agents/coach/services/coach_history_repository.py](agents/coach/services/coach_history_repository.py)
-- [agents/planner/memory/pacing_store.py](agents/planner/memory/pacing_store.py)
-- [services/signal_processing_service/smoothing.py](services/signal_processing_service/smoothing.py)
-- [services/signal_processing_service/repository.py](services/signal_processing_service/repository.py)
-- [agents/scheduler/services/scheduling_heuristics.py](agents/scheduler/services/scheduling_heuristics.py)
-- [services/ai_orchestrator/orchestrator.py](services/ai_orchestrator/orchestrator.py)
-- [services/api/main.py](services/api/main.py)
+- [agents/course_ingestion/enrichment/chunk_embedder.py](../../../study-partner-ai/agents/course_ingestion/enrichment/chunk_embedder.py)
+- [agents/course_ingestion/enrichment/deduplicator.py](../../../study-partner-ai/agents/course_ingestion/enrichment/deduplicator.py)
+- [services/vector_store/embedder.py](../../../study-partner-ai/services/vector_store/embedder.py)
+- [services/vector_store/adapter.py](../../../study-partner-ai/services/vector_store/adapter.py)
+- [agents/planner/rag/index_store.py](../../../study-partner-ai/agents/planner/rag/index_store.py)
+- [agents/planner/rag/retriever.py](../../../study-partner-ai/agents/planner/rag/retriever.py)
+- [agents/coach/services/coach_history_repository.py](../../../study-partner-ai/agents/coach/services/coach_history_repository.py)
+- [agents/planner/memory/pacing_store.py](../../../study-partner-ai/agents/planner/memory/pacing_store.py)
+- [services/signal_processing_service/smoothing.py](../../../study-partner-ai/services/signal_processing_service/smoothing.py)
+- [services/signal_processing_service/repository.py](../../../study-partner-ai/services/signal_processing_service/repository.py)
+- [agents/scheduler/services/scheduling_heuristics.py](../../../study-partner-ai/agents/scheduler/services/scheduling_heuristics.py)
+- [services/ai_orchestrator/orchestrator.py](../../../study-partner-ai/services/ai_orchestrator/orchestrator.py)
+- [services/api/main.py](../../../study-partner-ai/services/api/main.py)
 
 **Next recommended actions**
 - Seed a test MongoDB with representative `courses` and run the skipped integration to validate end-to-end planner→scheduler behavior.

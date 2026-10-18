@@ -1,183 +1,45 @@
-# Deployment Guide
+# Deployment — existing configuration and readiness limits
 
-This document describes how to deploy the Mindflow full-stack application (Next.js frontend + NestJS backend modular monolith + independent Python AI service) across development, testing, and production environments.
+This is a configuration guide, not evidence of a successful deployment. Current build/startup/test failures are documented in [validation](audit/2026-10-18/VALIDATION.md); resolve ED-01/ED-02 before deployment. No deployment or image replacement was performed during this audit.
 
----
+## Main stack
 
-## 1. System Architecture
+Root `Dockerfile` builds the API; `study-partner-web/Dockerfile` builds Next standalone. `docker-compose.yml` defines app/API (:3000 bound localhost), web (:5173 internally), nginx edge (:8080), MongoDB (:27017), Redis, RabbitMQ and Mailpit (:1025/:8025). Persistent volumes hold Mongo, RabbitMQ and two upload roots. Do not remove them to resolve application errors.
 
-The deployed system consists of:
+Copy/configure root `.env.example` into `study-partner-api/.env` and review the Compose environment interpolation separately from `env_file`. Set real local/deployment secrets, broker credentials/vhost, database URI, common Better Auth secret, trusted public URL/origins, email delivery and independent AI endpoint/key. Node and Next must resolve the same identity database and auth secret. In production use HTTPS and an explicitly configured public auth origin.
 
-```
-                           Internet / Clients
-                                   │
-                                   ▼
-                         ┌───────────────────┐
-                         │    Nginx Edge     │ (:80 / :443)
-                         └─────────┬─────────┘
-                                   │
-                  ┌────────────────┴────────────────┐
-                  │ HTTP / Static Assets            │ WebSocket (/ws/) & /api/v1
-                  ▼                                 ▼
-       ┌─────────────────────┐           ┌─────────────────────┐
-       │   Next.js (Web)     │           │    NestJS (API)     │
-       │  Standalone Server  │           │  Modular Monolith   │
-       │     (:5173)         │           │      (:3000)        │
-       └──────────┬──────────┘           └──────────┬──────────┘
-                  │                                 │
-                  │ /api/auth                       │ Domain Handlers
-                  ▼                                 │
-         Better Auth Engine ────────────────────────┤
-                                                    │
-                      ┌─────────────────────────────┼─────────────────────────────┐
-                      │                             │                             │
-                      ▼                             ▼                             ▼
-              ┌───────────────┐             ┌───────────────┐             ┌───────────────┐
-              │    MongoDB    │             │     Redis     │             │   RabbitMQ    │
-              │  (:27017/srv) │             │    (:6379)    │             │    (:5672)    │
-              └───────────────┘             └───────────────┘             └───────┬───────┘
-                                                                                  │ Async Jobs
-                                                                                  ▼
-                                                                     ┌────────────────────────┐
-                                                                     │   Independent Python   │
-                                                                     │       AI Service       │
-                                                                     │      (:8000)           │
-                                                                     └────────────────────────┘
-```
-
----
-
-## 2. Prerequisites
-
-- **Node.js**: >= 24.0.0
-- **pnpm**: 11.3.0 (`corepack enable && corepack prepare pnpm@11.3.0 --activate`)
-- **Docker & Docker Compose**: v2.20+
-- **MongoDB**: v7.0+ (Local Docker container or hosted MongoDB Atlas)
-- **Redis**: v7.0+
-- **RabbitMQ**: v3.12+
-
----
-
-## 3. Environment Variables Configuration
-
-Copy the example environment files:
+Main configured launcher:
 
 ```bash
-# Core Application (NestJS & Next.js)
-cp .env.example study-partner-api/.env
-cp study-partner-web/.env.example study-partner-web/.env.local
-
-# Independent AI Service (Optional, if running locally)
-cp .env.ai.example .env.ai
-```
-
-### Critical Production Variables
-
-| Variable | Description | Example / Required Format |
-|---|---|---|
-| `NODE_ENV` | Runtime environment | `production` |
-| `PORT` | API listen port | `3000` |
-| `MONGODB_URI` / `DOCKER_MONGODB_URI` | Connection URI to MongoDB | `mongodb+srv://user:pass@cluster.mongodb.net/study_partner` |
-| `BETTER_AUTH_SECRET` | 32+ character random secret for signing sessions | Generate with `openssl rand -base64 32` |
-| `BETTER_AUTH_URL` | Public origin of the Next.js frontend | `https://app.mindflow.example.com` |
-| `AUTH_TRUSTED_ORIGINS` | Comma-separated list of allowed origins | `https://app.mindflow.example.com` |
-| `INTERNAL_API_SECRET` | Secret for machine-to-machine internal calls | Generate with `openssl rand -hex 32` |
-| `RABBITMQ_URL` | RabbitMQ connection string | `amqp://user:pass@rabbitmq:5672/mindflow` |
-| `REDIS_URL` | Redis connection string | `redis://redis:6379` |
-| `AI_SERVICE_URL` | Base URL of independent AI service | `http://host.docker.internal:8000` or remote URL |
-| `STRIPE_SECRET_KEY` | Stripe secret key for subscriptions | `sk_live_...` |
-| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret | `whsec_...` |
-| `SMTP_HOST` | Production SMTP host | `smtp.sendgrid.net` |
-| `SMTP_PORT` | Production SMTP port | `587` |
-
----
-
-## 4. Docker Deployment
-
-### 4.1. Development & Local Stack
-
-To launch the full local environment including databases, message bus, API, frontend, and development mailpit:
-
-```bash
-# 1. Start core stack
 docker compose --env-file study-partner-api/.env up -d --build
-
-# 2. Check service status
-docker compose ps
 ```
 
-Services exposed:
-- **Web UI & Edge**: `http://localhost:8080`
-- **NestJS Direct API**: `http://localhost:3000`
-- **Mailpit Web UI**: `http://localhost:8025`
-- **RabbitMQ Management**: `http://localhost:15672`
-
-### 4.2. Production Deployment
-
-Production uses `docker-compose.yml` overlayed with `docker-compose.prod.yml`:
+For the provided production override (review bind ports, resource/security/edge settings first):
 
 ```bash
-docker compose \
-  --env-file study-partner-api/.env \
-  -f docker-compose.yml \
-  -f docker-compose.prod.yml \
-  up -d --build
+docker compose --env-file study-partner-api/.env -f docker-compose.yml -f docker-compose.prod.yml config --quiet
 ```
 
-Key production optimizations enabled:
-1. **Multi-stage builds**:
-   - `Dockerfile`: Compiles TypeScript to `dist/`, prunes development dependencies, packages minimal Alpine runner.
-   - `study-partner-web/Dockerfile`: Uses Next.js `output: 'standalone'`, exporting only necessary node_modules, static assets, and pre-rendered pages.
-2. **Resource limits**: API container bounded to 1GB RAM and 2.0 CPUs.
-3. **Hardened security**: Non-root execution, `X-Content-Type-Options: nosniff`, `Content-Security-Policy`, and unprivileged nginx edge proxy.
+The production override and `deploy/Caddyfile` are retained infrastructure; configuration validation does not prove a working public deployment, TLS or zero-downtime rollout. nginx forwards API/WS to app and web traffic/auth engine to Next. Preserve forwarded origins/cookies and WS upgrade headers.
 
-### 4.3. Independent AI Service Deployment
+## Independent Python AI
 
-The Python AI service in `study-partner-ai` is operated independently:
+`docker-compose.ai.yml` is a separate lifecycle; copy `.env.ai.example` to a local `.env.ai` and set reachable `AI_MONGODB_URI`/`AI_RABBITMQ_URL` plus the service secret/model env in the expected Python environment. The file optionally loads `study-partner-ai/.env`. Confirm effective Compose config privately; never print credentials into shared logs.
 
 ```bash
-# Start AI service container independently
-docker compose --env-file .env.ai -f docker-compose.ai.yml up -d --build
+docker compose --env-file .env.ai -f docker-compose.ai.yml config --quiet
 ```
 
-If the AI service is hosted remotely, simply point `AI_SERVICE_URL` in `study-partner-api/.env` to the remote AI endpoint. The NestJS backend remains fully functional even when the AI service is temporarily unavailable.
+Its HTTP command starts uvicorn only, not RabbitMQ consumers. Launch needed workers separately using the same database/broker/key and shared upload path, as described in [AI operations](docs-repo/docs/ai-service.md). The external volume is named `study-partner-api_study_uploads`; verify it matches actual API staging paths before ingestion. DB names and `aiCourseId`/file references are not automatically reconciled by Compose. AI Compose must not accidentally point to unrelated persistent services.
 
----
+Python Docker uses a CUDA/PyTorch base and direct pip list that differs from Poetry (including missing messaging dependencies); the organizer inference service has its own constraints. Do not assume this image builds/runs all workers or satisfies challenge inference requirements. Record and fix install/entrypoint parity under ED-01/ED-03, without silently migrating infrastructure.
 
-## 5. Health Checks & Monitoring
+## Checks and recovery
 
-The deployment includes comprehensive health check endpoints:
+API `/api/v1/health` is a basic check; `/api/v1/monitoring/health` includes independent AI reachability and can report degraded state. `/api/v1/monitoring/metrics` requires session plus admin/internal access. Python `/health` is intentionally lightweight and does not initialize agents/models/workers. Healthy HTTP containers are insufficient evidence of job execution.
 
-- **Edge / API Readiness**:
-  ```bash
-  curl -fsS http://localhost:3000/api/v1/health
-  # Response: {"status":"healthy","service":"study-partner-api","timestamp":"..."}
-  ```
-- **Subsystem & AI Connectivity**:
-  ```bash
-  curl -fsS http://localhost:3000/api/v1/monitoring/health
-  # Response includes MongoDB connection status, domain module statuses, and independent AI service reachability.
-  ```
-- **Prometheus / System Metrics** (Internal secret protected):
-  ```bash
-  curl -H "x-internal-secret: <INTERNAL_API_SECRET>" http://localhost:3000/api/v1/monitoring/metrics
-  ```
+Verify: cookie login and authorization; private course download; Node->broker->worker->result; upload volume mapping; slow/limited model behavior; two-browser room transport; source isolation; mail delivery. Run required builds/tests and inspect redacted logs before promotion. Retain backup/restore scripts in `study-partner-api/scripts`; inspect targets and test restore in an isolated environment. Old rollback details are historical guidance, not an instruction to delete databases/queues. The [RabbitMQ runbook](docs/runbooks/rabbitmq-topology-v2-migration.md) describes a specific topology migration and its production cautions.
 
----
+## CI limitations
 
-## 6. Zero-Downtime Updates & Rollback
-
-### Rollback Strategy
-
-1. **Database Backward Compatibility**:
-   - The MongoDB database schema is fully backward-compatible.
-   - Better Auth user tables live alongside existing models with preserved ObjectIds.
-2. **Container Rollback**:
-   ```bash
-   # Revert to previous image tag if needed:
-   docker compose down
-   # Switch git commit / checkout previous tag
-   docker compose --env-file study-partner-api/.env up -d
-   ```
-3. **Graceful Shutdown**:
-   - NestJS traps `SIGTERM` and `SIGINT`, stopping incoming HTTP requests, draining active WebSocket sessions, and finishing in-flight RabbitMQ worker consumers before closing database handles.
+Root `.github/workflows/ci.yml` runs Node checks/browser tests, but its AI install points to absent `requirements.txt` and an absent URL test filename. The nested `study-partner-ai/.github/workflows/ai.yml` is a former standalone workflow and is not a root workflow in this checkout. Repair install/test paths and required coverage rather than removing checks (ED-01). No CI/CD success or deployed status is claimed.

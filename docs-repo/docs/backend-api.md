@@ -1,33 +1,13 @@
-# Backend API
+# Backend API — CURRENT
 
-The backend is one modular Express application, running Node 24 with pnpm 11.3.0. The only entrypoint is `study-partner-api/src/main.js` on port 3000. Its notification and session WebSockets share that listener.
+The production entrypoint is `study-partner-api/src/main.ts`, compiled to `dist/main.js`. It boots NestJS on one Express-backed HTTP listener (:3000), loads seven in-process domains and attaches notification/session WebSockets. `src/app.ts` remains an Express compatibility path used by tests; retain it until usage is proven otherwise.
 
-| Module | Public routes | Responsibilities |
-|---|---|---|
-| Auth | `/api/v1/auth` | Cookies, JWT, OTP, RBAC, subscriptions |
-| Users | `/api/v1/users` | Profiles, availability, XP, ranks, quests, friends |
-| Study | `/api/v1/study`, `/api/v1/competencies`, `/api/v1/coach` | Courses, plans, tasks, sessions, competency feedback |
-| AI integration | `/api/v1/ai`, `/api/v1/eval`, `/api/v1/search` | External AI requests and asynchronous job results |
-| Signals | `/api/v1/signals` | Focus session tracking |
-| Analytics | `/api/v1/analytics` | Events and insights |
-| Notifications | `/api/v1/notifications`, `/api/v1/session-chat`, `/api/v1/voice`, `/ws/*` | Notifications, session chat and voice signaling |
+Authoritative public route mounts are `src/domain-definitions.ts`; generated Nest controllers live under `src/framework/domains/` and dispatch domain contract operations. `shared/moduleClient.ts` handles `module://` calls with identity context; outbound HTTP uses `shared/aiClient.ts`. Domain models/persistence remain in `modules/*` and `shared`.
 
-Domain packages live in `study-partner-api/modules/*`, expose application and lifecycle contracts, and never start independent listeners. Shared infrastructure lives in `study-partner-api/shared`. Internal calls use validated in-process contracts. Outbound AI HTTP uses `shared/aiClient.js` and `AI_SERVICE_URL`.
+Better Auth's engine is hosted at Next `/api/auth/*`. Backend session guards resolve the same database identity; roles are student/admin and tier/ownership policies add restrictions. This is not active custom JWT login. Some HTTP resource-membership paths still need repair (ED-02). See [permissions](roles-and-permissions.md), [architecture](../../ARCHITECTURE.md) and [validation](../../audit/2026-10-18/VALIDATION.md).
 
-The same MongoDB collection names remain in use, with one connection owned by the API lifecycle. Redis provides caching and public request limits. RabbitMQ retains durable AI jobs/results, publisher confirms, retry queues and DLQs. Python AI is independently operated; the main Compose deployment neither builds nor starts it.
+From root: `pnpm --filter study-partner-api build`, `pnpm --filter study-partner-api typecheck`, `pnpm --filter study-partner-api test`, `pnpm test:integration`, `pnpm test:auth`. Database/broker/test prerequisites are in [development](../../DEVELOPMENT.md). Preserve contracts, leases/idempotency, upload checks, session auth, metrics and backup mechanisms. Institutional membership/publication/facilitator APIs are PLANNED, not delivered.
 
-From the parent workspace:
+## v1.2 implementation scope
 
-```bash
-pnpm install --frozen-lockfile
-pnpm --filter study-partner-api dev
-pnpm test
-pnpm test:integration
-pnpm docker:up
-```
-
-Configure `study-partner-api/.env` using the central `.env.example`. See [architecture](../../ARCHITECTURE.md), [development](../../DEVELOPMENT.md), and the [migration record](../../MIGRATION.md) for deployment, validation and rollback details. Character selection and character abilities have been removed.
-
-## Authentication migration (2026-10-08)
-
-Authentication is now owned by Better Auth hosted in Next.js. NestJS owns the backend listener, verifies HTTP-only sessions and enforces application authorization before dispatching domain modules. MongoDB stores new auth collections beside preserved domain users/profile data. Custom JWT/refresh flows are retired; see the root AUTH_MIGRATION_ANALYSIS.md and AUTH_MIGRATION.md for the current endpoint map, setup, migration and validation. Python AI remains independent.
+Each owner delivers API, frontend and AI together: Habib course/content/access/revision endpoints and ingestion; Tasnim activity/attempt/evidence/progress/reward endpoints and individual tutoring/evaluation; Aziz room/chat/voice/private-help/debrief endpoints and group facilitation. Source authorization Habib, individual evidence Tasnim and room state Aziz are the authoritative boundaries; no backend-only or AI-only member. See [team plan](team-delivery-plan.md) and [backlog](sprint-backlog.md). This update implemented no features.

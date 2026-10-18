@@ -1,32 +1,7 @@
-# MindFlow — Documentation Repository
+# EdNova documentation
 
-Centralized documentation for the **MindFlow (Study Partner)** platform: a
-multi-agent AI study-assistance system built during the PIDEV – 3rd Year
-Engineering Program (Esprit, 2025–2026).
+The [documentation index](docs/index.md) maps current code, target specifications, backlog and organizer sources. The [workspace README](../README.md) is the main entrypoint; this directory is part of that Git repository, not evidence of a separately audited remote repository.
 
-Domain documentation lives here. Workspace architecture, migration and development instructions live in the parent workspace alongside its pnpm configuration.
+EdNova is the proposed product direction; MindFlow / Study Partner names remain in runtime code and packages. The audit changes documentation only. Status and actual test results are separated from target designs, and historical migration claims are explicitly labeled.
 
-## The platform in one line
-
-```
-study-partner-web (React) → study-partner-api (modular Node API) → study-partner-ai (Python agents + LiteLLM)
-```
-
-## Quick navigation
-
-| I need... | Go to |
-|-----------|-------|
-| Where to start | [Docs index](docs/index.md) |
-| How the whole platform is built | [Architecture](docs/architecture.md) |
-| **AI service** (Python agents, RabbitMQ job bus) | [AI Service](docs/ai-service.md) · [LLM Config](docs/llm-config.md) |
-| **Backend API** (modular Node API, single listener :3000) | [Backend API](docs/backend-api.md) |
-| **Frontend Web** (React + Vite) | [Frontend Web](docs/frontend-web.md) |
-| What we plan to build | [Sprint Backlog](docs/sprint-backlog.md) |
-| Current progress story-by-story | [Implementation Tracker](docs/implementation-tracker.md) |
-| Detailed runtime data flows | [Agents Data Flow Report](docs/reference/agents-dataflow-report.md) |
-
-## Maintenance
-
-- Update the docs in the same change/commit as the code they document.
-- Keep [`docs/index.md`](docs/index.md) in sync whenever a document is added.
-- Keep the parent architecture and migration documents synchronized with these domain guides.
+Latest alignment is v1.2: trusted interactive learning UI, instructor Course Studio and evidence-based gamification proposals. Start with the [three-member implementation plan](docs/team-delivery-plan.md) and [feature gap report](../audit/2026-10-18/EDNOVA_V1_2_UPDATE.md).

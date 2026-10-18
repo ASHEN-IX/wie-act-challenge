@@ -1,7 +1,9 @@
+> **CURRENT configuration guide; scope limit:** provider aliases are not verified organizer compact/capable mappings. Missing keys may mock. See [AI specification](ai-specification.md), [delivery rules](hackathon-delivery.md) and [actual validation](../../audit/2026-10-18/VALIDATION.md). Historical migration completion language below does not certify this checkout.
+
 # LiteLLM Config Guide
 
 Introduced in **COACH-07** (shared client) and completed across all agents in
-**S-MIG-01**. Every agent now talks to the LLM through one client; the only
+**S-MIG-01**. LLM-backed agent aliases use the shared client; the only
 thing that varies per agent is the model wiring in `litellm/config.yaml`.
 
 ## The shared client: `utils/llm_client.py`

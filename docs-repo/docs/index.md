@@ -1,56 +1,39 @@
-# Docs
+# Documentation index and authority
 
-Welcome. MindFlow is a full-stack study-assistance platform split across three
-code repositories:
+Last aligned: **v1.2, 18 October 2026**. Read [workspace README](../../README.md) and [audit](../../audit/2026-10-18/EDNOVA_AUDIT.md) first.
 
-| Repository | Layer | Stack |
-|-----------|-------|-------|
-| `study-partner-web` | Frontend | React (JSX) + Vite, Tailwind, shadcn/ui, vitest, Playwright |
-| `study-partner-api` | Backend | Node 20 / Express microservices, MongoDB 7 (Mongoose), Redis, RabbitMQ |
-| `study-partner-ai` | AI | Python 3.12 (FastAPI), multi-agent, RabbitMQ job bus, LiteLLM |
+## Maintained source of truth
 
-This index is the single entry point for all documentation.
+| Document | Responsibility |
+|---|---|
+| [Reference provenance](reference/README.md) | Original organizer PDF, latest team brief v1.2 and historical v1.1; requirements vs proposal |
+| [v1.2 alignment report](../../audit/2026-10-18/EDNOVA_V1_2_UPDATE.md) | Implemented/reusable/missing matrix, changes and validation for latest brief |
+| [Three-member plan](team-delivery-plan.md) | Habib/Tasnim/Aziz task owners, shared contracts and integration gates; single backlog status remains canonical |
+| [Product specification](product-specification.md) | Vision, scope, feature flows/status/dependencies/acceptance |
+| [Roles and permissions](roles-and-permissions.md) | Current enforcement and proposed five-role matrix |
+| [Current architecture](../../ARCHITECTURE.md) | Source-verified stack, services, data flows, auth, realtime and infrastructure |
+| [Target architecture](../../TARGET_ARCHITECTURE.md) | Minimal proposed adaptations; no implementation claim |
+| [Data model](data-model.md) | Actual schemas vs proposed entities/ownership |
+| [Workflows](workflows.md) | Twelve end-to-end journeys with current/partial/planned steps |
+| [AI specification](ai-specification.md) | Actual agents, proposed facilitator/routing, validation, safety and fallback |
+| [Backlog](sprint-backlog.md) | Single active ID/priority/dependency/status register |
+| [Status entrypoint](implementation-tracker.md) | Links to the canonical backlog; no duplicate percentages |
+| [Testing plan](testing-plan.md) | Required functional/security/pedagogical/capacity scenarios |
+| [Hackathon delivery](hackathon-delivery.md) | Official timing/limits/rules/rubric and proposed artifact/business plan |
+| [Validation record](../../audit/2026-10-18/VALIDATION.md) | Commands actually executed, results/skips and limits |
+| [Change register](../../audit/2026-10-18/CHANGES.md) | Files changed/removed/preserved and rationale |
+| [Development](../../DEVELOPMENT.md), [deployment](../../DEPLOYMENT.md) | Operational setup and known readiness blockers |
+| [Frontend](frontend-web.md), [backend](backend-api.md), [AI service](ai-service.md) | Package operation pointers and implementation scope |
+| [LLM config](llm-config.md) | Existing alias/client mechanics; not organizer compliance |
+| [AI contract](../../docs/contracts/ai-message-contract.md), [RabbitMQ runbook](../../docs/runbooks/rabbitmq-topology-v2-migration.md) | Retained interoperability/reliability constraints |
+| [Bloom reference](education/bloom-taxonomy.md) | Existing educational/estimator mechanics; not empirical mastery validation |
 
-## Contents
+## Status and maintenance rules
 
-1. [Architecture](architecture.md) — the full platform: repos, services, ports,
-   request flow from browser to AI.
-2. [AI Service](ai-service.md) — AI repo: setup, `.env`, running agents/workers,
-   testing.
-3. [LLM Configuration](llm-config.md) — per-agent model routing via
-   `litellm/config.yaml`, keys, mock/fallback behaviour.
-4. [Backend API](backend-api.md) — API repo: microservices, ports, shared
-   package, endpoints, Docker Compose, setup.
-5. [Frontend Web](frontend-web.md) — web repo: stack, key pages, data access &
-   auth, scripts, testing.
-6. [Sprint Backlog](sprint-backlog.md) — feature-based sprint backlog
-   (F01–F14): user stories, story format, acceptance criteria.
-7. [Implementation Tracker](implementation-tracker.md) — live progress
-   (e.g. `F03 AI Coach 8/16`) against the backlog.
-8. [Reference](reference/agents-dataflow-report.md) — detailed runtime data
-   flows, persistence, observability (AI services).
+CURRENT means source exists with cited boundaries; executed behavior is limited to the validation record. TARGET describes the intended design; PLANNED denotes missing work. KEEP/REUSE/MODIFY LATER/REMOVE/INVESTIGATE are audit dispositions, not task completion statuses. DONE/PARTIAL/TODO/BLOCKED live only in the active backlog and require acceptance evidence.
 
-## Request flow at a glance
+Organizer rules come from the PDF. Team choices come from the brief/specifications. Current behavior comes from source/tests, not diagrams/checkmarks. Update the owning document instead of adding competing architecture/task reports. Keep stable task IDs; mark retired work with reason rather than recycle IDs. For runtime changes update source evidence and rerun affected gates before recording success.
 
-```
-Browser  (study-partner-web, Vite dev :5173)
-   │  /api/* through Vite proxy
-   ▼
-API Gateway  (study-partner-api :3000)
-   │  route + rate-limit + JWT
-   ▼
-Microservices  (:3001–:3007)
-   auth · user-profile · study · ai-orchestrator ·
-   signal-processing · analytics · notification     (+ Redis)
-   │  ai-orchestrator (:3004) proxies AI calls
-   ▼
-Python AI  (study-partner-ai :8000, FastAPI)
-   agents · RabbitMQ job bus · LiteLLM (per-agent model routing)
-```
+## Historical material
 
-## Reading order
-
-- New to the project → **Architecture**, then one layer doc at a time
-  (**Backend API**, **Frontend Web**, **AI Service**).
-- Working on AI features → **LLM Config** + the tracker.
-- Planning/tracking work → **Sprint Backlog** + **Implementation Tracker**.
+Root migration/auth/API compatibility analyses, old route inventories and the [agents dataflow report](reference/agents-dataflow-report.md) retain technical history with banners. [Legacy sprint backlog](reference/legacy-sprint-backlog.md) and [legacy tracker](reference/legacy-implementation-tracker.md) preserve previous MindFlow IDs in one archival location. Old paths, counts and completion/deployment assertions describe historical claims and are not present-day acceptance. The [earlier remediation handoff](../../audit/2026-10-18/REMEDIATION_STATUS.md) remains useful because it explicitly records incomplete regression work.

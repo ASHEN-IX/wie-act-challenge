@@ -1,108 +1,58 @@
-# Mindflow Development Guide
+# Development — CURRENT workspace
 
-This guide describes how to set up, develop, test, and debug the Mindflow Next.js + NestJS monorepo locally.
+Use Node >=24 and pnpm 11.3.0 as declared in root/package manifests. Python AI supports >=3.11,<3.15 and has its own Poetry manifest. The host default Python may be outside this range; choose a compatible isolated environment. See [current architecture](ARCHITECTURE.md) and [actual validation](audit/2026-10-18/VALIDATION.md) for known baseline failures.
 
----
+## Install and configure
 
-## 1. Quick Start
+From the repository root:
 
-### 1.1. Prerequisites
-- **Node.js**: >= 24.0.0
-- **pnpm**: 11.3.0
-- **Docker**: For running MongoDB, Redis, and RabbitMQ dependencies
-
-Activate pnpm 11.3.0 using Corepack:
 ```bash
-corepack enable
-corepack prepare pnpm@11.3.0 --activate
-```
-
-### 1.2. Environment Setup
-```bash
-# Copy example configuration to API and Web packages
+pnpm install --frozen-lockfile
 cp .env.example study-partner-api/.env
 cp study-partner-web/.env.example study-partner-web/.env.local
 ```
 
-Ensure both `study-partner-api/.env` and `study-partner-web/.env.local` share:
-- `MONGODB_URI` (or `DOCKER_MONGODB_URI`)
-- `BETTER_AUTH_SECRET` (minimum 32-character secret)
-- `AUTH_TRUSTED_ORIGINS` (`http://localhost:5173,http://localhost:8080`)
+Replace placeholders with local secrets. API and Next must share the same `MONGODB_URI` and `BETTER_AUTH_SECRET`; choose `BETTER_AUTH_URL=http://localhost:5173` and consistent trusted origins for direct development. Keep secrets server-only. For dedicated test infrastructure:
 
-### 1.3. Install Dependencies
-```bash
-pnpm install --frozen-lockfile
-```
-
----
-
-## 2. Running Locally
-
-### 2.1. Start Supporting Infrastructure
-Run MongoDB and Mailpit via Docker:
 ```bash
 pnpm test:infra:up
 ```
-*(Starts MongoDB on port 27018 and Mailpit on 1026/8026).*
 
-Or start the full local Docker environment (including Redis and RabbitMQ):
+That starts MongoDB on **27018** and Mailpit SMTP on **1026** (UI **8026**). Set API/web `MONGODB_URI` to an appropriate local database on 27018 and SMTP host `127.0.0.1`, port `1026`, secure false if using those services. Example files instead default to 27017/1025 and are not automatically rewritten. Auth lifecycle/browser tests use their own test DB names; never point them at production.
+
+API startup also requires `INTERNAL_API_SECRET` and `RABBITMQ_URL`. Root test Compose provides neither RabbitMQ nor Redis. Configure a dedicated reachable broker and optional Redis, or run just the main Compose broker/cache services using the API env file (review host port conflicts first):
+
 ```bash
-pnpm docker:up
+docker compose --env-file study-partner-api/.env up -d rabbitmq redis
 ```
 
-### 2.2. Start the Development Servers
-Start both the NestJS API and Next.js frontend concurrently:
+The configured RabbitMQ user/password/vhost must agree with the URL. Do not use unrelated application brokers or databases for tests. API startup retries unavailable consumer initialization, but queued work needs a working broker/worker. Starting the main stack instead uses [deployment](DEPLOYMENT.md) configuration and ports.
+
 ```bash
 pnpm dev
 ```
 
-Or run packages individually:
-```bash
-# Start NestJS backend (runs on http://localhost:3000)
-pnpm --filter study-partner-api dev
+This builds/starts API (:3000) and Next (:5173) only. It does not start Python or workers; current Nest route syntax can prevent startup (ED-01). API health is `/api/v1/health`; OpenAPI is `/api/v1/docs/openapi.json`. Next rewrites `/api/v1` and `/uploads` to BACKEND_URL. WebSocket `/ws/*` needs direct `NEXT_PUBLIC_WS_URL` for direct-dev backend access, or an edge proxy such as the main nginx stack; Next rewrites do not establish a WS proxy.
 
-# Start Next.js frontend (runs on http://localhost:5173)
-pnpm --filter study-partner-web dev
-```
+## AI lifecycle
 
-Access:
-- **Frontend**: http://localhost:5173
-- **NestJS API**: http://localhost:3000/api/v1/health
-- **OpenAPI Docs**: http://localhost:3000/api/v1/docs
+See [AI service](docs-repo/docs/ai-service.md). Use a compatible Python environment with Poetry; configure Mongo, reachable broker, optional Redis, `AI_SERVICE_API_KEY` and provider/model configuration. Node's `AI_SERVICE_API_KEY` must match Python. The API service key is a server-to-server secret, separate from model provider credentials.
 
----
+HTTP alone does not consume broker jobs. Launch ingestion/planner/schedule/coach/evaluator/search workers as required in separate processes. Share the correct uploads directory and reconcile Node course IDs/aiCourseId with Python persistence. Missing provider keys may invoke mocks even when LLM_MOCK is not 1; a successful fallback/template is not evidence of real inference. Organizer-model adaptation is PLANNED.
 
-## 3. Monorepo Scripts & Commands
+## Existing commands and tests
 
-| Command | Action | Scope |
-|---|---|---|
-| `pnpm dev` | Run API and Next.js concurrently in development mode | Workspace |
-| `pnpm build` | Compile NestJS TypeScript (`tsc`) and Next.js App Router | Workspace |
-| `pnpm lint` | Run ESLint across backend modules and frontend sources | Workspace |
-| `pnpm typecheck` | Run TypeScript checking and AST syntax checks | Workspace |
-| `pnpm test` | Run all unit tests (Jest backend, Vitest frontend, Auth lifecycle) | Workspace |
-| `pnpm test:integration` | Run backend integration tests with Supertest | API |
-| `pnpm test:e2e` | Run Playwright browser end-to-end tests | Web |
-| `pnpm format` | Run Prettier code formatting | API & Web |
-| `pnpm test:infra:up` | Start test containers (MongoDB on 27018, Mailpit on 1026) | Workspace |
-| `pnpm test:infra:down` | Stop test containers | Workspace |
+| Root command | Scope / prerequisite |
+|---|---|
+| `pnpm build` | API tsc and Next production webpack build |
+| `pnpm lint`, `pnpm typecheck` | Both Node packages; strict API checks include test files |
+| `pnpm test` | API Jest + auth lifecycle, then Vitest; stops on failure |
+| `pnpm test:integration` | API integration cases; real roundtrip opt-in separate |
+| `pnpm test:auth` | API build then Better Auth lifecycle/Nest tests; Mongo on 27018 |
+| `pnpm test:e2e` | Auth/smoke Playwright; test Mongo/Mailpit and browser required |
 
----
+No root format command exists. Package `format` scripts are different and may have legacy globs; do not treat them as a repository-wide check. Python checks use its own environment. Full scenario gates and exact current failures are in [testing plan](docs-repo/docs/testing-plan.md) and [validation](audit/2026-10-18/VALIDATION.md).
 
-## 4. Architectural Rules for Developers
+## Working conventions
 
-1. **Modular Monolith Boundaries**:
-   - Backend domain logic lives in `study-partner-api/modules/*`.
-   - Never import another module's Mongoose models directly.
-   - Use `moduleClient.call('moduleName', 'operation', params)` or injectable NestJS providers to interact across domains.
-2. **NestJS Providers & Controllers**:
-   - HTTP routes must be declared in NestJS Controllers with `@Controller()` and method decorators.
-   - Business logic must reside in `@Injectable()` domain services.
-   - All protected routes must use `@UseGuards(SessionGuard)`.
-3. **Next.js App Router**:
-   - File-system routes live in `study-partner-web/app/*`.
-   - Use Server Components by default; only add `'use client'` where interactive state, event handlers, or browser APIs are required.
-   - Route data fetching through `src/services/api.js` or React Query.
-4. **Independent Python AI Service**:
-   - The Python AI service in `study-partner-ai` is operated independently.
-   - Never import Python scripts into Node.js; communicate only via `shared/aiClient.js` and RabbitMQ queues.
+Preserve contract/controller registration, security checks, AI message topology parity, correlation/idempotency and rollback mechanisms. Do not remove legacy apps/routes/helpers based solely on new architecture diagrams. Runtime changes, role additions and schema evolution belong to future backlog tasks. Maintain one active [backlog](docs-repo/docs/sprint-backlog.md); add executed evidence before marking DONE.

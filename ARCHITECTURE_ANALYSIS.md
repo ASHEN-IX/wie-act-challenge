@@ -1,3 +1,5 @@
+> **HISTORICAL / SUPERSEDED as current-state evidence (18 October 2026).** Retained for migration/security context. Completion, deployment, old paths and test counts below are historical assertions, not current validation. Use [CURRENT architecture](ARCHITECTURE.md), [EdNova audit](audit/2026-10-18/EDNOVA_AUDIT.md), [permissions](docs-repo/docs/roles-and-permissions.md) and [executed validation](audit/2026-10-18/VALIDATION.md). Do not run historical migration/removal steps without checking the current source and data.
+
 # Architecture analysis (discovery completed before implementation)
 
 The workspace contains separate Git repositories for `study-partner-api`, `study-partner-web`, `study-partner-ai`, and documentation. The parent folder is not itself a Git repository. Preserve the current folders and the character feature removal already present in the worktrees.
