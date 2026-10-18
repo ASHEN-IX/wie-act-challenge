@@ -350,23 +350,24 @@ All execution notes below are **TARGET recommendations, not changes performed**.
 - **Interface/data/architecture choices:** Language preference is not a separate identity or fixed ability score. Schema enums/source refs remain language-independent; instructions/feedback localized. Each owner implements UI/API/AI inside their module using the same field contract.
 - **Failure checks, handoff and review:** Record human source correctness and learning-level rubric plus accessibility evidence; no invented accuracy percentages. Tasnim coordinates fixture set, Habib/Aziz verify module outputs. Review: both consumers.
 
-## ED-17 — Validate optional live peer voice
+## ED-17 — LiveKit Cloud Media Plane & WebRTC Audio Integration
 
 - **Accountable member / relevant roles:** Aziz / Group learners. Module/symbol boundaries and cross-member work packages: [team plan](team-delivery-plan.md).
-- **Objective / related feature:** F10. Validate optional live peer voice.
-- **Existing implementation:** WebRTC/STUN, signaling/mute/speaking state, no proven TURN/SFU path.
-- **Required changes:** Resolve organizer voice rule, consent and provider declaration; harden existing audio/NAT/reconnect rather than add AI listening.
-- **Dependencies:** Organizer clarification; ED-02, ED-07, stable P0.
+- **Objective / related feature:** F10. LiveKit Cloud Media Plane & WebRTC Audio Integration.
+- **Approved architecture:** LiveKit Cloud SFU WebRTC audio transport, NestJS Control Plane token issuance (`Contract 11`), client audio controls (mute, deafen, speaking indicators).
+- **Existing implementation:** Legacy P2P WebRTC/STUN signaling; replaced by LiveKit Cloud media plane.
+- **Required changes:** Integrate `@livekit/components-react` and `livekit-server-sdk` into NestJS. Implement `POST /api/v1/study/rooms/:roomId/livekit-token` validating enrollment and voice consent before issuing short-lived LiveKit JWTs. Wire client audio room component in `study-partner-web/src/features/collaboration/voice-room.tsx`.
+- **Dependencies:** ED-02, ED-07, stable P0.
 - **Priority / complexity / status:** P1 / M / **PARTIAL**.
-- **Acceptance criteria:** Three browsers communicate while AI offline; denial/mute/device/reconnect/leave work; no recording/transcript.
-- **Validation approach:** Real device/network/browser test matrix, media-track teardown and persistence inspection.
+- **Acceptance criteria:** Multi-user audio streams connect reliably via LiveKit Cloud; NestJS enforces room authorization and voice consent before token issuance; media disconnection/reconnection works without dropping the room session; student-to-student audio functions independently of AI agent availability.
+- **Validation approach:** Multi-browser real audio verification, token expiration tests, network switch/reconnect tests.
 
 ### ED-17 technical execution notes — TARGET
 
-- **Existing code to inspect/reuse:** WEB/src/features/collaboration/realtime-status.tsx; WEB/src/features/collaboration/realtime-status.tsx; WEB/src/features/collaboration/realtime-status.tsx; API/modules/notification/src/routes/voice.ts; API/modules/notification/src/realtime.ts.
-- **Implementation sequence:** 1. Aziz first verifies current peer media with real browsers and synthetic aliases. 2. Add explicit microphone permission/notice, join/mute/leave and track teardown, network/device error states. 3. Inspect ICE failures before choosing a permitted TURN/managed transport; do not assume a new SFU is required for 2–4 users. 4. Keep audio independent of queued facilitator requests; text always works. 5. Confirm organizer voice/privacy interpretation and external-service declaration.
-- **Interface/data/architecture choices:** Voice signaling is room-member authorized; no recording/transcription by default. A nullable recordingUrl schema field does not establish recording functionality. Do not send audio to AI or claim spoken moderation without separately accepted ED-25.
-- **Failure checks, handoff and review:** Three real devices/browser contexts, permission denial, mute/reconnect/tab close/device switch and AI offline. Inspect tracks/persistence for no stored audio. Reviewer: Habib access/privacy and Tasnim learning flow; owner remains Aziz for UI/API/media.
+- **Existing code to inspect/reuse:** WEB/src/features/collaboration/realtime-status.tsx; API/modules/notification/src/routes/voice.ts; API/modules/notification/src/realtime.ts; Contract 11 (`docs/contracts/technical-contracts.md`).
+- **Implementation sequence:** 1. Aziz integrates `livekit-server-sdk` into NestJS `notification` module to generate signed LiveKit room access tokens. 2. Implement `POST /api/v1/study/rooms/:roomId/livekit-token` verifying active room membership and explicit `hasVoiceConsent: true`. 3. Build Next.js React voice room component using `@livekit/components-react` rendering participant avatars with real-time speaking indicators and mic mute controls. 4. Verify audio stream isolation between different rooms. 5. Ensure that media disconnection never crashes the WebSocket state synchronization or text chat.
+- **Interface/data/architecture choices:** Media Plane (LiveKit Cloud) is strictly separated from Control Plane (NestJS). LiveKit handles audio packet transport only; permissions, room lifecycle, and participant authorization remain exclusively within NestJS.
+- **Failure checks, handoff and review:** Test microphone denial, room leave, token expiry, and LiveKit connection interruption. Reviewer: Habib access/privacy and Tasnim learning flow; owner remains Aziz for UI/API/media.
 
 ## ED-18 — Recipient-only private room help
 
@@ -494,23 +495,24 @@ All execution notes below are **TARGET recommendations, not changes performed**.
 - **Interface/data/architecture choices:** No enterprise infrastructure, auth migration or commercial feature is a hackathon prerequisite. Each future integration needs its own permission/data/recovery contract and measurable acceptance; no unvalidated capacity/traction claim.
 - **Failure checks, handoff and review:** Team/product/security review and pilot-backed requirements before implementation. Review: Tasnim individual access and Aziz collaboration boundaries; retain current stack until a measured limitation justifies change.
 
-## ED-25 — Explore consented speech-aware assistance
+## ED-25 — Multi-Speaker Voice AI Moderator (LiveKit Agents & Streaming Speech)
 
 - **Accountable member / relevant roles:** Aziz / Consenting room participants. Module/symbol boundaries and cross-member work packages: [team plan](team-delivery-plan.md).
-- **Objective / related feature:** F10 / optional AI speech. Explore consented speech-aware assistance.
-- **Existing implementation:** Peer audio only; any search speech utility is not room observation.
-- **Required changes:** If explicitly approved, evaluate STT/attribution/TTS latency, multilingual fairness and opt-in retention; no hidden listening or default recording. Aziz owns group speech UI/API/AI consent/orchestration together; shared transport stays reused.
-- **Dependencies:** Organizer clarification, ED-17, ED-13; stable P0.
-- **Priority / complexity / status:** P2 / L / **TODO**.
-- **Acceptance criteria:** Every participant consents; nonconsent keeps text usable; observed typed vs spoken inputs honest; latency/privacy evidence recorded.
-- **Validation approach:** Controlled synthetic-audio evaluation, consent revocation and storage audit; no production data.
+- **Objective / related feature:** F10. Multi-Speaker Voice AI Moderator.
+- **Approved architecture:** Python LiveKit Agents SDK, Deepgram Nova-3 streaming STT, Cartesia Sonic 3.6 streaming TTS, LiteLLM reasoning, Peer-First facilitation policy.
+- **Existing implementation:** Text-based coach rules; upgraded to live voice participant agent in LiveKit rooms.
+- **Required changes:** Build Python LiveKit Agent worker in `study-partner-ai/agents/voice_moderator/`. Subscribe to individual participant audio tracks, perform server-side VAD, stream audio to Deepgram Nova-3 WebSocket, correlate speaker identity, feed utterances into facilitator policy, synthesize spoken nudges with Cartesia Sonic 3.6, and publish audio back to the LiveKit room. Enforce Guided, On-Demand, and Muted modes.
+- **Dependencies:** ED-17, ED-09, ED-13; stable P0.
+- **Priority / complexity / status:** P1 / L / **TODO**.
+- **Acceptance criteria:** Agent joins LiveKit room on dispatch; accurately attributes utterances to individual speakers; intervenes peer-first without spoiling answers; latency from speech pause to AI response onset is <1,500ms; muting or disconnection leaves peer audio intact; zero audio recorded to persistent disk.
+- **Validation approach:** Multi-speaker simulated audio dialogues, turn-taking tests, interruption tests, and audio packet inspection.
 
 ### ED-25 technical execution notes — TARGET
 
-- **Existing code to inspect/reuse:** WEB/src/features/collaboration/realtime-status.tsx; WEB/src/features/collaboration/realtime-status.tsx; AI/services/api/main.py; docs/hackathon-delivery.md.
-- **Implementation sequence:** 1. Aziz confirms allowed speech processing and explicit all-participant consent before prototyping. 2. Keep audio transport separate; opt-in speech events are bounded and attributed tentatively. 3. Implement speech-to-text/facilitator/private or public output with clear observation labels; silence/uncertainty is not ability evidence. 4. Default recording off and define revocation/retention/failure behavior. 5. Reuse model access rather than a new inference fleet.
-- **Interface/data/architecture choices:** Student-to-student live audio is not consent for AI listening. No actual STT/provider/library choice is committed here; choose only after rules, quality/latency/cost and language evaluation. Keep typed activity path fully usable.
-- **Failure checks, handoff and review:** Synthetic consented audio, attribution failures, language mismatch, consent withdrawal and AI outage; verify no residual unauthorized recording/transcript. Review: Habib privacy and Tasnim pedagogical evidence. P2 only.
+- **Existing code to inspect/reuse:** `study-partner-ai/agents/coach/`; Contracts 12, 14, 15, 16 (`docs/contracts/technical-contracts.md`); LiveKit Python Agent SDK.
+- **Implementation sequence:** 1. Initialize `livekit-agents` worker connecting to LiveKit Cloud with agent identity `agent-ednova-moderator`. 2. Attach Deepgram Nova-3 streaming STT plugin and Cartesia Sonic 3.6 TTS plugin. 3. Implement turn-taking buffer with VAD end-of-speech detection (500ms pause threshold). 4. Forward speaker-attributed utterances to Aziz's facilitator reasoning engine (Contract 14). 5. If intervention is triggered (Contract 15), stream synthesized speech to room audio track. 6. If an AI-to-UI action is proposed (e.g. launching an activity), forward Contract 16 to NestJS Control Plane.
+- **Interface/data/architecture choices:** Speech audio flows purely through Media Plane (LiveKit) and Intelligence Plane (Python LiveKit Agent). The Control Plane (NestJS) manages room authorization and dispatch but never handles binary audio packets.
+- **Failure checks, handoff and review:** Test STT timeout, TTS synthesis failure, simultaneous overlapping speech, and participant microphone muting. Reviewer: Habib privacy and Tasnim pedagogical evidence. P1 deliverable.
 
 ## ED-DOC — Audit and realign documentation
 

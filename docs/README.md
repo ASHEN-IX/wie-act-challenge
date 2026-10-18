@@ -7,16 +7,18 @@ One documentation folder, one task register. Start with the team plan and backlo
 | [Team plan](team-delivery-plan.md) | Habib/Tasnim/Aziz ownership, shared contracts, reviews and integration gates |
 | [Backlog](sprint-backlog.md) | All 36 task owners, current gaps, technical steps, dependencies and acceptance |
 | [Development](development.md) | Local setup, Python/workers, testing and troubleshooting |
+| [Architecture Decisions (ADRs)](architecture-decisions.md) | 16 authoritative decisions: 3 execution planes, LiveKit, STT/TTS, Next.js 16, NestJS, Mongo, Redis, RabbitMQ |
+| [Technical Contracts](contracts/technical-contracts.md) | 18 implementation-ready contracts across Control, Media, and Intelligence planes |
 | [Current architecture](architecture.md) | Existing services, frameworks and data flow |
-| [Target architecture](target-architecture.md) | Recommended implementation, proposed interfaces and recovery rules |
+| [Target architecture](target-architecture.md) | Approved 3-plane target design, LiveKit audio, dual-path inference, and recovery rules |
 | [Product specification](product-specification.md) | Feature scope and acceptance |
 | [Roles and permissions](roles-and-permissions.md) | Current enforcement and target access matrix |
-| [Data model](data-model.md) / [workflows](workflows.md) | Storage ownership and end-to-end journeys |
+| [Data model](data-model.md) / [Workflows](workflows.md) | Storage ownership, schemas and 8 end-to-end Mermaid journeys (A through H) |
 | [AI specification](ai-specification.md) / [LLM configuration](llm-config.md) | Domain AI behavior, contracts and safe fallback |
-| [Frontend](frontend-web.md) / [backend](backend-api.md) / [AI service](ai-service.md) | Implementation entrypoints and package operations |
+| [Frontend](frontend-web.md) / [Backend](backend-api.md) / [AI service](ai-service.md) | Implementation entrypoints and package operations |
 | [Testing plan](testing-plan.md) | Functional, isolation, learning and capacity scenarios |
 | [Hackathon delivery](hackathon-delivery.md) | Organizer requirements and submission artifacts |
-| [Deployment](deployment.md) / [security](security.md) | Deployment and security guidance |
+| [Deployment](deployment.md) / [Security](security.md) | Deployment and security guidance |
 | [AI message contract](contracts/ai-message-contract.md) / [RabbitMQ runbook](runbooks/rabbitmq-topology-v2-migration.md) | Existing interoperability constraints; JSON fixtures are consumed by tests |
 | [Bloom taxonomy](education/bloom-taxonomy.md) | Existing educational mechanics |
 | [Reference inputs](reference/README.md) | Latest team brief and official organizer PDF |
