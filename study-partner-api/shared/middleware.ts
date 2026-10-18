@@ -1,0 +1,212 @@
+import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import type { Request, Response, NextFunction } from 'express';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const logger = require('./logger');
+import { v4 as uuidv4 } from 'uuid';
+
+/**
+ * Security headers middleware (helmet)
+ */
+export function securityMiddleware(): any {
+  return helmet({
+    contentSecurityPolicy: false, // Disabled for API-only services
+    crossOriginResourcePolicy: { policy: 'cross-origin' }
+  });
+}
+
+/**
+ * CORS middleware configuration
+ */
+export function corsMiddleware(): any {
+  const allowedOrigins =
+    process.env.AUTH_TRUSTED_ORIGINS || process.env.CORS_ORIGIN
+      ? (process.env.AUTH_TRUSTED_ORIGINS || process.env.CORS_ORIGIN)!
+          .split(',')
+          .map((o) => o.trim())
+      : ['http://localhost:5173', 'http://localhost:3000'];
+
+  return cors({
+    origin: allowedOrigins,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+  });
+}
+
+/**
+ * Request logging middleware
+ */
+export function loggingMiddleware(req: Request, res: Response, next: NextFunction): void {
+  const requestId = uuidv4();
+  (req as any).requestId = requestId;
+
+  const startTime = Date.now();
+
+  logger.info(`[${requestId}] ${req.method} ${req.path} - Started`, {
+    requestId,
+    method: req.method,
+    path: req.path,
+    ip: req.ip
+  });
+
+  // Log response
+  res.on('finish', () => {
+    const duration = Date.now() - startTime;
+    logger.info(
+      `[${requestId}] ${req.method} ${req.path} - Completed ${res.statusCode} in ${duration}ms`,
+      {
+        requestId,
+        statusCode: res.statusCode,
+        duration
+      }
+    );
+  });
+
+  next();
+}
+
+/**
+ * Error handling middleware
+ */
+export function errorHandler(err: any, req: Request, res: Response, _next: NextFunction): void {
+  const requestId = (req as any).requestId || 'unknown';
+
+  logger.error(`[${requestId}] Error:`, {
+    requestId,
+    error: err.message,
+    stack: err.stack
+  });
+
+  const statusCode = err.statusCode || err.status || 500;
+  const message = statusCode >= 500 ? 'Internal server error' : err.message || 'Request failed';
+
+  res.status(statusCode).json({
+    error: message,
+    requestId,
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+  });
+}
+
+/**
+ * Rate limiting middleware — Redis-backed when REDIS_URL is set, falls back to
+ * in-memory otherwise. Keys by authenticated userId when available, otherwise IP.
+ */
+let redisRateClient: any = null;
+let limiterIndex = 0;
+function _getRedisStore(): any {
+  if (!process.env.REDIS_URL) return null;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const Redis = require('ioredis');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { RedisStore } = require('rate-limit-redis');
+  if (!redisRateClient) {
+    redisRateClient = new Redis(process.env.REDIS_URL, {
+      maxRetriesPerRequest: 1,
+      enableOfflineQueue: true
+    });
+    redisRateClient.on('error', () => {});
+  }
+  const store = new RedisStore({
+    sendCommand: (...args: any[]) => redisRateClient.call(...args),
+    prefix: `rl:module:${limiterIndex++}:`
+  });
+  // Store scripts load before the first request. Observe failures so optional Redis
+  // initialization cannot become an unhandled rejection; requests still fail closed.
+  store.incrementScriptSha.catch((error: Error) => logger.warn(error.message));
+  store.getScriptSha.catch((error: Error) => logger.warn(error.message));
+  return store;
+}
+
+export async function closeRateLimits(): Promise<void> {
+  if (redisRateClient) {
+    redisRateClient.disconnect();
+    redisRateClient = null;
+  }
+}
+
+export function rateLimiter(maxRequests: number = 100, windowMs: number = 60000): any {
+  const store = _getRedisStore();
+  return rateLimit({
+    windowMs,
+    max: maxRequests,
+    message: 'Too many requests, please try again later.',
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: (req: any) => req[Symbol.for('mindflow.moduleCall')] === true,
+    keyGenerator: (req: any) => (req.user && req.user.userId) || req.ip,
+    ...(store ? { store } : {})
+  });
+}
+
+/**
+ * Health check endpoint handler with readiness probe
+ */
+export function healthCheck(serviceName: string) {
+  return async (_req: Request, res: Response): Promise<void> => {
+    const health: Record<string, any> = {
+      status: 'healthy',
+      service: serviceName,
+      version: '1.0.0',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime()
+    };
+
+    // Check MongoDB connection if mongoose is loaded
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const mongoose = require('mongoose');
+      if (mongoose.connection.readyState !== 1) {
+        health.status = 'degraded';
+        health.db = 'disconnected';
+      } else {
+        health.db = 'connected';
+      }
+    } catch {
+      // No mongoose in this service (e.g., api-gateway)
+    }
+
+    const statusCode = health.status === 'healthy' ? 200 : 503;
+    res.status(statusCode).json(health);
+  };
+}
+
+/**
+ * Wrap an async Express route handler so thrown errors are forwarded to
+ * the Express error handler instead of becoming unhandled promise rejections.
+ */
+export const asyncHandler =
+  (fn: (req: Request, res: Response, next: NextFunction) => Promise<any> | any) =>
+  (req: Request, res: Response, next: NextFunction): Promise<any> =>
+    Promise.resolve(fn(req, res, next)).catch(next);
+
+/**
+ * INGEST-03: require `multipart/form-data` on upload routes.
+ * Refuses anything else with 415 before it can reach multer/parsers.
+ */
+export function requireMultipart(req: Request, _res: Response, next: NextFunction): void {
+  if (req.method === 'POST' || req.method === 'PUT') {
+    const contentType = req.headers['content-type'] || '';
+    if (!contentType.toLowerCase().startsWith('multipart/form-data')) {
+      const err: any = new Error(
+        'Unsupported media type - this endpoint requires multipart/form-data'
+      );
+      err.statusCode = 415;
+      return next(err);
+    }
+  }
+  next();
+}
+
+module.exports = {
+  closeRateLimits,
+  corsMiddleware,
+  securityMiddleware,
+  loggingMiddleware,
+  errorHandler,
+  rateLimiter,
+  healthCheck,
+  asyncHandler,
+  requireMultipart
+};

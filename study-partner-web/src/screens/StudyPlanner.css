@@ -1,0 +1,448 @@
+.study-planner-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 100px 2rem 2rem 2rem;
+  min-height: 100vh;
+}
+
+.study-planner-container h1 {
+  font-size: 2rem;
+  color: var(--foreground);
+  margin-bottom: 0.5rem;
+}
+
+.subtitle {
+  color: var(--muted-foreground);
+  margin-bottom: 2rem;
+}
+
+.planner-form-section {
+  background: hsl(var(--card) / 0.5);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  margin-bottom: 2rem;
+}
+
+.planner-form .form-group {
+  margin-bottom: 1.5rem;
+}
+
+.planner-form label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--foreground);
+}
+
+.planner-form textarea,
+.planner-form input,
+.planner-form select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid hsl(var(--border) / 0.8);
+  background: hsl(var(--background) / 0.5);
+  color: var(--foreground);
+  border-radius: 8px;
+  font-size: 1rem;
+  font-family: inherit;
+}
+
+.planner-form textarea {
+  resize: vertical;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.create-plan-btn {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  width: 100%;
+  box-shadow: 0 4px 14px var(--accent-color-dynamic-shadow-30);
+}
+
+.create-plan-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px var(--accent-color-dynamic-shadow-40);
+}
+
+.create-plan-btn:disabled {
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.error-message {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: rgba(220, 53, 69, 0.1);
+  color: var(--accent-color-dynamic);
+  border: 1px solid rgba(220, 53, 69, 0.2);
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.study-plan-result {
+  background: hsl(var(--card) / 0.5);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.study-plan-result h2 {
+  font-size: 1.5rem;
+  margin-bottom: 1.5rem;
+  color: var(--foreground);
+}
+
+.plan-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.summary-card {
+  padding: 1rem;
+  background: hsl(var(--background) / 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.summary-label {
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+  margin-bottom: 0.5rem;
+}
+
+.summary-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.tasks-list {
+  margin-bottom: 2rem;
+}
+
+.tasks-list h3 {
+  font-size: 1.25rem;
+  margin-bottom: 1rem;
+  color: var(--foreground);
+}
+
+.task-card {
+  background: hsl(var(--background) / 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.task-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.task-number {
+  background: var(--primary);
+  color: white;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.875rem;
+}
+
+.task-header h4 {
+  flex: 1;
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--foreground);
+}
+
+.task-duration {
+  background: hsl(var(--primary) / 0.1);
+  color: var(--primary);
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.task-description {
+  color: var(--muted-foreground);
+  margin: 0 0 0.75rem 0;
+  line-height: 1.5;
+}
+
+.task-meta {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+}
+
+.task-difficulty,
+.task-prereqs {
+  padding: 0.25rem 0.5rem;
+  background: hsl(var(--card) / 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.start-session-btn {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  width: 100%;
+}
+
+.start-session-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px var(--accent-color-dynamic-shadow-40);
+}
+
+/* Action buttons for scheduling */
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.schedule-plan-btn {
+  padding: 1rem 2rem;
+  background: linear-gradient(
+    135deg,
+    var(--accent-color-dynamic) 0%,
+    var(--accent-color-dynamic-hover) 100%
+  );
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+}
+
+.schedule-plan-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+}
+
+.schedule-plan-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.scheduled-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: center;
+}
+
+.scheduled-actions {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.success-message {
+  color: var(--accent-color-dynamic);
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.view-tasks-btn,
+.view-calendar-btn {
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(
+    135deg,
+    var(--accent-color-dynamic) 0%,
+    var(--accent-color-dynamic) 100%
+  );
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+}
+
+.view-calendar-btn {
+  background: linear-gradient(
+    135deg,
+    var(--accent-color-dynamic) 0%,
+    var(--accent-color-dynamic) 100%
+  );
+}
+
+.view-tasks-btn:hover,
+.view-calendar-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.schedule-preview {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: hsl(var(--background) / 0.5);
+  border-radius: 8px;
+  border-left: 4px solid var(--accent-color-dynamic);
+}
+
+.schedule-preview h3 {
+  margin-top: 0;
+  color: var(--foreground);
+}
+
+.schedule-preview p {
+  margin: 0.5rem 0;
+  color: var(--muted-foreground);
+}
+
+.warning-message {
+  padding: 1rem;
+  background: rgba(255, 193, 7, 0.1);
+  border: 1px solid rgba(255, 193, 7, 0.2);
+  border-radius: 8px;
+  color: var(--accent-color-dynamic);
+  margin-bottom: 1rem;
+}
+
+/* Existing Study Plans Section */
+.existing-plans-section {
+  margin-bottom: 2rem;
+}
+
+.existing-plans-section h2 {
+  font-size: 1.5rem;
+  color: var(--foreground);
+  margin-bottom: 1rem;
+}
+
+.plans-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.plan-card {
+  background: hsl(var(--card) / 0.5);
+  backdrop-filter: blur(12px);
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.plan-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.plan-header h3 {
+  font-size: 1.2rem;
+  color: var(--foreground);
+  margin: 0;
+  flex: 1;
+}
+
+.status-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-badge.created {
+  background: rgba(40, 167, 69, 0.1);
+  color: var(--accent-color-dynamic);
+}
+
+.status-badge.scheduled {
+  background: rgba(0, 123, 255, 0.1);
+  color: var(--accent-color-dynamic);
+}
+
+.plan-meta {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  color: var(--muted-foreground);
+}
+
+.plan-warning {
+  background: rgba(255, 193, 7, 0.1);
+  border: 1px solid rgba(255, 193, 7, 0.2);
+  border-radius: 8px;
+  padding: 0.75rem;
+  color: var(--accent-color-dynamic);
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.plan-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.view-plan-btn {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.view-plan-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--accent-color-dynamic-shadow-30);
+}

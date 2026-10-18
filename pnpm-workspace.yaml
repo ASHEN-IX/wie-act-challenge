@@ -1,0 +1,10 @@
+packages:
+  - study-partner-api
+  - study-partner-api/modules/*
+  - study-partner-api/shared
+  - study-partner-web
+
+allowBuilds:
+  esbuild: true
+
+nodeLinker: isolated

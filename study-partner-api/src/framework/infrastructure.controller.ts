@@ -1,0 +1,51 @@
+import { Controller, Get, Req, Res, UseGuards } from '@nestjs/common';
+import type { Response } from 'express';
+import type { DomainRequest } from './contracts';
+import { SessionGuard } from './auth.guard';
+@Controller('api/v1')
+export class InfrastructureController {
+  @Get('health')
+  health(@Req() req: DomainRequest, @Res() res: Response): void {
+    require('../../shared').healthCheck('study-partner-api')(req, res);
+  }
+  @Get('docs/openapi.json')
+  specification(): unknown {
+    return require('../openapi');
+  }
+  @Get('docs')
+  docs(@Res() res: Response): void {
+    res
+      .type('html')
+      .send(
+        '<h1>Study Partner API</h1><a href="/api/v1/docs/openapi.json">OpenAPI specification</a>'
+      );
+  }
+  @Get('monitoring/metrics')
+  @UseGuards(SessionGuard)
+  metrics(@Req() req: DomainRequest, @Res() res: Response): void {
+    require('../../shared/auth').requireInternal(req, res, () =>
+      res.json(require('./metrics').metricsSnapshot())
+    );
+  }
+  @Get('monitoring/health')
+  async monitoring(@Res() res: Response): Promise<void> {
+    const connected = require('mongoose').connection.readyState === 1;
+    const names = ['auth', 'users', 'study', 'ai', 'signals', 'analytics', 'notifications'];
+    const services: Record<string, unknown> = Object.fromEntries(
+      names.map((name) => [name, { status: connected ? 'healthy' : 'degraded', latency: 0 }])
+    );
+    let aiHealthy = false;
+    try {
+      await require('../../shared/aiClient').get('/health', { timeout: 2000 });
+      aiHealthy = true;
+    } catch {
+      /* Independent AI availability. */
+    }
+    services['ai-service-python'] = { status: aiHealthy ? 'healthy' : 'unhealthy' };
+    res.status(connected && aiHealthy ? 200 : 207).json({
+      status: connected && aiHealthy ? 'healthy' : 'degraded',
+      services,
+      timestamp: new Date().toISOString()
+    });
+  }
+}

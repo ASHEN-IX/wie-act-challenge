@@ -1,0 +1,48 @@
+/* Background layer utilities for custom wallpaper / animated backgrounds */
+
+.app-bg-static {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-position: center;
+  background-repeat: no-repeat;
+  transition:
+    opacity 0.5s ease,
+    filter 0.5s ease;
+}
+
+.app-bg-video {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  transition:
+    opacity 0.5s ease,
+    filter 0.5s ease;
+}
+
+/* Override for pages that want no background bleed */
+.bg-override-solid {
+  position: relative;
+  z-index: 1;
+  background-color: #0f1923;
+}
+
+/* Custom scrollbar used in session sidebar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #ffffff15;
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #ffffff30;
+}

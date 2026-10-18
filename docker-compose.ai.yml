@@ -1,0 +1,34 @@
+# Separate lifecycle: docker compose --env-file .env.ai -f docker-compose.ai.yml up -d
+name: mindflow-ai
+services:
+  ai-service:
+    build:
+      context: ./study-partner-ai
+      dockerfile: Dockerfile
+    ports:
+      - '127.0.0.1:8000:8000'
+    env_file:
+      - path: ./study-partner-ai/.env
+        required: false
+    environment:
+      MONGODB_URI: ${AI_MONGODB_URI:?Set the independent AI database URI}
+      DB_NAME: ${AI_DB_NAME:-study_partner}
+      RABBITMQ_URL: ${AI_RABBITMQ_URL:?Set the reachable AI broker URI}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      LLM_MOCK: ${LLM_MOCK:-0}
+      PYTHONPATH: /app:/app/agents/evaluator
+      INGEST_UPLOADS_DIR: /app/uploads
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    volumes:
+      - study_uploads:/app/uploads
+    working_dir: /app
+    command: uvicorn services.api.main:app --host 0.0.0.0 --port 8000 --workers 2
+    restart: unless-stopped
+volumes:
+  study_uploads:
+    external: true
+    name: study-partner-api_study_uploads

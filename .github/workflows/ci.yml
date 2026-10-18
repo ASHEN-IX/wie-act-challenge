@@ -1,0 +1,80 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  node:
+    name: pnpm workspace and modular API
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:7
+        ports: [27018:27017]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.3.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - run: docker build -t mindflow-api .
+      - run: docker build -f study-partner-web/Dockerfile -t mindflow-web .
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:7
+        ports: [27018:27017]
+      mailpit:
+        image: axllent/mailpit:v1.31.4
+        ports: [1026:1025, 8026:8025]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.3.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter study-partner-web exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+  ai:
+    name: AI (Python)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: study-partner-ai
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Syntax check
+        run: python -m py_compile services/api/main.py
+
+      - name: Lint (flake8)
+        run: flake8 services/api/main.py --max-line-length=120 --count --show-source --statistics
+        continue-on-error: true
+
+      - name: SSRF guard tests
+        run: python -m pytest tests/test_url_validator.py -v
+        continue-on-error: true

@@ -1,0 +1,637 @@
+/**
+ * Per-type job payload validators (F02 / PLAN-02).
+ *
+ * Python mirror: `study-partner-ai/workers/schemas.py`. Limits MUST stay
+ * identical on both sides — parity is covered by contract tests.
+ *
+ * Used by the ai-orchestrator jobs route to reject malformed payloads BEFORE
+ * publishing (defense at the edge); workers re-validate as defense-in-depth.
+ */
+
+import { ValidationResult } from './envelope';
+
+export const GOAL_MAX_CHARS = 500;
+export const CONCEPTS_MAX_ITEMS = 50;
+export const CONCEPT_MAX_CHARS = 100;
+export const AVAILABLE_MINUTES_MIN = 1;
+export const AVAILABLE_MINUTES_MAX = 7 * 24 * 60; // one week
+export const COURSE_ID_MAX_CHARS = 64;
+export const DOCUMENT_ID_MAX_CHARS = 64;
+export const CONTENT_REF_MAX_CHARS = 256;
+
+// Coach input limits (COACH-02) — keep in sync with workers/schemas.py
+export const COACH_SESSION_ID_MAX_CHARS = 64;
+export const COACH_MAX_SIGNALS = 20;
+export const COACH_MAX_MESSAGES = 40;
+export const COACH_MESSAGE_MAX_CHARS = 2000;
+export const COACH_MAX_PAYLOAD_BYTES = 16 * 1024; // 16 KB
+
+// Coach session-stats bounds (COACH-13) — keep in sync with workers/schemas.py
+export const SESSION_STATS_MAX_PROGRESS_PCT = 100;
+export const SESSION_STATS_MAX_MINUTES_ELAPSED = 600;
+export const SESSION_STATS_MAX_TASK_SWITCHES = 50;
+export const SESSION_STATS_MAX_BREAK_COUNT = 20;
+export const SESSION_STATS_MAX_STREAK_DAYS = 365;
+
+// Schedule apply bounds (COACH-16) — keep in sync with workers/schemas.py
+export const SCHEDULE_MAX_AFFECTED_TASK_IDS = 20;
+export const SCHEDULE_MAX_DURATION_MINUTES = 24 * 60;
+export const SCHEDULE_REASONING_MAX_CHARS = 500;
+export const SCHEDULE_MAX_PAYLOAD_BYTES = 4 * 1024;
+
+export const SCHEDULE_ACTIONS = [
+  'add_break',
+  'extend_task',
+  'reschedule_task',
+  'cancel_task',
+  'suspend_session'
+] as const;
+
+export const SESSION_STATS_FIELDS = [
+  'progress_pct',
+  'minutes_elapsed',
+  'task_switches',
+  'break_count',
+  'current_streak_days'
+] as const;
+
+export const SESSION_STATS_BOUNDS: Record<string, [number, number]> = {
+  progress_pct: [0, SESSION_STATS_MAX_PROGRESS_PCT],
+  minutes_elapsed: [0, SESSION_STATS_MAX_MINUTES_ELAPSED],
+  task_switches: [0, SESSION_STATS_MAX_TASK_SWITCHES],
+  break_count: [0, SESSION_STATS_MAX_BREAK_COUNT],
+  current_streak_days: [0, SESSION_STATS_MAX_STREAK_DAYS]
+};
+
+const COACH_FIELDS = new Set([
+  'session_id',
+  'session_stats',
+  'signals',
+  'messages',
+  'focus_state',
+  'focus_score',
+  'fatigue_state',
+  'fatigue_score',
+  'ignored_count',
+  'do_not_disturb',
+  'current_time'
+]);
+const FOCUS_STATES = ['Focused', 'Drifting', 'Lost'];
+const FATIGUE_STATES = ['Alert', 'Moderate', 'High', 'Critical'];
+
+export function validatePlannerPayload(payload: any): ValidationResult {
+  const errors: string[] = [];
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+    return { valid: false, errors: ['payload must be an object'] };
+  }
+
+  const goal = payload.goal;
+  if (typeof goal !== 'string' || goal.trim().length < 1) {
+    errors.push('goal must be a non-empty string');
+  } else if (goal.length > GOAL_MAX_CHARS) {
+    errors.push(`goal exceeds ${GOAL_MAX_CHARS} chars`);
+  }
+
+  if (payload.concepts !== undefined) {
+    if (!Array.isArray(payload.concepts)) {
+      errors.push('concepts must be an array');
+    } else {
+      if (payload.concepts.length > CONCEPTS_MAX_ITEMS)
+        errors.push(`concepts exceeds ${CONCEPTS_MAX_ITEMS} items`);
+      for (const c of payload.concepts) {
+        if (typeof c !== 'string' || !c.trim()) {
+          errors.push('each concept must be a non-empty string');
+          break;
+        }
+        if (c.length > CONCEPT_MAX_CHARS) {
+          errors.push(`concept exceeds ${CONCEPT_MAX_CHARS} chars`);
+          break;
+        }
+      }
+    }
+  }
+
+  if (payload.courseId !== undefined && payload.courseId !== null) {
+    if (typeof payload.courseId !== 'string' || !payload.courseId.trim()) {
+      errors.push('courseId must be a non-empty string');
+    } else if (payload.courseId.length > COURSE_ID_MAX_CHARS) {
+      errors.push(`courseId exceeds ${COURSE_ID_MAX_CHARS} chars`);
+    }
+  }
+
+  if (payload.deadline !== undefined && payload.deadline !== null) {
+    if (typeof payload.deadline !== 'string' || Number.isNaN(Date.parse(payload.deadline))) {
+      errors.push('deadline must be an ISO 8601 date string');
+    }
+  }
+
+  if (payload.available_minutes !== undefined) {
+    const n = payload.available_minutes;
+    if (!Number.isInteger(n) || n < AVAILABLE_MINUTES_MIN || n > AVAILABLE_MINUTES_MAX) {
+      errors.push(
+        `available_minutes must be an integer between ${AVAILABLE_MINUTES_MIN} and ${AVAILABLE_MINUTES_MAX}`
+      );
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+/** SEARCH-02 strict validator for `study.search.query`. Mirrors
+ *  workers/schemas.py SearchRequest — limits MUST stay identical on both sides. */
+export const SEARCH_QUERY_MIN_CHARS = 1;
+export const SEARCH_QUERY_MAX_CHARS = 500;
+export const SEARCH_MAX_RESULTS_MIN = 1;
+export const SEARCH_MAX_RESULTS_MAX = 10;
+export const SEARCH_MAX_RESULTS_DEFAULT = 5;
+export const SEARCH_SESSION_ID_MAX_CHARS = 64;
+
+export function validateSearchPayload(payload: any): ValidationResult {
+  const errors: string[] = [];
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+    return { valid: false, errors: ['payload must be an object'] };
+  }
+
+  // query: required string, 1–500 chars
+  const query = payload.query;
+  if (typeof query !== 'string') {
+    errors.push('query must be a string');
+  } else if (query.trim().length < SEARCH_QUERY_MIN_CHARS) {
+    errors.push('query must be a non-empty string');
+  } else if (query.length > SEARCH_QUERY_MAX_CHARS) {
+    errors.push(`query exceeds ${SEARCH_QUERY_MAX_CHARS} chars`);
+  }
+
+  // maxResults: optional integer 1–10, default 5
+  if (payload.maxResults !== undefined) {
+    const n = payload.maxResults;
+    if (!Number.isInteger(n) || n < SEARCH_MAX_RESULTS_MIN || n > SEARCH_MAX_RESULTS_MAX) {
+      errors.push(
+        `maxResults must be an integer between ${SEARCH_MAX_RESULTS_MIN} and ${SEARCH_MAX_RESULTS_MAX}`
+      );
+    }
+  }
+
+  // voiceMode: optional boolean
+  if (payload.voiceMode !== undefined && typeof payload.voiceMode !== 'boolean') {
+    errors.push('voiceMode must be a boolean');
+  }
+
+  // sessionId: optional string, max 64 chars
+  if (payload.sessionId !== undefined && payload.sessionId !== null) {
+    if (typeof payload.sessionId !== 'string' || !payload.sessionId.trim()) {
+      errors.push('sessionId must be a non-empty string when provided');
+    } else if (payload.sessionId.length > SEARCH_SESSION_ID_MAX_CHARS) {
+      errors.push(`sessionId exceeds ${SEARCH_SESSION_ID_MAX_CHARS} chars`);
+    }
+  }
+
+  // Reject unknown fields (strict mode)
+  const allowed = new Set(['query', 'maxResults', 'voiceMode', 'sessionId']);
+  for (const key of Object.keys(payload)) {
+    if (!allowed.has(key)) {
+      errors.push(`unknown field "${key}"`);
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+/** Basic sanity for types whose strict schemas land with their own stories
+ *  (COACH-02, EVAL-02, SEARCH-02, INGEST-05). */
+function validateBasicObjectWithFields(
+  payload: any,
+  requiredFields: string[] = []
+): ValidationResult {
+  const errors: string[] = [];
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+    return { valid: false, errors: ['payload must be an object'] };
+  }
+  for (const field of requiredFields) {
+    const v = payload[field];
+    if (typeof v === 'string') {
+      if (!v.trim() || v.length > GOAL_MAX_CHARS) {
+        errors.push(`${field} must be a non-empty string of at most ${GOAL_MAX_CHARS} chars`);
+      }
+    } else if (v === undefined || v === null) {
+      errors.push(`${field} is required`);
+    }
+  }
+  return { valid: errors.length === 0, errors };
+}
+
+/** eval (F04 / EVAL-08): optional objectiveId matches the Python mirror —
+ *  blank/over-length values are rejected, absent is fine. */
+export function validateEvalPayload(payload: any): ValidationResult {
+  const base = validateBasicObjectWithFields(payload, ['sessionId']);
+  const errors = [...base.errors];
+  if (payload.objectiveId !== undefined && payload.objectiveId !== null) {
+    if (typeof payload.objectiveId !== 'string' || !payload.objectiveId.trim()) {
+      errors.push('objectiveId must be a non-empty string when provided');
+    } else if (payload.objectiveId.length > COURSE_ID_MAX_CHARS) {
+      errors.push(`objectiveId exceeds ${COURSE_ID_MAX_CHARS} chars`);
+    }
+  }
+  return { valid: errors.length === 0, errors };
+}
+
+/** Validate the input contract for `study.knowledge.extract` jobs (BLOOM-03). */
+export function validateKnowledgeExtractPayload(payload: any): ValidationResult {
+  const errors: string[] = [];
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+    return { valid: false, errors: ['payload must be an object'] };
+  }
+
+  const documentId = payload.documentId;
+  const courseId = payload.courseId;
+  const contentRef = payload.contentRef;
+
+  if (
+    typeof documentId !== 'string' ||
+    !documentId.trim() ||
+    documentId.length > DOCUMENT_ID_MAX_CHARS
+  ) {
+    errors.push(`documentId must be a non-empty string of at most ${DOCUMENT_ID_MAX_CHARS} chars`);
+  }
+  if (typeof courseId !== 'string' || !courseId.trim() || courseId.length > COURSE_ID_MAX_CHARS) {
+    errors.push(`courseId must be a non-empty string of at most ${COURSE_ID_MAX_CHARS} chars`);
+  }
+  if (
+    typeof contentRef !== 'string' ||
+    !contentRef.trim() ||
+    contentRef.length > CONTENT_REF_MAX_CHARS
+  ) {
+    errors.push(`contentRef must be a non-empty string of at most ${CONTENT_REF_MAX_CHARS} chars`);
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+/** Validate the bounded COACH-13 session_stats block. */
+export function validateSessionStats(stats: any, errors: string[], prefix = 'session_stats'): void {
+  if (typeof stats !== 'object' || stats === null || Array.isArray(stats)) {
+    errors.push(`${prefix} must be an object`);
+    return;
+  }
+  for (const key of Object.keys(stats)) {
+    if (!SESSION_STATS_FIELDS.includes(key as any)) {
+      errors.push(`${prefix}.${key} is unknown`);
+      continue;
+    }
+    const v = stats[key];
+    if (!Number.isInteger(v)) {
+      errors.push(`${prefix}.${key} must be an integer`);
+      continue;
+    }
+    const [lo, hi] = SESSION_STATS_BOUNDS[key];
+    if (v < lo || v > hi) {
+      errors.push(`${prefix}.${key} must be an integer between ${lo} and ${hi}`);
+    }
+  }
+}
+
+/** Bounded CoachRequest validation (COACH-02) — Python mirror workers/schemas.py. */
+export function validateCoachPayload(payload: any): ValidationResult {
+  const errors: string[] = [];
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+    return { valid: false, errors: ['payload must be an object'] };
+  }
+
+  // userId MUST come from the authenticated envelope context, never the body.
+  for (const key of Object.keys(payload)) {
+    if (!COACH_FIELDS.has(key)) {
+      errors.push(`unknown field: ${key}`);
+    }
+  }
+
+  if (payload.session_id !== undefined && payload.session_id !== null) {
+    if (typeof payload.session_id !== 'string' || !payload.session_id.trim()) {
+      errors.push('session_id must be a non-empty string');
+    } else if (payload.session_id.length > COACH_SESSION_ID_MAX_CHARS) {
+      errors.push(`session_id exceeds ${COACH_SESSION_ID_MAX_CHARS} chars`);
+    }
+  }
+
+  if (payload.session_stats !== undefined && payload.session_stats !== null) {
+    validateSessionStats(payload.session_stats, errors);
+  }
+
+  if (payload.signals !== undefined) {
+    if (!Array.isArray(payload.signals)) {
+      errors.push('signals must be an array');
+    } else if (payload.signals.length > COACH_MAX_SIGNALS) {
+      errors.push(`signals exceeds ${COACH_MAX_SIGNALS} items`);
+    } else {
+      for (const s of payload.signals) {
+        if (typeof s !== 'object' || s === null || Array.isArray(s)) {
+          errors.push('each signal must be an object');
+          continue;
+        }
+        if (typeof s.timestamp !== 'string' || Number.isNaN(Date.parse(s.timestamp))) {
+          errors.push('signal.timestamp must be an ISO 8601 string');
+        }
+        if (!FOCUS_STATES.includes(s.focus_state)) {
+          errors.push(`signal.focus_state must be one of: ${FOCUS_STATES.join(', ')}`);
+        }
+        if (!FATIGUE_STATES.includes(s.fatigue_state)) {
+          errors.push(`signal.fatigue_state must be one of: ${FATIGUE_STATES.join(', ')}`);
+        }
+        for (const k of [
+          'focus_score',
+          'fatigue_score',
+          'focus_confidence',
+          'fatigue_confidence'
+        ]) {
+          const v = s[k];
+          if (v === undefined || v === null) continue;
+          if (typeof v !== 'number' || v < 0 || v > 1) {
+            errors.push(`signal.${k} must be a number in [0, 1]`);
+          }
+        }
+        if (
+          s.focus_trend !== undefined &&
+          s.focus_trend !== null &&
+          typeof s.focus_trend !== 'number'
+        ) {
+          errors.push('signal.focus_trend must be a number');
+        }
+      }
+    }
+  }
+
+  if (payload.messages !== undefined) {
+    if (!Array.isArray(payload.messages)) {
+      errors.push('messages must be an array');
+    } else if (payload.messages.length > COACH_MAX_MESSAGES) {
+      errors.push(`messages exceeds ${COACH_MAX_MESSAGES} items`);
+    } else {
+      for (const m of payload.messages) {
+        if (typeof m !== 'object' || m === null || Array.isArray(m)) {
+          errors.push('each message must be an object');
+          continue;
+        }
+        if (m.role !== 'user' && m.role !== 'assistant') {
+          errors.push('message.role must be user or assistant');
+        }
+        const c = m.content;
+        if (typeof c !== 'string' || !c.trim()) {
+          errors.push('message.content must be a non-empty string');
+        } else if (c.length > COACH_MESSAGE_MAX_CHARS) {
+          errors.push(`message.content exceeds ${COACH_MESSAGE_MAX_CHARS} chars`);
+        }
+      }
+    }
+  }
+
+  for (const [k, states] of [
+    ['focus_state', FOCUS_STATES],
+    ['fatigue_state', FATIGUE_STATES]
+  ] as const) {
+    const v = payload[k];
+    if (v !== undefined && v !== null && !states.includes(v)) {
+      errors.push(`${k} must be one of: ${states.join(', ')}`);
+    }
+  }
+  for (const k of ['focus_score', 'fatigue_score']) {
+    const v = payload[k];
+    if (v !== undefined && v !== null && (typeof v !== 'number' || v < 0 || v > 1)) {
+      errors.push(`${k} must be a number in [0, 1]`);
+    }
+  }
+  if (
+    payload.ignored_count !== undefined &&
+    (!Number.isInteger(payload.ignored_count) || payload.ignored_count < 0)
+  ) {
+    errors.push('ignored_count must be an integer >= 0');
+  }
+  if (payload.do_not_disturb !== undefined && typeof payload.do_not_disturb !== 'boolean') {
+    errors.push('do_not_disturb must be a boolean');
+  }
+  if (
+    payload.current_time !== undefined &&
+    payload.current_time !== null &&
+    (typeof payload.current_time !== 'string' || Number.isNaN(Date.parse(payload.current_time)))
+  ) {
+    errors.push('current_time must be an ISO 8601 string');
+  }
+
+  const size = Buffer.byteLength(JSON.stringify(payload), 'utf8');
+  if (size > COACH_MAX_PAYLOAD_BYTES) {
+    errors.push(`payload exceeds ${COACH_MAX_PAYLOAD_BYTES} bytes (got ${size})`);
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+/** Bounded ScheduleApplyRequest validation (COACH-16) — Python mirror. */
+const SCHEDULE_FIELDS = new Set([
+  'action',
+  'duration_minutes',
+  'new_start_time',
+  'affected_task_ids',
+  'reasoning'
+]);
+
+/** INGEST-05 — `study.ingest.course` payload. Python mirror:
+ *  workers/schemas.py IngestionRequest — limits MUST stay identical. */
+export const INGEST_MAX_FILES = 10;
+export const INGEST_FILENAME_MAX_CHARS = 256;
+export const INGEST_MIME_MAX_CHARS = 128;
+
+/**
+ * Strict validator for the async course-ingestion job (INGEST-05). Reference
+ * fields only — raw content is read from storage by the worker (INGEST-06),
+ * never inlined in the envelope. `files` carries per-file metadata + the
+ * storage-relative path so the worker can locate each document.
+ */
+export function validateIngestPayload(payload: any): ValidationResult {
+  const errors: string[] = [];
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+    return { valid: false, errors: ['payload must be an object'] };
+  }
+  for (const key of Object.keys(payload)) {
+    if (!['courseId', 'fileRef', 'files'].includes(key)) {
+      errors.push(`unknown field "${key}"`);
+    }
+  }
+  if (
+    typeof payload.courseId !== 'string' ||
+    !payload.courseId.trim() ||
+    payload.courseId.length > COURSE_ID_MAX_CHARS
+  ) {
+    errors.push(`courseId must be a non-empty string of at most ${COURSE_ID_MAX_CHARS} chars`);
+  }
+  if (
+    typeof payload.fileRef !== 'string' ||
+    !payload.fileRef.trim() ||
+    payload.fileRef.length > CONTENT_REF_MAX_CHARS
+  ) {
+    errors.push(`fileRef must be a non-empty string of at most ${CONTENT_REF_MAX_CHARS} chars`);
+  }
+  if (payload.files !== undefined) {
+    if (!Array.isArray(payload.files)) {
+      errors.push('files must be an array');
+    } else if (payload.files.length > INGEST_MAX_FILES) {
+      errors.push(`files exceeds ${INGEST_MAX_FILES} items`);
+    } else {
+      for (const file of payload.files) {
+        if (typeof file !== 'object' || file === null || Array.isArray(file)) {
+          errors.push('each file must be an object');
+          break;
+        }
+        const nameOk = (v: any) =>
+          typeof v === 'string' && v.trim().length > 0 && v.length <= INGEST_FILENAME_MAX_CHARS;
+        const mimeOk = (v: any) =>
+          typeof v === 'string' && v.trim().length > 0 && v.length <= INGEST_MIME_MAX_CHARS;
+        if (!nameOk(file.filename) || !nameOk(file.originalName)) {
+          errors.push(
+            `each file needs filename/originalName (non-empty, <= ${INGEST_FILENAME_MAX_CHARS} chars)`
+          );
+          break;
+        }
+        if (!mimeOk(file.mimetype)) {
+          errors.push(
+            `file.mimetype must be a non-empty string of at most ${INGEST_MIME_MAX_CHARS} chars`
+          );
+          break;
+        }
+        if (!Number.isInteger(file.size) || file.size < 0) {
+          errors.push('file.size must be an integer >= 0');
+          break;
+        }
+        if (
+          file.path !== undefined &&
+          (typeof file.path !== 'string' ||
+            !file.path.trim() ||
+            file.path.length > CONTENT_REF_MAX_CHARS)
+        ) {
+          errors.push(
+            `file.path must be a non-empty string of at most ${CONTENT_REF_MAX_CHARS} chars`
+          );
+          break;
+        }
+      }
+    }
+  }
+  return { valid: errors.length === 0, errors };
+}
+
+export function validateScheduleApplyPayload(payload: any): ValidationResult {
+  const errors: string[] = [];
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+    return { valid: false, errors: ['payload must be an object'] };
+  }
+
+  // userId MUST come from the authenticated envelope context, never the body.
+  for (const key of Object.keys(payload)) {
+    if (!SCHEDULE_FIELDS.has(key)) {
+      errors.push(`unknown field: ${key}`);
+    }
+  }
+
+  if (!SCHEDULE_ACTIONS.includes(payload.action)) {
+    errors.push(`action must be one of: ${SCHEDULE_ACTIONS.join(', ')}`);
+  }
+
+  if (payload.duration_minutes !== undefined && payload.duration_minutes !== null) {
+    if (
+      !Number.isInteger(payload.duration_minutes) ||
+      payload.duration_minutes < 1 ||
+      payload.duration_minutes > SCHEDULE_MAX_DURATION_MINUTES
+    ) {
+      errors.push(
+        `duration_minutes must be an integer between 1 and ${SCHEDULE_MAX_DURATION_MINUTES}`
+      );
+    }
+  }
+
+  if (payload.new_start_time !== undefined && payload.new_start_time !== null) {
+    if (
+      typeof payload.new_start_time !== 'string' ||
+      Number.isNaN(Date.parse(payload.new_start_time))
+    ) {
+      errors.push('new_start_time must be an ISO 8601 string');
+    }
+  }
+
+  if (payload.affected_task_ids !== undefined) {
+    if (!Array.isArray(payload.affected_task_ids)) {
+      errors.push('affected_task_ids must be an array');
+    } else if (payload.affected_task_ids.length > SCHEDULE_MAX_AFFECTED_TASK_IDS) {
+      errors.push(`affected_task_ids exceeds ${SCHEDULE_MAX_AFFECTED_TASK_IDS} items`);
+    } else {
+      for (const id of payload.affected_task_ids) {
+        if (typeof id !== 'string' || !id.trim()) {
+          errors.push('each affected_task_id must be a non-empty string');
+          break;
+        }
+      }
+    }
+  }
+
+  if (payload.reasoning !== undefined && payload.reasoning !== null) {
+    if (typeof payload.reasoning !== 'string') {
+      errors.push('reasoning must be a string');
+    } else if (payload.reasoning.length > SCHEDULE_REASONING_MAX_CHARS) {
+      errors.push(`reasoning exceeds ${SCHEDULE_REASONING_MAX_CHARS} chars`);
+    }
+  }
+
+  const size = Buffer.byteLength(JSON.stringify(payload), 'utf8');
+  if (size > SCHEDULE_MAX_PAYLOAD_BYTES) {
+    errors.push(`payload exceeds ${SCHEDULE_MAX_PAYLOAD_BYTES} bytes (got ${size})`);
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+const VALIDATORS: Record<string, (payload: any) => ValidationResult> = {
+  'study.plan.generate': validatePlannerPayload,
+  'study.coach.nudge': validateCoachPayload,
+  'study.eval.step': validateEvalPayload,
+  'study.search.query': validateSearchPayload,
+  'study.ingest.course': validateIngestPayload,
+  'study.knowledge.extract': validateKnowledgeExtractPayload,
+  'study.schedule.apply': validateScheduleApplyPayload
+};
+
+/** Validate a job payload for the given type. Unknown types pass through. */
+export function validateJobPayload(type: string, payload: any): ValidationResult {
+  const validator = VALIDATORS[type];
+  if (!validator) return { valid: true, errors: [] };
+  return validator(payload);
+}
+
+export const LIMITS = {
+  GOAL_MAX_CHARS,
+  CONCEPTS_MAX_ITEMS,
+  CONCEPT_MAX_CHARS,
+  AVAILABLE_MINUTES_MIN,
+  AVAILABLE_MINUTES_MAX,
+  COURSE_ID_MAX_CHARS,
+  DOCUMENT_ID_MAX_CHARS,
+  CONTENT_REF_MAX_CHARS,
+  SEARCH_QUERY_MIN_CHARS,
+  SEARCH_QUERY_MAX_CHARS,
+  SEARCH_MAX_RESULTS_MIN,
+  SEARCH_MAX_RESULTS_MAX,
+  SEARCH_MAX_RESULTS_DEFAULT,
+  SEARCH_SESSION_ID_MAX_CHARS,
+  COACH_SESSION_ID_MAX_CHARS,
+  COACH_MAX_SIGNALS,
+  COACH_MAX_MESSAGES,
+  COACH_MESSAGE_MAX_CHARS,
+  COACH_MAX_PAYLOAD_BYTES,
+  SESSION_STATS_MAX_PROGRESS_PCT,
+  SESSION_STATS_MAX_MINUTES_ELAPSED,
+  SESSION_STATS_MAX_TASK_SWITCHES,
+  SESSION_STATS_MAX_BREAK_COUNT,
+  SESSION_STATS_MAX_STREAK_DAYS,
+  SCHEDULE_MAX_AFFECTED_TASK_IDS,
+  SCHEDULE_MAX_DURATION_MINUTES,
+  SCHEDULE_REASONING_MAX_CHARS,
+  SCHEDULE_MAX_PAYLOAD_BYTES,
+  INGEST_MAX_FILES,
+  INGEST_FILENAME_MAX_CHARS,
+  INGEST_MIME_MAX_CHARS
+};

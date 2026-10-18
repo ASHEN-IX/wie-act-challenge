@@ -1,0 +1,21 @@
+name: mindflow-tests
+services:
+  mongodb:
+    image: mongo:7
+    ports:
+    - 127.0.0.1:27018:27017
+    healthcheck:
+      test:
+      - CMD
+      - mongosh
+      - --quiet
+      - --eval
+      - db.adminCommand('ping')
+      interval: 5s
+      timeout: 5s
+      retries: 6
+  mailpit:
+    image: axllent/mailpit:v1.31.4
+    ports:
+    - 127.0.0.1:1026:1025
+    - 127.0.0.1:8026:8025

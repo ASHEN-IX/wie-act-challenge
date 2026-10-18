@@ -1,0 +1,40 @@
+{
+  "exchanges": {
+    "jobs": "ai.jobs",
+    "delay": "ai.delay",
+    "dlx": "ai.dlx",
+    "results": "ai.results"
+  },
+  "queues": {
+    "results": "ai.results.inbox",
+    "progress": "ai.results.progress",
+    "ingestResults": "ai.results.ingest"
+  },
+  "routingKeys": {
+    "result": "result",
+    "progress": "progress"
+  },
+  "retryDelaysMs": [1000, 4000, 16000],
+  "maxRetries": 3,
+  "naming": {
+    "workQueue": "ai.work.<type>",
+    "dlq": "ai.dlq.<type>",
+    "delayQueue": "ai.delay.<type>.<ms>",
+    "retryRoutingKey": "retry.<type>.<ms>",
+    "sampleWorkQueue": "ai.work.study.plan.generate",
+    "sampleDlq": "ai.dlq.study.plan.generate",
+    "sampleDelayQueue1000": "ai.delay.study.plan.generate.1000",
+    "sampleDelayQueue16000": "ai.delay.study.plan.generate.16000",
+    "sampleRetryKey1000": "retry.study.plan.generate.1000"
+  },
+  "headers": {
+    "retryCount": "x-retry-count"
+  },
+  "queueArguments": {
+    "workQueue": {
+      "x-dead-letter-exchange": "ai.dlx",
+      "x-dead-letter-routing-key": "study.plan.generate"
+    },
+    "delayQueue1000": { "x-message-ttl": 1000, "x-dead-letter-exchange": "ai.jobs" }
+  }
+}

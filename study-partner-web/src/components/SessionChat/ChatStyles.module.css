@@ -1,0 +1,5 @@
+.panel {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(15, 25, 35, 0.96);
+  border-radius: 12px;
+}

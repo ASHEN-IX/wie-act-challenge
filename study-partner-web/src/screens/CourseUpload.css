@@ -1,0 +1,181 @@
+.course-upload-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 100px 2rem 2rem 2rem; /* Adjusted for floating navbar */
+  min-height: 100vh;
+}
+
+.course-upload-container h1 {
+  font-size: 2rem;
+  color: var(--foreground);
+  margin-bottom: 0.5rem;
+}
+
+.subtitle {
+  color: var(--muted-foreground);
+  margin-bottom: 2rem;
+}
+
+.upload-section {
+  background: hsl(var(--card) / 0.5);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  margin-bottom: 3rem;
+}
+
+.upload-form .form-group {
+  margin-bottom: 1.5rem;
+}
+
+.upload-form label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--foreground);
+}
+
+.upload-form input[type="text"] {
+  width: 100%;
+  padding: 0.75rem;
+  background: hsl(var(--background) / 0.5);
+  color: var(--foreground);
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  font-size: 1rem;
+}
+
+.upload-form input[type="file"] {
+  width: 100%;
+  padding: 0.5rem;
+  background: hsl(var(--background) / 0.3);
+  color: var(--foreground);
+  border: 2px dashed hsl(var(--border) / 0.8);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.upload-form input[type="file"]:hover {
+  border-color: var(--primary);
+}
+
+.file-list {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: hsl(var(--background) / 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+}
+
+.file-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0 0;
+}
+
+.file-list li {
+  padding: 0.5rem 0;
+  color: var(--muted-foreground);
+}
+
+.upload-btn {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  width: 100%;
+  box-shadow: 0 4px 14px var(--accent-color-dynamic-shadow-30);
+}
+
+.upload-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px var(--accent-color-dynamic-shadow-40);
+}
+
+.upload-btn:disabled {
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.upload-status {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.upload-status.success {
+  background: rgba(40, 167, 69, 0.1);
+  color: var(--accent-color-dynamic);
+  border: 1px solid rgba(40, 167, 69, 0.2);
+}
+
+.upload-status.error {
+  background: rgba(220, 53, 69, 0.1);
+  color: var(--accent-color-dynamic);
+  border: 1px solid rgba(220, 53, 69, 0.2);
+}
+
+.courses-section {
+  margin-top: 3rem;
+}
+
+.courses-section h2 {
+  font-size: 1.5rem;
+  margin-bottom: 1.5rem;
+  color: var(--foreground);
+}
+
+.no-courses {
+  color: var(--muted-foreground);
+  text-align: center;
+  padding: 2rem;
+  background: hsl(var(--card) / 0.5);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+}
+
+.courses-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.course-card {
+  background: hsl(var(--card) / 0.5);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 1.5rem;
+  transition: all 0.3s;
+  cursor: pointer;
+}
+
+.course-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  transform: translateY(-4px);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.course-card h3 {
+  font-size: 1.25rem;
+  margin: 0 0 0.5rem 0;
+  color: var(--foreground);
+}
+
+.course-date {
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  margin: 0;
+}

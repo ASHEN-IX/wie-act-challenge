@@ -1,0 +1,275 @@
+/**
+ * Study Service Tests
+ * Tests course upload, plan CRUD, and task completion endpoints
+ */
+import express from 'express';
+
+process.env.JWT_SECRET = 'test-secret-key';
+process.env.MONGODB_URI = 'mongodb://localhost:27017/test_study_partner';
+process.env.NODE_ENV = 'test';
+
+// Prevent process.exit() from killing tests
+process.exit = jest.fn() as any;
+
+// ── Mock Models ──────────────────────────────────
+const mockCourse = {
+  _id: 'course-1',
+  userId: 'user-123',
+  title: 'Test Course',
+  status: 'active',
+  modules: [],
+  toJSON: function () {
+    return { ...this };
+  },
+  save: jest.fn().mockResolvedValue(true)
+};
+
+const mockPlan = {
+  _id: 'plan-1',
+  userId: 'user-123',
+  courseId: 'course-1',
+  title: 'Test Plan',
+  status: 'active',
+  tasks: [
+    { _id: 'task-1', title: 'Task 1', status: 'pending', duration_minutes: 30 },
+    { _id: 'task-2', title: 'Task 2', status: 'pending', duration_minutes: 45 }
+  ],
+  toJSON: function () {
+    return { ...this };
+  },
+  save: jest.fn().mockResolvedValue(true)
+};
+
+jest.mock('../models/index', () => ({
+  Course: {
+    find: jest.fn(),
+    findOne: jest.fn(),
+    findById: jest.fn(),
+    create: jest.fn(),
+    findByIdAndUpdate: jest.fn(),
+    findByIdAndDelete: jest.fn(),
+    findOneAndDelete: jest.fn()
+  },
+  StudyPlan: {
+    find: jest.fn(),
+    findOne: jest.fn(),
+    findById: jest.fn(),
+    create: jest.fn(),
+    findByIdAndUpdate: jest.fn(),
+    findByIdAndDelete: jest.fn()
+  },
+  StudySession: {},
+  Task: {
+    find: jest.fn()
+  },
+  Topic: {},
+  Subject: {},
+  LearningObjective: {
+    find: jest.fn().mockReturnValue({
+      select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) })
+    }),
+    updateMany: jest.fn().mockResolvedValue({ modifiedCount: 0 }),
+    deleteMany: jest.fn().mockResolvedValue({ deletedCount: 0 })
+  }
+}));
+
+// Get the mocked models
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { Course, StudyPlan, Task } = require('../models/index');
+import { validateLearningObjective } from '../validators/learningObjective';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const courseRoutes = require('../routes/courses');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const planRoutes = require('../routes/plans');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const learningObjectiveRoutes = require('../routes/learningObjectives');
+
+// Build app with routes
+const app = express();
+app.use(express.json());
+
+// Fake auth
+const fakeAuth = (req: any, res: any, next: any) => {
+  req.user = { userId: 'user-123' };
+  next();
+};
+
+app.use('/api/v1/study/courses', fakeAuth, courseRoutes);
+app.use('/api/v1/study/plans', fakeAuth, planRoutes);
+app.use('/api/v1/study/learning-objectives', fakeAuth, learningObjectiveRoutes);
+
+import request from 'supertest';
+
+describe('learningObjective validator (F01)', () => {
+  const base = {
+    objectiveId: 'obj-1',
+    topicId: 'topic-1',
+    knowledgeType: 'conceptual',
+    bloomLevel: 'apply',
+    verb: 'Solve',
+    text: 'Solve systems of linear equations using substitution.'
+  };
+
+  test('accepts a valid objective', () => {
+    const result = validateLearningObjective(base);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toEqual([]);
+  });
+
+  test("rejects a verb not in the level's verb map", () => {
+    const result = validateLearningObjective({ ...base, verb: 'Design' });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('verb must be one of'))).toBe(true);
+  });
+
+  test('rejects a bloomLevel outside the enum', () => {
+    const result = validateLearningObjective({ ...base, bloomLevel: 'memorize' });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('bloomLevel must be one of'))).toBe(true);
+  });
+
+  test('rejects non-measurable phrasing', () => {
+    const result = validateLearningObjective({
+      ...base,
+      verb: 'Solve',
+      text: 'Know how to solve systems of linear equations.'
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('non-measurable phrasing'))).toBe(true);
+  });
+
+  test('rejects empty text', () => {
+    const result = validateLearningObjective({ ...base, text: '' });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('text must be a non-empty string');
+  });
+
+  test('rejects text over 200 chars', () => {
+    const result = validateLearningObjective({ ...base, text: 'Solve ' + 'x'.repeat(200) });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('exceeds 200 chars'))).toBe(true);
+  });
+
+  test('rejects verb not near the start of text', () => {
+    const result = validateLearningObjective({
+      ...base,
+      text: 'Using substitution, systems of linear equations can be solved by students.'
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('must appear at/near the start'))).toBe(true);
+  });
+});
+
+describe('POST /api/v1/study/learning-objectives (route)', () => {
+  const validObjective = {
+    objectiveId: 'obj-route-1',
+    topicId: 'topic-1',
+    knowledgeType: 'conceptual',
+    bloomLevel: 'apply',
+    verb: 'Solve',
+    text: 'Solve systems of linear equations using substitution.'
+  };
+
+  test('returns 200 and echoes the objective when valid', async () => {
+    const res = await request(app).post('/api/v1/study/learning-objectives').send(validObjective);
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('Learning objective accepted');
+    expect(res.body.objective).toEqual(validObjective);
+  });
+
+  test('returns 400 with errors and does not create anything when invalid', async () => {
+    const invalidObjective = { ...validObjective, verb: 'Design' }; // wrong verb for 'apply'
+
+    const res = await request(app).post('/api/v1/study/learning-objectives').send(invalidObjective);
+
+    expect(res.status).toBe(400);
+    expect(Array.isArray(res.body.errors)).toBe(true);
+    expect(res.body.errors.some((e: string) => e.includes('verb must be one of'))).toBe(true);
+  });
+});
+
+describe('Study Service', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  // ── Courses ──────────────────────────────────
+  describe('Courses', () => {
+    describe('GET /api/v1/study/courses', () => {
+      it('should return user courses', async () => {
+        Course.find.mockReturnValue({
+          sort: jest.fn().mockReturnValue({
+            lean: jest.fn().mockResolvedValue([mockCourse])
+          })
+        });
+
+        const res = await request(app).get('/api/v1/study/courses');
+        expect(res.status).toBe(200);
+        expect(res.body.courses).toHaveLength(1);
+      });
+    });
+
+    describe('GET /api/v1/study/courses/:id', () => {
+      it('should return a specific course', async () => {
+        Course.findOne.mockResolvedValue(mockCourse);
+
+        const res = await request(app).get('/api/v1/study/courses/course-1');
+        expect(res.status).toBe(200);
+      });
+
+      it('should return 404 for missing course', async () => {
+        Course.findOne.mockResolvedValue(null);
+
+        const res = await request(app).get('/api/v1/study/courses/nonexistent');
+        expect(res.status).toBe(404);
+      });
+    });
+
+    describe('DELETE /api/v1/study/courses/:id', () => {
+      it('should delete a course', async () => {
+        Course.findOneAndDelete.mockResolvedValue(mockCourse);
+
+        const res = await request(app).delete('/api/v1/study/courses/course-1');
+        expect(res.status).toBe(200);
+      });
+    });
+  });
+
+  // ── Plans ──────────────────────────────────
+  describe('Plans', () => {
+    describe('GET /api/v1/study/plans', () => {
+      it('should return user study plans', async () => {
+        StudyPlan.find.mockReturnValue({
+          sort: jest.fn().mockReturnValue({
+            lean: jest.fn().mockResolvedValue([mockPlan])
+          })
+        });
+
+        const res = await request(app).get('/api/v1/study/plans');
+        expect(res.status).toBe(200);
+      });
+    });
+
+    describe('GET /api/v1/study/plans/:id', () => {
+      it('should return a specific plan', async () => {
+        StudyPlan.findOne.mockReturnValue({
+          lean: jest.fn().mockResolvedValue(mockPlan)
+        });
+        Task.find.mockReturnValue({
+          lean: jest.fn().mockResolvedValue([])
+        });
+
+        const res = await request(app).get('/api/v1/study/plans/507f1f77bcf86cd799439011');
+        expect(res.status).toBe(200);
+      });
+
+      it('should return 404 for missing plan', async () => {
+        StudyPlan.findOne.mockReturnValue({
+          lean: jest.fn().mockResolvedValue(null)
+        });
+
+        const res = await request(app).get('/api/v1/study/plans/507f1f77bcf86cd799439012');
+        expect(res.status).toBe(404);
+      });
+    });
+  });
+});

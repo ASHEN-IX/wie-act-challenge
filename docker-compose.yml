@@ -1,0 +1,156 @@
+name: study-partner-api
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mindflow-api
+    restart: unless-stopped
+    ports:
+    - 127.0.0.1:3000:3000
+    env_file: ./study-partner-api/.env
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      MONGODB_URI: ${DOCKER_MONGODB_URI:-mongodb://mongodb:27017/study_partner}
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-mindflow}:${RABBITMQ_PASS:?RABBITMQ_PASS
+        must be set}@rabbitmq:5672/${RABBITMQ_VHOST:-mindflow}
+      AI_SERVICE_URL: ${AI_SERVICE_URL:-http://host.docker.internal:8000}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:8080}
+      AUTH_TRUSTED_ORIGINS: ${AUTH_TRUSTED_ORIGINS:-http://localhost:8080,http://localhost:5173}
+    extra_hosts:
+    - host.docker.internal:host-gateway
+    volumes:
+    - study_uploads:/app/study-partner-api/uploads
+    - study_module_uploads:/app/study-partner-api/modules/study/uploads
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -fsS
+      - http://localhost:3000/api/v1/health
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+  frontend:
+    image: nginx:alpine
+    container_name: frontend
+    ports:
+    - 8080:80
+    restart: unless-stopped
+    volumes:
+    - ./study-partner-web/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      web:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD
+      - wget
+      - -q
+      - --spider
+      - http://127.0.0.1/
+      interval: 10s
+      timeout: 5s
+      retries: 6
+  mongodb:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+    - 127.0.0.1:27017:27017
+    volumes:
+    - mongodb_data:/data/db
+    healthcheck:
+      test:
+      - CMD
+      - mongosh
+      - --quiet
+      - --eval
+      - db.adminCommand('ping')
+      interval: 10s
+      timeout: 5s
+      retries: 6
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    ports:
+    - 127.0.0.1:6379:6379
+    healthcheck:
+      test:
+      - CMD
+      - redis-cli
+      - ping
+      interval: 10s
+      timeout: 5s
+      retries: 3
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-mindflow}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:?RABBITMQ_PASS must be set}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-mindflow}
+    ports:
+    - 127.0.0.1:5672:5672
+    - 127.0.0.1:15672:15672
+    volumes:
+    - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test:
+      - CMD
+      - rabbitmq-diagnostics
+      - -q
+      - ping
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+  web:
+    build:
+      context: .
+      dockerfile: study-partner-web/Dockerfile
+    container_name: mindflow-web
+    restart: unless-stopped
+    env_file: ./study-partner-api/.env
+    environment:
+      NODE_ENV: production
+      PORT: 5173
+      BACKEND_URL: http://app:3000
+      MONGODB_URI: ${DOCKER_MONGODB_URI:-mongodb://mongodb:27017/study_partner}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:8080}
+      AUTH_TRUSTED_ORIGINS: ${AUTH_TRUSTED_ORIGINS:-http://localhost:8080,http://localhost:5173}
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -fsS
+      - http://localhost:5173/
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+  mailpit:
+    image: axllent/mailpit:v1.31.4
+    restart: unless-stopped
+    ports:
+    - 127.0.0.1:8025:8025
+    - 127.0.0.1:1025:1025
+volumes:
+  mongodb_data: null
+  rabbitmq_data: null
+  study_uploads: null
+  study_module_uploads: null

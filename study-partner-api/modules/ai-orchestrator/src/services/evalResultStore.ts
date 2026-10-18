@@ -1,0 +1,52 @@
+/**
+ * EvalResult persistence helpers (F04 / EVAL-08).
+ *
+ * `upsertByCorrelation` is idempotent by `correlationId`: a replayed result
+ * event overwrites the existing document in place, so a step is never
+ * double-counted. `listStepsForSession` returns the ordered per-step history a
+ * backend can use to resume a session.
+ *
+ * This is the only writer to the eval_results collection — the Python agents
+ * only publish ai.results events and never touch MongoDB.
+ */
+
+import EvalResult from '../models/EvalResult';
+import { EvalResultRecord } from './evalResultBuilder';
+
+/**
+ * @param {object} record fields produced by buildEvalResultRecord
+ * @returns {Promise<string>} correlationId written
+ */
+export async function upsertByCorrelation(record: EvalResultRecord): Promise<string> {
+  const doc = {
+    correlationId: record.correlationId,
+    messageId: record.messageId,
+    userId: record.userId,
+    sessionId: record.sessionId,
+    step: record.step,
+    status: record.status,
+    masteryScore: record.masteryScore,
+    scores: record.scores,
+    nextQuestion: record.nextQuestion,
+    demonstratedBloomLevel: record.demonstratedBloomLevel,
+    objectiveId: record.objectiveId,
+    targetBloomLevel: record.targetBloomLevel || null
+  };
+  await EvalResult.updateOne(
+    { correlationId: record.correlationId },
+    { $set: doc },
+    { upsert: true }
+  );
+  return doc.correlationId;
+}
+
+/**
+ * @param {string} sessionId
+ * @returns {Promise<Array>} step records ascending by step
+ */
+export async function listStepsForSession(sessionId: string): Promise<any[]> {
+  return EvalResult.find({ sessionId }).sort({ step: 1 }).lean();
+}
+
+export default { upsertByCorrelation, listStepsForSession };
+module.exports = { upsertByCorrelation, listStepsForSession };

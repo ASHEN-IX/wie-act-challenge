@@ -1,0 +1,100 @@
+.webcam-capture {
+  position: relative;
+  width: 100%;
+}
+
+.webcam-error {
+  background: #fee2e2;
+  color: #991b1b;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+  border: 2px solid #fca5a5;
+}
+
+.error-icon {
+  font-size: 1.25rem;
+}
+
+.webcam-container {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #1a1a1a;
+  border: 3px solid #e2e8f0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+.webcam-container.streaming {
+  border-color: var(--accent-color-dynamic);
+  box-shadow: 0 0 20px rgba(102, 126, 234, 0.4);
+}
+
+.webcam-video {
+  width: 100%;
+  height: auto;
+  display: block;
+  transform: scaleX(-1); /* Mirror the video */
+}
+
+.webcam-indicator {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  padding: 6px 12px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: white;
+}
+
+.recording-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-color-dynamic);
+  animation: pulse 1.5s ease infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.8);
+  }
+}
+
+/* Mobile responsive */
+@media (max-width: 800px) {
+  .webcam-container {
+    max-width: 100%;
+  }
+
+  .webcam-indicator {
+    top: 8px;
+    right: 8px;
+    padding: 4px 10px;
+    font-size: 0.75rem;
+  }
+
+  .recording-dot {
+    width: 6px;
+    height: 6px;
+  }
+}

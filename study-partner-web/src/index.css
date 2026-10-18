@@ -1,0 +1,454 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 346 100% 58%; /* More refined pink/red */
+    --primary-rgb: 255, 41, 91;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222 47% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222 47% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 346 100% 58%;
+    --radius: 0.5rem;
+    --accent-color-dynamic: #4fb8ce;
+    --accent-color-dynamic-hover: color-mix(
+      in srgb,
+      var(--accent-color-dynamic) 78%,
+      black
+    );
+    --accent-color-dynamic-shadow-15: color-mix(
+      in srgb,
+      var(--accent-color-dynamic) 15%,
+      transparent
+    );
+    --accent-color-dynamic-shadow-20: color-mix(
+      in srgb,
+      var(--accent-color-dynamic) 20%,
+      transparent
+    );
+    --accent-color-dynamic-shadow-30: color-mix(
+      in srgb,
+      var(--accent-color-dynamic) 30%,
+      transparent
+    );
+    --accent-color-dynamic-shadow-40: color-mix(
+      in srgb,
+      var(--accent-color-dynamic) 40%,
+      transparent
+    );
+    --accent-color-dynamic-shadow-50: color-mix(
+      in srgb,
+      var(--accent-color-dynamic) 50%,
+      transparent
+    );
+    --accent-color-dynamic-shadow-60: color-mix(
+      in srgb,
+      var(--accent-color-dynamic) 60%,
+      transparent
+    );
+    --accent-color-dynamic-shadow-80: color-mix(
+      in srgb,
+      var(--accent-color-dynamic) 80%,
+      transparent
+    );
+  }
+
+  .dark {
+    --background: 222 47% 11%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 11%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 346 100% 58%;
+    --primary-rgb: 255, 41, 91;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 346 100% 58%;
+  }
+}
+
+.text-glow {
+  text-shadow:
+    0 0 10px var(--accent-color-dynamic),
+    0 0 20px var(--accent-color-dynamic, rgba(79, 184, 206, 0.5));
+  transition: text-shadow 0.3s ease;
+}
+
+.box-glow {
+  box-shadow:
+    0 0 20px var(--accent-color-dynamic),
+    0 0 40px var(--accent-color-dynamic, rgba(79, 184, 206, 0.15));
+  transition: box-shadow 0.3s ease;
+}
+
+.border-glow {
+  border-color: var(--accent-color-dynamic, rgba(79, 184, 206, 0.5));
+  box-shadow: 0 0 10px var(--accent-color-dynamic, rgba(79, 184, 206, 0.2));
+  transition:
+    border-color 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+/* Valorant-style Card */
+.card-valorant {
+  background: hsl(var(--card) / 0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid hsl(var(--border));
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-valorant:hover {
+  border-color: hsl(var(--primary) / 0.5);
+  box-shadow: 0 0 20px hsl(var(--primary) / 0.15);
+  transform: translateY(-2px);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased selection:bg-primary/30;
+    /* Optional global radial gradient or modern background */
+    background-image: radial-gradient(
+      circle at top center,
+      rgba(var(--primary-rgb), 0.05) 0%,
+      transparent 70%
+    );
+    background-attachment: fixed;
+  }
+}
+
+/* New utility tokens for improved gray and card styles */
+.text-muted {
+  color: hsl(var(--muted-foreground));
+}
+
+/* Add a subtle white highlight/shadow for headings in How It Works dark mode */
+.howitworks-title {
+  transition: text-shadow 160ms ease;
+}
+.dark .howitworks-title {
+  text-shadow: 0 6px 18px rgba(255, 255, 255, 0.06);
+}
+
+/* CTA sheen handling: keep subtle in light, remove in dark to avoid glare */
+.cta-inner-sheen {
+  mix-blend-mode: overlay;
+  opacity: 0.35;
+  transition: opacity 160ms ease;
+}
+.dark .cta-inner-sheen {
+  display: none;
+}
+
+/* CTA title white highlight in dark mode (subtle) */
+.cta-title {
+  transition: text-shadow 160ms ease;
+}
+.dark .cta-title {
+  text-shadow: 0 8px 22px rgba(255, 255, 255, 0.06);
+}
+
+/* Textured Background noise */
+.bg-noise {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  display: none; /* noise removed per user request */
+}
+
+/* Valorant Style Utilities */
+@layer components {
+  /* ... existing valo-card components ... */
+
+  /* Outline Text Effect */
+  .text-outline {
+    -webkit-text-stroke: 1px hsl(var(--primary) / 1);
+    color: transparent;
+  }
+  .dark .text-outline {
+    -webkit-text-stroke: 1px hsl(var(--primary) / 1);
+    color: transparent;
+  }
+
+  /* Big background typography */
+  .text-outline-lg {
+    -webkit-text-stroke: 2px hsl(var(--primary) / 1);
+    color: transparent;
+    font-weight: 800;
+  }
+
+  .valo-card {
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.25s ease;
+    background: hsl(var(--card) / 0.6);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    /* More aggressive polygonal clip */
+    clip-path: polygon(
+      0 0,
+      100% 0,
+      100% calc(100% - 20px),
+      calc(100% - 20px) 100%,
+      20px 100%,
+      0 calc(100% - 20px)
+    );
+  }
+  .dark .valo-card {
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(11, 13, 17, 0.6);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  }
+
+  .valo-card-sm {
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: hsl(var(--card) / 0.6);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.05);
+    transition: all 0.2s ease;
+    clip-path: polygon(
+      10px 0,
+      100% 0,
+      100% calc(100% - 10px),
+      calc(100% - 10px) 100%,
+      0 100%,
+      0 10px
+    );
+  }
+  .dark .valo-card-sm {
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(11, 13, 17, 0.6);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+  }
+
+  /* Rectangular card variant: sharp corners, no polygon clip */
+  .rect-card {
+    clip-path: none !important;
+    border-radius: var(--radius) !important;
+    background: hsl(var(--card) / 0.6);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  }
+
+  .rect-card-sm {
+    clip-path: none !important;
+    border-radius: var(--radius) !important;
+    background: hsl(var(--card) / 0.6);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+  }
+
+  .valo-btn {
+    position: relative;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    transition:
+      transform 0.18s ease,
+      box-shadow 0.18s ease;
+    transform: translateZ(0);
+    clip-path: polygon(
+      10px 0,
+      100% 0,
+      100% calc(100% - 10px),
+      calc(100% - 10px) 100%,
+      0 100%,
+      0 10px
+    );
+    background: transparent;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    color: inherit;
+    box-shadow: none;
+  }
+
+  /* Glitch effect on hover */
+  .valo-glitch:hover {
+    animation: glitch 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) both infinite;
+  }
+
+  @keyframes glitch {
+    0% {
+      transform: translate(0);
+    }
+    20% {
+      transform: translate(-2px, 2px);
+    }
+    40% {
+      transform: translate(-2px, -2px);
+    }
+    60% {
+      transform: translate(2px, 2px);
+    }
+    80% {
+      transform: translate(2px, -2px);
+    }
+    100% {
+      transform: translate(0);
+    }
+  }
+}
+
+.font-valorant {
+  font-family: "Oswald", "Space Grotesk", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+code {
+  font-family:
+    source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
+}
+
+.App {
+  min-height: 100vh;
+}
+
+/* Container */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* Buttons */
+.btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.3s ease;
+}
+
+.btn-primary {
+  background-color: var(--accent-color-dynamic);
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: var(--accent-color-dynamic-hover);
+}
+
+.btn-secondary {
+  background-color: #6c757d;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background-color: #545b62;
+}
+
+/* Forms */
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+
+.form-input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-size: 16px;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--accent-color-dynamic);
+}
+
+/* Cards */
+.card {
+  background: hsl(var(--card) / 1);
+  color: hsl(var(--card-foreground) / 1);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: 0 6px 18px rgba(11, 13, 17, 0.06);
+  margin-bottom: 20px;
+}
+
+/* Loading */
+.loading {
+  text-align: center;
+  padding: 40px;
+  font-size: 18px;
+  color: #666;
+}
+
+/* Error */
+.error {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 15px;
+  border-radius: 5px;
+  margin-bottom: 20px;
+}
+
+/* Utility Classes */
+.text-center {
+  text-align: center;
+}
+
+.mt-20 {
+  margin-top: 20px;
+}
+
+.mb-20 {
+  margin-bottom: 20px;
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+/* Hide scrollbar for IE, Edge and Firefox */
+.scrollbar-hide {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}

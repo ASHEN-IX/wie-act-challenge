@@ -1,0 +1,234 @@
+.levelup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.3s ease;
+  backdrop-filter: blur(8px);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.levelup-modal {
+  background: hsl(var(--card) / 0.8);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  padding: 48px;
+  max-width: 500px;
+  width: 90%;
+  position: relative;
+  overflow: hidden;
+  animation: modalBounce 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  box-shadow:
+    0 25px 60px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+@keyframes modalBounce {
+  0% {
+    transform: scale(0.3) rotate(-15deg);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.05) rotate(3deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+.levelup-confetti {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.confetti-piece {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  top: -10px;
+  opacity: 0;
+  animation: confettiFall 3s linear infinite;
+}
+
+@keyframes confettiFall {
+  0% {
+    top: -10px;
+    opacity: 1;
+    transform: rotate(0deg);
+  }
+  100% {
+    top: 110%;
+    opacity: 0;
+    transform: rotate(720deg);
+  }
+}
+
+.levelup-content {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}
+
+.levelup-icon {
+  font-size: 5rem;
+  margin-bottom: 16px;
+  animation: iconPulse 1s ease infinite;
+}
+
+@keyframes iconPulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+}
+
+.levelup-title {
+  font-size: 2.5rem;
+  font-weight: 900;
+  background: linear-gradient(
+    135deg,
+    var(--primary) 0%,
+    var(--accent-color-dynamic) 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 24px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.levelup-level {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.level-label {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.level-number {
+  font-size: 4rem;
+  font-weight: 900;
+  color: var(--primary);
+  text-shadow: 2px 2px 4px var(--accent-color-dynamic-shadow-20);
+  animation: numberGlow 2s ease infinite;
+}
+
+@keyframes numberGlow {
+  0%,
+  100% {
+    transform: scale(1);
+    text-shadow: 2px 2px 4px var(--accent-color-dynamic-shadow-20);
+  }
+  50% {
+    transform: scale(1.1);
+    text-shadow: 0 0 20px var(--accent-color-dynamic-shadow-60);
+  }
+}
+
+.levelup-xp {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--foreground);
+  margin-bottom: 16px;
+}
+
+.levelup-message {
+  font-size: 1.1rem;
+  color: var(--muted-foreground);
+  margin-bottom: 32px;
+  line-height: 1.6;
+}
+
+.levelup-close-btn {
+  background: linear-gradient(
+    135deg,
+    var(--primary) 0%,
+    var(--accent-color-dynamic) 100%
+  );
+  color: white;
+  border: none;
+  padding: 16px 48px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  box-shadow: 0 4px 12px var(--accent-color-dynamic-shadow-40);
+}
+
+.levelup-close-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px var(--accent-color-dynamic-shadow-50);
+}
+
+.levelup-close-btn:active {
+  transform: translateY(-1px);
+}
+
+/* Mobile responsive */
+@media (max-width: 800px) {
+  .levelup-modal {
+    padding: 32px 24px;
+    border-radius: 20px;
+  }
+
+  .levelup-icon {
+    font-size: 3.5rem;
+  }
+
+  .levelup-title {
+    font-size: 2rem;
+  }
+
+  .level-number {
+    font-size: 3rem;
+  }
+
+  .levelup-xp {
+    font-size: 1rem;
+  }
+
+  .levelup-message {
+    font-size: 1rem;
+  }
+
+  .levelup-close-btn {
+    padding: 14px 36px;
+    font-size: 1rem;
+  }
+}

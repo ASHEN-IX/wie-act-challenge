@@ -1,0 +1,39 @@
+{
+  "name": "@study-partner/shared",
+  "version": "1.0.0",
+  "description": "Shared utilities for Study Partner backend services",
+  "main": "index.ts",
+  "scripts": {
+    "test": "echo \"No tests yet\""
+  },
+  "keywords": [
+    "study-partner",
+    "shared",
+    "utilities"
+  ],
+  "author": "Study Partner Team",
+  "license": "MIT",
+  "dependencies": {
+    "@better-auth/mongo-adapter": "^1.7.7",
+    "amqplib": "^0.10.9",
+    "axios": "^1.13.5",
+    "bcryptjs": "^2.4.3",
+    "better-auth": "^1.7.7",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "helmet": "^7.1.0",
+    "ioredis": "^5.8.1",
+    "mongodb": "^7.7.0",
+    "mongoose": "^8.0.3",
+    "nodemailer": "^8.0.11",
+    "rate-limit-redis": "^4.2.0",
+    "uuid": "^9.0.1",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/nodemailer": "^8.0.2"
+  }
+}
