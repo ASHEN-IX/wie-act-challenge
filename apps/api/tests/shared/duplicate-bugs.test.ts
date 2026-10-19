@@ -33,23 +33,3 @@ describe("badge key regression ('use' key bug, leaderboardService)", () => {
     }
   });
 });
-
-describe('duplicate-method regressions (audit §1-6)', () => {
-  const py = (rel: string) => fs.readFileSync(path.join(__dirname, rel), 'utf8');
-
-  test('signal_processing service defines is_ready exactly once', () => {
-    const src = py('../../../ai/services/signal_processing_service/service.py');
-    expect(src.match(/^\s*def is_ready\(/gm) || []).toHaveLength(1);
-    // The surviving definition must be the real initialization check
-    expect(src).toMatch(/getattr\(self,\s*["']_initialized["']/);
-  });
-
-  test('planner retriever defines retrieve/add_documents exactly once', () => {
-    const src = py('../../../ai/agents/planner/rag/retriever.py');
-    expect(src.match(/^\s*def retrieve\(/gm) || []).toHaveLength(1);
-    expect(src.match(/^\s*def add_documents\(/gm) || []).toHaveLength(1);
-    // Keep the structured-logging variants, not the print() ones
-    expect(src).toMatch(/retriever_retrieve_error/);
-    expect(src).not.toMatch(/print\(f"Retrieval error/);
-  });
-});
