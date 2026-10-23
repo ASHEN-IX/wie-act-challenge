@@ -1,3 +1,5 @@
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { Response, NextFunction } from 'express';
 // Set environment variables BEFORE any imports
 process.env.JWT_SECRET = 'test-secret-key';
 process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27018/test_study_partner';
@@ -5,7 +7,10 @@ process.env.NODE_ENV = 'test';
 process.env.AI_SERVICE_URL = 'http://localhost:8000';
 
 // Prevent process.exit() from killing tests
-process.exit = jest.fn() as any;
+const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => {
+  throw new Error(`Unexpected process.exit(${code})`);
+});
+afterAll(() => exitSpy.mockRestore());
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const moduleClient = require('@study-partner/shared/moduleClient');
@@ -20,20 +25,39 @@ jest.mock('../models/FocusSession', () => ({
 }));
 
 jest.mock('@study-partner/shared/auth', () => ({
-  authenticate: jest.fn((req: any, _res: any, next: any) => {
-    req.user = { userId: 'test-user-123' };
-    next();
-  })
+  authenticate: jest.fn(
+    (req: DomainRequest & { userTier?: string }, _res: Response, next: NextFunction) => {
+      req.user = { userId: 'test-user-123', role: 'student' };
+      next();
+    }
+  )
 }));
 
 jest.mock('@study-partner/shared', () => ({
-  corsMiddleware: jest.fn(() => (_req: any, _res: any, next: any) => next()),
-  securityMiddleware: jest.fn(() => (_req: any, _res: any, next: any) => next()),
-  loggingMiddleware: jest.fn((_req: any, _res: any, next: any) => next()),
-  errorHandler: jest.fn((err: any, _req: any, res: any) => {
-    res.status(err.status || 500).json({ error: err.message });
-  }),
-  rateLimiter: jest.fn(() => (_req: any, _res: any, next: any) => next()),
+  corsMiddleware: jest.fn(
+    () => (_req: DomainRequest & { userTier?: string }, _res: Response, next: NextFunction) =>
+      next()
+  ),
+  securityMiddleware: jest.fn(
+    () => (_req: DomainRequest & { userTier?: string }, _res: Response, next: NextFunction) =>
+      next()
+  ),
+  loggingMiddleware: jest.fn(
+    (_req: DomainRequest & { userTier?: string }, _res: Response, next: NextFunction) => next()
+  ),
+  errorHandler: jest.fn(
+    (
+      err: Error & { status?: number },
+      _req: DomainRequest & { userTier?: string },
+      res: Response
+    ) => {
+      res.status(err.status || 500).json({ error: err.message });
+    }
+  ),
+  rateLimiter: jest.fn(
+    () => (_req: DomainRequest & { userTier?: string }, _res: Response, next: NextFunction) =>
+      next()
+  ),
   logger: {
     info: jest.fn(),
     error: jest.fn(),
@@ -191,7 +215,7 @@ describe('Signal Processing Service', () => {
     });
 
     test('should handle signal buffering', () => {
-      const buffer: any[] = [];
+      const buffer: Array<{ timestamp: Date; level: number }> = [];
       const signal = { timestamp: new Date(), level: 8 };
 
       buffer.push(signal);
@@ -200,7 +224,7 @@ describe('Signal Processing Service', () => {
     });
 
     test('should support streaming updates', () => {
-      const subscribers: any[] = [];
+      const subscribers: jest.Mock[] = [];
       const callback = jest.fn();
 
       subscribers.push(callback);

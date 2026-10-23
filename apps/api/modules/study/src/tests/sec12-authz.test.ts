@@ -1,3 +1,5 @@
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { Response, NextFunction } from 'express';
 /**
  * SEC-12 — Cross-user authorization regression.
  */
@@ -49,7 +51,7 @@ jest.mock('../services/competencyQueries', () => ({
   getWeakCompetenciesForCourse: jest.fn().mockResolvedValue([])
 }));
 jest.mock('@study-partner/shared/tierGate', () => ({
-  tierGate: () => (req: any, res: any, next: any) => next()
+  tierGate: () => (req: DomainRequest, res: Response, next: NextFunction) => next()
 }));
 jest.mock('@study-partner/shared', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() }
@@ -76,7 +78,7 @@ function authHeader(u = userA) {
   return { Cookie: `mindflow.test_session=${jwt.sign(u, process.env.JWT_SECRET)}` };
 }
 
-function renderable(doc: any) {
+function renderable(doc: unknown) {
   return { lean: jest.fn().mockResolvedValue(doc) };
 }
 
@@ -145,11 +147,13 @@ describe('SEC-12 plans are isolated per user', () => {
     );
   });
 
-  it('POST /plans/create-status 403s when the job belongs to another user', async () => {
+  it('POST /plans/create-status hides jobs when the job belongs to another user', async () => {
     mongooseMock.connection.collection.mockReturnValue(fakeAiJobColl);
     fakeAiJobColl.findOne.mockResolvedValue({
       correlationId: 'job-1',
       userId: 'user-b',
+      type: 'study.plan.generate',
+      resourceScope: {},
       status: 'COMPLETED',
       result: { task_graph: { goal: 'G', tasks: [] } }
     });
@@ -164,8 +168,8 @@ describe('SEC-12 plans are isolated per user', () => {
       .set(authHeader(userA))
       .send({ correlationId: 'job-1' });
 
-    expect(res.status).toBe(403);
-    expect(res.body.error).toMatch(/Forbidden/);
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe('job not found');
     expect(StudyPlan.create).not.toHaveBeenCalled();
     expect(Task.create).not.toHaveBeenCalled();
   });
@@ -175,6 +179,8 @@ describe('SEC-12 plans are isolated per user', () => {
     fakeAiJobColl.findOne.mockResolvedValue({
       correlationId: 'job-2',
       userId: 'user-a',
+      type: 'study.plan.generate',
+      resourceScope: {},
       status: 'COMPLETED',
       result: {
         fallbackUsed: false,
@@ -200,11 +206,13 @@ describe('SEC-12 plans are isolated per user', () => {
     expect(Task.create).toHaveBeenCalled();
   });
 
-  it('POST /plans/create-status lets admins finalise any job', async () => {
+  it('POST /plans/create-status denies admin access to private foreign jobs', async () => {
     mongooseMock.connection.collection.mockReturnValue(fakeAiJobColl);
     fakeAiJobColl.findOne.mockResolvedValue({
       correlationId: 'job-3',
       userId: 'user-b',
+      type: 'study.plan.generate',
+      resourceScope: {},
       status: 'COMPLETED',
       result: { task_graph: { goal: 'G', tasks: [] } }
     });
@@ -220,7 +228,7 @@ describe('SEC-12 plans are isolated per user', () => {
       .set(authHeader(admin))
       .send({ correlationId: 'job-3' });
 
-    expect(res.status).toBe(201);
-    expect(StudyPlan.create).toHaveBeenCalled();
+    expect(res.status).toBe(404);
+    expect(StudyPlan.create).not.toHaveBeenCalled();
   });
 });

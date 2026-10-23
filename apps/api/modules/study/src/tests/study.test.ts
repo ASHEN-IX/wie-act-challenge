@@ -1,3 +1,5 @@
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { Response, NextFunction } from 'express';
 /**
  * Study Service Tests
  * Tests course upload, plan CRUD, and task completion endpoints
@@ -9,7 +11,10 @@ process.env.MONGODB_URI = 'mongodb://localhost:27017/test_study_partner';
 process.env.NODE_ENV = 'test';
 
 // Prevent process.exit() from killing tests
-process.exit = jest.fn() as any;
+const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => {
+  throw new Error(`Unexpected process.exit(${code})`);
+});
+afterAll(() => exitSpy.mockRestore());
 
 // ── Mock Models ──────────────────────────────────
 const mockCourse = {
@@ -27,7 +32,7 @@ const mockCourse = {
 const mockPlan = {
   _id: 'plan-1',
   userId: 'user-123',
-  courseId: 'course-1',
+  courseId: '64a000000000000000000001',
   title: 'Test Plan',
   status: 'active',
   tasks: [
@@ -42,6 +47,7 @@ const mockPlan = {
 
 jest.mock('../models/index', () => ({
   Course: {
+    exists: jest.fn().mockResolvedValue({ _id: '64a000000000000000000001' }),
     find: jest.fn(),
     findOne: jest.fn(),
     findById: jest.fn(),
@@ -89,8 +95,8 @@ const app = express();
 app.use(express.json());
 
 // Fake auth
-const fakeAuth = (req: any, res: any, next: any) => {
-  req.user = { userId: 'user-123' };
+const fakeAuth = (req: DomainRequest, res: Response, next: NextFunction) => {
+  req.user = { userId: 'user-123', role: 'student' };
   next();
 };
 

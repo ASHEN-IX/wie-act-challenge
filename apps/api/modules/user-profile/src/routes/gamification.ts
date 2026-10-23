@@ -1,3 +1,6 @@
+import { errorDetails } from '@study-partner/shared/errors';
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { Response } from 'express';
 import { createContracts } from '@study-partner/shared/domainContracts';
 import Joi from 'joi';
 import moduleClient from '@study-partner/shared/moduleClient';
@@ -65,9 +68,9 @@ const awardXpSchema = Joi.object({
 });
 
 // Get gamification profile
-router.get('/', async (req: any, res: any) => {
+router.get('/', async (req: DomainRequest, res: Response) => {
   try {
-    const userId = isInternalRequest(req) ? req.query.userId || req.user.userId : req.user.userId;
+    const userId = isInternalRequest(req) ? req.query.userId || req.user!.userId : req.user!.userId;
     let profile = await Gamification.findOne({ userId });
 
     if (!profile) {
@@ -91,7 +94,7 @@ router.get('/', async (req: any, res: any) => {
 });
 
 // Award XP (internal orchestration or admin only)
-router.post('/award-xp', requireInternal, async (req: any, res: any) => {
+router.post('/award-xp', requireInternal, async (req: DomainRequest, res: Response) => {
   try {
     console.info('award-xp endpoint received request', {
       body: req.body,
@@ -103,7 +106,7 @@ router.post('/award-xp', requireInternal, async (req: any, res: any) => {
       return res.status(400).json({ error: error.details[0].message });
     }
 
-    const userId = isInternalRequest(req) ? value.userId || req.user.userId : req.user.userId;
+    const userId = isInternalRequest(req) ? value.userId || req.user!.userId : req.user!.userId;
     const xp = value.xp_amount || XP_REWARDS[value.action] || 0;
 
     if (xp === 0) {
@@ -138,15 +141,15 @@ router.post('/award-xp', requireInternal, async (req: any, res: any) => {
 
     await profile.save();
 
-    let rankAward: any = null;
+    let rankAward: Awaited<ReturnType<typeof awardKnowledgePoints>> | null = null;
     try {
       rankAward = await awardKnowledgePoints({
         userId,
         action: value.action,
         metadata: value.metadata || {}
       });
-    } catch (rankError: any) {
-      console.warn('Rank point award failed:', rankError.message);
+    } catch (rankError) {
+      console.warn('Rank point award failed:', errorDetails(rankError).message);
     }
 
     // Send notifications for level-ups and new achievements
@@ -174,11 +177,13 @@ router.post('/award-xp', requireInternal, async (req: any, res: any) => {
     // Fire-and-forget notifications
     if (notifications.length > 0) {
       for (const notif of notifications) {
-        (moduleClient as any)
+        moduleClient
           .post(`${NOTIFICATION_SERVICE_URL}/api/v1/notifications`, notif, {
             headers: buildInternalHeaders(req.headers.cookie)
           })
-          .catch((err: any) => console.warn('Notification send failed:', err.message));
+          .catch((err: unknown) =>
+            console.warn('Notification send failed:', errorDetails(err).message)
+          );
       }
     }
 
@@ -208,7 +213,7 @@ router.post('/award-xp', requireInternal, async (req: any, res: any) => {
 });
 
 // Get leaderboard
-router.get('/leaderboard', async (req: any, res: any) => {
+router.get('/leaderboard', async (req: DomainRequest, res: Response) => {
   try {
     const limit = require('@study-partner/shared/pagination').boundedInteger(
       req.query.limit,
@@ -216,9 +221,9 @@ router.get('/leaderboard', async (req: any, res: any) => {
       100
     );
     const type = req.query.type || 'friends'; // 'all' or 'friends' (default friends)
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
 
-    let query: any = Gamification.find();
+    let query = Gamification.find();
 
     if (type === 'friends') {
       // Get friends' userIds
@@ -229,7 +234,7 @@ router.get('/leaderboard', async (req: any, res: any) => {
         ]
       });
 
-      const friendIds = friendships.map((f: any) =>
+      const friendIds = friendships.map((f) =>
         f.requester === userId ? f.recipient : f.requester
       );
       friendIds.push(userId); // include self?
@@ -244,20 +249,19 @@ router.get('/leaderboard', async (req: any, res: any) => {
 
     // Attach nicknames from UserProfile
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const UserProfile = require('../models/UserProfile');
-    const userIds = leaderboard.map((e: any) => e.userId);
+    const UserProfile: typeof import('../models/UserProfile').default = require('../models/UserProfile');
+    const userIds = leaderboard.map((e) => e.userId);
     const profiles = await UserProfile.find({ userId: { $in: userIds } })
       .select('userId nickname')
       .lean();
-    const nicknameMap: Record<string, any> = {};
-    profiles.forEach((p: any) => {
+    const nicknameMap: Record<string, string | undefined> = {};
+    profiles.forEach((p) => {
       nicknameMap[p.userId] = p.nickname;
     });
 
-    const enriched = leaderboard.map((e: any) => {
+    const enriched = leaderboard.map((e) => {
       const obj = e.toObject ? e.toObject() : e;
-      obj.nickname = nicknameMap[obj.userId] || null;
-      return obj;
+      return { ...obj, nickname: nicknameMap[obj.userId] || null };
     });
 
     res.json(enriched);

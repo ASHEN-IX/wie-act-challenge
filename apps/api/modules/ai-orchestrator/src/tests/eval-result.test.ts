@@ -10,6 +10,7 @@ const AiJob = require('../models/AiJob');
 const EvalResult = require('../models/EvalResult');
 
 jest.mock('../models/AiJob', () => ({
+  findOne: jest.fn(),
   completeByCorrelation: jest.fn(),
   failByCorrelation: jest.fn()
 }));
@@ -103,6 +104,7 @@ describe('buildEvalResultRecord (real implementation)', () => {
     const rec = buildEvalResultRecord({
       correlationId: 'c2',
       messageId: 'm2',
+      userId: 'user-123',
       type: EVAL_JOB_TYPE,
       payload: {
         sessionId: 's2',
@@ -135,6 +137,10 @@ describe('buildEvalResultRecord (real implementation)', () => {
     expect(
       buildEvalResultRecord({ type: EVAL_JOB_TYPE, payload: { sessionId: 's', step: 1.5 } })
     ).toBeNull();
+    for (const field of ['userId', 'messageId', 'correlationId']) {
+      const malformed = { ...completedEvalResult(), [field]: 42 };
+      expect(buildEvalResultRecord(malformed)).toBeNull();
+    }
     expect(buildEvalResultRecord(null)).toBeNull();
     expect(buildEvalResultRecord(undefined)).toBeNull();
   });
@@ -166,7 +172,7 @@ describe('evalResultStore (mocked model)', () => {
     expect(EvalResult.updateOne).toHaveBeenCalledTimes(1);
     expect(EvalResult.updateOne).toHaveBeenCalledWith(
       { correlationId: 'corr-1' },
-      { $set: expect.objectContaining({ sessionId: 'sess-1', step: 2 }) },
+      { $setOnInsert: expect.objectContaining({ sessionId: 'sess-1', step: 2 }) },
       { upsert: true }
     );
   });
@@ -176,8 +182,8 @@ describe('evalResultStore (mocked model)', () => {
       sort: jest.fn().mockReturnThis(),
       lean: jest.fn().mockResolvedValue([{ step: 1 }, { step: 2 }])
     });
-    const steps = await realListSteps('sess-1');
-    expect(EvalResult.find).toHaveBeenCalledWith({ sessionId: 'sess-1' });
+    const steps = await realListSteps('sess-1', 'user-123');
+    expect(EvalResult.find).toHaveBeenCalledWith({ sessionId: 'sess-1', userId: 'user-123' });
     expect(steps).toHaveLength(2);
   });
 });
@@ -187,6 +193,10 @@ describe('evalResultStore (mocked model)', () => {
 describe('handleResult (mocked deps)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    AiJob.findOne.mockResolvedValue({
+      userId: 'user-123',
+      resourceScope: { sessionId: 'sess-1', step: 2, objectiveId: 'obj-9' }
+    });
   });
 
   test('completed eval result persists a per-step record', async () => {
@@ -200,7 +210,11 @@ describe('handleResult (mocked deps)', () => {
 
     await handleResult(completedEvalResult());
 
-    expect(AiJob.completeByCorrelation).toHaveBeenCalledWith('corr-1', expect.any(Object));
+    expect(AiJob.completeByCorrelation).toHaveBeenCalledWith(
+      'corr-1',
+      expect.any(Object),
+      expect.objectContaining({ userId: 'user-123' })
+    );
     expect(builder.buildEvalResultRecord).toHaveBeenCalled();
     expect(store.upsertByCorrelation).toHaveBeenCalledWith({
       correlationId: 'corr-1',
@@ -225,7 +239,8 @@ describe('handleResult (mocked deps)', () => {
     expect(store.upsertByCorrelation).not.toHaveBeenCalled();
   });
 
-  test('unmatched completed job still attemps eval persistence', async () => {
+  test('unmatched completed job cannot persist any eval result', async () => {
+    AiJob.findOne.mockResolvedValue(null);
     AiJob.completeByCorrelation.mockResolvedValue(null);
     builder.buildEvalResultRecord.mockReturnValue({
       correlationId: 'corr-1',
@@ -236,7 +251,7 @@ describe('handleResult (mocked deps)', () => {
 
     await handleResult(completedEvalResult());
 
-    expect(store.upsertByCorrelation).toHaveBeenCalledTimes(1);
+    expect(store.upsertByCorrelation).not.toHaveBeenCalled();
   });
 
   test('failed result fails the AiJob and never persists an eval record', async () => {
@@ -250,7 +265,11 @@ describe('handleResult (mocked deps)', () => {
       error: 'LLM quota exceeded'
     });
 
-    expect(AiJob.failByCorrelation).toHaveBeenCalledWith('c4', 'LLM quota exceeded');
+    expect(AiJob.failByCorrelation).toHaveBeenCalledWith(
+      'c4',
+      'LLM quota exceeded',
+      expect.objectContaining({ userId: 'user-123' })
+    );
     expect(store.upsertByCorrelation).not.toHaveBeenCalled();
     expect(AiJob.completeByCorrelation).not.toHaveBeenCalled();
   });

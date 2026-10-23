@@ -1,12 +1,20 @@
+import { errorDetails } from '@study-partner/shared/errors';
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { Response } from 'express';
 import { createContracts } from '@study-partner/shared/domainContracts';
-import Quest from '../models/Quest';
+import Quest, { IQuest } from '../models/Quest';
+
+type QuestTemplate = Pick<
+  IQuest,
+  'title' | 'description' | 'icon' | 'action' | 'targetCount' | 'xpReward'
+>;
 import Gamification from '../models/Gamification';
 import { requireInternal } from '@study-partner/shared/auth';
 
 const router = createContracts();
 
 // ── Daily / Weekly quest templates ──────────────────
-const DAILY_QUEST_TEMPLATES = [
+const DAILY_QUEST_TEMPLATES: QuestTemplate[] = [
   {
     title: 'Task Crusher',
     description: 'Complete 3 tasks today',
@@ -41,7 +49,7 @@ const DAILY_QUEST_TEMPLATES = [
   }
 ];
 
-const WEEKLY_QUEST_TEMPLATES = [
+const WEEKLY_QUEST_TEMPLATES: QuestTemplate[] = [
   {
     title: 'Knowledge Builder',
     description: 'Upload 2 courses this week',
@@ -100,9 +108,9 @@ function endOfWeek(): Date {
 }
 
 // ── GET /api/v1/users/quests — get active quests (auto-generate if needed) ──
-router.get('/', async (req: any, res: any) => {
+router.get('/', async (req: DomainRequest, res: Response) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const now = new Date();
 
     // Expire old quests
@@ -116,14 +124,14 @@ router.get('/', async (req: any, res: any) => {
     if (dailyQuests.length === 0) {
       // Generate 2 random daily quests
       const templates = pickRandom(DAILY_QUEST_TEMPLATES, 2);
-      dailyQuests = (await Quest.insertMany(
+      dailyQuests = await Quest.insertMany(
         templates.map((t) => ({
           userId,
           type: 'daily',
           ...t,
           expiresAt: endOfDay()
         }))
-      )) as any;
+      );
     }
 
     // Check for existing active weekly quests
@@ -131,14 +139,14 @@ router.get('/', async (req: any, res: any) => {
     if (weeklyQuests.length === 0) {
       // Generate 2 random weekly quests
       const templates = pickRandom(WEEKLY_QUEST_TEMPLATES, 2);
-      weeklyQuests = (await Quest.insertMany(
+      weeklyQuests = await Quest.insertMany(
         templates.map((t) => ({
           userId,
           type: 'weekly',
           ...t,
           expiresAt: endOfWeek()
         }))
-      )) as any;
+      );
     }
 
     // Also get recently completed quests (last 24h)
@@ -160,9 +168,9 @@ router.get('/', async (req: any, res: any) => {
 });
 
 // ── POST /api/v1/users/quests/progress — increment quest progress by action (internal or admin) ──
-router.post('/progress', requireInternal, async (req: any, res: any) => {
+router.post('/progress', requireInternal, async (req: DomainRequest, res: Response) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const { action } = req.body;
 
     if (!action) {
@@ -190,8 +198,8 @@ router.post('/progress', requireInternal, async (req: any, res: any) => {
               questTitle: quest.title
             });
             await profile.save();
-          } catch (xpErr: any) {
-            console.warn('Quest XP award failed:', xpErr.message);
+          } catch (xpErr) {
+            console.warn('Quest XP award failed:', errorDetails(xpErr).message);
           }
         }
 

@@ -7,84 +7,87 @@ export const ACHIEVEMENT_CATALOG = [
     name: 'Knowledge Seeker',
     description: 'Upload your first course',
     icon: '📚',
-    condition: (stats: any) => stats.coursesUploaded >= 1
+    condition: (stats: IGamification['stats']) => stats.coursesUploaded >= 1
   },
   {
     id: 'five_courses',
     name: 'Librarian',
     description: 'Upload 5 courses',
     icon: '🏛️',
-    condition: (stats: any) => stats.coursesUploaded >= 5
+    condition: (stats: IGamification['stats']) => stats.coursesUploaded >= 5
   },
   {
     id: 'first_task',
     name: 'Task Tackler',
     description: 'Complete your first task',
     icon: '✅',
-    condition: (stats: any) => stats.tasksCompleted >= 1
+    condition: (stats: IGamification['stats']) => stats.tasksCompleted >= 1
   },
   {
     id: 'ten_tasks',
     name: 'Productivity Machine',
     description: 'Complete 10 tasks',
     icon: '⚡',
-    condition: (stats: any) => stats.tasksCompleted >= 10
+    condition: (stats: IGamification['stats']) => stats.tasksCompleted >= 10
   },
   {
     id: 'fifty_tasks',
     name: 'Task Master',
     description: 'Complete 50 tasks',
     icon: '🏆',
-    condition: (stats: any) => stats.tasksCompleted >= 50
+    condition: (stats: IGamification['stats']) => stats.tasksCompleted >= 50
   },
   {
     id: 'first_focus',
     name: 'Laser Focus',
     description: 'Achieve your first perfect focus session',
     icon: '🎯',
-    condition: (stats: any) => stats.perfectSessions >= 1
+    condition: (stats: IGamification['stats']) => stats.perfectSessions >= 1
   },
   {
     id: 'ten_focus',
     name: 'Focus Guru',
     description: 'Achieve 10 perfect focus sessions',
     icon: '🧘',
-    condition: (stats: any) => stats.perfectSessions >= 10
+    condition: (stats: IGamification['stats']) => stats.perfectSessions >= 10
   },
   {
     id: 'level_5',
     name: 'Rising Star',
     description: 'Reach level 5',
     icon: '⭐',
-    condition: (_: any, profile: any) => profile.level >= 5
+    condition: (_: IGamification['stats'], profile: Pick<IGamification, 'level'>) =>
+      profile.level >= 5
   },
   {
     id: 'level_10',
     name: 'Veteran Scholar',
     description: 'Reach level 10',
     icon: '🌟',
-    condition: (_: any, profile: any) => profile.level >= 10
+    condition: (_: IGamification['stats'], profile: Pick<IGamification, 'level'>) =>
+      profile.level >= 10
   },
   {
     id: 'level_25',
     name: 'Grand Master',
     description: 'Reach level 25',
     icon: '👑',
-    condition: (_: any, profile: any) => profile.level >= 25
+    condition: (_: IGamification['stats'], profile: Pick<IGamification, 'level'>) =>
+      profile.level >= 25
   },
   {
     id: 'streak_7',
     name: 'Week Warrior',
     description: 'Maintain a 7-day streak',
     icon: '🔥',
-    condition: (stats: any) => stats.currentStreak >= 7
+    condition: (stats: IGamification['stats']) => stats.currentStreak >= 7
   },
   {
     id: 'streak_30',
     name: 'Unstoppable',
     description: 'Maintain a 30-day streak',
     icon: '💎',
-    condition: (stats: any) => stats.currentStreak >= 30
+    condition: (stats: IGamification['stats']) => stats.currentStreak >= 30
   },
   // Social achievements
   {
@@ -92,28 +95,28 @@ export const ACHIEVEMENT_CATALOG = [
     name: 'Social Butterfly',
     description: 'Add your first friend',
     icon: '🤝',
-    condition: (stats: any) => (stats.friendsAdded || 0) >= 1
+    condition: (stats: IGamification['stats']) => (stats.friendsAdded || 0) >= 1
   },
   {
     id: 'five_friends',
     name: 'Study Circle',
     description: 'Have 5 friends',
     icon: '👥',
-    condition: (stats: any) => (stats.friendsAdded || 0) >= 5
+    condition: (stats: IGamification['stats']) => (stats.friendsAdded || 0) >= 5
   },
   {
     id: 'first_team_session',
     name: 'Team Player',
     description: 'Complete your first team study session',
     icon: '🎮',
-    condition: (stats: any) => (stats.teamSessions || 0) >= 1
+    condition: (stats: IGamification['stats']) => (stats.teamSessions || 0) >= 1
   },
   {
     id: 'ten_team_sessions',
     name: 'Squad Leader',
     description: 'Complete 10 team study sessions',
     icon: '🏅',
-    condition: (stats: any) => (stats.teamSessions || 0) >= 10
+    condition: (stats: IGamification['stats']) => (stats.teamSessions || 0) >= 10
   }
 ];
 
@@ -125,7 +128,7 @@ export interface IGamification extends Document {
     action: string;
     xp: number;
     timestamp: Date;
-    metadata?: any;
+    metadata?: unknown;
   }>;
   achievements: Array<{
     id: string;
@@ -145,7 +148,6 @@ export interface IGamification extends Document {
     groupSessions: number;
     challengesCompleted: number;
     subjectsCreated?: number;
-    [key: string]: any;
   };
   createdAt: Date;
   updatedAt: Date;
@@ -153,16 +155,16 @@ export interface IGamification extends Document {
   awardXp(
     xp: number,
     action: string,
-    metadata?: any
+    metadata?: unknown
   ): {
     xpAwarded: number;
     totalXp: number;
     oldLevel: number;
     newLevel: number;
     leveledUp: boolean;
-    newAchievements: any[];
+    newAchievements: IGamification['achievements'];
   };
-  checkAndUnlockAchievements(): any[];
+  checkAndUnlockAchievements(): IGamification['achievements'];
 }
 
 const gamificationSchema = new Schema<IGamification>(
@@ -256,12 +258,17 @@ const gamificationSchema = new Schema<IGamification>(
 );
 
 // Calculate level based on XP (100 XP per level)
-gamificationSchema.methods.calculateLevel = function () {
+gamificationSchema.methods.calculateLevel = function (this: IGamification) {
   return Math.floor(this.totalXp / 100) + 1;
 };
 
 // Award XP and check for level up
-gamificationSchema.methods.awardXp = function (xp: number, action: string, metadata: any = {}) {
+gamificationSchema.methods.awardXp = function (
+  this: IGamification,
+  xp: number,
+  action: string,
+  metadata: unknown = {}
+) {
   const oldLevel = this.level;
   this.totalXp += xp;
   this.level = this.calculateLevel();
@@ -287,9 +294,9 @@ gamificationSchema.methods.awardXp = function (xp: number, action: string, metad
 };
 
 // Check all achievement conditions and unlock any newly earned ones
-gamificationSchema.methods.checkAndUnlockAchievements = function () {
-  const unlockedIds = new Set(this.achievements.map((a: any) => a.id));
-  const newlyUnlocked: any[] = [];
+gamificationSchema.methods.checkAndUnlockAchievements = function (this: IGamification) {
+  const unlockedIds = new Set(this.achievements.map((a) => a.id));
+  const newlyUnlocked: IGamification['achievements'] = [];
 
   for (const achievement of ACHIEVEMENT_CATALOG) {
     if (unlockedIds.has(achievement.id)) continue;

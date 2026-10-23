@@ -28,7 +28,7 @@ Branch from current main per coherent task (`feat/ed-30-course-drafts`, for exam
 
 See [AI service](ai-service.md). Use a compatible Python environment with Poetry; configure Mongo, reachable broker, optional Redis, `AI_SERVICE_API_KEY` and provider/model configuration. Node's `AI_SERVICE_API_KEY` must match Python. The API service key is a server-to-server secret, separate from model provider credentials.
 
-HTTP alone does not consume broker jobs. Launch ingestion/planner/schedule/coach/evaluator/search workers as required in separate processes. Share the correct uploads directory and reconcile Node course IDs/aiCourseId with Python persistence. Missing provider keys may invoke mocks even when LLM_MOCK is not 1; a successful fallback/template is not evidence of real inference. Organizer-model adaptation is PLANNED. Local setup sets `LLM_MOCK=1` explicitly; this is development scaffolding, not real inference acceptance.
+HTTP alone does not consume broker jobs. Launch ingestion/planner/schedule/coach/evaluator/search workers as required in separate processes. Share the correct uploads directory and reconcile Node course IDs/aiCourseId with Python persistence. The shared LLM client requires explicit `LLM_MOCK=1` for test responders. Without a configured provider key it raises `LLMUnavailableError` (`UNAVAILABLE`); existing callers may choose an identified deterministic fallback. A successful fallback/template is not evidence of real inference. Organizer-model adaptation is PLANNED. Local setup sets `LLM_MOCK=1` explicitly; this is development scaffolding, not real inference acceptance.
 
 ## Existing commands and tests
 
@@ -36,13 +36,25 @@ HTTP alone does not consume broker jobs. Launch ingestion/planner/schedule/coach
 |---|---|
 | `pnpm build` | API tsc and Next production webpack build |
 | `pnpm lint`, `pnpm typecheck` | Both Node packages; strict API checks include test files |
-| `pnpm test` | API Jest + auth lifecycle, then Vitest; stops on failure |
+| `pnpm test` | API route checks + Jest + Node unit/real integration + auth lifecycle, then Vitest; stops on failure |
 | `pnpm test:integration` | API integration cases; real roundtrip opt-in separate |
 | `pnpm test:auth` | API build then Better Auth lifecycle/Nest tests; Mongo on 27018 |
 | `pnpm test:e2e` | Auth/workspace/smoke Playwright; test Mongo/Mailpit and browser required |
 
 No root format command exists. Package `format` scripts are different and may have legacy globs; do not treat them as a repository-wide check. Python checks use its own environment. Full scenario gates and exact current failures are in [testing plan](testing-plan.md) and [validation](audit/validation.md).
 
+### M01 baseline recipe — 22 October 2026
+
+The current CI and AI Docker recipe use Python 3.12 and Poetry 2.5.1 with the existing `apps/ai/poetry.lock`. The manifest's wider supported interpreter range is unchanged; this recipe does not certify every interpreter/model combination. The AI image installs locked main dependencies rather than an independent unpinned package list. Build it with `docker build -t ednova-ai -f apps/ai/Dockerfile apps/ai`; the AI context has its own `.dockerignore` excluding local environment files and caches. Full ML/CUDA dependency installation still requires substantial downloads.
+
+API `test:node` and `test:node:integration` execute `node:test` suites separately from Jest; both are included in the default API test command. The integration command points its AI HTTP boundary at an unavailable loopback port, exercising existing deterministic fallback without provider calls. This does not establish real inference. The production web builder includes the API-backed browser launchers' source/dependency context so the existing strict web check remains enabled.
+
+Install all browser prerequisites with `pnpm --filter web exec playwright install chromium ffmpeg`. Use only the dedicated Mongo/Mailpit test stack for the documented browser/auth runs. Current executed results, failures, preservation hashes and remaining ED-01 gates are recorded in [M01 baseline verification](../reports/EDNOVA-M01-BASELINE.md); a successful build is not a claim that repository-wide lint, full Python or the complete CI pipeline is green.
+
 ## Working conventions
 
+Keep authored verification reports in `reports/*.md` in Git. Raw command logs, generated inventories, screenshots, patches and copied helper scripts under `reports/evidence/` are local artifacts excluded from Git and the root Docker build context. Report links into that directory resolve only where the evidence has been retained; publish reviewed evidence separately as CI/PR artifacts when it must be shared. Keep reusable test runners in the source tree. Do not ignore source JSON, lockfiles, fixture PDFs or product images globally.
+
 Preserve contract/controller registration, security checks, AI message topology parity, correlation/idempotency and rollback mechanisms. Do not remove legacy apps/routes/helpers based solely on new architecture diagrams. Runtime changes, role additions and schema evolution belong to future backlog tasks. Maintain one active [backlog](sprint-backlog.md); add executed evidence before marking DONE.
+
+M01 continuation results and reproducible broker fixture instructions are recorded in [the continuation verification](../reports/EDNOVA-M01-CONTINUATION-VERIFICATION.md). API lint passes. The [final runtime verification](../reports/EDNOVA-M01-FINAL-RUNTIME-VERIFICATION.md) closes the full locked Python/AI image gate: 818 Python tests pass with five documented existing manual-fixture skips, and actual image health/native imports plus broker worker transport pass. This is local baseline evidence, not approved inference, GPU/media or downstream feature acceptance.

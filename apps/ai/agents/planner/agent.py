@@ -1,3 +1,6 @@
+import copy
+import hashlib
+import json
 import uuid
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
@@ -60,6 +63,14 @@ class PlannerAgent:
         # Note: Knowledge base starts empty and is populated from course_documents
 
     def plan(self, request: PlannerInput) -> PlannerOutput:
+        # The API and worker reuse this agent. Share immutable model weights,
+        # but never retain another request's private chunks or FAISS state.
+        context = copy.copy(self)
+        context.vector_store = VectorStore(dim=384)
+        context.retriever = ContentRetriever(context.vector_store, self.embed_model)
+        return context._plan(request)
+
+    def _plan(self, request: PlannerInput) -> PlannerOutput:
         """
         Main planning method that orchestrates the entire planning process.
 
@@ -96,6 +107,21 @@ class PlannerAgent:
                 self._extract_texts_from_course_knowledge(request.course_knowledge)
             )
 
+        # A stable resource plus actor and current source content identifies the
+        # existing disk-cache entry. Titles and legacy unscoped cache files are
+        # never authority; Node must still authorize every request/delivery.
+        cache_key = None
+        if request.course_knowledge and request.course_knowledge.get("_id"):
+            identity = {
+                "actor": request.user_id,
+                "course": request.course_knowledge,
+                "texts": course_texts,
+                "tokenization": request.tokenization_settings,
+            }
+            cache_key = hashlib.sha256(
+                json.dumps(identity, sort_keys=True, default=str).encode("utf-8")
+            ).hexdigest()
+
         # Index all course texts — prefer pre-computed embeddings when available
         if course_texts:
             try:
@@ -103,6 +129,7 @@ class PlannerAgent:
                     request.course_knowledge,
                     course_texts,
                     request.tokenization_settings,
+                    cache_key=cache_key,
                 )
                 logger.info(
                     "planner_chunks_indexed",
@@ -146,12 +173,7 @@ class PlannerAgent:
             )
 
         # Step 9: Persist FAISS index to disk if we built one
-        course_id = (
-            request.course_knowledge.get("_id")
-            or request.course_knowledge.get("course_title", "default")
-            if request.course_knowledge
-            else None
-        )
+        course_id = cache_key
         if course_id and self.retriever.indexed_chunks:
             try:
                 save_index(
@@ -242,6 +264,7 @@ class PlannerAgent:
         course_knowledge: dict | None,
         course_texts: list[str],
         tokenization_settings: dict | None,
+        cache_key: str | None = None,
     ) -> int:
         """
         Populate the in-memory FAISS retriever, preferring pre-computed embeddings.
@@ -275,11 +298,7 @@ class PlannerAgent:
                 )
 
         # --- path 2: disk-cached FAISS index --- #
-        course_id = None
-        if course_knowledge:
-            course_id = str(
-                course_knowledge.get("_id") or course_knowledge.get("course_title", "")
-            )
+        course_id = cache_key
         if course_id:
             disk_index, disk_chunks = load_index(course_id)
             if disk_index is not None:
@@ -288,6 +307,7 @@ class PlannerAgent:
                     extra={"course_id": course_id, "ntotal": disk_index.ntotal},
                 )
                 self.vector_store.index = disk_index
+                self.vector_store.texts = list(disk_chunks)
                 self.retriever.indexed_chunks = disk_chunks
                 return len(disk_chunks)
             # Recovery path: rebuild index from stored embeddings when index files are missing/corrupt.
@@ -298,6 +318,7 @@ class PlannerAgent:
                 )
                 if rebuilt_index is not None:
                     self.vector_store.index = rebuilt_index
+                    self.vector_store.texts = list(rebuilt_chunks or [])
                     self.retriever.indexed_chunks = rebuilt_chunks or []
                     logger.info(
                         "planner_rebuilt_disk_index",

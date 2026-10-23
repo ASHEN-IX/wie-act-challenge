@@ -11,10 +11,16 @@ async function registerTests() {
   const client = new MongoClient('mongodb://127.0.0.1:27018');
   await client.connect();
   const db: Db = client.db('auth_migration_test_' + process.pid);
-  const emails: any[] = [];
+  const emails: Array<{ text: string }> = [];
+  const latestEmail = () => {
+    const email = emails.at(-1);
+    assert.ok(email, 'Expected an authentication email');
+    return email;
+  };
   const auth = await createAuth(db, {
-    sendMail: async (message: any) => {
-      emails.push(message);
+    sendMail: async (message) => {
+      assert.ok(typeof message.text === 'string', 'Authentication email must contain text');
+      emails.push({ text: message.text });
     }
   });
 
@@ -30,7 +36,7 @@ async function registerTests() {
   const password = 'LegacyPass!123';
   let cookie: string, userId: ObjectId;
 
-  const call = async (path: string, body?: any, headers: Record<string, string> = {}) => {
+  const call = async (path: string, body?: unknown, headers: Record<string, string> = {}) => {
     const result = await auth.handler(
       new Request('http://localhost:5173/api/auth/' + path, {
         method: body === undefined ? 'GET' : 'POST',
@@ -161,8 +167,8 @@ async function registerTests() {
       ).status,
       200
     );
-    const lastEmail = emails.at(-1);
-    const otp = lastEmail?.text.match(/\b\d{6}\b/)[0];
+    const lastEmail = latestEmail();
+    const otp = lastEmail.text.match(/\b\d{6}\b/)?.[0];
     assert.equal(
       (await call('email-otp/verify-email', { email: 'new@example.test', otp: '000000' })).status,
       400
@@ -198,7 +204,7 @@ async function registerTests() {
       redirectTo: '/reset-password'
     });
     assert.deepEqual(known.data, unknown.data);
-    const url = new URL(emails.at(-1)?.text.split('Reset your password: ')[1]);
+    const url = new URL(latestEmail().text.split('Reset your password: ')[1]);
     const token = url.pathname.split('/').at(-1);
     assert.equal(
       (await call('reset-password', { token: 'invalid', newPassword: 'ChangedPass!456' })).status,
@@ -251,7 +257,7 @@ async function registerTests() {
       email: 'otp-lock@example.test',
       type: 'email-verification'
     });
-    const otp = emails.at(-1)?.text.match(/\b\d{6}\b/)[0];
+    const otp = latestEmail().text.match(/\b\d{6}\b/)?.[0];
     for (let attempt = 0; attempt < 5; attempt++)
       assert.ok(
         (await call('email-otp/verify-email', { email: 'otp-lock@example.test', otp: 'invalid' }))
@@ -265,7 +271,7 @@ async function registerTests() {
       email: 'otp-lock@example.test',
       type: 'email-verification'
     });
-    const expiredOtp = emails.at(-1)?.text.match(/\b\d{6}\b/)[0];
+    const expiredOtp = latestEmail().text.match(/\b\d{6}\b/)?.[0];
     await db.collection('auth_verifications').updateMany({}, { $set: { expiresAt: new Date(0) } });
     assert.ok(
       (await call('email-otp/verify-email', { email: 'otp-lock@example.test', otp: expiredOtp }))
@@ -278,7 +284,7 @@ async function registerTests() {
       email: 'new@example.test',
       redirectTo: '/reset-password'
     });
-    const token = new URL(emails.at(-1)?.text.split('Reset your password: ')[1]).pathname
+    const token = new URL(latestEmail().text.split('Reset your password: ')[1]).pathname
       .split('/')
       .at(-1);
     await db.collection('auth_verifications').updateMany({}, { $set: { expiresAt: new Date(0) } });

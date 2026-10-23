@@ -46,14 +46,17 @@ export interface ValidationResult {
  * @param {object} payload
  * @returns {{valid: boolean, errors: string[]}}
  */
-function validateLearningObjective(payload: any): ValidationResult {
+function validateLearningObjective(payload: unknown): ValidationResult {
   const errors: string[] = [];
 
   if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
     return { valid: false, errors: ['payload must be an object'] };
   }
 
-  const { objectiveId, topicId, knowledgeType, bloomLevel, verb, text } = payload;
+  const { objectiveId, topicId, knowledgeType, bloomLevel, verb, text } = payload as Record<
+    string,
+    unknown
+  >;
 
   if (typeof objectiveId !== 'string' || !objectiveId.trim()) {
     errors.push('objectiveId must be a non-empty string');
@@ -73,7 +76,7 @@ function validateLearningObjective(payload: any): ValidationResult {
   }
 
   // verb-vs-level check only makes sense once bloomLevel itself is valid
-  if (bloomLevelValid) {
+  if (bloomLevelValid && typeof bloomLevel === 'string') {
     const allowedVerbs = VERB_MAP[bloomLevel] || [];
     if (typeof verb !== 'string' || !allowedVerbs.includes(verb)) {
       errors.push(`verb must be one of: ${allowedVerbs.join(', ')} for bloomLevel "${bloomLevel}"`);

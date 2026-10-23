@@ -1,3 +1,4 @@
+import { canReadCourse } from '../../../study/src/services/resourceAccess';
 /**
  * objectiveContext — resolve a learning objective's Bloom context (EVAL-02b).
  *
@@ -18,18 +19,21 @@ import LearningObjective from '../models/LearningObjective';
  * @returns {Promise<{targetBloomLevel: string, knowledgeType: string}|null>}
  */
 export async function resolveObjectiveContext(
-  objectiveId: string
-): Promise<{ targetBloomLevel: string; knowledgeType: string | null } | null> {
+  objectiveId: string,
+  userId: string
+): Promise<{ targetBloomLevel: string; knowledgeType: string | null; courseId: string } | null> {
   if (!objectiveId) return null;
-  const objective = await (LearningObjective as any)
-    .findOne({
-      objectiveId,
-      isActive: true
-    })
-    .select('bloomLevel knowledgeType')
+  const objective = await LearningObjective.findOne({
+    objectiveId,
+    userId,
+    isActive: true
+  })
+    .select('bloomLevel knowledgeType documentId')
     .lean();
-  if (!objective || !objective.bloomLevel) return null;
+  if (!objective || !objective.bloomLevel || !(await canReadCourse(userId, objective.documentId)))
+    return null;
   return {
+    courseId: objective.documentId,
     targetBloomLevel: objective.bloomLevel,
     knowledgeType: objective.knowledgeType || null
   };

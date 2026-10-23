@@ -32,7 +32,7 @@ Node `modules/ai-orchestrator` owns jobs/eval results and external requests; stu
 
 Shared fallback aliases use Groq/NVIDIA/OpenRouter 70B configurations. Router settings include 2 retries, retry_after 2 and cooldown 30. These are per-agent/provider routes, **not verified compact/capable categories on the organizer service**. Do not route around the organizer quota using these providers during the demo. Confirm approved models and declarations first (ED-03).
 
-`LLM_MOCK=1` OR absence of any recognized usable primary/fallback provider key makes the shared client call a supplied mock responder; without one it raises `MissingMockResponderError`. `LLM_MOCK=0` alone does not force real inference. Real failures surface `LLMRequestError`; worker policy handles retries. Coach and planner have deterministic exhaustion fallbacks. Passing stub/mock tests proves contracts, not inference quality or compliance.
+`LLM_MOCK=1` explicitly selects a supplied test responder; without one it raises `MissingMockResponderError`. With mock mode disabled or unset, absence of recognized usable primary/fallback provider keys raises `LLMUnavailableError` (`UNAVAILABLE`), without calling the responder or provider. `LLM_MOCK=0` does not establish approved provider readiness. Real failures surface `LLMRequestError`; worker policy handles retries. Coach and planner have deterministic exhaustion fallbacks. Passing stub/mock tests proves contracts, not inference quality or compliance.
 
 ## CURRENT grounding, validation and state
 

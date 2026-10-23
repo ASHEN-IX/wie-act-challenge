@@ -1,3 +1,6 @@
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { Response, NextFunction } from 'express';
+import type { IUserRankProfile } from '../models/UserRankProfile';
 import { createContracts } from '@study-partner/shared/domainContracts';
 import Joi from 'joi';
 import {
@@ -29,7 +32,7 @@ const startSeasonSchema = Joi.object({
   theme: Joi.string().trim().max(120).optional().allow('', null)
 });
 
-function toProfilePayload(profile: any) {
+function toProfilePayload(profile: IUserRankProfile) {
   const knowledgePoints = Math.max(0, Number(profile.knowledgePoints || 0));
   const seasonPeakKp = Math.max(0, Number(profile.seasonPeakKp || 0));
   const allTimePeakKp = Math.max(0, Number(profile.allTimePeakKp || 0));
@@ -53,18 +56,18 @@ function toProfilePayload(profile: any) {
   };
 }
 
-function isAdmin(req: any) {
+function isAdmin(req: DomainRequest) {
   return req.user?.role === 'admin' || req.user?.isAdmin === true;
 }
 
-function requireAdmin(req: any, res: any, next: any) {
+function requireAdmin(req: DomainRequest, res: Response, next: NextFunction) {
   if (!isAdmin(req)) {
     return res.status(403).json({ error: 'Admin access required' });
   }
   return next();
 }
 
-router.get('/seasons/current', async (req: any, res: any) => {
+router.get('/seasons/current', async (req, res) => {
   try {
     const season = await getOrCreateActiveSeason();
     return res.json({
@@ -79,14 +82,14 @@ router.get('/seasons/current', async (req: any, res: any) => {
         resetPolicy: season.resetPolicy
       }
     });
-  } catch (error) {
+  } catch {
     return res.status(500).json({ error: 'Failed to fetch current season' });
   }
 });
 
-router.get('/profile', async (req: any, res: any) => {
+router.get('/profile', async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const { season, profile, progress, rankBadge } = await getRankProfile(userId);
 
     return res.json({
@@ -103,14 +106,14 @@ router.get('/profile', async (req: any, res: any) => {
       progress,
       rankBadge
     });
-  } catch (error) {
+  } catch {
     return res.status(500).json({ error: 'Failed to fetch rank profile' });
   }
 });
 
-router.get('/progress', async (req: any, res: any) => {
+router.get('/progress', async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const { season, profile, progress, rankBadge } = await getRankProgress(userId);
 
     return res.json({
@@ -125,23 +128,23 @@ router.get('/progress', async (req: any, res: any) => {
       progress,
       rankBadge
     });
-  } catch (error) {
+  } catch {
     return res.status(500).json({ error: 'Failed to fetch rank progress' });
   }
 });
 
-router.get('/badges', async (req: any, res: any) => {
+router.get('/badges', async (req, res) => {
   try {
     const badges = await getAllRankBadges();
     return res.json({ badges });
-  } catch (error) {
+  } catch {
     return res.status(500).json({ error: 'Failed to fetch rank badges' });
   }
 });
 
-router.get('/history', async (req: any, res: any) => {
+router.get('/history', async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const limit = Number(req.query.limit) || 20;
     const { season, events } = await getRankHistory(userId, limit);
 
@@ -153,14 +156,14 @@ router.get('/history', async (req: any, res: any) => {
       },
       events
     });
-  } catch (error) {
+  } catch {
     return res.status(500).json({ error: 'Failed to fetch rank history' });
   }
 });
 
-router.get('/leaderboard', async (req: any, res: any) => {
+router.get('/leaderboard', async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const limit = Number(req.query.limit) || 20;
     const scope = req.query.scope === 'friends' ? 'friends' : 'all';
     const { season, leaderboard } = await getRankLeaderboard({ userId, scope, limit });
@@ -176,14 +179,14 @@ router.get('/leaderboard', async (req: any, res: any) => {
       scope,
       leaderboard
     });
-  } catch (error) {
+  } catch {
     return res.status(500).json({ error: 'Failed to fetch rank leaderboard' });
   }
 });
 
-router.get('/session-result', async (req: any, res: any) => {
+router.get('/session-result', async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const sessionId = (req.query.sessionId as string) || null;
     const result = await getSessionResult(userId, sessionId);
 
@@ -199,19 +202,19 @@ router.get('/session-result', async (req: any, res: any) => {
       events: result.events,
       primaryBreakdown: result.primaryBreakdown
     });
-  } catch (error) {
+  } catch {
     return res.status(500).json({ error: 'Failed to fetch session result' });
   }
 });
 
-router.post('/events/award', requireInternal, async (req: any, res: any) => {
+router.post('/events/award', requireInternal, async (req, res) => {
   try {
     const { error, value } = awardEventSchema.validate(req.body || {});
     if (error) {
       return res.status(400).json({ error: error.details[0].message });
     }
 
-    const targetUserId = value.userId && isAdmin(req) ? value.userId : req.user.userId;
+    const targetUserId = value.userId && isAdmin(req) ? value.userId : req.user!.userId;
     const award = await awardKnowledgePoints({
       userId: targetUserId,
       action: value.action,
@@ -230,12 +233,12 @@ router.post('/events/award', requireInternal, async (req: any, res: any) => {
       breakdown: award.breakdown || null,
       seasonCode: award.season?.seasonCode || null
     });
-  } catch (error) {
+  } catch {
     return res.status(500).json({ error: 'Failed to award knowledge points' });
   }
 });
 
-router.post('/seasons/reset-preview', requireAdmin, async (req: any, res: any) => {
+router.post('/seasons/reset-preview', requireAdmin, async (req, res) => {
   try {
     const { seasonId } = req.body || {};
     const { season, preview } = await previewSeasonReset(seasonId || null);
@@ -251,12 +254,12 @@ router.post('/seasons/reset-preview', requireAdmin, async (req: any, res: any) =
       totalUsers: preview.length,
       preview
     });
-  } catch (error) {
+  } catch {
     return res.status(500).json({ error: 'Failed to preview season reset' });
   }
 });
 
-router.post('/seasons/start', requireAdmin, async (req: any, res: any) => {
+router.post('/seasons/start', requireAdmin, async (req, res) => {
   try {
     const { error, value } = startSeasonSchema.validate(req.body || {});
     if (error) {
@@ -267,7 +270,7 @@ router.post('/seasons/start', requireAdmin, async (req: any, res: any) => {
       seasonCode: value.seasonCode,
       name: value.name,
       theme: value.theme || null,
-      startedBy: req.user.userId
+      startedBy: req.user!.userId
     });
 
     return res.status(201).json({
@@ -281,18 +284,20 @@ router.post('/seasons/start', requireAdmin, async (req: any, res: any) => {
         startAt: season.startAt
       }
     });
-  } catch (error: any) {
-    return res.status(400).json({ error: error.message || 'Failed to start season' });
+  } catch (error) {
+    return res
+      .status(400)
+      .json({ error: (error instanceof Error && error.message) || 'Failed to start season' });
   }
 });
 
-router.post('/seasons/close', requireAdmin, async (req: any, res: any) => {
+router.post('/seasons/close', requireAdmin, async (req, res) => {
   try {
     const { seasonId } = req.body || {};
 
     const result = await closeSeasonAndStartNext({
       seasonId: seasonId || null,
-      startedBy: req.user.userId
+      startedBy: req.user!.userId
     });
 
     return res.json({
@@ -309,8 +314,10 @@ router.post('/seasons/close', requireAdmin, async (req: any, res: any) => {
       },
       affectedUsers: result.affectedUsers
     });
-  } catch (error: any) {
-    return res.status(400).json({ error: error.message || 'Failed to close season' });
+  } catch (error) {
+    return res
+      .status(400)
+      .json({ error: (error instanceof Error && error.message) || 'Failed to close season' });
   }
 });
 

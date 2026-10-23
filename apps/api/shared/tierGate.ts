@@ -1,4 +1,5 @@
-import type { Request, Response, NextFunction } from 'express';
+import type { Response, NextFunction } from 'express';
+import type { DomainRequest } from '../src/framework/contracts';
 import { effectiveTier } from './entitlements';
 
 /**
@@ -7,14 +8,14 @@ import { effectiveTier } from './entitlements';
  */
 export const tierGate =
   (...allowedTiers: string[]) =>
-  (req: Request, res: Response, next: NextFunction): any => {
-    const userTier = effectiveTier((req as any).user || {});
+  (req: DomainRequest, res: Response, next: NextFunction) => {
+    const userTier = effectiveTier(req.user || {});
 
     // Auto-downgrade expired trials
     if (
-      (req as any).user?.tier === 'trial' &&
-      (req as any).user?.trialExpiresAt &&
-      new Date((req as any).user.trialExpiresAt) < new Date()
+      req.user?.tier === 'trial' &&
+      req.user?.trialExpiresAt &&
+      new Date(req.user.trialExpiresAt) < new Date()
     ) {
       return res.status(403).json({
         error: 'Trial expired',

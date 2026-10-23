@@ -1,3 +1,5 @@
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { Response } from 'express';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { createContracts } = require('@study-partner/shared/domainContracts');
 import Joi from 'joi';
@@ -24,14 +26,14 @@ const challengeCompleteSchema = Joi.object({
 });
 
 // POST /challenge/start — Start a dedicated challenge session
-router.post('/challenge/start', async (req: any, res: any) => {
+router.post('/challenge/start', async (req: DomainRequest, res: Response) => {
   const { error } = challengeStartSchema.validate(req.body);
   if (error) {
     return res.status(400).json({ error: error.details[0].message });
   }
 
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const {
       challengeId,
       courseId = null,
@@ -73,9 +75,9 @@ router.post('/challenge/start', async (req: any, res: any) => {
 });
 
 // GET /challenge/:sessionId — Get challenge session details
-router.get('/challenge/:sessionId', async (req: any, res: any) => {
+router.get('/challenge/:sessionId', async (req: DomainRequest, res: Response) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const session = await StudySession.findOne({
       _id: req.params.sessionId,
       userId,
@@ -109,14 +111,14 @@ router.get('/challenge/:sessionId', async (req: any, res: any) => {
 });
 
 // PUT /challenge/:sessionId/complete — Complete challenge session and award challenge KP/XP
-router.put('/challenge/:sessionId/complete', async (req: any, res: any) => {
+router.put('/challenge/:sessionId/complete', async (req: DomainRequest, res: Response) => {
   const { error, value } = challengeCompleteSchema.validate(req.body, { stripUnknown: true });
   if (error) {
     return res.status(400).json({ error: error.details[0].message });
   }
 
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const session = await StudySession.findOne({
       _id: req.params.sessionId,
       userId,

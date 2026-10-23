@@ -57,7 +57,7 @@ async function ensureActiveSeason() {
 async function upsertProfile(
   userId: string,
   totalXp: number,
-  activeSeasonId: any,
+  activeSeasonId: mongoose.Types.ObjectId,
   dryRun: boolean
 ) {
   const initialKP = toInitialKp(totalXp);
@@ -136,8 +136,11 @@ if (require.main === module) {
     console.error('[KP Migration] Failed:', error);
     try {
       await mongoose.disconnect();
-    } catch (disconnectError: any) {
-      console.error('[KP Migration] Disconnect failed:', disconnectError.message);
+    } catch (disconnectError) {
+      console.error(
+        '[KP Migration] Disconnect failed:',
+        disconnectError instanceof Error ? disconnectError.message : String(disconnectError)
+      );
     }
     process.exit(1);
   });

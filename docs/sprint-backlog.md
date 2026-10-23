@@ -25,10 +25,10 @@ All execution notes below are **TARGET recommendations, not changes performed**.
 
 | ID | Module owner | Priority | Status | Complexity | Title |
 |---|---|---|---|---|---|
-| ED-01 | Habib | P0 | PARTIAL | L | Repair and revalidate baseline |
-| ED-02 | Habib | P0 | PARTIAL | L | Close resource and transport isolation gaps |
+| ED-01 | Habib | P0 | DONE | L | Repair and revalidate baseline |
+| ED-02 | Habib | P0 | DONE | L | Close resource and transport isolation gaps |
 | ED-03 | Tasnim | P0 | BLOCKED | M | Confirm and connect organizer inference service |
-| ED-04 | Habib | P0 | TODO | L | Minimal institutional membership and access contexts |
+| ED-04 | Habib | P0 | PARTIAL | L | Minimal institutional membership and access contexts |
 | ED-05 | Habib | P0 | PARTIAL | L | Instructor versioned draft/review/publication flow |
 | ED-06 | Habib | P0 | PARTIAL | L | Unify scoped material ingestion and provenance |
 | ED-07 | Aziz | P0 | PARTIAL | L | Reuse team sessions for synchronized learning rooms |
@@ -51,7 +51,7 @@ All execution notes below are **TARGET recommendations, not changes performed**.
 | ED-24 | Habib | Post-hackathon | TODO | L | Institutional product expansion |
 | ED-25 | Aziz | P2 | TODO | L | Explore consented speech-aware assistance |
 | ED-DOC | Aziz | P0 | DONE | M | Audit and realign documentation |
-| ED-26 | Habib | P0 | TODO | M | Freeze versioned cross-member activity/content/evidence contracts |
+| ED-26 | Habib | P0 | PARTIAL | M | Freeze versioned cross-member activity/content/evidence contracts |
 | ED-27 | Tasnim | P0 | PARTIAL | L | Trusted quiz/guided-problem renderer and learner flow |
 | ED-28 | Tasnim | P0 | PARTIAL | M | AI intent-to-activity selection and safe output validation |
 | ED-29 | Tasnim | P0 | PARTIAL | L | Private activity attempts, assessment and accepted evidence |
@@ -64,14 +64,20 @@ All execution notes below are **TARGET recommendations, not changes performed**.
 
 ## ED-01 — Repair and revalidate baseline
 
+**22 October 2026 M01 baseline follow-up:** [Current execution and remaining gates](../reports/EDNOVA-M01-BASELINE.md) records strict typing, test-runner/fixture, dependency and image repairs against the preserved dirty tree. ED-01 remains **PARTIAL** until repository-wide lint and full locked Python/image validation meet the canonical acceptance below. Passing local subsets do not establish approved inference or complete CI readiness.
+
 - **Accountable member / relevant roles:** Habib / All / platform operator. Module/symbol boundaries and cross-member work packages: [team plan](team-delivery-plan.md).
 - **Objective / related feature:** All retained foundations. Repair and revalidate baseline.
-- **Existing implementation:** Preparation repaired Nest route normalization and shared exports; production builds, full root tests and native browser flows pass. API strict typing/lint and full Python/Docker/model readiness remain open; see [latest results](audit/cleanup.md).
+- **Existing implementation:** Preparation repaired Nest route normalization and shared exports; production builds, full root tests and native browser flows pass. Strict typing/lint, full locked Python installation, AI image/import/health and isolated worker transport now pass; see [final M01 verification](../reports/EDNOVA-M01-FINAL-RUNTIME-VERIFICATION.md). Approved provider, GPU/media and feature acceptance are separate gates.
 - **Required changes:** Keep the repaired build/route/auth/lease fixtures and corrected Poetry CI covered; resolve remaining API strict test typing/lint findings and Python Docker/dependency parity without weakening checks. Habib coordinates; each owner repairs their module UI/API/Python. Tasnim stewards shared inference configuration; Aziz coordinates integrated browser checks.
 - **Dependencies:** None.
-- **Priority / complexity / status:** P0 / L / **PARTIAL**.
+- **Priority / complexity / status:** P0 / L / **DONE**.
 - **Acceptance criteria:** API/web production builds, lint/typecheck and required unit/integration/auth/browser suites pass; skips and Python install policy explicit.
 - **Validation approach:** Run documented full checks, compare route/auth behavior; record versions, exits and skips.
+
+**22 October 2026 M01 continuation:** [Verification and evidence](../reports/EDNOVA-M01-CONTINUATION-VERIFICATION.md) closes API lint (1,991 → 0 errors) and revalidates strict checks, application/browser/container regressions and real isolated broker transport. ED-01 stays **PARTIAL**: full locked Python installation and AI image/runtime health remain blocked by bounded dependency downloads. M02 stays paused.
+
+**23 October 2026 M01 final runtime:** [Final verification](../reports/EDNOVA-M01-FINAL-RUNTIME-VERIFICATION.md) closes the canonical baseline gate: full locked Python and dependency consistency, 818 passing Python tests with five explicit existing manual-fixture skips, actual AI image/native imports/health, real broker worker transport, and all required local Node/browser/container regressions pass. ED-01 is **DONE** for this evidenced baseline. No approved provider, GPU/media, remote Actions run or downstream feature acceptance is claimed. M02 is the next mission and has not started.
 
 ### ED-01 technical execution notes — TARGET
 
@@ -87,7 +93,7 @@ All execution notes below are **TARGET recommendations, not changes performed**.
 - **Existing implementation:** Owner course download and AI policy; WS membership checks; HTTP chat/voice and team course lookup gaps.
 - **Required changes:** Habib owns course/account/source checks; Tasnim owns private learning/evidence checks; Aziz owns HTTP chat/history/voice/team resource checks and their UI handling; verify static upload bypass, current-member broadcasts/revocation and course/invite/cache isolation.
 - **Dependencies:** ED-01.
-- **Priority / complexity / status:** P0 / L / **PARTIAL**.
+- **Priority / complexity / status:** P0 / L / **DONE**.
 - **Acceptance criteria:** Cross-user course summaries/files/chat/voice denied before lookup/inference; revoked users receive no further scoped data; existing legitimate team flow works.
 - **Validation approach:** API negative access matrix plus two-browser revocation, guessed IDs and alternate download paths.
 
@@ -97,6 +103,8 @@ All execution notes below are **TARGET recommendations, not changes performed**.
 - **Implementation sequence:** 1. Habib centralizes course/source authorization from authenticated identity plus personal ownership or active enrollment; inspect static upload paths as well as scoped file endpoint. 2. Tasnim applies the same source decision before tutor retrieval/attempt lookup/cache delivery. 3. Aziz checks room membership for HTTP history/voice and incoming AND outgoing WS delivery, including after revocation. 4. Verify team source lookup cannot copy foreign course summaries before authorization.
 - **Interface/data/architecture choices:** Authorize resource before loading content or inference. A room invite grants room entry only; it cannot grant official course enrollment. An administrative identity is not default permission to read private learning content. Preserve unrelated public avatar/static behavior when closing private-file bypasses.
 - **Failure checks, handoff and review:** Run cross-owner, enrolled/unenrolled, left-member, guessed-ID, direct-file/static URL and cached-result tests. Hand off shared source-access function/result semantics to Tasnim/Aziz. Review: each consumer owner; Habib coordinates closure.
+
+**23 October 2026 M02 verification:** [Executed resource/transport matrix](../reports/EDNOVA-M02-RESOURCE-ISOLATION-VERIFICATION.md) closes the current owner/resource isolation gate: private static-path denial, actor/source-scoped HTTP/internal/AI/cache access, bound callbacks, legacy team/voice authorization and three-context source revocation pass. Root lint/strict/test/build, Python, existing room browsers and fresh container smoke pass. ED-02 is **DONE** for current personal grants; institutional enrollment/published revisions remain separate gates. M03 is next and has not started.
 
 ## ED-03 — Confirm and connect organizer inference service
 
@@ -113,19 +121,20 @@ All execution notes below are **TARGET recommendations, not changes performed**.
 
 - **Existing code to inspect/reuse:** AI/utils/llm_client.py; AI/litellm/config.yaml; API/shared/aiClient.ts; API/shared/ai-messaging/envelope.ts.
 - **Implementation sequence:** 1. Tasnim records organizer endpoint, auth format, compact/capable model IDs, non-streaming shape, quotas, Retry-After guidance and approved external-service declarations. 2. Adapt existing provider boundary in one place; preserve server-only credentials. 3. Prove one real compact and capable operation with sanitized traces. 4. Habib and Aziz add their own operation mappings and source-safe real-call examples.
-- **Interface/data/architecture choices:** Keep business operations separate from provider deployment names. LLM_MOCK=0 does not force real inference in the current client; missing recognized keys may still mock. The approved-service adapter must make real/mock/unavailable status unambiguous, without extra-account/provider quota bypass.
+- **Interface/data/architecture choices:** Keep business operations separate from provider deployment names. The shared client requires explicit LLM_MOCK=1 for mocks; missing recognized keys otherwise raise UNAVAILABLE. LLM_MOCK=0 does not establish approved inference. The approved-service adapter must make real/mock/unavailable status unambiguous, without extra-account/provider quota bypass.
 - **Failure checks, handoff and review:** Validate absent/invalid key, timeout, 429, malformed response and category mapping. No model call is considered compliant until approved access is confirmed. Hand off one documented adapter and sample response to Habib/Aziz; they own their prompts/fallback.
 
 ## ED-04 — Minimal institutional membership and access contexts
 
 - **Accountable member / relevant roles:** Habib / University admin, instructor, learners. Module/symbol boundaries and cross-member work packages: [team plan](team-delivery-plan.md).
 - **Objective / related feature:** F01–F02. Minimal institutional membership and access contexts.
-- **Existing implementation:** Better Auth student/admin and personal ownership; teacher UI helper is not enforcement.
-- **Required changes:** Implement one institution demo, scoped memberships, instructor assignment and learner enrollment/invitations while reusing one identity and personal workspace.
-- **Dependencies:** ED-01, ED-02.
-- **Priority / complexity / status:** P0 / L / **TODO**.
-- **Acceptance criteria:** Two institutional scopes and personal mode isolated; course invite cannot grant instructor/global admin; revoke tested.
-- **Validation approach:** Role/membership matrix API tests and synthetic instructor/student browser flow.
+- **Existing implementation:** Better Auth student/admin and personal ownership; teacher UI helper is not enforcement. M04-A/M04-A.1 additionally implements synthetic institution setup, scoped memberships, hashed single-use membership invitations, durable acceptance retry recovery, suspension/revocation and display-only profile context.
+- **Required changes:** The M04-A foundations are implemented. Remaining target work is course enrollment, course-scoped instructor assignment, and any institutional source grant after the ED-26/Contract 03 decisions are frozen. Course invite semantics must not be invented while Contract 03 remains unfrozen. Recipient-bound invitation policy also remains unresolved.
+- **Dependencies:** ED-01, ED-02, and ED-26/Contract 03 for enrollment/source grants.
+- **Priority / complexity / status:** P0 / L / **PARTIAL**.
+- **Acceptance criteria:** Membership and invitation isolation, role-escalation denial and revocation pass. Two institution scopes plus personal mode are isolated for membership context. Course enrollment and course-invite acceptance remain absent, so full ED-04 acceptance is unmet.
+- **Validation approach:** Real NestJS/MongoDB membership matrix, multiple pending invitations, same-actor retry recovery, expiry/revocation, concurrent acceptance/suspension and browser acceptance with two users/two synthetic institutions pass in M04-A.1. Course enrollment remains absent.
+- **M04-A evidence:** [EDNOVA-M04A-INSTITUTION-FOUNDATION-VERIFICATION.md](../reports/EDNOVA-M04A-INSTITUTION-FOUNDATION-VERIFICATION.md); [M04-A.1 invitation reliability](../reports/EDNOVA-M04A1-INVITATION-RELIABILITY-VERIFICATION.md). No enrollment or source-access claim is made.
 
 ### ED-04 technical execution notes — TARGET
 
@@ -172,6 +181,14 @@ All execution notes below are **TARGET recommendations, not changes performed**.
 
 ## ED-07 — Reuse team sessions for synchronized learning rooms
 
+**22 October 2026 verification:** Gate **PARTIAL**; status remains PARTIAL. Current working-tree authorization/snapshot fixes and real test evidence are in [current ED-07 verification](../reports/ED-07-CURRENT-VERIFICATION.md). The historical lifecycle report does not establish full shared activity/source/private-attempt acceptance; missing interfaces, peer text/presence and durable command replay remain explicit.
+
+**Durable replay follow-up:** [ED-07 replay implementation/evidence](../reports/ED-07-DURABLE-REPLAY.md) adds atomic room receipts to the existing create/join/leave/phase/presenter commands and wires current web controls. This supersedes the earlier report's missing replay finding for commands using the documented metadata; legacy requests without IDs remain outside that guarantee. ED-07 stays **PARTIAL**. Next isolated task: accurate room presence; peer text, source/activity/private-attempt integration and full acceptance remain unfinished.
+
+**Presence follow-up:** [ED-07 connection presence verification](../reports/ED-07-PRESENCE-VERIFICATION.md) supersedes the missing presence finding for the configured single API instance. Multi-tab aggregation, final closure, reconnect, authorization-pending cleanup, revocation and missed-pong cleanup are verified independently from durable replay. No distributed consistency claim is made. ED-07 stays **PARTIAL**. Next isolated task: **AI-independent peer text**; published source/activity/private-attempt integration and the full canonical gate remain unfinished. [Aziz's remaining task review](../reports/AZIZ-REMAINING-TASKS.md).
+
+**Peer-text follow-up:** [ED-07 peer-text implementation/evidence](../reports/ED-07-PEER-TEXT-VERIFICATION.md) supersedes the missing peer-text finding for the documented bounded SessionChat journal and single-instance realtime flow. Authorized peer sends, durable ordering/deduplication, history/reconnect recovery, failure UX, safe rendering and revocation work without AI. ED-07 remains **PARTIAL**. Next: authorized published source/revision, shared activity and private-attempt integration, requiring Habib's Contract 03 and Tasnim's Contracts 04–07. [Updated remaining-work/dependency review](../reports/AZIZ-REMAINING-TASKS.md).
+
 - **Accountable member / relevant roles:** Aziz / Both learner contexts. Module/symbol boundaries and cross-member work packages: [team plan](team-delivery-plan.md).
 - **Objective / related feature:** F09, F11. Reuse team sessions for synchronized learning rooms.
 - **Existing implementation:** Team invite codes, max 4, participants/taskProgress and WS signaling/search chat.
@@ -207,6 +224,8 @@ All execution notes below are **TARGET recommendations, not changes performed**.
 - **Failure checks, handoff and review:** Test beginner/advanced/untested and corrected second attempt, valid full-answer request, invalid rubric/output and unavailable model. Hand off a private-check operation to Aziz with recipient-only results and safe completion signal. Reviewer: Aziz on group integration, Habib on source provenance.
 
 ## ED-09 — Explicit peer-first facilitator policy
+
+**22 October 2026 audit:** Existing uncommitted facilitator code is documented in [ED-09 baseline audit](../reports/ED-09-BASELINE-AUDIT.md). No new ED-09 feature implementation started because the required ED-07 gate is PARTIAL; status remains TODO. No live inference or completed grounding/proposal-validation acceptance is claimed.
 
 - **Accountable member / relevant roles:** Aziz / Group learners. Module/symbol boundaries and cross-member work packages: [team plan](team-delivery-plan.md).
 - **Objective / related feature:** F12, F14. Explicit peer-first facilitator policy.
@@ -481,7 +500,7 @@ All execution notes below are **TARGET recommendations, not changes performed**.
 
 - **Accountable member / relevant roles:** Habib / University administrator. Module/symbol boundaries and cross-member work packages: [team plan](team-delivery-plan.md).
 - **Objective / related feature:** Future vision. Institutional product expansion.
-- **Existing implementation:** Minimal institution work planned, not enterprise capability.
+- **Existing implementation:** M04-A provides minimal institution membership/invitation foundations; enterprise expansion, SSO/LMS and cohort licensing remain planned.
 - **Required changes:** After pilot evidence consider governance, SSO/LMS, longitudinal analytics, cohort licensing and operational scale; no premature framework migration.
 - **Dependencies:** Validated pilot, ED-04, ED-19.
 - **Priority / complexity / status:** Post-hackathon / L / **TODO**.
@@ -536,10 +555,10 @@ All execution notes below are **TARGET recommendations, not changes performed**.
 
 - **Accountable member / relevant roles:** Habib / All; F20–F22.
 - **Objective / feature:** Freeze versioned cross-member activity/content/evidence contracts; integrate with the same individual/group learning engine.
-- **CURRENT / reusable code:** Domain/message payload schemas and shared contracts exist; new activity/revision/evidence contracts are absent.
+- **CURRENT / reusable code:** Existing domain/message contracts are preserved. M03 adds executable TS/Pydantic v1 review candidates, JSON Schema export and shared negative/serialization fixtures; no downstream service is implied.
 - **Required implementation work:** Agree public vs server-only projections, type enums/versions, source+revision pins, private attempt IDs/statuses, room events and accepted-evidence/award keys; Habib owns source/revision/access contracts; Tasnim owns activity/attempt/evidence/reward contracts; Aziz owns room/facilitator contracts; use existing shared-contract patterns and cross-review; each owner maintains their module Python mirrors. Habib coordinates agreement, not all AI or backend implementation. Do not generate browser code.
 - **Dependencies:** ED-01/02; Habib+Tasnim+Aziz contract review.
-- **Priority / complexity / status:** P0 / M / **TODO**.
+- **Priority / complexity / status:** P0 / M / **PARTIAL**.
 - **Acceptance criteria:** Canonical quiz/guided-problem/source/attempt/room/evidence examples agree across all three members; invalid/version-mismatch and visibility rules explicit; no keys/rubrics in public payload.
 - **Validation requirements:** Schema parity fixtures, serialization/negative validation and source/recipient ACL review by all three.
 
@@ -549,6 +568,8 @@ All execution notes below are **TARGET recommendations, not changes performed**.
 - **Implementation sequence:** 1. Habib authors source/revision/enrollment/provenance examples; Tasnim authors activity/attempt/evidence/reward and shared inference projection; Aziz authors room/facilitator/presenter/private-help schemas. 2. Review producer/consumer examples including forbidden, stale, unsupported, pending and duplicate paths. 3. Agree public/private/server-only fields, enums, finite sizes and version strategy. 4. Add schema parity/consumer fixtures in existing validation patterns; do not introduce a competing schema service.
 - **Interface/data/architecture choices:** Proposed public activity fields: schemaVersion, activityId/revision, type/componentVersion, instructions, bounded data, sourceRefs, objective/difficulty/language/visibility. Server evaluationRef/answer key/rubric never enters learner projection. One provider/job envelope is reused; unique command, attempt and completion IDs have distinct purposes.
 - **Failure checks, handoff and review:** Validate roundtrip serialization and negative examples across TS/Python/React consumers. A contract is frozen only after all affected owners review it. Habib coordinates agreement, not everyone else API/AI implementation.
+
+**23 October 2026 M03 implementation:** [Versioned candidate and review ledger](contracts/ednova-v1.md), [cross-domain review package](../reports/EDNOVA-M03-CONTRACT-REVIEW-PACKAGE.md) and [freeze verification](../reports/EDNOVA-M03-FREEZE-VERIFICATION.md) record 21 shared contract roots, 161 TS/Python golden fixtures, consumer decoding, a 6,899-case differential parity run and baseline regressions. The parity run found and fixed Unicode-digit timestamp acceptance in Python. **ED-26 remains PARTIAL; NOT FROZEN.** Habib/Tasnim/Aziz review and cross-domain agreement remain PENDING; no approval is inferred from automated tests. M04-A/M04-A.1 has delivered contract-independent membership/invitation foundations; course enrollment and institutional source access remain unstarted and subject to this gate.
 
 ## ED-27 — Trusted quiz/guided-problem renderer and learner flow
 

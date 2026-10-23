@@ -6,7 +6,7 @@ const path = require('path');
 import { getBadgeKeyForRank } from '../../modules/user-profile/src/services/leaderboardService';
 
 describe("badge key regression ('use' key bug, leaderboardService)", () => {
-  const getBadgeKey = (rank: any) => getBadgeKeyForRank(rank);
+  const getBadgeKey = (rank: Parameters<typeof getBadgeKeyForRank>[0]) => getBadgeKeyForRank(rank);
 
   test('legend tier maps to its existing asset key "only"', () => {
     // legend ships public/ranking-badges/legend/only.png — never 'use'

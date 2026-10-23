@@ -1,67 +1,32 @@
-# Use PyTorch base image (includes PyTorch, CUDA, cuDNN pre-installed)
-FROM pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
+FROM python:3.12-slim-bookworm
 
 WORKDIR /app
 
-ENV PYTHONPATH=/app:/app/agents/evaluator/src
+ENV PYTHONPATH=/app:/app/agents/evaluator/src \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    VIRTUAL_ENV=/opt/venv \
+    PATH=/opt/venv/bin:$PATH \
+    POETRY_NO_INTERACTION=1
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    curl \
-    poppler-utils \
-    tesseract-ocr \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
+# Native document/OCR/image libraries used by the existing ingestion pipeline.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl poppler-utils tesseract-ocr libgl1 libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python packages
-RUN pip install --no-cache-dir \
-    fastapi \
-    uvicorn \
-    pymongo \
-    pydantic \
-    python-dotenv \
-    google-genai \
-    litellm \
-    requests \
-    PyMuPDF \
-    pillow \
-    faiss-cpu \
-    scikit-learn \
-    pytesseract \
-    numpy \
-    pandas \
-    matplotlib \
-    seaborn \
-    scipy \
-    pdf2image \
-    PyPDF2 \
-    reportlab \
-    opencv-python \
-    mediapipe \
-    python-multipart \
-    flask \
-    beautifulsoup4 \
-    apify-client \
-    SpeechRecognition \
-    pyttsx3 \
-    pytest \
-    pytest-asyncio \
-    pytest-json-report \
-    httpx \
-    anyio \
-    "transformers>=4.38.0,<4.45.0" \
-    "sentence-transformers>=2.5.0,<2.8.0"
+# Keep Poetry's dependencies separate from the locked application environment.
+RUN python -m venv /opt/poetry && /opt/poetry/bin/pip install --no-cache-dir poetry==2.5.1 \
+    && python -m venv /opt/venv
+COPY pyproject.toml poetry.lock ./
+# Retain verified downloads across interrupted builds without baking wheels into the image.
+RUN --mount=type=cache,id=ednova-ai-poetry-artifacts,target=/root/.cache/pypoetry/artifacts,sharing=locked \
+    /opt/poetry/bin/poetry check --lock \
+    && /opt/poetry/bin/poetry install --only main --no-ansi
 
-# Copy application code
 COPY . .
 
-# Expose port
 EXPOSE 8000
-
-# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/health')" || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5).close()" || exit 1
 
-# Run the application with uvicorn
 CMD ["uvicorn", "services.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

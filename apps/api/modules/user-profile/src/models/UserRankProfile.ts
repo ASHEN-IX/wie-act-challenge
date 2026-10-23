@@ -184,16 +184,22 @@ userRankProfileSchema.methods.applyKnowledgeDelta = function applyKnowledgeDelta
   };
 };
 
-userRankProfileSchema.methods.applySeasonReset = function applySeasonReset(resetPolicy: any = {}) {
-  const lowBracketDrop = Number.isFinite(resetPolicy.lowBracketDrop)
-    ? resetPolicy.lowBracketDrop
-    : 3;
-  const highBracketDrop = Number.isFinite(resetPolicy.highBracketDrop)
-    ? resetPolicy.highBracketDrop
-    : 5;
-  const seasonFloorIndex = Number.isFinite(resetPolicy.seasonFloorIndex)
-    ? resetPolicy.seasonFloorIndex
-    : DEFAULT_SEASON_FLOOR_INDEX;
+userRankProfileSchema.methods.applySeasonReset = function applySeasonReset(
+  resetPolicy: NonNullable<Parameters<IUserRankProfile['applySeasonReset']>[0]> = {}
+) {
+  const lowBracketDrop =
+    typeof resetPolicy.lowBracketDrop === 'number' && Number.isFinite(resetPolicy.lowBracketDrop)
+      ? resetPolicy.lowBracketDrop
+      : 3;
+  const highBracketDrop =
+    typeof resetPolicy.highBracketDrop === 'number' && Number.isFinite(resetPolicy.highBracketDrop)
+      ? resetPolicy.highBracketDrop
+      : 5;
+  const seasonFloorIndex =
+    typeof resetPolicy.seasonFloorIndex === 'number' &&
+    Number.isFinite(resetPolicy.seasonFloorIndex)
+      ? resetPolicy.seasonFloorIndex
+      : DEFAULT_SEASON_FLOOR_INDEX;
 
   const oldRankIndex = this.rankIndex;
   const demotedBy = isLowBracket(oldRankIndex) ? lowBracketDrop : highBracketDrop;

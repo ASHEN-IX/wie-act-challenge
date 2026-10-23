@@ -45,8 +45,6 @@ describe('claimResult', () => {
   });
 
   test('returns null when processed or currently leased', async () => {
-    const dupErr: any = new Error('duplicate key');
-    dupErr.code = 11000;
     EvalResultRecord.findOneAndUpdate.mockResolvedValue(null);
     expect(await claimResult('c1')).toBeNull();
   });
@@ -67,37 +65,41 @@ describe('resolveCompetencyKey', () => {
     LearningObjective.findOne.mockReturnValue({
       lean: jest.fn().mockResolvedValue({ topicId: 't1', knowledgeType: 'procedural' })
     });
-    const key = await resolveCompetencyKey('obj-1');
+    const key = await resolveCompetencyKey('obj-1', 'user-1');
     expect(key).toEqual({ topicId: 't1', knowledgeType: 'procedural' });
-    expect(LearningObjective.findOne).toHaveBeenCalledWith({ objectiveId: 'obj-1' });
+    expect(LearningObjective.findOne).toHaveBeenCalledWith({
+      objectiveId: 'obj-1',
+      userId: 'user-1',
+      isActive: true
+    });
   });
 
   test('defaults knowledgeType to declarative when missing on objective', async () => {
     LearningObjective.findOne.mockReturnValue({
       lean: jest.fn().mockResolvedValue({ topicId: 't1' })
     });
-    const key = await resolveCompetencyKey('obj-1');
+    const key = await resolveCompetencyKey('obj-1', 'user-1');
     expect(key!.knowledgeType).toBe('declarative');
   });
 
   test('returns null when objectiveId is falsy', async () => {
-    expect(await resolveCompetencyKey(null)).toBeNull();
-    expect(await resolveCompetencyKey(undefined)).toBeNull();
-    expect(await resolveCompetencyKey('')).toBeNull();
+    expect(await resolveCompetencyKey(null, 'user-1')).toBeNull();
+    expect(await resolveCompetencyKey(undefined, 'user-1')).toBeNull();
+    expect(await resolveCompetencyKey('', 'user-1')).toBeNull();
   });
 
   test('returns null when objective is not found', async () => {
     LearningObjective.findOne.mockReturnValue({
       lean: jest.fn().mockResolvedValue(null)
     });
-    expect(await resolveCompetencyKey('obj-missing')).toBeNull();
+    expect(await resolveCompetencyKey('obj-missing', 'user-1')).toBeNull();
   });
 
   test('returns null when objective has no topicId', async () => {
     LearningObjective.findOne.mockReturnValue({
       lean: jest.fn().mockResolvedValue({ knowledgeType: 'declarative' })
     });
-    expect(await resolveCompetencyKey('obj-notopic')).toBeNull();
+    expect(await resolveCompetencyKey('obj-notopic', 'user-1')).toBeNull();
   });
 });
 
@@ -155,8 +157,6 @@ describe('processEvalResult', () => {
   });
 
   test('skips when the result cannot be claimed', async () => {
-    const dupErr: any = new Error('dup');
-    dupErr.code = 11000;
     EvalResultRecord.findOneAndUpdate.mockResolvedValue(null);
 
     const result = await processEvalResult(baseResult);
@@ -231,9 +231,6 @@ describe('runOnce', () => {
   });
 
   test('skips already-processed results and counts correctly', async () => {
-    const dupErr: any = new Error('dup');
-    dupErr.code = 11000;
-
     const candidates = [
       {
         correlationId: 'c1',

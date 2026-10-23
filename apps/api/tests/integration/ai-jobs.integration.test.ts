@@ -31,7 +31,10 @@ jest.mock('@study-partner/shared/ai-messaging', () => {
   };
 });
 
-process.exit = jest.fn();
+const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => {
+  throw new Error(`Unexpected process.exit(${code})`);
+});
+afterAll(() => exitSpy.mockRestore());
 
 const { publishAiJob } = require('@study-partner/shared/ai-messaging');
 const app = require('../../modules/ai-orchestrator/src/app');
@@ -40,8 +43,8 @@ const { createSession: generateToken } = require('../sessionFixtures');
 
 const userA = { userId: 'job-user-a', email: 'a@test.com', role: 'student' };
 const userB = { userId: 'job-user-b', email: 'b@test.com', role: 'student' };
-let tokenA;
-let tokenB;
+let tokenA: string;
+let tokenB: string;
 
 beforeAll(async () => {
   await mongoose.connect(process.env.MONGODB_URI, {
@@ -104,7 +107,7 @@ describe('POST /api/v1/ai/jobs', () => {
 });
 
 describe('GET /api/v1/ai/jobs/:jobId', () => {
-  let jobId;
+  let jobId: string;
 
   beforeAll(async () => {
     const res = await request(app)

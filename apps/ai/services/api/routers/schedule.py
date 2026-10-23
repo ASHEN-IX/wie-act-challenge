@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from deps import get_schedule_orchestrator
+from services.api.deps import get_schedule_orchestrator
 from utils.logger import get_logger
 
 logger = get_logger(__name__)

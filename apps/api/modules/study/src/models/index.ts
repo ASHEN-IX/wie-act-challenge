@@ -10,6 +10,7 @@ export interface ISignalHistoryEntry {
 }
 
 export interface ITaskProgressEntry {
+  estimatedMinutes?: number;
   taskId?: string;
   title?: string;
   description?: string;
@@ -114,10 +115,24 @@ export interface ISubtopic {
   formulas?: string[];
   examples?: string[];
   tokenized_chunks?: string[];
-  learning_objectives?: any[];
+  learning_objectives?: Array<
+    Partial<
+      Pick<
+        ILearningObjective,
+        | 'objectiveId'
+        | 'topicId'
+        | 'knowledgeType'
+        | 'bloomLevel'
+        | 'verb'
+        | 'text'
+        | 'classification'
+      >
+    >
+  >;
 }
 
 export interface ICourseTopic {
+  id?: string;
   title?: string;
   subtopics?: ISubtopic[];
 }
@@ -161,8 +176,8 @@ export interface ILearningObjective extends Document {
   textHash: string;
   version: number;
   isActive: boolean;
-  supersededAt?: Date;
-  classification?: any;
+  supersededAt?: Date | null;
+  classification?: unknown;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -198,7 +213,7 @@ export interface IEvalResultRecord extends Document {
   step: number;
   status?: string;
   masteryScore?: number | null;
-  scores?: any;
+  scores?: Record<string, number>;
   nextQuestion?: string | null;
   demonstratedBloomLevel?: string | null;
   objectiveId?: string | null;
@@ -218,6 +233,7 @@ export interface IStudyPlanTask {
   title?: string;
   description?: string;
   estimated_minutes?: number;
+  estimatedTime?: number;
   difficulty?: number;
   prerequisites?: string[];
   is_review?: boolean;
@@ -226,6 +242,7 @@ export interface IStudyPlanTask {
 }
 
 export interface IStudyPlan extends Document {
+  resourceScope?: { courseId?: string };
   userId: string;
   courseId?: string;
   goal: string;
@@ -775,6 +792,7 @@ const competencyProcessingSchema = new Schema<ICompetencyProcessing>(
 
 const studyPlanSchema = new Schema<IStudyPlan>(
   {
+    resourceScope: { type: Schema.Types.Mixed },
     userId: {
       type: String,
       required: true,
@@ -825,7 +843,8 @@ const studyPlanSchema = new Schema<IStudyPlan>(
     }
   },
   {
-    timestamps: true
+    timestamps: true,
+    minimize: false
   }
 );
 
@@ -902,8 +921,44 @@ export {
   CompetencyProcessing
 };
 
+export {
+  StudyRoom,
+  IStudyRoom,
+  IStudyRoomParticipant,
+  RoomPhase,
+  ModeratorMode
+} from './StudyRoom';
+
+export {
+  Institution,
+  InstitutionMembership,
+  InstitutionInvitation,
+  INSTITUTION_MEMBERSHIP_ROLES,
+  INSTITUTION_MEMBERSHIP_STATUSES,
+  INSTITUTION_INVITATION_ROLES,
+  INSTITUTION_INVITATION_STATUSES
+} from './Institution';
+export type {
+  IInstitution,
+  IInstitutionMembership,
+  IInstitutionInvitation,
+  InstitutionMembershipRole,
+  InstitutionMembershipStatus,
+  InstitutionInvitationRole,
+  InstitutionInvitationStatus
+} from './Institution';
+export {
+  FacilitatorIntervention,
+  IFacilitatorIntervention,
+  FacilitatorStrategy,
+  FacilitatorTrigger,
+  InterventionStatus
+} from './FacilitatorIntervention';
+
 module.exports = {
   StudySession,
+  StudyRoom: require('./StudyRoom').StudyRoom,
+  FacilitatorIntervention: require('./FacilitatorIntervention').FacilitatorIntervention,
   Task,
   Topic,
   Subject,

@@ -1,3 +1,4 @@
+import type { DomainRequest } from '../../../../src/framework/contracts';
 /**
  * User Profile Service Tests
  * Tests profile CRUD and availability endpoints
@@ -45,8 +46,8 @@ app.use(express.json());
 // Fake auth middleware — all requests have user
 app.use(
   '/api/v1/users/profile',
-  (req: any, res, next) => {
-    req.user = { userId: 'user-123' };
+  (req: DomainRequest, res, next) => {
+    req.user = { userId: 'user-123', role: 'student' };
     next();
   },
   profileRoutes

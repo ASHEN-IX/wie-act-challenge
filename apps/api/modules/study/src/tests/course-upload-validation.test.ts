@@ -1,3 +1,6 @@
+import type { CourseFixture } from '../../../../tests/courseFixture';
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { Response, NextFunction } from 'express';
 /**
  * INGEST-01 — Course upload file validation (MIME + magic bytes).
  */
@@ -11,19 +14,26 @@ import fs from 'fs';
 const UPLOAD_DIR = 'uploads';
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-process.exit = jest.fn() as any;
+const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => {
+  throw new Error(`Unexpected process.exit(${code})`);
+});
+afterAll(() => exitSpy.mockRestore());
 
 jest.mock('../models/index', () => {
-  const mockCourse: any = jest.fn().mockImplementation(function (this: any, data: any) {
-    Object.assign(this, data);
-    this._id = 'course-new';
-    this.save = jest.fn().mockResolvedValue(true);
-    mockCourse.instances.push(this);
-  });
-  mockCourse.instances = [];
-  mockCourse.find = jest.fn();
-  mockCourse.findOne = jest.fn();
-  mockCourse.findOneAndDelete = jest.fn();
+  const mockCourse = Object.assign(
+    jest.fn().mockImplementation(function (this: CourseFixture, data: object) {
+      Object.assign(this, data);
+      this._id = 'course-new';
+      this.save = jest.fn().mockResolvedValue(true);
+      mockCourse.instances.push(this);
+    }),
+    {
+      instances: new Array<CourseFixture>(),
+      find: jest.fn(),
+      findOne: jest.fn(),
+      findOneAndDelete: jest.fn()
+    }
+  );
   return {
     Course: mockCourse,
     Subject: { findOne: jest.fn() }
@@ -49,8 +59,8 @@ const { createSession } = require('../../../../tests/sessionFixtures');
 const jwt = { sign: createSession };
 
 const app = express();
-const fakeAuth = (req: any, res: any, next: any) => {
-  req.user = { userId: 'user-123', tier: 'vip' };
+const fakeAuth = (req: DomainRequest, res: Response, next: NextFunction) => {
+  req.user = { userId: 'user-123', tier: 'vip', role: 'student' };
   next();
 };
 
@@ -357,7 +367,7 @@ describe('INGEST-04 POST /api/v1/study/courses (polyglot/trailer/encryption → 
 });
 
 describe('INGEST-05 POST /api/v1/study/courses/:courseId/files (async re-ingest → 202)', () => {
-  let reIngestCourse: any;
+  let reIngestCourse: CourseFixture;
   beforeEach(() => {
     jest.clearAllMocks();
     Course.instances = [];

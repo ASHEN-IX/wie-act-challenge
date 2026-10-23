@@ -51,7 +51,7 @@ export async function replayDeadLetters(
     if (!msg) break;
     inspected += 1;
 
-    const headers: Record<string, any> = { ...(msg.properties.headers || {}) };
+    const headers: Record<string, unknown> = { ...(msg.properties.headers || {}) };
     const originalMessageId = msg.properties.messageId || headers['x-original-message-id'];
     delete headers[retryHeader];
     delete headers['x-last-failure'];

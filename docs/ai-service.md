@@ -8,7 +8,7 @@ cd ..
 pnpm dev:ai
 ```
 
-Configure process environment using the service `.env.example` and root `.env.ai.example` guidance. API needs Mongo settings and `AI_SERVICE_API_KEY` >=32 chars; Node's matching service key authenticates private HTTP requests. Provider keys/model aliases are separate in `litellm/config.yaml`. `LLM_CONFIG` can override YAML. `LLM_MOCK=1` forces mocks; absent recognized usable provider keys can also select mocks even with `LLM_MOCK=0`. Do not claim these as real inference.
+Configure process environment using the service `.env.example` and root `.env.ai.example` guidance. API needs Mongo settings and `AI_SERVICE_API_KEY` >=32 chars; Node's matching service key authenticates private HTTP requests. Provider keys/model aliases are separate in `litellm/config.yaml`. `LLM_CONFIG` can override YAML. `LLM_MOCK=1` explicitly enables test responders. Otherwise absent recognized usable provider keys raise `LLMUnavailableError` (`UNAVAILABLE`), including with `LLM_MOCK=0`. Mock responses are not approved inference.
 
 FastAPI mounts ingest/planning/coaching/signals/search/reflection/schedule routers with service authentication. `/health` is lightweight and does not prove agents/models/workers ready. Broker jobs require separate worker processes using the same broker/vhost/database/upload configuration:
 
@@ -25,7 +25,7 @@ Run worker commands from the repository root. The helpers load `study-partner-ai
 
 The [AI specification](ai-specification.md) documents actual ingestion/planner/scheduler/coach/evaluator/search/reflection behavior, current model configuration, and the separate PLANNED EdNova facilitator/category policy. Preserve BaseAIWorker leases, validated payloads, retries/DLQs, deterministic fallback and [message contract](contracts/ai-message-contract.md). Existing external provider fallback is not authorization to bypass organizer limits.
 
-Tests: `poetry run pytest tests agents -q` with known manual/network/heavy-model prerequisites reviewed first. Focused worker/state/schema tests can run in a lightweight compatible environment, but do not certify full ML/RAG/real inference. See [testing plan](testing-plan.md) and [actual validation](audit/validation.md). Root CI now installs through Poetry and runs named worker/contract/configuration/SSRF checks. This is not full ML/inference coverage. Docker pip dependencies still differ from Poetry; deployment parity remains separate work.
+Tests: `poetry run pytest tests agents -q` with known manual/network/heavy-model prerequisites reviewed first. Focused worker/state/schema tests can run in a lightweight compatible environment, but do not certify full ML/RAG/real inference. See [testing plan](testing-plan.md) and [actual validation](audit/validation.md). Root CI now installs through Poetry and runs named worker/contract/configuration/SSRF checks. This is not full ML/inference coverage. The AI Docker recipe installs the canonical Poetry lock with Python 3.12/Poetry 2.5.1; the [23 October 2026 M01 verification](../reports/EDNOVA-M01-FINAL-RUNTIME-VERIFICATION.md) records a passing complete image/import/health and isolated worker gate. Approved provider inference and GPU/media acceptance remain separate. Its BuildKit artifact cache preserves Poetry downloads across interrupted builds without adding cached wheels to runtime layers.
 
 ## v1.2 implementation scope
 

@@ -1,14 +1,21 @@
 import { randomUUID } from 'node:crypto';
 
+interface TestIdentity {
+  userId?: string;
+  exp?: number;
+  isActive?: boolean;
+  [key: string]: unknown;
+}
+
 interface SessionRecord {
-  identity: any;
+  identity: TestIdentity;
   invalid: boolean;
 }
 
 const sessions = new Map<string, SessionRecord>();
 
 export function createSession(
-  identity: any,
+  identity: TestIdentity,
   secret = 'test-secret-key',
   options: { expiresIn?: string } = {}
 ): string {
@@ -22,9 +29,10 @@ export function createSession(
 }
 
 export async function resolveIdentity(
-  headers: Record<string, any> = {}
-): Promise<{ identity: any; domain: any } | null> {
+  headers: Record<string, unknown> = {}
+): Promise<{ identity: TestIdentity; domain: TestIdentity } | null> {
   const cookie = headers.cookie || headers.Cookie || '';
+  if (typeof cookie !== 'string') return null;
   const token = cookie.match(/mindflow\.test_session=([^;]+)/)?.[1];
   if (!token) return null;
   const session = sessions.get(token);

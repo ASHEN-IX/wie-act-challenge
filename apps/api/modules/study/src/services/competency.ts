@@ -1,3 +1,4 @@
+import { errorDetails } from '@study-partner/shared/errors';
 /**
  * BLOOM-07 — CompetencyProfile estimator service.
  *
@@ -45,7 +46,9 @@ function computeConfidence(evidenceCount: number): number {
  * Sort evidence by evaluatedAt (oldest first) and replay EWMA to get the
  * canonical score for a given profile key.
  */
-function replayEvidence(evidence: IEvidenceEntry[]): { score: number; confidence: number } {
+function replayEvidence(
+  evidence: Array<Omit<IEvidenceEntry, 'masteryScore'> & { masteryScore?: number | null }>
+): { score: number; confidence: number } {
   const sorted = [...evidence]
     .filter((e) => e.masteryScore != null)
     .sort(
@@ -108,8 +111,8 @@ async function upsertProfile({
         { upsert: !existing, new: true, setDefaultsOnInsert: true }
       );
       if (updated) return updated;
-    } catch (error: any) {
-      if (error.code !== 11000) throw error;
+    } catch (error) {
+      if (errorDetails(error).code !== 11000) throw error;
     }
   }
   throw new Error('Concurrent competency update; retry after lease expiry');

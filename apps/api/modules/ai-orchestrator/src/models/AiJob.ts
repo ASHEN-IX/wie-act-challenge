@@ -30,7 +30,15 @@ const TRANSITIONS: Record<string, string[]> = {
   FAILED: []
 };
 
+export interface JobResourceScope {
+  courseId?: string;
+  sessionId?: string;
+  objectiveId?: string;
+  step?: number;
+}
+
 export interface IAiJob extends Document {
+  resourceScope?: JobResourceScope;
   jobId: string;
   type: string;
   userId: string;
@@ -38,7 +46,7 @@ export interface IAiJob extends Document {
   correlationId: string;
   messageId: string;
   status: JobStatus;
-  result: any;
+  result: unknown;
   error: string | null;
   attempts: number;
   fallbackUsed: boolean;
@@ -55,10 +63,18 @@ export interface IAiJobModel extends Model<IAiJob> {
     requestId?: string;
     correlationId: string;
     messageId: string;
-    payloadSnapshot?: any;
+    payloadSnapshot?: unknown;
   }): Promise<IAiJob>;
-  completeByCorrelation(correlationId: string, payload?: any): Promise<IAiJob | null>;
-  failByCorrelation(correlationId: string, sanitizedError?: string): Promise<IAiJob | null>;
+  completeByCorrelation(
+    correlationId: string,
+    payload?: unknown,
+    binding?: Pick<IAiJob, 'userId' | 'messageId' | 'type' | 'requestId'>
+  ): Promise<IAiJob | null>;
+  failByCorrelation(
+    correlationId: string,
+    sanitizedError?: string,
+    binding?: Pick<IAiJob, 'userId' | 'messageId' | 'type' | 'requestId'>
+  ): Promise<IAiJob | null>;
 }
 
 const aiJobSchema = new Schema<IAiJob, IAiJobModel>(
@@ -75,6 +91,7 @@ const aiJobSchema = new Schema<IAiJob, IAiJobModel>(
       default: 'PENDING',
       index: true
     },
+    resourceScope: { type: Schema.Types.Mixed },
     result: { type: Schema.Types.Mixed, default: null },
     error: {
       type: String,
@@ -88,7 +105,8 @@ const aiJobSchema = new Schema<IAiJob, IAiJobModel>(
     expireAt: { type: Date, default: null }
   },
   {
-    collection: 'ai_jobs'
+    collection: 'ai_jobs',
+    minimize: false // An explicit empty scope identifies authorized source-free jobs.
   }
 );
 
@@ -128,8 +146,18 @@ aiJobSchema.statics.createPending = function createPending({
   requestId?: string;
   correlationId: string;
   messageId: string;
-  payloadSnapshot?: any;
+  payloadSnapshot?: unknown;
 }) {
+  const source =
+    payloadSnapshot && typeof payloadSnapshot === 'object'
+      ? (payloadSnapshot as Record<string, unknown>)
+      : {};
+  const resourceScope: JobResourceScope = {};
+  for (const field of ['courseId', 'sessionId', 'objectiveId'] as const) {
+    const value = source[field] ?? source[field.replace(/[A-Z]/g, (c) => '_' + c.toLowerCase())];
+    if (typeof value === 'string' && value) resourceScope[field] = value;
+  }
+  if (typeof source.step === 'number') resourceScope.step = source.step;
   return this.create({
     type,
     userId,
@@ -137,33 +165,51 @@ aiJobSchema.statics.createPending = function createPending({
     correlationId,
     messageId,
     status: 'PENDING',
-    ...(payloadSnapshot !== undefined ? {} : {})
+    resourceScope
   });
 };
 
 /** Correlated completion — idempotent: replayed results are ignored once terminal. */
 aiJobSchema.statics.completeByCorrelation = async function completeByCorrelation(
   correlationId: string,
-  payload?: any
+  payload?: unknown,
+  binding?: Pick<IAiJob, 'userId' | 'messageId' | 'type' | 'requestId'>
 ) {
-  const job = await this.findOne({ correlationId });
-  if (!job) return null;
-  if (job.status === 'COMPLETED') return job; // duplicate result event
-  job.result = payload || {};
-  await job.transitionTo('COMPLETED');
-  return job;
+  const filter = { correlationId, ...binding };
+  const job = await this.findOneAndUpdate(
+    { ...filter, status: { $in: ['PENDING', 'PROCESSING', 'RETRYING'] } },
+    {
+      $set: {
+        status: 'COMPLETED',
+        result: payload || {},
+        updatedAt: new Date(),
+        expireAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      }
+    },
+    { new: true }
+  );
+  return job || this.findOne(filter);
 };
 
 aiJobSchema.statics.failByCorrelation = async function failByCorrelation(
   correlationId: string,
-  sanitizedError?: string
+  sanitizedError?: string,
+  binding?: Pick<IAiJob, 'userId' | 'messageId' | 'type' | 'requestId'>
 ) {
-  const job = await this.findOne({ correlationId });
-  if (!job) return null;
-  if (job.status === 'FAILED' || job.status === 'COMPLETED') return job;
-  job.error = String(sanitizedError || 'AI job failed').slice(0, 512);
-  await job.transitionTo('FAILED');
-  return job;
+  const filter = { correlationId, ...binding };
+  const job = await this.findOneAndUpdate(
+    { ...filter, status: { $in: ['PENDING', 'PROCESSING', 'RETRYING'] } },
+    {
+      $set: {
+        status: 'FAILED',
+        error: String(sanitizedError || 'AI job failed').slice(0, 512),
+        updatedAt: new Date(),
+        expireAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      }
+    },
+    { new: true }
+  );
+  return job || this.findOne(filter);
 };
 
 const AiJob =

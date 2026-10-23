@@ -4,11 +4,15 @@ import { hashPassword, verifyPassword } from 'better-auth/crypto';
 import { createAuthMiddleware, APIError } from 'better-auth/api';
 import { emailOTP } from 'better-auth/plugins';
 import { MongoClient, ObjectId, Db } from 'mongodb';
+// @ts-ignore
 import bcrypt from 'bcryptjs';
-import nodemailer from 'nodemailer';
+import nodemailer, { SendMailOptions } from 'nodemailer';
+import type { IncomingHttpHeaders } from 'node:http';
 import { effectiveTier } from './entitlements';
 
-let singleton: Promise<any> | undefined;
+export type AuthInstance = Awaited<ReturnType<typeof createAuth>>;
+
+let singleton: Promise<AuthInstance> | undefined;
 let client: MongoClient | undefined;
 
 export function trustedOrigins(): string[] {
@@ -17,9 +21,16 @@ export function trustedOrigins(): string[] {
     .map((value) => new URL(value.trim()).origin);
 }
 
-function normalizeOnboarding(input: any = {}) {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) input = {};
-  const strings = (value: any, limit: number): string[] =>
+function normalizeOnboarding(value: unknown = {}) {
+  const input: Record<string, unknown> =
+    value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+  const preferences =
+    input.notificationPreferences && typeof input.notificationPreferences === 'object'
+      ? input.notificationPreferences
+      : {};
+  const strings = (value: unknown, limit: number): string[] =>
     Array.isArray(value)
       ? value
           .filter((item) => typeof item === 'string')
@@ -39,23 +50,27 @@ function normalizeOnboarding(input: any = {}) {
           : 0
       )
     ),
-    studyLevel: ['beginner', 'intermediate', 'advanced'].includes(input.studyLevel)
-      ? input.studyLevel
-      : 'beginner',
-    studyTime: ['morning', 'afternoon', 'evening', 'night'].includes(input.studyTime)
-      ? input.studyTime
-      : 'evening',
+    studyLevel:
+      typeof input.studyLevel === 'string' &&
+      ['beginner', 'intermediate', 'advanced'].includes(input.studyLevel)
+        ? input.studyLevel
+        : 'beginner',
+    studyTime:
+      typeof input.studyTime === 'string' &&
+      ['morning', 'afternoon', 'evening', 'night'].includes(input.studyTime)
+        ? input.studyTime
+        : 'evening',
     timezone: typeof input.timezone === 'string' ? input.timezone.slice(0, 100) : 'UTC',
     language: typeof input.language === 'string' ? input.language.slice(0, 20) : 'en',
     notificationPreferences: {
-      email: input.notificationPreferences?.email !== false,
-      push: input.notificationPreferences?.push !== false
+      email: !('email' in preferences) || preferences.email !== false,
+      push: !('push' in preferences) || preferences.push !== false
     }
   };
 }
 
 export interface CreateAuthOptions {
-  sendMail?: (message: any) => Promise<void>;
+  sendMail?: (message: SendMailOptions) => Promise<void>;
   baseURL?: string;
 }
 
@@ -77,7 +92,7 @@ export async function createAuth(
     throw new Error('Production authentication requires HTTPS');
   const deliver =
     sendMail ||
-    (async (message: any) => {
+    (async (message: SendMailOptions) => {
       if (!process.env.SMTP_HOST)
         throw new Error('SMTP_HOST is required for authentication email delivery');
       const transport = nodemailer.createTransport({
@@ -127,7 +142,7 @@ export async function createAuth(
             ? bcrypt.compare(password, hash)
             : verifyPassword({ hash, password })
       },
-      sendResetPassword: async ({ user, url }: { user: any; url: string }) =>
+      sendResetPassword: async ({ user, url }) =>
         deliver({
           to: user.email,
           subject: 'Reset your Mindflow password',
@@ -137,13 +152,13 @@ export async function createAuth(
     emailVerification: {
       sendOnSignUp: true,
       expiresIn: 24 * 60 * 60,
-      sendVerificationEmail: async ({ user, url }: { user: any; url: string }) =>
+      sendVerificationEmail: async ({ user, url }) =>
         deliver({
           to: user.email,
           subject: 'Verify your Mindflow email',
           text: `Verify your email: ${url}`
         }),
-      afterEmailVerification: async (user: any): Promise<void> => {
+      afterEmailVerification: async (user): Promise<void> => {
         await db
           .collection('users')
           .updateOne({ _id: new ObjectId(user.id) }, { $set: { isVerified: true } });
@@ -164,7 +179,7 @@ export async function createAuth(
       })
     ],
     hooks: {
-      before: createAuthMiddleware(async (ctx: any) => {
+      before: createAuthMiddleware(async (ctx) => {
         if (['/sign-up/email', '/reset-password', '/change-password'].includes(ctx.path)) {
           const password = ctx.body?.newPassword || ctx.body?.password;
           if (
@@ -189,7 +204,7 @@ export async function createAuth(
     databaseHooks: {
       user: {
         create: {
-          after: async (user: any, context: any) => {
+          after: async (user, context) => {
             const now = new Date();
             await db.collection('users').updateOne(
               { _id: new ObjectId(user.id) },
@@ -216,7 +231,7 @@ export async function createAuth(
       },
       session: {
         create: {
-          before: async (session: any) => {
+          before: async (session) => {
             const user = await db
               .collection('users')
               .findOne({ _id: new ObjectId(session.userId) });
@@ -261,13 +276,23 @@ export async function getAuth() {
 
 export async function closeAuth() {
   await client?.close();
+  client = undefined;
   singleton = undefined;
 }
 
-export async function resolveIdentity(headers: any, auth?: any, db?: Db) {
+export async function resolveIdentity(
+  headers: Headers | IncomingHttpHeaders,
+  auth?: AuthInstance,
+  db?: Db
+) {
   auth ||= await getAuth();
   const session = await auth.api.getSession({
-    headers: new Headers(headers),
+    headers:
+      headers instanceof Headers
+        ? new Headers(headers)
+        : new Headers(
+            Object.fromEntries(Object.entries(headers).map(([key, value]) => [key, String(value)]))
+          ),
     query: { disableCookieCache: true }
   });
   if (!session) return null;
@@ -295,6 +320,7 @@ export async function resolveIdentity(headers: any, auth?: any, db?: Db) {
     identity: {
       userId: String(domain._id),
       email: domain.email,
+      name: domain.name || session.user.name || 'Learner',
       role: domain.role,
       isAdmin: domain.role === 'admin',
       tier: effectiveTier({

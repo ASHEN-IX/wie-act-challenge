@@ -1,7 +1,11 @@
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { FilterQuery } from 'mongoose';
+import type { IUser } from '../models/User';
+import type { IPayment } from '../models/Payment';
 import { createContracts } from '@study-partner/shared/domainContracts';
 import Joi from 'joi';
 import crypto from 'crypto';
-import type { Request, Response } from 'express';
+import type { Response } from 'express';
 import User from '../models/User';
 import Coupon from '../models/Coupon';
 import Payment from '../models/Payment';
@@ -31,10 +35,10 @@ const couponUpdateSchema = Joi.object({
 }).min(1);
 
 // GET /admin/users — List all users with tier info
-router.get('/users', async (req: Request, res: Response): Promise<any> => {
+router.get('/users', async (req: DomainRequest, res: Response) => {
   try {
-    const { tier, isActive, query, page = 1, limit = 50 } = req.query as Record<string, any>;
-    const filter: Record<string, any> = {};
+    const { tier, isActive, query, page = 1, limit = 50 } = req.query;
+    const filter: FilterQuery<IUser> = {};
     if (tier) filter.tier = tier;
     if (typeof isActive !== 'undefined') {
       filter.isActive = String(isActive).toLowerCase() === 'true';
@@ -72,7 +76,7 @@ router.get('/users', async (req: Request, res: Response): Promise<any> => {
 });
 
 // GET /admin/users/:userId — User detail
-router.get('/users/:userId', async (req: Request, res: Response): Promise<any> => {
+router.get('/users/:userId', async (req: DomainRequest, res: Response) => {
   try {
     const user = await User.findById(req.params.userId)
       .select('-password -refreshTokens -verificationToken -resetPasswordToken')
@@ -88,10 +92,10 @@ router.get('/users/:userId', async (req: Request, res: Response): Promise<any> =
 });
 
 // PUT /admin/users/:userId — Update user state/tier/admin status
-router.put('/users/:userId', async (req: Request, res: Response): Promise<any> => {
+router.put('/users/:userId', async (req: DomainRequest, res: Response) => {
   try {
     const { tier, isActive, isAdmin, role } = req.body || {};
-    const updates: Record<string, any> = {};
+    const updates: Partial<IUser> = {};
 
     if (typeof tier !== 'undefined') {
       if (!updatableTiers.includes(tier)) {
@@ -135,7 +139,7 @@ router.put('/users/:userId', async (req: Request, res: Response): Promise<any> =
 });
 
 // DELETE /admin/users/:userId — Soft deactivate user
-router.delete('/users/:userId', async (req: Request, res: Response): Promise<any> => {
+router.delete('/users/:userId', async (req: DomainRequest, res: Response) => {
   try {
     const user = await User.findByIdAndUpdate(
       req.params.userId,
@@ -153,7 +157,7 @@ router.delete('/users/:userId', async (req: Request, res: Response): Promise<any
 });
 
 // PUT /admin/users/:userId/tier — Change a user's tier
-router.put('/users/:userId/tier', async (req: Request, res: Response): Promise<any> => {
+router.put('/users/:userId/tier', async (req: DomainRequest, res: Response) => {
   try {
     const { userId } = req.params;
     const { tier } = req.body;
@@ -184,7 +188,7 @@ router.put('/users/:userId/tier', async (req: Request, res: Response): Promise<a
 });
 
 // GET /admin/stats — Tier distribution
-router.get('/stats', async (req: Request, res: Response): Promise<any> => {
+router.get('/stats', async (req: DomainRequest, res: Response) => {
   try {
     const stats = await User.aggregate([{ $group: { _id: '$tier', count: { $sum: 1 } } }]);
 
@@ -202,7 +206,7 @@ router.get('/stats', async (req: Request, res: Response): Promise<any> => {
 });
 
 // GET /admin/analytics/revenue — monthly revenue + ARR
-router.get('/analytics/revenue', async (req: Request, res: Response): Promise<any> => {
+router.get('/analytics/revenue', async (req: DomainRequest, res: Response) => {
   try {
     const now = new Date();
     const startOfYear = new Date(now.getFullYear(), 0, 1);
@@ -246,10 +250,10 @@ router.get('/analytics/revenue', async (req: Request, res: Response): Promise<an
 });
 
 // GET /admin/subscriptions — list subscription payments with user context
-router.get('/subscriptions', async (req: Request, res: Response): Promise<any> => {
+router.get('/subscriptions', async (req: DomainRequest, res: Response) => {
   try {
-    const { status = 'succeeded', tier, page = 1, limit = 50 } = req.query as Record<string, any>;
-    const filter: Record<string, any> = {};
+    const { status = 'succeeded', tier, page = 1, limit = 50 } = req.query;
+    const filter: FilterQuery<IPayment> = {};
 
     if (status && status !== 'all') {
       filter.status = status;
@@ -279,46 +283,43 @@ router.get('/subscriptions', async (req: Request, res: Response): Promise<any> =
 });
 
 // PUT /admin/subscriptions/:paymentId/cancel — force cancel subscription and downgrade user
-router.put(
-  '/subscriptions/:paymentId/cancel',
-  async (req: Request, res: Response): Promise<any> => {
-    try {
-      const payment = await Payment.findById(req.params.paymentId);
-      if (!payment) {
-        return res.status(404).json({ error: 'Subscription payment not found' });
-      }
-
-      payment.status = 'canceled';
-      await payment.save();
-
-      const user = await User.findById(payment.userId);
-      if (user) {
-        user.tier = 'normal';
-        user.tierChangedAt = new Date();
-        user.subscriptionId = null;
-        user.subscriptionStartAt = null;
-        user.subscriptionEndAt = null;
-        user.subscriptionDurationMonths = 0;
-        user.renewalDate = null;
-        user.canChangeAfter = null;
-        user.autoRenew = false;
-        await user.save();
-      }
-
-      return res.json({
-        message: 'Subscription canceled',
-        payment,
-        user: user?.toJSON?.() || null
-      });
-    } catch (error) {
-      console.error('Error canceling subscription:', error);
-      return res.status(500).json({ error: 'Failed to cancel subscription' });
+router.put('/subscriptions/:paymentId/cancel', async (req: DomainRequest, res: Response) => {
+  try {
+    const payment = await Payment.findById(req.params.paymentId);
+    if (!payment) {
+      return res.status(404).json({ error: 'Subscription payment not found' });
     }
+
+    payment.status = 'canceled';
+    await payment.save();
+
+    const user = await User.findById(payment.userId);
+    if (user) {
+      user.tier = 'normal';
+      user.tierChangedAt = new Date();
+      user.subscriptionId = null;
+      user.subscriptionStartAt = null;
+      user.subscriptionEndAt = null;
+      user.subscriptionDurationMonths = 0;
+      user.renewalDate = null;
+      user.canChangeAfter = null;
+      user.autoRenew = false;
+      await user.save();
+    }
+
+    return res.json({
+      message: 'Subscription canceled',
+      payment,
+      user: user?.toJSON?.() || null
+    });
+  } catch (error) {
+    console.error('Error canceling subscription:', error);
+    return res.status(500).json({ error: 'Failed to cancel subscription' });
   }
-);
+});
 
 // GET /admin/coupons — list all coupons
-router.get('/coupons', async (req: Request, res: Response): Promise<any> => {
+router.get('/coupons', async (req: DomainRequest, res: Response) => {
   try {
     const coupons = await Coupon.find()
       .populate('createdBy', 'email name')
@@ -332,7 +333,7 @@ router.get('/coupons', async (req: Request, res: Response): Promise<any> => {
 });
 
 // POST /admin/coupons — create coupon
-router.post('/coupons', async (req: Request, res: Response): Promise<any> => {
+router.post('/coupons', async (req: DomainRequest, res: Response) => {
   try {
     const { error, value } = couponCreateSchema.validate(req.body || {});
     if (error) {
@@ -354,7 +355,7 @@ router.post('/coupons', async (req: Request, res: Response): Promise<any> => {
       durationDays: value.durationDays,
       maxUses: value.maxUses,
       expiresAt: value.expiresAt || null,
-      createdBy: (req as any).user.userId,
+      createdBy: req.user!.userId,
       isActive: true
     });
 
@@ -366,7 +367,7 @@ router.post('/coupons', async (req: Request, res: Response): Promise<any> => {
 });
 
 // PUT /admin/coupons/:couponId — update coupon
-router.put('/coupons/:couponId', async (req: Request, res: Response): Promise<any> => {
+router.put('/coupons/:couponId', async (req: DomainRequest, res: Response) => {
   try {
     const { error, value } = couponUpdateSchema.validate(req.body || {});
     if (error) {
@@ -390,7 +391,7 @@ router.put('/coupons/:couponId', async (req: Request, res: Response): Promise<an
 });
 
 // DELETE /admin/coupons/:couponId — soft delete (deactivate)
-router.delete('/coupons/:couponId', async (req: Request, res: Response): Promise<any> => {
+router.delete('/coupons/:couponId', async (req: DomainRequest, res: Response) => {
   try {
     const coupon = await Coupon.findByIdAndUpdate(
       req.params.couponId,
@@ -409,7 +410,7 @@ router.delete('/coupons/:couponId', async (req: Request, res: Response): Promise
 });
 
 // GET /admin/coupons/:couponId/usage — usage history
-router.get('/coupons/:couponId/usage', async (req: Request, res: Response): Promise<any> => {
+router.get('/coupons/:couponId/usage', async (req: DomainRequest, res: Response) => {
   try {
     const coupon = await Coupon.findById(req.params.couponId)
       .populate('usageHistory.userId', 'email name')

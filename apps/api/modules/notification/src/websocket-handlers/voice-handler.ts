@@ -3,11 +3,17 @@ import { updateSpeakingStatus, updateMute } from '../services/voiceService';
 export interface VoiceHandlerContext {
   sessionId: string;
   userId: string;
-  broadcastToSession: (sessionId: string, payload: any) => Promise<void> | void;
+  broadcastToSession: (sessionId: string, payload: Record<string, unknown>) => Promise<void> | void;
 }
 
 export interface VoiceHandlerArgs {
-  payload: any;
+  payload: {
+    signalType?: string;
+    targetUserId?: string | null;
+    signal?: unknown;
+    isMuted?: unknown;
+    speakingStatus?: 'silent' | 'speaking' | 'loud';
+  };
   context: VoiceHandlerContext;
 }
 

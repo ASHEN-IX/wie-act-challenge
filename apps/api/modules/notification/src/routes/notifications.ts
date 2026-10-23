@@ -1,9 +1,16 @@
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { FilterQuery } from 'mongoose';
+import type { INotification } from '../models/Notification';
 import { createContracts } from '@study-partner/shared/domainContracts';
 import Joi from 'joi';
-import type { Request, Response, NextFunction } from 'express';
+import type { Response, NextFunction } from 'express';
 import Notification from '../models/Notification';
 import { isEmailEnabled, sendNotificationEmail } from '../services/emailService';
 import { requireInternal } from '@study-partner/shared/auth';
+import {
+  broadcastToSession as realtimeBroadcastToSession,
+  broadcastToUser as realtimeBroadcastToUser
+} from '../realtime';
 
 const router = createContracts();
 
@@ -41,13 +48,13 @@ const createSchema = Joi.object({
 
 // ── GET /api/v1/notifications?status=...&limit=... ──
 // Scoped to the authenticated user (req.user.userId); the userId query param is ignored.
-router.get('/', async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+router.get('/', async (req: DomainRequest, res: Response, next: NextFunction) => {
   try {
-    const { status, limit = 50, offset = 0 } = req.query as Record<string, any>;
+    const { status, limit = 50, offset = 0 } = req.query;
     const dbTimeoutMs = Number(process.env.NOTIFICATION_DB_TIMEOUT_MS || 8000);
-    const userId = (req as any).user.userId;
+    const userId = req.user!.userId;
 
-    const filter: Record<string, any> = { userId };
+    const filter: FilterQuery<INotification> = { userId };
     if (status) filter.status = status;
 
     const [notifications, total] = await Promise.all([
@@ -75,13 +82,13 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
 router.post(
   '/broadcast',
   requireInternal,
-  async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+  async (req: DomainRequest, res: Response, next: NextFunction) => {
     try {
       const { userIds, payload } = req.body;
       if (!Array.isArray(userIds) || !payload) {
         return res.status(400).json({ error: 'userIds (array) and payload are required' });
       }
-      const broadcastToUser = (req.app.locals as any).broadcastToUser;
+      const broadcastToUser = req.app?.locals?.broadcastToUser || realtimeBroadcastToUser;
       if (broadcastToUser) {
         userIds.forEach((uid: string) => broadcastToUser(uid, payload));
       }
@@ -92,59 +99,75 @@ router.post(
   }
 );
 
-// ── POST /api/v1/notifications — internal services only (or admins) ──
+// ── POST /api/v1/notifications/broadcast-session — broadcast to all sockets in a room ──
 router.post(
-  '/',
+  '/broadcast-session',
   requireInternal,
-  async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+  async (req: DomainRequest, res: Response, next: NextFunction) => {
     try {
-      const { error, value } = createSchema.validate(req.body);
-      if (error) {
-        return res.status(400).json({ error: error.details[0].message });
+      const { sessionId, roomId, payload } = req.body;
+      const targetId = roomId || sessionId;
+      if (!targetId || !payload) {
+        return res.status(400).json({ error: 'sessionId/roomId and payload are required' });
       }
-
-      const normalizedValue = {
-        ...value,
-        metadata:
-          value.metadata && Object.keys(value.metadata).length > 0
-            ? value.metadata
-            : value.data || {}
-      };
-      delete normalizedValue.data;
-
-      const notification = await Notification.create(normalizedValue);
-
-      // Push via WebSocket if available
-      const broadcastToUser = (req.app.locals as any).broadcastToUser;
-      if (broadcastToUser) {
-        broadcastToUser(normalizedValue.userId, {
-          type: 'new_notification',
-          notification: notification.toObject()
-        });
+      const broadcastToSession = req.app?.locals?.broadcastToSession || realtimeBroadcastToSession;
+      if (broadcastToSession) {
+        await broadcastToSession(targetId, payload);
       }
-
-      const shouldEmail =
-        isEmailEnabled() &&
-        ['achievement', 'level_up', 'study_reminder', 'session_start', 'plan_generated'].includes(
-          notification.type
-        );
-
-      let emailResult = null;
-      if (shouldEmail) {
-        emailResult = await sendNotificationEmail({ req, notification: notification.toObject() });
-      }
-
-      return res.status(201).json({ ...notification.toObject(), email: emailResult });
+      return res.json({ delivered: true, targetId });
     } catch (err) {
       return next(err);
     }
   }
 );
 
+// ── POST /api/v1/notifications — internal services only (or admins) ──
+router.post('/', requireInternal, async (req: DomainRequest, res: Response, next: NextFunction) => {
+  try {
+    const { error, value } = createSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ error: error.details[0].message });
+    }
+
+    const normalizedValue = {
+      ...value,
+      metadata:
+        value.metadata && Object.keys(value.metadata).length > 0 ? value.metadata : value.data || {}
+    };
+    delete normalizedValue.data;
+
+    const notification = await Notification.create(normalizedValue);
+
+    // Push via WebSocket if available
+    const broadcastToUser = req.app?.locals?.broadcastToUser || realtimeBroadcastToUser;
+    if (broadcastToUser) {
+      broadcastToUser(normalizedValue.userId, {
+        type: 'new_notification',
+        notification: notification.toObject()
+      });
+    }
+
+    const shouldEmail =
+      isEmailEnabled() &&
+      ['achievement', 'level_up', 'study_reminder', 'session_start', 'plan_generated'].includes(
+        notification.type
+      );
+
+    let emailResult = null;
+    if (shouldEmail) {
+      emailResult = await sendNotificationEmail({ req, notification: notification.toObject() });
+    }
+
+    return res.status(201).json({ ...notification.toObject(), email: emailResult });
+  } catch (err) {
+    return next(err);
+  }
+});
+
 router.post(
   '/email/test',
   requireInternal,
-  async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+  async (req: DomainRequest, res: Response, next: NextFunction) => {
     try {
       if (process.env.NODE_ENV === 'production') {
         return res.status(403).json({ error: 'Email test disabled in production' });
@@ -166,10 +189,10 @@ router.post(
 );
 
 // ── PATCH /api/v1/notifications/:id/read — owner-only ──
-router.patch('/:id/read', async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+router.patch('/:id/read', async (req: DomainRequest, res: Response, next: NextFunction) => {
   try {
     const notification = await Notification.findByIdAndUpdate(
-      { _id: req.params.id, userId: (req as any).user.userId },
+      { _id: req.params.id, userId: req.user!.userId },
       { status: 'read', readAt: new Date() },
       { new: true }
     );
@@ -185,9 +208,9 @@ router.patch('/:id/read', async (req: Request, res: Response, next: NextFunction
 });
 
 // ── PATCH /api/v1/notifications/read-all — scoped to authenticated user ──
-router.patch('/read-all', async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+router.patch('/read-all', async (req: DomainRequest, res: Response, next: NextFunction) => {
   try {
-    const userId = (req as any).user.userId;
+    const userId = req.user!.userId;
 
     const result = await Notification.updateMany(
       { userId, status: 'unread' },
@@ -201,10 +224,10 @@ router.patch('/read-all', async (req: Request, res: Response, next: NextFunction
 });
 
 // ── DELETE /api/v1/notifications/:id — owner-only ──
-router.delete('/:id', async (req: Request, res: Response, next: NextFunction): Promise<any> => {
+router.delete('/:id', async (req: DomainRequest, res: Response, next: NextFunction) => {
   try {
     const notification = await Notification.findByIdAndUpdate(
-      { _id: req.params.id, userId: (req as any).user.userId },
+      { _id: req.params.id, userId: req.user!.userId },
       { status: 'dismissed' },
       { new: true }
     );

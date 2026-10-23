@@ -1,3 +1,5 @@
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { Response, NextFunction } from 'express';
 /**
  * BLOOM-09 — Competency API tests.
  */
@@ -17,8 +19,8 @@ const competencyRoutes = require('../routes/competencies');
 const app = express();
 app.use(express.json());
 
-const fakeAuth = (req: any, res: any, next: any) => {
-  req.user = { userId: 'user-123' };
+const fakeAuth = (req: DomainRequest, res: Response, next: NextFunction) => {
+  req.user = { userId: 'user-123', role: 'student' };
   next();
 };
 
@@ -58,7 +60,7 @@ describe('GET /api/v1/competencies', () => {
       subjectId: undefined,
       knowledgeTypeBreakdown: false
     });
-    expect(res.headers['cache-control']).toMatch(/max-age=/);
+    expect(res.headers['cache-control']).toBe('private, no-store');
   });
 
   test('forwards subjectId filter and knowledgeType breakdown', async () => {
@@ -142,7 +144,7 @@ describe('groupKnowledgeTypes', () => {
       { knowledgeType: 'procedural', score: 0.5, confidence: 0.3, evidence: [] }
     ]);
     expect(out).toHaveLength(2);
-    const conceptual = out.find((k: any) => k.knowledgeType === 'conceptual');
+    const conceptual = out.find((k: { knowledgeType: string }) => k.knowledgeType === 'conceptual');
     expect(conceptual.score).toBe(0.7);
     expect(conceptual.confidence).toBe(0.6);
     expect(conceptual.count).toBe(2);
@@ -201,7 +203,7 @@ describe('getUserCompetencyMap (real implementation, mocked models)', () => {
     expect(map[0].subjectName).toBe('Algorithms');
     expect(map[0].topics[0].topicName).toBe('Sorting');
     const levels = map[0].topics[0].levels;
-    expect(levels.map((l: any) => l.bloomLevel)).toEqual(['REMEMBER', 'APPLY']);
+    expect(levels.map((l: { bloomLevel: string }) => l.bloomLevel)).toEqual(['REMEMBER', 'APPLY']);
     expect(levels[0].count).toBe(1);
   });
 
@@ -334,7 +336,9 @@ describe('getUserCompetencyMap (real implementation, mocked models)', () => {
     });
 
     const map = await realGetUserCompetencyMap('u1', { knowledgeTypeBreakdown: true });
-    const apply = map[0].topics[0].levels.find((l: any) => l.bloomLevel === 'APPLY');
+    const apply = map[0].topics[0].levels.find(
+      (l: { bloomLevel: string }) => l.bloomLevel === 'APPLY'
+    );
     expect(apply.knowledgeTypes).toBeDefined();
     expect(apply.knowledgeTypes).toHaveLength(2);
   });

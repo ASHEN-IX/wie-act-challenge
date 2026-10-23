@@ -52,7 +52,7 @@ export const RETRY_DELAYS_MS: readonly number[] = Object.freeze(
     if (
       !Array.isArray(parsed) ||
       !parsed.length ||
-      parsed.some((n: any) => !Number.isInteger(n) || n < 1)
+      parsed.some((n: unknown) => typeof n !== 'number' || !Number.isInteger(n) || n < 1)
     ) {
       throw new Error('AI_RETRY_DELAYS_MS must be a JSON array of positive integers');
     }
@@ -85,9 +85,10 @@ export const FAILURE_CLASSES = Object.freeze({
   TERMINAL: 'terminal'
 } as const);
 
-export function classifyFailure(err: any): 'retryable' | 'terminal' {
-  const message = String((err && err.message) || err || '');
-  const code = (err && (err.code || err.name)) || '';
+export function classifyFailure(err: unknown): 'retryable' | 'terminal' {
+  const fields = err && typeof err === 'object' ? err : {};
+  const message = String(('message' in fields && fields.message) || err || '');
+  const code = ('code' in fields && fields.code) || ('name' in fields && fields.name) || '';
   const combined = `${code} ${message}`.toLowerCase();
 
   const terminalPatterns = [

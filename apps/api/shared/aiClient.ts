@@ -4,7 +4,7 @@ import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 export const getBaseUrl = (): string => process.env.AI_SERVICE_URL || 'http://localhost:8000';
 
 export async function request(
-  method: string,
+  method: 'GET' | 'DELETE' | 'POST' | 'PUT' | 'PATCH',
   address: string,
   data?: unknown,
   config: AxiosRequestConfig = {}
@@ -13,7 +13,7 @@ export async function request(
   const url = new URL(address, base);
   if (url.origin !== base.origin) throw new Error('Outbound AI request must target AI_SERVICE_URL');
 
-  const headers: Record<string, any> = Object.fromEntries(
+  const headers: AxiosRequestConfig['headers'] = Object.fromEntries(
     Object.entries(config.headers || {}).filter(
       ([key]) => !['cookie', 'authorization', 'x-internal-secret'].includes(key.toLowerCase())
     )
@@ -32,11 +32,24 @@ export async function request(
   // Retry a safe read once; never replay AI job creation or LLM mutations.
   for (let attempt = 0; ; attempt++) {
     try {
-      if (['GET', 'DELETE'].includes(method.toUpperCase()))
-        return await (axios as any)[method.toLowerCase()](url.href, options);
-      return await (axios as any)[method.toLowerCase()](url.href, data, options);
-    } catch (error: any) {
-      if (method.toUpperCase() === 'GET' && attempt === 0 && !error.response) continue;
+      switch (method.toUpperCase()) {
+        case 'GET':
+          return await axios.get(url.href, options);
+        case 'DELETE':
+          return await axios.delete(url.href, options);
+        case 'POST':
+          return await axios.post(url.href, data, options);
+        case 'PUT':
+          return await axios.put(url.href, data, options);
+        case 'PATCH':
+          return await axios.patch(url.href, data, options);
+        default:
+          throw new Error('Unsupported AI request method');
+      }
+    } catch (error) {
+      const hasResponse =
+        error && typeof error === 'object' && 'response' in error && error.response;
+      if (method.toUpperCase() === 'GET' && attempt === 0 && !hasResponse) continue;
       throw error;
     }
   }

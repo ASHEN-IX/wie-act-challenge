@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from deps import convert_objectid_to_str, get_planner_agent
+from services.api.deps import get_planner_agent
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -20,6 +20,7 @@ class PlannerRequest(BaseModel):
     available_time_minutes: int
     start_date: Optional[datetime] = None
     course_id: Optional[str] = None
+    course_knowledge: Optional[dict] = None
     calendar_events: Optional[list] = (
         []
     )  # User's blocked time slots from Node.js backend
@@ -50,48 +51,16 @@ async def create_study_plan(request: PlannerRequest):
     try:
         from agents.planner.models.task_graph import PlannerInput
 
-        # Fetch course documents if course_id provided
-        course_knowledge = None
+        # Node supplies the owner-authorized, minimized source projection.
+        # A service credential alone is not a license to resolve arbitrary IDs.
+        course_knowledge = request.course_knowledge
         if request.course_id:
-            from agents.course_ingestion.services.database_service import (
-                DatabaseService,
-            )
-
-            db_service = DatabaseService()
-            course = db_service.get_course_by_id(request.course_id)
-            if course:
-                # Convert all ObjectIds to strings for JSON serialization
-                course_knowledge = convert_objectid_to_str(course)
-                print(
-                    f"DEBUG: Course knowledge loaded for course_id {request.course_id}"
-                )
-                print(
-                    f"DEBUG: Course has {len(course_knowledge.get('topics', []))} topics"
-                )
-                if (
-                    course_knowledge.get("topics")
-                    and len(course_knowledge["topics"]) > 0
-                ):
-                    first_topic = course_knowledge["topics"][0]
-                    if "subtopics" in first_topic and len(first_topic["subtopics"]) > 0:
-                        first_subtopic = first_topic["subtopics"][0]
-                        has_tokenized = "tokenized_chunks" in first_subtopic
-                        has_summary = "summary" in first_subtopic
-                        print(
-                            f"DEBUG: First subtopic has tokenized_chunks: {has_tokenized}, has summary: {has_summary}"
-                        )
-                        if has_tokenized:
-                            print(
-                                f"DEBUG: tokenized_chunks length: {len(first_subtopic['tokenized_chunks'])}"
-                            )
-                            print(
-                                f"DEBUG: First chunk preview: {first_subtopic['tokenized_chunks'][0][:100]}..."
-                            )
-                        if has_summary:
-                            print(
-                                f"DEBUG: summary preview: {first_subtopic['summary'][:100]}..."
-                            )
-
+            if course_knowledge is None:
+                raise HTTPException(status_code=503, detail="Authorized course context unavailable")
+            if str(course_knowledge.get("_id", "")) != request.course_id:
+                raise HTTPException(status_code=422, detail="Course context mismatch")
+        elif course_knowledge is not None:
+            raise HTTPException(status_code=422, detail="Course identity required")
         # Create planner input
         if request.start_date:
             deadline_iso = request.start_date.isoformat()
@@ -105,12 +74,6 @@ async def create_study_plan(request: PlannerRequest):
             user_id=request.user_id,
             course_knowledge=course_knowledge,
         )
-
-        print(
-            f"DEBUG: Created planner input with goal: '{request.goal}', course_knowledge: {course_knowledge is not None}"
-        )
-        if course_knowledge:
-            print(f"DEBUG: Course title: {course_knowledge.get('course_title', 'N/A')}")
 
         # Generate plan using planner agent
         planner_agent = get_planner_agent()
@@ -146,6 +109,8 @@ async def create_study_plan(request: PlannerRequest):
             "warning": plan_output.warning if hasattr(plan_output, "warning") else None,
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Study plan creation failed: {e}")
         import traceback

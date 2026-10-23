@@ -19,6 +19,7 @@ from utils import llm_client
 from utils.llm_client import (
     AGENT_GROUPS,
     LLMRequestError,
+    LLMUnavailableError,
     MissingMockResponderError,
     agent_config,
     ask,
@@ -94,10 +95,11 @@ def test_config_path_env_override(tmp_path, monkeypatch):
 
 # ---------------------------------------------------------------- mocking #
 
-def test_mock_used_when_no_keys(monkeypatch):
+def test_no_keys_are_unavailable(monkeypatch):
     _with_keys(monkeypatch)
-    out = ask("coach", "sys", "hello there", mock_fn=lambda up: "MOCK:" + up)
-    assert out == "MOCK:hello there"
+    with pytest.raises(LLMUnavailableError, match="UNAVAILABLE") as exc:
+        ask("coach", "sys", "hello there", mock_fn=lambda up: "MOCK:" + up)
+    assert exc.value.state == "UNAVAILABLE"
 
 
 def test_mock_forced_by_env(monkeypatch):
@@ -106,10 +108,12 @@ def test_mock_forced_by_env(monkeypatch):
     assert ask("coach", "sys", "hi", mock_fn=lambda up: "m") == "m"
 
 
-def test_dummy_gemini_key_means_mock(monkeypatch):
+def test_dummy_gemini_key_is_unavailable_without_explicit_mock(monkeypatch):
     _with_keys(monkeypatch, GEMINI_API_KEY="dummy_key_for_testing")
-    # Dummy counts as absent, no real key anywhere → mock.
-    assert llm_client._should_mock("coach")
+    # Dummy counts as absent and must not enable mock mode.
+    assert not llm_client._should_mock("coach")
+    with pytest.raises(LLMUnavailableError):
+        ask("coach", "sys", "user", mock_fn=lambda _: "synthetic")
     # A real fallback key is enough to attempt a real call (router will
     # fail over to groq if the primary provider key is missing).
     _with_keys(monkeypatch, GEMINI_API_KEY="dummy_key_for_testing", GROQ_API_KEY="real-key")
@@ -118,9 +122,10 @@ def test_dummy_gemini_key_means_mock(monkeypatch):
 
 def test_missing_mock_fn_raises(monkeypatch):
     _with_keys(monkeypatch)
+    monkeypatch.setenv("LLM_MOCK", "1")
     with pytest.raises(MissingMockResponderError) as exc:
         ask("coach", "sys", "hi")
-    assert "no API key" in str(exc.value)
+    assert "LLM_MOCK=1" in str(exc.value)
 
 
 # -------------------------------------------------------------- real path #
@@ -191,15 +196,16 @@ def test_reset_router_rebuilds():
 
 # ------------------------------------------------------------- end-to-end #
 # ask() must return a coach-style mock payload through the client when keys are
-# absent — the behaviour the decider's call_gemini relies on.
+# absent and explicit LLM_MOCK=1 is selected.
 
-def test_coach_decider_produces_mock_json_without_keys(monkeypatch):
+def test_coach_decider_produces_mock_json_only_in_explicit_mock_mode(monkeypatch):
     import json as _json
 
     from agents.coach.decision import llm_decider
     from agents.coach.decision.prompt import SYSTEM_PROMPT
 
     _with_keys(monkeypatch)
+    monkeypatch.setenv("LLM_MOCK", "1")
     raw = llm_decider.call_gemini(SYSTEM_PROMPT, "Student state looks focused")
     assert isinstance(raw, str)
     data = _json.loads(raw)

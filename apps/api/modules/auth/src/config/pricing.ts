@@ -40,7 +40,7 @@ export function calculatePlanPrice(tier: string, durationMonths: number = 1): Ca
     throw new Error(`Unsupported plan tier: ${tier}`);
   }
 
-  if (!MONTH_OPTIONS.includes(normalizedMonths as any)) {
+  if (!MONTH_OPTIONS.some((months) => months === normalizedMonths)) {
     throw new Error(`Unsupported durationMonths: ${normalizedMonths}`);
   }
 

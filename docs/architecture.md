@@ -42,7 +42,7 @@ Authoritative endpoint registration is `src/domain-definitions.ts` and generated
 
 ## Identity, authorization and storage
 
-Better Auth uses `auth_users`, `auth_accounts`, `auth_sessions`, `auth_verifications` and `auth_rate_limits` alongside preserved domain `users`. Session identity is resolved from Mongo-backed cookies; bcrypt compatibility supports old passwords. API SessionGuard authenticates; domain roles and tier gates restrict operations. `operationPolicy.ts` scopes AI actor/resource references and namespaces evaluation conversation IDs. Existing global roles are student/admin; there are no institution membership or course enrollment schemas.
+Better Auth uses `auth_users`, `auth_accounts`, `auth_sessions`, `auth_verifications` and `auth_rate_limits` alongside preserved domain `users`. Session identity is resolved from Mongo-backed cookies; bcrypt compatibility supports old passwords. API SessionGuard authenticates; domain roles and tier gates restrict operations. `operationPolicy.ts` scopes AI actor/resource references and namespaces evaluation conversation IDs. Existing global roles are student/admin; M04-A/M04-A.1 adds institution membership and invitation schemas, but no course enrollment or institutional course scope exists.
 
 Owner filters exist on personal course reads/downloads. Team creation's course lookup, session-chat/voice HTTP resource checks and generic static `/uploads` mounts require review: presence of authentication is not proof of content isolation. WebSocket connect and inbound messages check identity and team membership; session broadcast/heartbeat behavior must also be tested under revocation. See ED-02 and [roles](roles-and-permissions.md).
 

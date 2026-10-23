@@ -12,8 +12,11 @@ COPY apps/api/modules/analytics/package.json ./apps/api/modules/analytics/packag
 COPY apps/api/modules/notification/package.json ./apps/api/modules/notification/package.json
 COPY apps/api/shared/package.json ./apps/api/shared/package.json
 COPY apps/web/package.json ./apps/web/package.json
-RUN --mount=type=cache,id=mindflow-pnpm,target=/pnpm/store pnpm install --network-concurrency=4 --store-dir /pnpm/store --frozen-lockfile --filter web...
-COPY apps/api/shared ./apps/api/shared
+# The web strict check also checks the real API-backed browser launchers. Keep
+# their owning API sources/dependencies in the builder; standalone tracing still
+# determines the runtime image contents.
+RUN --mount=type=cache,id=mindflow-pnpm,target=/pnpm/store pnpm install --network-concurrency=4 --store-dir /pnpm/store --frozen-lockfile --filter web... --filter api...
+COPY apps/api ./apps/api
 COPY apps/web ./apps/web
 ARG BACKEND_URL=http://app:3000
 ENV BACKEND_URL=$BACKEND_URL

@@ -2,6 +2,18 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import type { Request, Response, NextFunction } from 'express';
+import type { DomainRequest } from '../src/framework/contracts';
+import type Redis from 'ioredis';
+import type { RedisStore as RateRedisStore } from 'rate-limit-redis';
+
+interface HttpError extends Error {
+  statusCode?: number;
+  status?: number;
+}
+type RedisCommand = Extract<
+  ConstructorParameters<typeof RateRedisStore>[0],
+  { sendCommand: unknown }
+>['sendCommand'];
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const logger = require('./logger');
 import { v4 as uuidv4 } from 'uuid';
@@ -9,7 +21,7 @@ import { v4 as uuidv4 } from 'uuid';
 /**
  * Security headers middleware (helmet)
  */
-export function securityMiddleware(): any {
+export function securityMiddleware() {
   return helmet({
     contentSecurityPolicy: false, // Disabled for API-only services
     crossOriginResourcePolicy: { policy: 'cross-origin' }
@@ -19,7 +31,7 @@ export function securityMiddleware(): any {
 /**
  * CORS middleware configuration
  */
-export function corsMiddleware(): any {
+export function corsMiddleware() {
   const allowedOrigins =
     process.env.AUTH_TRUSTED_ORIGINS || process.env.CORS_ORIGIN
       ? (process.env.AUTH_TRUSTED_ORIGINS || process.env.CORS_ORIGIN)!
@@ -38,9 +50,9 @@ export function corsMiddleware(): any {
 /**
  * Request logging middleware
  */
-export function loggingMiddleware(req: Request, res: Response, next: NextFunction): void {
+export function loggingMiddleware(req: DomainRequest, res: Response, next: NextFunction): void {
   const requestId = uuidv4();
-  (req as any).requestId = requestId;
+  req.requestId = requestId;
 
   const startTime = Date.now();
 
@@ -70,8 +82,13 @@ export function loggingMiddleware(req: Request, res: Response, next: NextFunctio
 /**
  * Error handling middleware
  */
-export function errorHandler(err: any, req: Request, res: Response, _next: NextFunction): void {
-  const requestId = (req as any).requestId || 'unknown';
+export function errorHandler(
+  err: HttpError,
+  req: DomainRequest,
+  res: Response,
+  _next: NextFunction
+): void {
+  const requestId = req.requestId || 'unknown';
 
   logger.error(`[${requestId}] Error:`, {
     requestId,
@@ -93,14 +110,14 @@ export function errorHandler(err: any, req: Request, res: Response, _next: NextF
  * Rate limiting middleware — Redis-backed when REDIS_URL is set, falls back to
  * in-memory otherwise. Keys by authenticated userId when available, otherwise IP.
  */
-let redisRateClient: any = null;
+let redisRateClient: Redis | null = null;
 let limiterIndex = 0;
-function _getRedisStore(): any {
+function _getRedisStore(): RateRedisStore | null {
   if (!process.env.REDIS_URL) return null;
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const Redis = require('ioredis');
+  const Redis: typeof import('ioredis').default = require('ioredis');
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { RedisStore } = require('rate-limit-redis');
+  const { RedisStore }: typeof import('rate-limit-redis') = require('rate-limit-redis');
   if (!redisRateClient) {
     redisRateClient = new Redis(process.env.REDIS_URL, {
       maxRetriesPerRequest: 1,
@@ -108,8 +125,10 @@ function _getRedisStore(): any {
     });
     redisRateClient.on('error', () => {});
   }
+  const client = redisRateClient;
   const store = new RedisStore({
-    sendCommand: (...args: any[]) => redisRateClient.call(...args),
+    sendCommand: (...args: string[]) =>
+      client.call(args[0], ...args.slice(1)) as ReturnType<RedisCommand>,
     prefix: `rl:module:${limiterIndex++}:`
   });
   // Store scripts load before the first request. Observe failures so optional Redis
@@ -126,7 +145,7 @@ export async function closeRateLimits(): Promise<void> {
   }
 }
 
-export function rateLimiter(maxRequests: number = 100, windowMs: number = 60000): any {
+export function rateLimiter(maxRequests: number = 100, windowMs: number = 60000) {
   const store = _getRedisStore();
   return rateLimit({
     windowMs,
@@ -134,8 +153,8 @@ export function rateLimiter(maxRequests: number = 100, windowMs: number = 60000)
     message: 'Too many requests, please try again later.',
     standardHeaders: true,
     legacyHeaders: false,
-    skip: (req: any) => req[Symbol.for('mindflow.moduleCall')] === true,
-    keyGenerator: (req: any) => (req.user && req.user.userId) || req.ip,
+    skip: (req: Request) => Reflect.get(req, Symbol.for('mindflow.moduleCall')) === true,
+    keyGenerator: (req: DomainRequest) => req.user?.userId || req.ip || 'unknown',
     ...(store ? { store } : {})
   });
 }
@@ -145,7 +164,7 @@ export function rateLimiter(maxRequests: number = 100, windowMs: number = 60000)
  */
 export function healthCheck(serviceName: string) {
   return async (_req: Request, res: Response): Promise<void> => {
-    const health: Record<string, any> = {
+    const health: Record<string, unknown> = {
       status: 'healthy',
       service: serviceName,
       version: '1.0.0',
@@ -177,8 +196,8 @@ export function healthCheck(serviceName: string) {
  * the Express error handler instead of becoming unhandled promise rejections.
  */
 export const asyncHandler =
-  (fn: (req: Request, res: Response, next: NextFunction) => Promise<any> | any) =>
-  (req: Request, res: Response, next: NextFunction): Promise<any> =>
+  (fn: (req: Request, res: Response, next: NextFunction) => unknown) =>
+  (req: Request, res: Response, next: NextFunction): Promise<unknown> =>
     Promise.resolve(fn(req, res, next)).catch(next);
 
 /**
@@ -189,7 +208,7 @@ export function requireMultipart(req: Request, _res: Response, next: NextFunctio
   if (req.method === 'POST' || req.method === 'PUT') {
     const contentType = req.headers['content-type'] || '';
     if (!contentType.toLowerCase().startsWith('multipart/form-data')) {
-      const err: any = new Error(
+      const err: HttpError = new Error(
         'Unsupported media type - this endpoint requires multipart/form-data'
       );
       err.statusCode = 415;

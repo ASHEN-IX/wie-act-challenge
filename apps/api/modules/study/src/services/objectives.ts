@@ -9,6 +9,7 @@
 
 import crypto from 'crypto';
 import { LearningObjective } from '../models/index';
+import type { ICourseTopic } from '../models/index';
 
 // --- helpers -----------------------------------------------------------------
 
@@ -25,7 +26,7 @@ export interface ExtractedObjective {
   verb: string;
   text: string;
   textHash: string;
-  classification: any;
+  classification: unknown;
 }
 
 /**
@@ -33,7 +34,7 @@ export interface ExtractedObjective {
  * list ready for upsert.  Each element has the fields the model expects
  * plus textHash (for the unique index).
  */
-function extractObjectives(documentId: string, topics: any[]): ExtractedObjective[] {
+function extractObjectives(documentId: string, topics: ICourseTopic[]): ExtractedObjective[] {
   if (!Array.isArray(topics)) return [];
   const results: ExtractedObjective[] = [];
   for (const topic of topics) {
@@ -62,7 +63,7 @@ function extractObjectives(documentId: string, topics: any[]): ExtractedObjectiv
 export interface SyncObjectivesParams {
   userId: string;
   documentId: string;
-  topics: any[];
+  topics: ICourseTopic[];
 }
 
 export interface SyncObjectivesResult {
@@ -93,7 +94,7 @@ async function syncObjectivesForDocument({
     .lean();
 
   const toSupersede = previouslyActive.filter(
-    (p: any) => !incomingKeys.has(`${p.topicId}\0${p.textHash}`)
+    (p) => !incomingKeys.has(`${p.topicId}\0${p.textHash}`)
   );
 
   let superseded = 0;
@@ -101,7 +102,7 @@ async function syncObjectivesForDocument({
     const supersedeResult = await LearningObjective.updateMany(
       {
         documentId,
-        $or: toSupersede.map((s: any) => ({
+        $or: toSupersede.map((s) => ({
           topicId: s.topicId,
           textHash: s.textHash
         }))
@@ -115,10 +116,10 @@ async function syncObjectivesForDocument({
   let inserted = 0;
   let updated = 0;
 
-  const ops = incoming.map((obj) => {
+  const ops: Parameters<typeof LearningObjective.bulkWrite>[0] = incoming.map((obj) => {
     const filter = { documentId, topicId: obj.topicId, textHash: obj.textHash };
     const existing = previouslyActive.find(
-      (p: any) => p.topicId === obj.topicId && p.textHash === obj.textHash
+      (p) => p.topicId === obj.topicId && p.textHash === obj.textHash
     );
 
     if (existing) {
@@ -171,7 +172,7 @@ async function syncObjectivesForDocument({
     };
   });
 
-  await LearningObjective.bulkWrite(ops as any, { ordered: false });
+  await LearningObjective.bulkWrite(ops, { ordered: false });
 
   return { inserted, updated, superseded };
 }

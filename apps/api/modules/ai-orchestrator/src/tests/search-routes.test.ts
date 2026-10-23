@@ -7,9 +7,14 @@ process.env.JWT_SECRET = 'test-secret-key';
 process.env.MONGODB_URI = 'mongodb://localhost:27017/test_study_partner';
 process.env.RABBITMQ_URL = 'amqp://localhost:5672/%2F';
 process.env.NODE_ENV = 'test';
-process.exit = jest.fn() as any;
+const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => {
+  throw new Error(`Unexpected process.exit(${code})`);
+});
+afterAll(() => exitSpy.mockRestore());
 
 import request from 'supertest';
+import express from 'express';
+import searchRoutes from '../routes/search';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const jwt = { sign: require('../../../../tests/sessionFixtures').createSession };
 
@@ -91,6 +96,26 @@ describe('POST /api/v1/search/query', () => {
     );
   });
 
+  test('retains the policy-resolved parent course for later result revocation', async () => {
+    const scoped = express();
+    scoped.use(express.json());
+    scoped.use((req, res, next) => {
+      Object.assign(req, { user: { userId: 'user-1' } });
+      res.locals.sourceCourseId = '0123456789abcdef01234567';
+      next();
+    });
+    scoped.use(searchRoutes);
+    (publishAiJob as jest.Mock).mockResolvedValue({});
+    const response = await request(scoped).post('/query').send(VALID_SEARCH);
+    expect(response.status).toBe(202);
+    expect(AiJob.createPending).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'user-1',
+        payloadSnapshot: { ...VALID_SEARCH, courseId: '0123456789abcdef01234567' }
+      })
+    );
+  });
+
   test('rolls back the PENDING job + 503 when the bus publish fails', async () => {
     (publishAiJob as jest.Mock).mockRejectedValue(new Error('broker down'));
     const deleteOne = jest.fn().mockResolvedValue(null);
@@ -151,6 +176,8 @@ describe('GET /api/v1/search/jobs/:jobId', () => {
       lean: jest.fn().mockResolvedValue({
         jobId: 'job-s1',
         type: 'study.search.query',
+        userId: 'user-1',
+        resourceScope: {},
         status: 'COMPLETED',
         attempts: 1,
         result: {
@@ -185,7 +212,7 @@ describe('GET /api/v1/search/jobs/:jobId', () => {
     });
   });
 
-  test('admin can read any search job', async () => {
+  test('admin job lookup remains actor-scoped', async () => {
     AiJob.findOne.mockReturnValue({
       lean: jest.fn().mockResolvedValue({ jobId: 'job-s1', status: 'PENDING' })
     });
@@ -194,7 +221,8 @@ describe('GET /api/v1/search/jobs/:jobId', () => {
 
     expect(AiJob.findOne).toHaveBeenCalledWith({
       jobId: 'job-s1',
-      type: 'study.search.query'
+      type: 'study.search.query',
+      userId: 'admin-1'
     });
   });
 

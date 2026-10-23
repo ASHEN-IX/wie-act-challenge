@@ -266,7 +266,7 @@ const userSchema = new Schema<IUser>(
 );
 
 userSchema.methods.toJSON = function (this: IUser) {
-  const user: any = this.toObject();
+  const user: Partial<IUser> = this.toObject();
   delete user.password;
   delete user.refreshTokens;
   delete user.verificationToken;

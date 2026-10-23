@@ -1,3 +1,6 @@
+import { canDeliverJob } from '../services/jobAccess';
+import type { IAiJob } from '../models/AiJob';
+import type { FilterQuery } from 'mongoose';
 /**
  * Search API (F05 / SEARCH-07).
  *
@@ -19,9 +22,9 @@ import AiJob from '../models/AiJob';
 const SEARCH_JOB_TYPE = 'study.search.query';
 const router = createContracts();
 
-router.post('/query', async (req: any, res: any, next: any) => {
+router.post('/query', async (req, res, next) => {
   try {
-    const userId = req.user.userId; // from auth context — never body
+    const userId = req.user!.userId; // from auth context — never body
     const payload = req.body || {};
 
     // Validate against the worker contract (SEARCH-02 strict) BEFORE publishing.
@@ -38,14 +41,18 @@ router.post('/query', async (req: any, res: any, next: any) => {
 
     // Persist BEFORE publishing: a fast worker's result event must always find
     // its job (AI-COM-07 correlation guarantee).
-    let job: any;
+    let job: IAiJob;
     try {
-      job = await (AiJob as any).createPending({
+      job = await AiJob.createPending({
         type: SEARCH_JOB_TYPE,
         userId,
         requestId,
         correlationId,
-        messageId
+        messageId,
+        payloadSnapshot: {
+          ...payload,
+          ...(res.locals.sourceCourseId ? { courseId: res.locals.sourceCourseId } : {})
+        }
       });
     } catch (err) {
       return next(err);
@@ -57,7 +64,7 @@ router.post('/query', async (req: any, res: any, next: any) => {
         correlationId,
         messageId
       });
-    } catch (err) {
+    } catch {
       await job.deleteOne(); // no silent loss, no orphan PENDING rows
       logger.error('search_job_publish_failed_rolling_back', { jobId: job.jobId });
       return res.status(503).json({ error: 'AI job bus unavailable, retry later' });
@@ -83,12 +90,13 @@ router.post('/query', async (req: any, res: any, next: any) => {
   }
 });
 
-router.get('/jobs/:jobId', async (req: any, res: any, next: any) => {
+router.get('/jobs/:jobId', async (req, res, next) => {
   try {
-    const query: any = { jobId: req.params.jobId, type: SEARCH_JOB_TYPE };
-    if (req.user.role !== 'admin') query.userId = req.user.userId;
+    const query: FilterQuery<IAiJob> = { jobId: req.params.jobId, type: SEARCH_JOB_TYPE };
+    query.userId = req.user!.userId;
     const job = await AiJob.findOne(query).lean();
-    if (!job) return res.status(404).json({ error: 'search job not found' });
+    if (!job || job.userId !== req.user!.userId || !(await canDeliverJob(job)))
+      return res.status(404).json({ error: 'search job not found' });
     return res.json({
       jobId: job.jobId,
       status: job.status,

@@ -22,7 +22,10 @@ process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/
 process.env.NODE_ENV = 'test';
 
 // Prevent process.exit() from killing tests
-process.exit = jest.fn();
+const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => {
+  throw new Error(`Unexpected process.exit(${code})`);
+});
+afterAll(() => exitSpy.mockRestore());
 
 // We import apps directly (not servers) to avoid port conflicts
 const gatewayApp = require('../../src/app').createApp();
@@ -36,10 +39,10 @@ const testUser = {
   role: 'student'
 };
 
-let token;
+let token: string;
 let dbConnected = false;
 
-function sleep(ms) {
+function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
@@ -51,7 +54,7 @@ async function connectMongoWithRetry(maxAttempts = 10) {
         connectTimeoutMS: 2000
       });
       return true;
-    } catch (_error) {
+    } catch {
       if (attempt === maxAttempts) {
         return false;
       }

@@ -1,3 +1,4 @@
+import type { Request, Response, NextFunction } from 'express';
 /**
  * Integration tests for the Coach route in AI Orchestrator service.
  *
@@ -15,7 +16,10 @@ process.env.NODE_ENV = 'test';
 process.env.AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
 
 // Prevent fail-fast app checks from terminating the Jest worker.
-process.exit = jest.fn() as any;
+const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => {
+  throw new Error(`Unexpected process.exit(${code})`);
+});
+afterAll(() => exitSpy.mockRestore());
 
 import request from 'supertest';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -29,7 +33,7 @@ jest.mock('@study-partner/shared/auth', () => ({
 }));
 
 jest.mock('@study-partner/shared/tierGate', () => ({
-  tierGate: jest.fn(() => (req: any, res: any, next: any) => next())
+  tierGate: jest.fn(() => (req: Request, res: Response, next: NextFunction) => next())
 }));
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports

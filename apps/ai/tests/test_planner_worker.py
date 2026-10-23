@@ -257,7 +257,7 @@ def test_decomposer_transient_llm_error_raises_retryable():
             LLMDecomposerReal().decompose("learn python", [], 120)
 
 
-def test_decomposer_missing_mock_responder_degrades_to_none():
+def test_decomposer_missing_mock_responder_selects_rule_fallback():
     from unittest.mock import patch
 
     from agents.planner.decomposition.llm_decomposer_real import LLMDecomposerReal
@@ -265,7 +265,8 @@ def test_decomposer_missing_mock_responder_degrades_to_none():
 
     with patch("agents.planner.decomposition.llm_decomposer_real.ask") as mock_ask:
         mock_ask.side_effect = MissingMockResponderError("no key")
-        assert LLMDecomposerReal()._completion("sys", "user") is None
+        assert LLMDecomposerReal().decompose("learn python", [], 120) == []
+        assert mock_ask.call_count == 1
 
 
 async def test_retryable_below_max_attempts_propagates():

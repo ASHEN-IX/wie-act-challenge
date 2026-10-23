@@ -1,3 +1,7 @@
+import type { IStudySession, ITaskProgressEntry } from '../models';
+import { errorDetails } from '@study-partner/shared/errors';
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { Response } from 'express';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { createContracts } = require('@study-partner/shared/domainContracts');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -16,7 +20,10 @@ const BYPASS_TASK_TIMING_GATE =
 const DEFAULT_TASK_ESTIMATED_MINUTES = 30;
 const MIN_TASK_COMPLETION_RATIO = 0.8;
 
-const getCurrentTaskTimingGate = (session: any, currentTask: any) => {
+const getCurrentTaskTimingGate = (
+  session: Pick<IStudySession, 'startTime' | 'createdAt'>,
+  currentTask: ITaskProgressEntry
+) => {
   const estimatedMinutesRaw = Number(currentTask?.estimatedMinutes);
   const estimatedMinutes =
     Number.isFinite(estimatedMinutesRaw) && estimatedMinutesRaw > 0
@@ -52,9 +59,9 @@ const getCurrentTaskTimingGate = (session: any, currentTask: any) => {
 };
 
 // POST /setup — Initialize a course-based study session
-router.post('/setup', async (req: any, res: any) => {
+router.post('/setup', async (req: DomainRequest, res: Response) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const { courseId, studyPlanId, mode } = req.body;
 
     if (!courseId) return res.status(400).json({ error: 'courseId is required' });
@@ -71,7 +78,7 @@ router.post('/setup', async (req: any, res: any) => {
     }
 
     // Build task list from study plan tasks or course topics
-    let tasks: any[] = [];
+    let tasks: ITaskProgressEntry[] = [];
 
     if (studyPlanId) {
       const plan = await StudyPlan.findOne({ _id: studyPlanId, userId });
@@ -82,10 +89,9 @@ router.post('/setup', async (req: any, res: any) => {
           userId
         }).lean();
 
-        tasks = plan.taskGraph.tasks.map((t: any, index: number) => {
+        tasks = plan.taskGraph.tasks.map((t, index) => {
           // Try to match by title (tasks are created in the same order as taskGraph.tasks)
-          const matchedDoc =
-            planTaskDocs[index] || planTaskDocs.find((d: any) => d.title === t.title);
+          const matchedDoc = planTaskDocs[index] || planTaskDocs.find((d) => d.title === t.title);
           return {
             taskId: matchedDoc ? matchedDoc._id.toString() : t.id || `task-${index}`,
             title: t.title,
@@ -105,9 +111,9 @@ router.post('/setup', async (req: any, res: any) => {
 
     // Fallback: generate tasks from course topics/subtopics
     if (tasks.length === 0 && course.topics) {
-      course.topics.forEach((topic: any, tIdx: number) => {
+      course.topics.forEach((topic, tIdx) => {
         if (topic.subtopics && topic.subtopics.length > 0) {
-          topic.subtopics.forEach((sub: any, sIdx: number) => {
+          topic.subtopics.forEach((sub, sIdx) => {
             tasks.push({
               taskId: sub.id || `t${tIdx}-s${sIdx}`,
               title: sub.title || `${topic.title} - Part ${sIdx + 1}`,
@@ -171,9 +177,9 @@ router.post('/setup', async (req: any, res: any) => {
 });
 
 // POST /:sessionId/task/complete — Complete current task and move to next
-router.post('/:sessionId/task/complete', async (req: any, res: any) => {
+router.post('/:sessionId/task/complete', async (req: DomainRequest, res: Response) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const { sessionId } = req.params;
 
     const session = await StudySession.findOne({ _id: sessionId, status: 'active' });
@@ -182,7 +188,7 @@ router.post('/:sessionId/task/complete', async (req: any, res: any) => {
     // Allow host or the session owner
     const isParticipant =
       session.userId === userId ||
-      session.participants?.some((p: any) => p.userId === userId && !p.leftAt);
+      session.participants?.some((p) => p.userId === userId && !p.leftAt);
     if (!isParticipant && session.userId !== userId) {
       return res.status(403).json({ error: 'Not a participant in this session' });
     }
@@ -234,7 +240,7 @@ router.post('/:sessionId/task/complete', async (req: any, res: any) => {
       Task.findOneAndUpdate(
         { _id: completedTaskId, userId: session.userId },
         { status: 'completed', completedAt: new Date() }
-      ).catch((err: any) => console.warn('Task sync failed:', err.message));
+      ).catch((err: unknown) => console.warn('Task sync failed:', errorDetails(err).message));
     }
 
     // Auto-award XP on task completion during study session
@@ -271,7 +277,7 @@ router.post('/:sessionId/task/complete', async (req: any, res: any) => {
           headers: buildInternalHeaders(req.headers.cookie)
         }
       );
-    } catch (xpErr: any) {
+    } catch (xpErr) {
       console.warn('[Session Task Complete] XP/Quest award failed:', getAxiosErrorDetails(xpErr));
     }
 
@@ -305,7 +311,7 @@ router.post('/:sessionId/task/complete', async (req: any, res: any) => {
 });
 
 // POST /:sessionId/task/skip — Skip current task
-router.post('/:sessionId/task/skip', async (req: any, res: any) => {
+router.post('/:sessionId/task/skip', async (req: DomainRequest, res: Response) => {
   try {
     const { sessionId } = req.params;
 

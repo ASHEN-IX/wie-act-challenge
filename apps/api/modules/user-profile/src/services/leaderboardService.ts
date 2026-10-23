@@ -1,3 +1,7 @@
+import type { FilterQuery } from 'mongoose';
+import type { IUserRankProfile } from '../models/UserRankProfile';
+import type { IUserProfile } from '../models/UserProfile';
+import type { RankLadderItem } from '../models/rankingConfig';
 import RankEventLedger from '../models/RankEventLedger';
 import UserRankProfile from '../models/UserRankProfile';
 import RankBadge from '../models/RankBadge';
@@ -22,7 +26,9 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-export function getBadgeKeyForRank(rank: any): string {
+export function getBadgeKeyForRank(
+  rank: Pick<RankLadderItem, 'tier' | 'division'> | null | undefined
+): string {
   const tier = String(rank?.tier || '').toLowerCase();
   if (SINGLE_BADGE_TIERS.has(tier)) {
     return SINGLE_BADGE_TIER_KEYS[tier] || 'use';
@@ -66,7 +72,7 @@ export async function getRankBadge(rankIndex: number) {
       badgeKey: badge.badgeKey,
       imagePath: badge.imagePath
     };
-  } catch (error) {
+  } catch {
     return fallback;
   }
 }
@@ -75,7 +81,7 @@ export async function getAllRankBadges() {
   try {
     const badges = await RankBadge.find({ isActive: true }).sort({ rankIndex: 1 }).lean();
     if (badges.length > 0) {
-      return badges.map((badge: any) => ({
+      return badges.map((badge) => ({
         rankIndex: badge.rankIndex,
         rankName: badge.rankName,
         tier: badge.tier,
@@ -84,14 +90,16 @@ export async function getAllRankBadges() {
         imagePath: badge.imagePath
       }));
     }
-  } catch (error) {
+  } catch {
     // Ignore and return fallback ladder mapping.
   }
 
   return RANK_LADDER.map((rank) => buildFallbackRankBadge(rank.index));
 }
 
-export function buildRankProgress(profile: any) {
+export function buildRankProgress(
+  profile: Pick<IUserRankProfile, 'knowledgePoints' | 'rankIndex'> | null | undefined
+) {
   const currentPoints = Math.max(0, Number(profile?.knowledgePoints || 0));
   const currentRank = getRankByIndex(profile?.rankIndex || 0);
   const nextRank = getRankByIndex((profile?.rankIndex || 0) + 1);
@@ -158,7 +166,7 @@ export async function getRankLeaderboard({
   const season = await seasonService.getOrCreateActiveSeason();
   const safeLimit = Math.max(1, Math.min(100, Number(limit) || 20));
 
-  const query: any = { currentSeasonId: season._id };
+  const query: FilterQuery<IUserRankProfile> = { currentSeasonId: season._id };
 
   if (scope === 'friends') {
     const friendships = await Friendship.find({
@@ -170,9 +178,7 @@ export async function getRankLeaderboard({
       .select('requester recipient')
       .lean();
 
-    const friendIds = friendships.map((f: any) =>
-      f.requester === userId ? f.recipient : f.requester
-    );
+    const friendIds = friendships.map((f) => (f.requester === userId ? f.recipient : f.requester));
     friendIds.push(userId);
     query.userId = { $in: [...new Set(friendIds)] };
   }
@@ -185,24 +191,24 @@ export async function getRankLeaderboard({
     )
     .lean();
 
-  const userIds = rows.map((row: any) => row.userId);
+  const userIds = rows.map((row) => row.userId);
   const profiles = await UserProfile.find({ userId: { $in: userIds } })
     .select('userId nickname avatar')
     .lean();
 
-  const profileMap = new Map();
-  profiles.forEach((profile: any) => {
+  const profileMap = new Map<string, Pick<IUserProfile, 'nickname' | 'avatar'>>();
+  profiles.forEach((profile) => {
     profileMap.set(profile.userId, profile);
   });
 
-  const leaderboard = rows.map((row: any, idx: number) => {
-    const userProfile = profileMap.get(row.userId) || {};
+  const leaderboard = rows.map((row, idx) => {
+    const userProfile = profileMap.get(row.userId);
     const points = Math.max(0, Number(row.knowledgePoints || 0));
     return {
       position: idx + 1,
       userId: row.userId,
-      nickname: userProfile.nickname || null,
-      avatar: userProfile.avatar || null,
+      nickname: userProfile?.nickname || null,
+      avatar: userProfile?.avatar || null,
       knowledgePoints: points,
       rankIndex: row.rankIndex,
       rankName: row.rankName,
@@ -221,7 +227,7 @@ export async function getSessionResult(userId: string, sessionId: string | null 
 
   let resolvedSessionId = sessionId || null;
   if (!resolvedSessionId) {
-    const latestSessionEvent: any = await RankEventLedger.findOne({
+    const latestSessionEvent = await RankEventLedger.findOne({
       userId,
       seasonId: season._id,
       contextSessionId: { $ne: null }
@@ -241,7 +247,7 @@ export async function getSessionResult(userId: string, sessionId: string | null 
     };
   }
 
-  let events: any[] = await RankEventLedger.find({
+  let events = await RankEventLedger.find({
     userId,
     seasonId: season._id,
     contextSessionId: resolvedSessionId
@@ -260,7 +266,7 @@ export async function getSessionResult(userId: string, sessionId: string | null 
       .lean();
   }
 
-  const normalizedEvents = events.map((event: any) => ({
+  const normalizedEvents = events.map((event) => ({
     action: event.action,
     baseKP: Number(event.baseKP || 0),
     multipliers: {

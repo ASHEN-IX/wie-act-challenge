@@ -1,3 +1,8 @@
+const {
+  publicUploads
+}: {
+  publicUploads: (directory: string) => import('express').RequestHandler;
+} = require('../../shared/publicUploads');
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import express from 'express';
@@ -50,11 +55,7 @@ export async function createNestApp() {
   for (const directory of ['user-profile', 'study']) {
     nest.use(
       '/uploads',
-      express.static(path.resolve(__dirname, '../../modules', directory, 'uploads'), {
-        dotfiles: 'deny',
-        index: false,
-        setHeaders: (res) => res.setHeader('X-Content-Type-Options', 'nosniff')
-      })
+      publicUploads(path.resolve(__dirname, '../../modules', directory, 'uploads'))
     );
   }
   const uploadLimiter = shared.rateLimiter(5, 60000);
@@ -94,7 +95,7 @@ export async function createNestApp() {
   });
   nest.use(
     '/api/v1/ai',
-    require('../../modules/ai-orchestrator/node_modules/express-fileupload')({
+    require('express-fileupload')({
       limits: { fileSize: 10 * 1024 * 1024 }
     })
   );

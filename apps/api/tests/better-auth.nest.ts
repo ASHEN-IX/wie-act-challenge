@@ -1,3 +1,4 @@
+import { listeningPort } from './listening-port';
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { MongoClient, ObjectId } from 'mongodb';
@@ -31,7 +32,7 @@ async function registerTests() {
   });
   await migrateAuth(db, { apply: true });
 
-  const { getAuth } = await import('../shared/betterAuth');
+  const { getAuth } = await import('../shared/betterAuth.js');
   const auth = await getAuth();
   const result = await auth.api.signInEmail({
     body: { email: 'nest@example.test', password: 'LegacyPass!123' },
@@ -42,9 +43,9 @@ async function registerTests() {
     .map((value: string) => value.split(';')[0])
     .join('; ');
 
-  const { start } = await import('../src/main');
+  const { start } = await import('../src/main.js');
   const runtime = await start({ port: 0, workers: false });
-  const url = 'http://127.0.0.1:' + runtime.server.address().port;
+  const url = 'http://127.0.0.1:' + listeningPort(runtime.server);
 
   after(async () => {
     await runtime.stop();

@@ -1,3 +1,4 @@
+import { canReadCourse } from '../modules/study/src/services/resourceAccess';
 import type { Request, Response, NextFunction } from 'express';
 import { AI_JOB_TIERS, effectiveTier } from './entitlements';
 import crypto from 'node:crypto';
@@ -43,7 +44,7 @@ export async function operationPolicy(req: Request, res: Response, next: NextFun
         if (field in source) source[field] = user.userId;
       }
     }
-    if (req.params.userId && req.params.userId !== user.userId && user.role !== 'admin') {
+    if (req.params.userId && req.params.userId !== user.userId) {
       return res.status(403).json({ error: 'Forbidden' });
     }
     const models = require('../modules/study/src/models');
@@ -55,17 +56,41 @@ export async function operationPolicy(req: Request, res: Response, next: NextFun
     ] as const;
     for (const [camel, snake, model] of resources) {
       if (camel === 'sessionId' && jobType === 'study.eval.step') continue;
-      const id =
-        req.params[camel] || payload[camel] || payload[snake] || body[camel] || body[snake];
-      if (!id) continue;
-      if (typeof id !== 'string' || !/^[a-f\d]{24}$/i.test(id)) {
+      const candidates = [
+        req.params[camel],
+        payload[camel],
+        payload[snake],
+        body[camel],
+        body[snake],
+        req.query[camel],
+        req.query[snake]
+      ].filter((value) => value !== undefined && value !== null && value !== '');
+      if (!candidates.length) continue;
+      if (candidates.some((id) => typeof id !== 'string' || !/^[a-f\d]{24}$/i.test(id))) {
         return res.status(422).json({ error: `Invalid ${camel}` });
       }
-      const found = await model.exists({
-        _id: id,
-        ...(user.role === 'admin' ? {} : { userId: user.userId })
-      });
+      if (new Set(candidates).size !== 1)
+        return res.status(422).json({ error: `Conflicting ${camel}` });
+      const id = candidates[0];
+      const found =
+        camel === 'courseId'
+          ? await canReadCourse(user.userId, id)
+          : await model.exists({ _id: id, userId: user.userId });
       if (!found) return res.status(404).json({ error: 'Resource not found' });
+      if (camel === 'courseId') res.locals.sourceCourseId = id;
+      if (camel === 'sessionId' || camel === 'planId') {
+        const parent = await model
+          .findOne({ _id: id, userId: user.userId })
+          .select('courseId')
+          .lean();
+        if (parent?.courseId) {
+          if (!(await canReadCourse(user.userId, parent.courseId)))
+            return res.status(404).json({ error: 'Resource not found' });
+          if (res.locals.sourceCourseId && res.locals.sourceCourseId !== parent.courseId)
+            return res.status(422).json({ error: 'Resource scope mismatch' });
+          res.locals.sourceCourseId = parent.courseId;
+        }
+      }
     }
     return next();
   } catch (error) {

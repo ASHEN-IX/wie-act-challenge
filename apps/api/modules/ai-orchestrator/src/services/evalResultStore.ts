@@ -2,7 +2,7 @@
  * EvalResult persistence helpers (F04 / EVAL-08).
  *
  * `upsertByCorrelation` is idempotent by `correlationId`: a replayed result
- * event overwrites the existing document in place, so a step is never
+ * event preserves the first accepted document, so a step is never
  * double-counted. `listStepsForSession` returns the ordered per-step history a
  * backend can use to resume a session.
  *
@@ -34,7 +34,7 @@ export async function upsertByCorrelation(record: EvalResultRecord): Promise<str
   };
   await EvalResult.updateOne(
     { correlationId: record.correlationId },
-    { $set: doc },
+    { $setOnInsert: doc },
     { upsert: true }
   );
   return doc.correlationId;
@@ -44,8 +44,8 @@ export async function upsertByCorrelation(record: EvalResultRecord): Promise<str
  * @param {string} sessionId
  * @returns {Promise<Array>} step records ascending by step
  */
-export async function listStepsForSession(sessionId: string): Promise<any[]> {
-  return EvalResult.find({ sessionId }).sort({ step: 1 }).lean();
+export async function listStepsForSession(sessionId: string, userId: string) {
+  return EvalResult.find({ sessionId, userId }).sort({ step: 1 }).lean();
 }
 
 export default { upsertByCorrelation, listStepsForSession };

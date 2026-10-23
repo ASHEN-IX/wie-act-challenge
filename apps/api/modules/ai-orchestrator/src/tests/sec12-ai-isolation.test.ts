@@ -1,3 +1,4 @@
+import type { Request, Response, NextFunction } from 'express';
 /**
  * SEC-12 — AI orchestrator user-isolation regression.
  *
@@ -13,7 +14,10 @@ process.env.RABBITMQ_URL = 'amqp://localhost:5672/%2F';
 process.env.AI_SERVICE_URL = 'http://ai-service:8000';
 process.env.INTERNAL_API_SECRET = 'sec12-ai-internal';
 process.env.NODE_ENV = 'test';
-process.exit = jest.fn() as any;
+const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => {
+  throw new Error(`Unexpected process.exit(${code})`);
+});
+afterAll(() => exitSpy.mockRestore());
 
 import express from 'express';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -29,7 +33,7 @@ jest.mock('@study-partner/shared', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() }
 }));
 jest.mock('@study-partner/shared/tierGate', () => ({
-  tierGate: () => (req: any, res: any, next: any) => next()
+  tierGate: () => (req: Request, res: Response, next: NextFunction) => next()
 }));
 jest.mock('@study-partner/shared/moduleClient');
 
@@ -41,7 +45,7 @@ app.use(express.json());
 app.use(fileUpload({ limits: { fileSize: 10 * 1024 * 1024 } }));
 app.use('/api/v1/ai', authenticate, aiRouter);
 
-function authHeader(payload: any) {
+function authHeader(payload: { userId: string; email: string; role: string; isActive: boolean }) {
   return { Cookie: `mindflow.test_session=${jwt.sign(payload, process.env.JWT_SECRET)}` };
 }
 
@@ -73,7 +77,7 @@ describe('SEC-12 analyze-frame pins the authenticated userId', () => {
     if (typeof body.pipe === 'function') {
       // Serialise the multipart payload the way moduleClient would, then inspect it:
       // the authenticated userId must be present and the smuggled one absent.
-      const collector: any[] = [];
+      const collector: Buffer[] = [];
       const sink = new Writable({
         write(chunk, enc, cb) {
           collector.push(chunk);
@@ -123,13 +127,13 @@ describe('SEC-12 coach history refuses cross-user access', () => {
     expect(moduleClient.get).toHaveBeenCalled();
   });
 
-  it('200 for an admin reading any history', async () => {
+  it('403 for an admin reading another learner history', async () => {
     moduleClient.get.mockResolvedValue({ data: { messages: [] } });
     const admin = { userId: 'admin-1', email: 'adm@test.com', role: 'admin', isActive: true };
     const res = await request(app)
       .get('/api/v1/ai/coach/history/user-mallory')
       .set(authHeader(admin));
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(403);
   });
 });

@@ -7,7 +7,7 @@
  * upsertProfile to atomically update the CompetencyProfile.
  */
 
-import { EvalResultRecord, LearningObjective } from '../models/index';
+import { EvalResultRecord, LearningObjective, type IEvalResultRecord } from '../models/index';
 import crypto from 'node:crypto';
 import { upsertProfile } from './competency';
 
@@ -39,10 +39,11 @@ async function claimResult(correlationId: string): Promise<string | null> {
  * Resolve objectiveId → { topicId, knowledgeType } via LearningObjective.
  */
 async function resolveCompetencyKey(
-  objectiveId: string | null | undefined
+  objectiveId: string | null | undefined,
+  userId: string
 ): Promise<{ topicId: string; knowledgeType: string } | null> {
   if (!objectiveId) return null;
-  const objective = await LearningObjective.findOne({ objectiveId }).lean();
+  const objective = await LearningObjective.findOne({ objectiveId, userId, isActive: true }).lean();
   if (!objective || !objective.topicId) return null;
   return { topicId: objective.topicId, knowledgeType: objective.knowledgeType || 'declarative' };
 }
@@ -60,48 +61,54 @@ interface ProcessResult {
 /**
  * Process a single EvalResult record.
  */
-async function processEvalResult(result: any): Promise<ProcessResult> {
+async function processEvalResult(
+  result: Pick<
+    IEvalResultRecord,
+    | 'correlationId'
+    | 'demonstratedBloomLevel'
+    | 'objectiveId'
+    | 'userId'
+    | 'masteryScore'
+    | 'createdAt'
+  >
+): Promise<ProcessResult> {
   if (!result.demonstratedBloomLevel) return { skipped: 'no_skill_level' };
   const token = await claimResult(result.correlationId);
   if (!token) return { skipped: 'already_processing' };
   const filter = { correlationId: result.correlationId, competencyLeaseToken: token };
-  try {
-    const key = await resolveCompetencyKey(result.objectiveId);
-    if (!key) {
-      // Retry missing objectives later, allowing all other records to progress.
-      await EvalResultRecord.updateOne(filter, {
-        $set: { competencyLeaseUntil: new Date(Date.now() + 60000) }
-      });
-      return { skipped: 'no_objective', correlationId: result.correlationId };
-    }
-    await upsertProfile({
-      userId: result.userId,
-      topicId: key.topicId,
-      knowledgeType: key.knowledgeType,
-      bloomLevel: result.demonstratedBloomLevel,
-      evidenceItem: {
-        objectiveId: result.objectiveId,
-        demonstratedBloomLevel: result.demonstratedBloomLevel,
-        masteryScore: result.masteryScore,
-        evaluatedAt: result.createdAt,
-        correlationId: result.correlationId
-      }
-    });
+  // Errors leave an expiring lease; replay-safe profile evidence permits recovery.
+  const key = await resolveCompetencyKey(result.objectiveId, result.userId);
+  if (!key) {
+    // Retry missing objectives later, allowing all other records to progress.
     await EvalResultRecord.updateOne(filter, {
-      $set: { competencyProcessedAt: new Date() },
-      $unset: { competencyLeaseUntil: '', competencyLeaseToken: '' }
+      $set: { competencyLeaseUntil: new Date(Date.now() + 60000) }
     });
-    return {
-      processed: true,
-      userId: result.userId,
-      topicId: key.topicId,
-      knowledgeType: key.knowledgeType,
-      bloomLevel: result.demonstratedBloomLevel
-    };
-  } catch (error) {
-    // The lease expires after errors/crashes. Profile evidence is replay-safe.
-    throw error;
+    return { skipped: 'no_objective', correlationId: result.correlationId };
   }
+  await upsertProfile({
+    userId: result.userId,
+    topicId: key.topicId,
+    knowledgeType: key.knowledgeType,
+    bloomLevel: result.demonstratedBloomLevel,
+    evidenceItem: {
+      objectiveId: result.objectiveId ?? undefined,
+      demonstratedBloomLevel: result.demonstratedBloomLevel,
+      masteryScore: result.masteryScore ?? undefined,
+      evaluatedAt: result.createdAt,
+      correlationId: result.correlationId
+    }
+  });
+  await EvalResultRecord.updateOne(filter, {
+    $set: { competencyProcessedAt: new Date() },
+    $unset: { competencyLeaseUntil: '', competencyLeaseToken: '' }
+  });
+  return {
+    processed: true,
+    userId: result.userId,
+    topicId: key.topicId,
+    knowledgeType: key.knowledgeType,
+    bloomLevel: result.demonstratedBloomLevel
+  };
 }
 
 interface RunOnceResults {
@@ -131,7 +138,7 @@ async function runOnce(): Promise<RunOnceResults> {
       const outcome = await processEvalResult(candidate);
       if (outcome.processed) results.processed++;
       else results.skipped++;
-    } catch (_err) {
+    } catch {
       results.errors++;
     }
   }
@@ -152,7 +159,7 @@ function startCompetencyUpdater(): () => Promise<void> {
     running = true;
     try {
       await runOnce();
-    } catch (_) {
+    } catch {
       // poll-level errors swallowed; individual results logged above
     } finally {
       running = false;

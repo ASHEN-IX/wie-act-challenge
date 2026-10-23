@@ -1,3 +1,7 @@
+import assert from 'node:assert/strict';
+import type { CourseFixture } from '../../../../tests/courseFixture';
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { Response, NextFunction } from 'express';
 /**
  * INGEST-07 — ingestion status tracking.
  */
@@ -9,7 +13,10 @@ process.env.NODE_ENV = 'test';
 import fs from 'fs';
 if (!fs.existsSync('uploads')) fs.mkdirSync('uploads', { recursive: true });
 
-process.exit = jest.fn() as any;
+const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => {
+  throw new Error(`Unexpected process.exit(${code})`);
+});
+afterAll(() => exitSpy.mockRestore());
 
 jest.mock('@study-partner/shared/ai-messaging', () => ({
   consumeAiProgress: jest.fn(),
@@ -24,16 +31,20 @@ jest.mock('../services/ingestionJob', () => ({
 }));
 
 jest.mock('../models/index', () => {
-  const mockCourse: any = jest.fn().mockImplementation(function (this: any, data: any) {
-    Object.assign(this, data);
-    this._id = 'course-new';
-    this.save = jest.fn().mockResolvedValue(true);
-    mockCourse.instances.push(this);
-  });
-  mockCourse.instances = [];
-  mockCourse.find = jest.fn();
-  mockCourse.findOne = jest.fn();
-  mockCourse.findOneAndDelete = jest.fn();
+  const mockCourse = Object.assign(
+    jest.fn().mockImplementation(function (this: CourseFixture, data: object) {
+      Object.assign(this, data);
+      this._id = 'course-new';
+      this.save = jest.fn().mockResolvedValue(true);
+      mockCourse.instances.push(this);
+    }),
+    {
+      instances: new Array<CourseFixture>(),
+      find: jest.fn(),
+      findOne: jest.fn(),
+      findOneAndDelete: jest.fn()
+    }
+  );
   return {
     Course: mockCourse,
     Subject: { findOne: jest.fn() },
@@ -71,8 +82,8 @@ const jwt = { sign: createSession };
 
 const app = express();
 app.use(express.json());
-const fakeAuth = (req: any, res: any, next: any) => {
-  req.user = { userId: 'user-123', tier: 'vip' };
+const fakeAuth = (req: DomainRequest, res: Response, next: NextFunction) => {
+  req.user = { userId: 'user-123', tier: 'vip', role: 'student' };
   next();
 };
 app.use('/api/v1/study/courses', fakeAuth, courseRoutes);
@@ -94,7 +105,7 @@ const BASE = {
   userId: 'user-123',
   requestId: 'req-ingest',
   timestamp: '2026-08-19T08:00:00Z'
-};
+} as const;
 
 const WORKER_COURSE = {
   course_id: 'course-1',
@@ -174,12 +185,16 @@ describe('handleIngestProgress (progress routing key)', () => {
 
 describe('handleIngestResult (ingest result routing key)', () => {
   test('completes the course and persists the whitelisted course structure', async () => {
-    const course: any = {
+    const course: CourseFixture = {
       _id: 'course-1',
       status: 'processing',
       ingestStage: 'embedding',
       ingestProgress: 0.6,
       topLevelJunk: 'never stored on completion either',
+      set(key: string, value: unknown) {
+        Reflect.set(this, key, value);
+        return this;
+      },
       save: jest.fn().mockResolvedValue(true)
     };
     Course.findOne.mockResolvedValue(course);
@@ -196,14 +211,15 @@ describe('handleIngestResult (ingest result routing key)', () => {
     expect(course.ingestError).toBe('');
     expect(course.processedAt).toBeInstanceOf(Date);
     expect(course.topics).toHaveLength(1);
+    assert.ok(course.topics);
     const sub = course.topics[0].subtopics[0];
     expect(sub.title).toBe('Graphs 101');
     expect(sub.key_concepts).toEqual(['node', 'edge']);
     expect(sub.definitions).toEqual([{ term: 'Graph', definition: 'A set of nodes and edges' }]);
     expect(sub.formulas).toEqual(['E = V - 1']);
     expect(sub.learning_objectives).toEqual([{ level: 'knowledge', text: 'define a graph' }]);
-    expect(sub.tokenized_chunks).toBeUndefined();
-    expect(sub.chunk_embeddings).toBeUndefined();
+    expect(Reflect.get(sub, 'tokenized_chunks')).toBeUndefined();
+    expect(Reflect.get(sub, 'chunk_embeddings')).toBeUndefined();
     expect(course.save).toHaveBeenCalled();
   });
 
@@ -222,7 +238,7 @@ describe('handleIngestResult (ingest result routing key)', () => {
   });
 
   test('fails the course with a sanitized reason', async () => {
-    const course: any = {
+    const course: CourseFixture = {
       _id: 'course-1',
       status: 'processing',
       ingestStage: null,

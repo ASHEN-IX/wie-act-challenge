@@ -2,6 +2,12 @@ import type { Request, Response, NextFunction, RequestHandler } from 'express';
 export interface DomainIdentity {
   userId: string;
   role: string;
+  name?: string;
+  email?: string;
+  isAdmin?: boolean;
+  tier?: string;
+  trialExpiresAt?: Date | string | null;
+  subscriptionEndAt?: Date | string | null;
   [key: string]: unknown;
 }
 export interface DomainRequest extends Request {

@@ -1,3 +1,8 @@
+import { canReadCourse } from '../services/resourceAccess';
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { Response } from 'express';
+import type { ITaskProgressEntry } from '../models';
+import { errorDetails } from '@study-partner/shared/errors';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { createContracts } = require('@study-partner/shared/domainContracts');
 import crypto from 'crypto';
@@ -22,22 +27,24 @@ const USER_PROFILE_URL = 'module://users';
 const NOTIFICATION_URL = 'module://notifications';
 
 // POST /team — Create team session
-router.post('/team', async (req: any, res: any) => {
+router.post('/team', async (req: DomainRequest, res: Response) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const { taskId, topicId, courseId, studyPlanId, mode, maxParticipants } = req.body;
     const inviteCode = crypto.randomBytes(3).toString('hex').toUpperCase();
 
     // Build task list from course if provided
-    const tasks: any[] = [];
+    const tasks: Array<ITaskProgressEntry & { estimatedMinutes: number }> = [];
     if (courseId) {
       const course = await Course.findOne({
-        _id: courseId
+        _id: courseId,
+        userId
       });
-      if (course && course.topics) {
-        course.topics.forEach((topic: any, tIdx: number) => {
+      if (!course) return res.status(404).json({ error: 'Course not found' });
+      if (course.topics) {
+        course.topics.forEach((topic, tIdx) => {
           if (topic.subtopics && topic.subtopics.length > 0) {
-            topic.subtopics.forEach((sub: any, sIdx: number) => {
+            topic.subtopics.forEach((sub, sIdx) => {
               tasks.push({
                 taskId: sub.id || `t${tIdx}-s${sIdx}`,
                 title: sub.title || `${topic.title} - Part ${sIdx + 1}`,
@@ -78,7 +85,7 @@ router.post('/team', async (req: any, res: any) => {
       participants: [
         {
           userId,
-          name: req.user.name || 'Host',
+          name: req.user!.name || 'Host',
           role: 'host',
           joinedAt: new Date()
         }
@@ -109,9 +116,9 @@ router.post('/team', async (req: any, res: any) => {
 });
 
 // POST /team/:sessionId/join — Join team session
-router.post('/team/:sessionId/join', async (req: any, res: any) => {
+router.post('/team/:sessionId/join', async (req: DomainRequest, res: Response) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const { inviteCode } = req.body;
     const { sessionId } = req.params;
     const session = await StudySession.findOne({
@@ -127,25 +134,25 @@ router.post('/team/:sessionId/join', async (req: any, res: any) => {
       return res.status(403).json({
         error: 'Invalid invite code'
       });
-    if (session.participants.some((p: any) => p.userId === userId && !p.leftAt)) {
+    if (session.participants.some((p) => p.userId === userId && !p.leftAt)) {
       return res.status(409).json({
         error: 'Already in this session'
       });
     }
-    if (session.participants.filter((p: any) => !p.leftAt).length >= session.maxParticipants) {
+    if (session.participants.filter((p) => !p.leftAt).length >= session.maxParticipants) {
       return res.status(400).json({
         error: 'Session is full'
       });
     }
     session.participants.push({
       userId,
-      name: req.user.name || 'Member',
+      name: req.user!.name || 'Member',
       role: 'member',
       joinedAt: new Date()
     });
 
     // Update XP multiplier based on team size
-    const activeCount = session.participants.filter((p: any) => !p.leftAt).length;
+    const activeCount = session.participants.filter((p) => !p.leftAt).length;
     const multipliers: Record<number, number> = {
       1: 1.0,
       2: 1.15,
@@ -172,14 +179,14 @@ router.post('/team/:sessionId/join', async (req: any, res: any) => {
           headers: buildInternalHeaders(req.headers.cookie)
         }
       );
-    } catch (err: any) {
-      console.warn('Team join notification failed:', err.message);
+    } catch (err) {
+      console.warn('Team join notification failed:', errorDetails(err).message);
     }
     res.json({
       message: 'Joined team session',
       session
     });
-  } catch (error) {
+  } catch {
     res.status(500).json({
       error: 'Failed to join session'
     });
@@ -187,9 +194,9 @@ router.post('/team/:sessionId/join', async (req: any, res: any) => {
 });
 
 // POST /team/join-by-code — Join session using invite code only (no sessionId needed)
-router.post('/team/join-by-code', async (req: any, res: any) => {
+router.post('/team/join-by-code', async (req: DomainRequest, res: Response) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const { inviteCode } = req.body;
     if (!inviteCode)
       return res.status(400).json({
@@ -204,23 +211,23 @@ router.post('/team/join-by-code', async (req: any, res: any) => {
       return res.status(404).json({
         error: 'No active session found with that invite code'
       });
-    if (session.participants.some((p: any) => p.userId === userId && !p.leftAt)) {
+    if (session.participants.some((p) => p.userId === userId && !p.leftAt)) {
       return res.status(409).json({
         error: 'Already in this session'
       });
     }
-    if (session.participants.filter((p: any) => !p.leftAt).length >= session.maxParticipants) {
+    if (session.participants.filter((p) => !p.leftAt).length >= session.maxParticipants) {
       return res.status(400).json({
         error: 'Session is full'
       });
     }
     session.participants.push({
       userId,
-      name: req.user.name || 'Member',
+      name: req.user!.name || 'Member',
       role: 'member',
       joinedAt: new Date()
     });
-    const activeCount = session.participants.filter((p: any) => !p.leftAt).length;
+    const activeCount = session.participants.filter((p) => !p.leftAt).length;
     const multipliers: Record<number, number> = {
       1: 1.0,
       2: 1.15,
@@ -247,8 +254,8 @@ router.post('/team/join-by-code', async (req: any, res: any) => {
           headers: buildInternalHeaders(req.headers.cookie)
         }
       );
-    } catch (err: any) {
-      console.warn('Team join notification failed:', err.message);
+    } catch (err) {
+      console.warn('Team join notification failed:', errorDetails(err).message);
     }
     res.json({
       message: 'Joined team session',
@@ -265,9 +272,9 @@ router.post('/team/join-by-code', async (req: any, res: any) => {
 });
 
 // POST /team/:sessionId/leave — Leave team session
-router.post('/team/:sessionId/leave', async (req: any, res: any) => {
+router.post('/team/:sessionId/leave', async (req: DomainRequest, res: Response) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const session = await StudySession.findOne({
       _id: req.params.sessionId,
       type: 'team',
@@ -277,7 +284,7 @@ router.post('/team/:sessionId/leave', async (req: any, res: any) => {
       return res.status(404).json({
         error: 'Session not found'
       });
-    const participant = session.participants.find((p: any) => p.userId === userId && !p.leftAt);
+    const participant = session.participants.find((p) => p.userId === userId && !p.leftAt);
     if (!participant)
       return res.status(404).json({
         error: 'Not in this session'
@@ -287,7 +294,7 @@ router.post('/team/:sessionId/leave', async (req: any, res: any) => {
     res.json({
       message: 'Left team session'
     });
-  } catch (error) {
+  } catch {
     res.status(500).json({
       error: 'Failed to leave session'
     });
@@ -295,9 +302,9 @@ router.post('/team/:sessionId/leave', async (req: any, res: any) => {
 });
 
 // POST /team/:sessionId/invite — Invite friend
-router.post('/team/:sessionId/invite', async (req: any, res: any) => {
+router.post('/team/:sessionId/invite', async (req: DomainRequest, res: Response) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const session = await StudySession.findOne({
       _id: req.params.sessionId,
       type: 'team',
@@ -333,14 +340,16 @@ router.post('/team/:sessionId/invite', async (req: any, res: any) => {
         }
       });
       inviterName = profileRes.data?.nickname || profileRes.data?.profile?.nickname || inviterName;
-    } catch (_e) {
+    } catch {
       /* best-effort */
     }
-    if (session.courseId) {
+    if (session.courseId && (await canReadCourse(friendId, session.courseId))) {
       try {
-        const course = await Course.findById(session.courseId).select('title').lean();
-        if (course) courseName = (course as any).title;
-      } catch (_e) {
+        const course = await Course.findOne({ _id: session.courseId, userId: friendId })
+          .select('title')
+          .lean();
+        if (course) courseName = course.title;
+      } catch {
         /* best-effort */
       }
     }
@@ -366,8 +375,12 @@ router.post('/team/:sessionId/invite', async (req: any, res: any) => {
         headers: buildInternalHeaders(req.headers.cookie)
       });
       console.log(`[Team Invite] Notification sent successfully to ${friendId}`);
-    } catch (err: any) {
-      console.warn('Team invite notification failed:', err.message, err.response?.data);
+    } catch (err) {
+      console.warn(
+        'Team invite notification failed:',
+        errorDetails(err).message,
+        errorDetails(err).data
+      );
     }
     res.json({
       message: 'Invite sent'
@@ -381,9 +394,9 @@ router.post('/team/:sessionId/invite', async (req: any, res: any) => {
 });
 
 // PUT /team/:sessionId/start — Leader starts the session for everyone
-router.put('/team/:sessionId/start', async (req: any, res: any) => {
+router.put('/team/:sessionId/start', async (req: DomainRequest, res: Response) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const session = await StudySession.findOne({
       _id: req.params.sessionId,
       type: 'team',
@@ -399,9 +412,11 @@ router.put('/team/:sessionId/start', async (req: any, res: any) => {
       });
 
     // Broadcast session_start to all active participants (including leader)
-    const activeUserIds = session.participants
-      .filter((p: any) => !p.leftAt)
-      .map((p: any) => p.userId);
+    const activeUserIds = [];
+    for (const participant of session.participants.filter((p) => !p.leftAt)) {
+      if (!session.courseId || (await canReadCourse(participant.userId, session.courseId)))
+        activeUserIds.push(participant.userId);
+    }
 
     // Also include the host if not already in participants list
     if (!activeUserIds.includes(userId)) activeUserIds.push(userId);
@@ -420,8 +435,8 @@ router.put('/team/:sessionId/start', async (req: any, res: any) => {
           headers: buildInternalHeaders(req.headers.cookie)
         }
       );
-    } catch (err: any) {
-      console.warn('[Team Start] Broadcast failed:', err.message);
+    } catch (err) {
+      console.warn('[Team Start] Broadcast failed:', errorDetails(err).message);
     }
     res.json({
       message: 'Session started',
@@ -436,12 +451,13 @@ router.put('/team/:sessionId/start', async (req: any, res: any) => {
 });
 
 // GET /team/:sessionId/participants — List participants
-router.get('/team/:sessionId/participants', async (req: any, res: any) => {
+router.get('/team/:sessionId/participants', async (req: DomainRequest, res: Response) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const session = await StudySession.findOne({
       _id: req.params.sessionId,
-      type: 'team'
+      type: 'team',
+      status: 'active'
     });
     if (!session)
       return res.status(404).json({
@@ -452,7 +468,7 @@ router.get('/team/:sessionId/participants', async (req: any, res: any) => {
         error: 'Not a member of this session'
       });
     }
-    const participants = session.participants.map((p: any) => ({
+    const participants = session.participants.map((p) => ({
       userId: p.userId,
       name: p.name,
       avatar: p.avatar,
@@ -460,13 +476,13 @@ router.get('/team/:sessionId/participants', async (req: any, res: any) => {
       joinedAt: p.joinedAt,
       leftAt: p.leftAt,
       durationMinutes: p.leftAt
-        ? Math.round((new Date(p.leftAt).getTime() - new Date(p.joinedAt).getTime()) / 60000)
-        : Math.round((new Date().getTime() - new Date(p.joinedAt).getTime()) / 60000)
+        ? Math.round((new Date(p.leftAt).getTime() - new Date(p.joinedAt ?? NaN).getTime()) / 60000)
+        : Math.round((new Date().getTime() - new Date(p.joinedAt ?? NaN).getTime()) / 60000)
     }));
     res.json({
       participants
     });
-  } catch (error) {
+  } catch {
     res.status(500).json({
       error: 'Failed to get participants'
     });
@@ -474,9 +490,9 @@ router.get('/team/:sessionId/participants', async (req: any, res: any) => {
 });
 
 // PUT /team/:sessionId/end — End team session (host only)
-router.put('/team/:sessionId/end', async (req: any, res: any) => {
+router.put('/team/:sessionId/end', async (req: DomainRequest, res: Response) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const session = await StudySession.findOne({
       _id: req.params.sessionId,
       type: 'team',
@@ -498,7 +514,7 @@ router.put('/team/:sessionId/end', async (req: any, res: any) => {
     session.duration = Math.round((now.getTime() - new Date(session.startTime).getTime()) / 60000);
 
     // Set leftAt for all active participants
-    session.participants.forEach((p: any) => {
+    session.participants.forEach((p) => {
       if (!p.leftAt) p.leftAt = now;
     });
     await session.save();
@@ -583,7 +599,7 @@ router.put('/team/:sessionId/end', async (req: any, res: any) => {
       session,
       teamRewards
     });
-  } catch (error) {
+  } catch {
     res.status(500).json({
       error: 'Failed to end session'
     });

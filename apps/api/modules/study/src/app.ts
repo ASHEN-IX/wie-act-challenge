@@ -1,3 +1,4 @@
+import { publicUploads } from '@study-partner/shared/publicUploads';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import path from 'path';
@@ -20,6 +21,10 @@ const learningObjectiveRoutes = require('./routes/learningObjectives');
 const competencyRoutes = require('./routes/competencies');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const coachRoutes = require('./routes/coach');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const roomRoutes = require('./routes/rooms');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const institutionRoutes = require('./routes/institutions');
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const {
@@ -57,14 +62,7 @@ app.use(rateLimiter());
 
 // Serve uploaded files (subject images) from the service's uploads directory
 // SEC-11: dotfiles and directory listings are denied; content sniffing off.
-app.use(
-  '/uploads',
-  express.static(path.join(__dirname, '../uploads'), {
-    dotfiles: 'deny',
-    index: false,
-    setHeaders: (res) => res.setHeader('X-Content-Type-Options', 'nosniff')
-  })
-);
+app.use('/uploads', publicUploads(path.join(__dirname, '../uploads')));
 
 // Health check
 app.get('/api/v1/health', healthCheck('study'));
@@ -84,6 +82,8 @@ app.use('/api/v1/study/plans', authenticate, planRoutes);
 app.use('/api/v1/study/learning-objectives', authenticate, learningObjectiveRoutes);
 app.use('/api/v1/competencies', authenticate, competencyRoutes);
 app.use('/api/v1/coach', authenticate, coachRoutes);
+app.use('/api/v1/study/rooms', authenticate, roomRoutes);
+app.use('/api/v1/study/institutions', authenticate, institutionRoutes);
 // Error handler (must be last)
 app.use(errorHandler);
 

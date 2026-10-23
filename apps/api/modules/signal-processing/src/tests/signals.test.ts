@@ -10,7 +10,10 @@ process.env.INTERNAL_API_SECRET = 'test-internal-secret';
 process.env.NODE_ENV = 'test';
 
 // Prevent process.exit() from killing tests
-process.exit = jest.fn() as any;
+const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => {
+  throw new Error(`Unexpected process.exit(${code})`);
+});
+afterAll(() => exitSpy.mockRestore());
 
 // We test the app directly
 // eslint-disable-next-line @typescript-eslint/no-require-imports

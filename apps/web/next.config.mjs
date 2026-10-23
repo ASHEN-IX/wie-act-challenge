@@ -123,6 +123,10 @@ export default {
         destination: `${process.env.BACKEND_URL || "http://localhost:3000"}/api/v1/:path*`,
       },
       {
+        source: "/ws/:path*",
+        destination: `${process.env.BACKEND_URL || "http://localhost:3000"}/ws/:path*`,
+      },
+      {
         source: "/uploads/:path*",
         destination: `${process.env.BACKEND_URL || "http://localhost:3000"}/uploads/:path*`,
       },

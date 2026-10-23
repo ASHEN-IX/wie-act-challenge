@@ -6,11 +6,11 @@ export default {
   get app() {
     return app;
   },
-  attachRealtime: (server: any) => attachRealtime(server)
+  attachRealtime: (server: Parameters<typeof attachRealtime>[0]) => attachRealtime(server)
 };
 module.exports = {
   get app() {
     return app;
   },
-  attachRealtime: (server: any) => attachRealtime(server)
+  attachRealtime: (server: Parameters<typeof attachRealtime>[0]) => attachRealtime(server)
 };

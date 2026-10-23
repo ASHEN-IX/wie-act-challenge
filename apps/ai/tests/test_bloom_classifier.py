@@ -23,7 +23,7 @@ from bloom.classifier import (
 from bloom.taxonomy import BLOOM_LEVELS, KNOWLEDGE_TYPES, VERB_MAP
 
 FIXTURE_PATH = (
-    __import__("pathlib").Path(__file__).resolve().parents[2]
+    __import__("pathlib").Path(__file__).resolve().parents[3]
     / "docs"
     / "contracts"
     / "classification-fixture.json"

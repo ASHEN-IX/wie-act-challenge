@@ -8,9 +8,12 @@ const { requestContext } = require('../../shared/requestContext');
 export class DomainService implements DomainExecutor {
   constructor(private readonly definition: DomainDefinition) {}
   async execute(key: string, req: DomainRequest, res: Response): Promise<void> {
-    const operation = this.definition.operations.find((entry) => `${entry.method.toUpperCase()} ${entry.path}` === key);
+    const operation = this.definition.operations.find(
+      (entry) => `${entry.method.toUpperCase()} ${entry.path}` === key
+    );
     if (!operation) throw new NotFoundException();
     new ContractParameterPipe(operation).transform(req);
+    res.setHeader('Cache-Control', 'private, no-store');
     await requestContext.run({ cookie: req.headers.cookie, identity: req.user }, () =>
       executeHandlers(
         [require('../../shared/operationPolicy').operationPolicy, ...operation.handlers],

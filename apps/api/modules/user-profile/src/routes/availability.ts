@@ -1,3 +1,5 @@
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { Response } from 'express';
 import { createContracts } from '@study-partner/shared/domainContracts';
 import Joi from 'joi';
 import AvailabilitySlot from '../models/AvailabilitySlot';
@@ -21,9 +23,9 @@ const createSlotSchema = Joi.object({
 });
 
 // Get all availability slots for current user
-router.get('/', async (req: any, res: any) => {
+router.get('/', async (req: DomainRequest, res: Response) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const slots = await AvailabilitySlot.find({ userId }).sort({ dayOfWeek: 1, startTime: 1 });
 
     // Convert to frontend format
@@ -47,14 +49,14 @@ router.get('/', async (req: any, res: any) => {
 });
 
 // Create new availability slot
-router.post('/', async (req: any, res: any) => {
+router.post('/', async (req: DomainRequest, res: Response) => {
   try {
     const { error, value } = createSlotSchema.validate(req.body);
     if (error) {
       return res.status(400).json({ error: error.details[0].message });
     }
 
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
 
     const slot = await AvailabilitySlot.create({
       userId,
@@ -125,8 +127,11 @@ router.post('/', async (req: any, res: any) => {
       if (entries.length > 0) {
         await calendarColl.insertMany(entries);
       }
-    } catch (calendarErr: any) {
-      console.error('Failed to save availability to calendar:', calendarErr.message);
+    } catch (calendarErr) {
+      console.error(
+        'Failed to save availability to calendar:',
+        calendarErr instanceof Error ? calendarErr.message : String(calendarErr)
+      );
       // Don't fail the request if calendar save fails
     }
 
@@ -149,9 +154,9 @@ router.post('/', async (req: any, res: any) => {
 });
 
 // Delete availability slot
-router.delete('/:id', async (req: any, res: any) => {
+router.delete('/:id', async (req: DomainRequest, res: Response) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const slotId = req.params.id;
 
     const result = await AvailabilitySlot.deleteOne({ _id: slotId, userId });
@@ -171,8 +176,11 @@ router.delete('/:id', async (req: any, res: any) => {
         taskId: slotId,
         source: 'availability'
       });
-    } catch (calendarErr: any) {
-      console.error('Failed to remove availability from calendar:', calendarErr.message);
+    } catch (calendarErr) {
+      console.error(
+        'Failed to remove availability from calendar:',
+        calendarErr instanceof Error ? calendarErr.message : String(calendarErr)
+      );
       // Don't fail the request if calendar cleanup fails
     }
 
@@ -184,9 +192,9 @@ router.delete('/:id', async (req: any, res: any) => {
 });
 
 // Get free time slots (calculated from blocked slots)
-router.get('/free-slots', async (req: any, res: any) => {
+router.get('/free-slots', async (req: DomainRequest, res: Response) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const durationMinutes = parseInt(req.query.duration_minutes as string) || 60;
 
     const blockedSlots = await AvailabilitySlot.find({ userId });

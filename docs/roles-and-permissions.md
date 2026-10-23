@@ -6,7 +6,7 @@
 
 `study-partner-api/modules/auth/src/models/User.ts` and `shared/auth.ts` define global `student` and `admin`. Better Auth resolves a Mongo session and domain user; `SessionGuard` authenticates, then domain handlers/tier policy apply. Admin/internal checks grant some privileged operations. AI operations enforce actor/resource ownership through `shared/operationPolicy.ts`. Paid/trial tiers affect access and expiry; independent signup is not unrestricted free AI access.
 
-The frontend `src/utils/permissions.ts` includes `teacher`, but neither its presence nor a visible screen implements an instructor role. Course routes generally use `{_id, userId}`; no Institution, InstitutionMembership or CourseEnrollment model was found. Team membership grants session participation, not a defined license to another user's course. Session-chat/voice HTTP handlers need explicit resource checks; static upload routes and team creation course lookup need isolation tests. Do not claim all retained legacy paths satisfy the TARGET matrix.
+The frontend `src/utils/permissions.ts` includes `teacher`, but neither its presence nor a visible screen implements an instructor role. Course routes generally use `{_id, userId}`; M04-A adds Institution, InstitutionMembership and invitation context, but no CourseEnrollment model or course-scoped grant exists. Team membership grants session participation, not a defined license to another user's course. Session-chat/voice HTTP handlers need explicit resource checks; static upload routes and team creation course lookup need isolation tests. Do not claim all retained legacy paths satisfy the TARGET matrix.
 
 ## TARGET responsibilities
 
@@ -16,7 +16,7 @@ The frontend `src/utils/permissions.ts` includes `teacher`, but neither its pres
 - **University student:** access enrolled published courses, use own personal courses, participate in authorized private rooms, obtain private assessment/next steps.
 - **Independent learner:** own private courses/resources and use individual/group learning without an institution. Official course access requires membership/enrollment. Student and independent learner are contexts of one learner account, not separate global roles/apps.
 
-## TARGET permission matrix (all institutional columns PLANNED)
+## TARGET permission matrix (M04-A implements only the membership/invitation subset; other institutional rows remain PLANNED)
 
 | Action / scope | Platform admin | University admin | Instructor | University student | Independent learner |
 |---|---|---|---|---|---|
@@ -58,3 +58,23 @@ Institution/university membership and current student/admin limitations above ar
 | Inspect learner private answers/help/reward evidence | No default | No | No default; aggregates only | Own only | Own only |
 
 Only trusted server processing can accept evidence and derive rewards from the approved policy; admin/internal legacy endpoints are not a public activity-award API. Instructor preview may reveal instructor-owned answer keys only after authorization; learner/public activity projection must not include them. A correct public contribution is not permission to expose another student's private check. Official active revision cannot be edited in place by the room presenter. Personal editing uses the same Studio/activity engine with private ownership, never an official-publication privilege.
+
+## M02 current implementation boundary — 23 October 2026
+
+The running personal-source grant is `Course.userId === authenticated actor`, checked by Study's `services/resourceAccess.ts`. Admin identity, team invitations and presenter authority do not grant access to another learner's private source, job or result. Institutional enrollment and published-revision grants remain later missions. A source-backed team member must independently hold the current source grant; source-free teams retain their active-membership flow. Explicit leave remains possible after source revocation.
+
+Private jobs and materialized plans/tasks retain source provenance and recheck the current grant when delivered. Legacy records without provenance fail closed and require resubmission; no backfill guesses their source. New explicitly source-free records retain an empty scope. Protected HTTP responses use `private, no-store`. Revocation checks run at request/delivery boundaries, not as one atomic transaction across auth, Mongo and socket writes. Already delivered content cannot be recalled. See the [M02 verification](../reports/EDNOVA-M02-RESOURCE-ISOLATION-VERIFICATION.md).
+
+## M04-A.1 current implementation boundary — 23 October 2026
+
+The repository now has one Better Auth identity plus Study-owned `institutions`, `institution_memberships` and single-use `institution_invitations`. These records provide display context and membership administration only. They are not a second login system and they are not a source grant.
+
+- Synthetic institution setup is an explicit platform-admin bootstrap. The item is unverified and the setup creates the first `university_admin` membership. No self-service institution creation exists.
+- An active `university_admin` of that institution may update metadata, issue or revoke membership invitations, and suspend an instructor/student membership. A platform role alone cannot manage another institution's membership; foreign institution IDs return 404.
+- Invitations can grant only `instructor` or `university_student`. They cannot grant `university_admin` or platform admin. The raw token is returned once, only its SHA-256 hash is stored, acceptance is conditional and single-use, and expiry is capped at 720 hours. Multiple independent pending invitations may exist for the same institution/role.
+- Acceptance claims the pending token before writing membership. The claim is not rolled back after a later failure: the same actor can retry to complete the missing membership, while a different actor gets `409`. A suspended membership is not reactivated by accepting a new invitation, and it remains pending. No recipient/email binding exists, so duplicate issuance to the same person is not detectable; that product policy remains unresolved.
+- Suspending or revoking a membership removes the institutional display context. It does not revoke personal data, and it cannot grant access. Membership acceptance, retry recovery, suspension, expiry and invitation revocation are tested against real NestJS/MongoDB. The real profile acceptance flow is also covered with two browser users and two synthetic institutions.
+- `Course.userId` remains the only course-read grant. No `course_enrollments`, institutional course scope, assigned-instructor grant or published-source authorization exists yet. No global-admin or membership bypass was added. A member still receives 404 for another user's personal course.
+- The profile page shows only active memberships and provides an invitation-token acceptance form. Course enrollment, instructor assignment, material scoping and publication remain later missions gated by ED-26/Contract 03 review.
+
+See the [M04-A verification](../reports/EDNOVA-M04A-INSTITUTION-FOUNDATION-VERIFICATION.md) and the [M04-A.1 invitation reliability verification](../reports/EDNOVA-M04A1-INVITATION-RELIABILITY-VERIFICATION.md).

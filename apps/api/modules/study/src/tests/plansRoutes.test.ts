@@ -1,3 +1,6 @@
+import type { IStudyPlan } from '../models';
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { Response, NextFunction } from 'express';
 /**
  * BLOOM-10 — plans route wiring (Node side).
  */
@@ -12,21 +15,33 @@ jest.mock('../models/index', () => ({
     findOne: jest.fn(async () => MOCK_COURSE)
   },
   StudyPlan: {
-    create: jest.fn(async (doc: any) => ({
-      _id: { toString: () => 'plan-1' },
-      ...doc,
-      userId: doc.userId,
-      goal: doc.goal,
-      availableTimeMinutes: doc.availableTimeMinutes,
-      totalEstimatedMinutes: doc.totalEstimatedMinutes,
-      status: 'created',
-      warning: doc.warning,
-      taskGraph: doc.taskGraph,
-      createdAt: new Date()
-    }))
+    create: jest.fn(
+      async (
+        doc: Pick<
+          IStudyPlan,
+          | 'userId'
+          | 'goal'
+          | 'availableTimeMinutes'
+          | 'totalEstimatedMinutes'
+          | 'warning'
+          | 'taskGraph'
+        >
+      ) => ({
+        _id: { toString: () => 'plan-1' },
+        ...doc,
+        userId: doc.userId,
+        goal: doc.goal,
+        availableTimeMinutes: doc.availableTimeMinutes,
+        totalEstimatedMinutes: doc.totalEstimatedMinutes,
+        status: 'created',
+        warning: doc.warning,
+        taskGraph: doc.taskGraph,
+        createdAt: new Date()
+      })
+    )
   },
   Task: {
-    create: jest.fn(async (doc: any) => ({ _id: 'task-1', ...doc }))
+    create: jest.fn(async (doc: object) => ({ _id: 'task-1', ...doc }))
   }
 }));
 
@@ -49,8 +64,8 @@ const plansRoutes = require('../routes/plans');
 
 const app = express();
 app.use(express.json());
-const fakeAuth = (req: any, res: any, next: any) => {
-  req.user = { userId: 'user-123', tier: 'vip' };
+const fakeAuth = (req: DomainRequest, res: Response, next: NextFunction) => {
+  req.user = { userId: 'user-123', tier: 'vip', role: 'student' };
   next();
 };
 app.use('/api/v1/plans', fakeAuth, plansRoutes);
@@ -105,9 +120,13 @@ describe('POST /api/v1/plans/create — weak_competencies payload', () => {
 });
 
 describe('POST /api/v1/plans/create-status — competency target persistence', () => {
-  function aiJobsResult(taskOverrides: any = {}) {
+  function aiJobsResult(
+    taskOverrides: { extra?: Array<Partial<import('../models').IStudyPlanTask>> } = {}
+  ) {
     return {
       userId: 'user-123',
+      type: 'study.plan.generate',
+      resourceScope: {},
       status: 'COMPLETED',
       result: {
         task_graph: {

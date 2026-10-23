@@ -40,8 +40,9 @@ async function publishCourseIngestionJob({
   const payload = { courseId, fileRef, files: files || [] };
   const check = validateJobPayload(INGEST_JOB_TYPE, payload);
   if (!check.valid) {
-    const err: any = new Error(`invalid ingestion payload: ${check.errors.join('; ')}`);
-    err.code = 'INGEST_PAYLOAD_INVALID';
+    const err = Object.assign(new Error(`invalid ingestion payload: ${check.errors.join('; ')}`), {
+      code: 'INGEST_PAYLOAD_INVALID'
+    });
     throw err;
   }
 

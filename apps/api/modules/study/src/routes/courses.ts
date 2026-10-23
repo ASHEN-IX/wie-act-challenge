@@ -1,3 +1,9 @@
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { Response, NextFunction, RequestHandler } from 'express';
+import type { FilterQuery } from 'mongoose';
+import type { ICourse, ICourseTopic, ISubtopic } from '../models';
+import { errorDetails } from '@study-partner/shared/errors';
+
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { createContracts } = require('@study-partner/shared/domainContracts');
 import multer from 'multer';
@@ -15,12 +21,48 @@ import { publishCourseIngestionJob } from '../services/ingestionJob';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { buildInternalHeaders } = require('@study-partner/shared/auth');
 
+type CourseUpload = Pick<
+  NonNullable<DomainRequest['file']>,
+  'filename' | 'originalname' | 'mimetype' | 'size' | 'path'
+>;
+
+// express-fileupload and Multer expose incompatible ambient Request.files types.
+// Read the Multer disk-upload boundary explicitly and validate the fields we consume.
+function requestFileEntries(req: DomainRequest): unknown[] {
+  const files: unknown = Reflect.get(req, 'files');
+  if (!files) return [];
+  if (Array.isArray(files)) return files;
+  return typeof files === 'object' ? Object.values(files).flat() : [];
+}
+
+function courseUploads(req: DomainRequest): CourseUpload[] {
+  const files = requestFileEntries(req);
+  function isUpload(file: unknown): file is CourseUpload {
+    return (
+      !!file &&
+      typeof file === 'object' &&
+      'filename' in file &&
+      typeof file.filename === 'string' &&
+      'originalname' in file &&
+      typeof file.originalname === 'string' &&
+      'mimetype' in file &&
+      typeof file.mimetype === 'string' &&
+      'path' in file &&
+      typeof file.path === 'string' &&
+      'size' in file &&
+      typeof file.size === 'number'
+    );
+  }
+  if (!files.every(isUpload)) throw new Error('Invalid disk upload metadata');
+  return files;
+}
+
 const router = createContracts();
 
 // INGEST-05: move freshly-uploaded files into a course-scoped directory so the
 // async worker (INGEST-06) can find them via a single unambiguous fileRef.
 // Stored paths are relative to the uploads root.
-function stageCourseFiles(reqFiles: any[], courseId: string) {
+function stageCourseFiles(reqFiles: CourseUpload[], courseId: string) {
   const courseUploadDir = path.join('uploads', 'courses', courseId);
   fs.mkdirSync(courseUploadDir, { recursive: true });
   return reqFiles.map((file) => {
@@ -44,8 +86,8 @@ function cleanupCourseFiles(courseId: string) {
   const dir = path.join('uploads', 'courses', courseId);
   try {
     fs.rmSync(dir, { recursive: true, force: true });
-  } catch (err: any) {
-    console.warn(`Failed to cleanup course files for ${courseId}:`, err.message);
+  } catch (err) {
+    console.warn(`Failed to cleanup course files for ${courseId}:`, errorDetails(err).message);
   }
 }
 
@@ -54,7 +96,7 @@ function cleanupCourseFiles(courseId: string) {
 // path separator, control char or traversal payload survives into the path.
 const STORAGE_EXT_RE = /^\.[a-z0-9]{1,8}$/;
 
-function sanitizeStoredFilename(file: any) {
+function sanitizeStoredFilename(file: Pick<NonNullable<DomainRequest['file']>, 'originalname'>) {
   const safeSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
   const ext = (path.extname(file.originalname) || '').toLowerCase();
   return STORAGE_EXT_RE.test(ext) ? `${safeSuffix}${ext}` : `${safeSuffix}.bin`;
@@ -88,34 +130,33 @@ const upload = multer({
     // Cheap first pass: declared MIME + extension must be allowed.
     const check = validateUploadMetadata(file);
     if (check.valid) return cb(null, true);
-    const err: any = new Error(check.errors.join('; '));
-    err.statusCode = 422; // sanitized message, no client-controlled content reflected
+    const err = Object.assign(new Error(check.errors.join('; ')), { statusCode: 422 }); // sanitized message, no client-controlled content reflected
     return cb(err);
   }
 });
 
 // INGEST-02: multer size-limit violations surface as 413 (never a generic 500),
 // and any file already written to disk by diskStorage is removed.
-function cleanupRequestFiles(req: any) {
-  if (!req.files) return;
-  const files: any[] = Array.isArray(req.files) ? req.files : Object.values(req.files).flat();
-  for (const file of files) {
+function cleanupRequestFiles(req: DomainRequest) {
+  for (const file of requestFileEntries(req)) {
+    if (!file || typeof file !== 'object' || !('path' in file) || typeof file.path !== 'string')
+      continue;
     try {
       fs.unlinkSync(file.path);
-    } catch (_) {
+    } catch {
       /* best-effort cleanup */
     }
   }
 }
 
-function handleUploadError(err: any, req: any, res: any, next: any) {
+function handleUploadError(err: unknown, req: DomainRequest, res: Response, next: NextFunction) {
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {
       cleanupRequestFiles(req);
-      const sizeErr: any = new Error(
-        `File too large - maximum allowed is ${MAX_UPLOAD_MB}MB per file`
+      const sizeErr = Object.assign(
+        new Error(`File too large - maximum allowed is ${MAX_UPLOAD_MB}MB per file`),
+        { statusCode: 413 }
       );
-      sizeErr.statusCode = 413;
       return next(sizeErr);
     }
     return next(err);
@@ -123,8 +164,9 @@ function handleUploadError(err: any, req: any, res: any, next: any) {
   return next(err);
 }
 
-const withUploadError = (mw: any) => (req: any, res: any, next: any) =>
-  mw(req, res, (err: any) => handleUploadError(err, req, res, next));
+const withUploadError =
+  (mw: RequestHandler) => (req: DomainRequest, res: Response, next: NextFunction) =>
+    mw(req, res, (err: unknown) => handleUploadError(err, req, res, next));
 
 function streamFileSlice(filePath: string, start: number, end: number): Promise<Buffer> {
   return new Promise((resolve, reject) => {
@@ -136,39 +178,41 @@ function streamFileSlice(filePath: string, start: number, end: number): Promise<
   });
 }
 
-async function sniffUploadedFiles(req: any, res: any, next: any) {
-  if (!req.files || req.files.length === 0) return next();
+async function sniffUploadedFiles(req: DomainRequest, res: Response, next: NextFunction) {
+  if (!courseUploads(req) || courseUploads(req).length === 0) return next();
 
-  const rejectAndCleanup = (files: any[], message: string) => {
+  const rejectAndCleanup = (files: CourseUpload[], message: string) => {
     for (const f of files) {
       try {
         fs.unlinkSync(f.path);
-      } catch (_) {
+      } catch {
         /* best-effort cleanup */
       }
     }
-    const err: any = new Error(message);
-    err.statusCode = 422;
+    const err = Object.assign(new Error(message), { statusCode: 422 });
     return err;
   };
 
   try {
     // Fast path: sniff only the header, reject binaries before any full read.
-    for (const file of req.files) {
+    for (const file of courseUploads(req)) {
       const header = await streamFileSlice(file.path, 0, SNIFF_BYTES - 1);
       if (header.length > 0) {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const { sniffMagicBytes } = require('@study-partner/shared/uploadValidation');
         if (sniffMagicBytes(header) === 'binary') {
           return next(
-            rejectAndCleanup(req.files, 'Upload rejected: binary/script content is not allowed')
+            rejectAndCleanup(
+              courseUploads(req),
+              'Upload rejected: binary/script content is not allowed'
+            )
           );
         }
       }
     }
 
     // Authoritative check: ensure MIME/extension match the (async) full content.
-    for (const file of req.files) {
+    for (const file of courseUploads(req)) {
       const buffer = await fs.promises.readFile(file.path);
       const check = validateUploadFile({
         originalname: file.originalname,
@@ -177,59 +221,67 @@ async function sniffUploadedFiles(req: any, res: any, next: any) {
       });
 
       if (!check.valid) {
-        return next(rejectAndCleanup(req.files, 'Upload rejected: ' + check.errors.join('; ')));
+        return next(
+          rejectAndCleanup(courseUploads(req), 'Upload rejected: ' + check.errors.join('; '))
+        );
       }
     }
-  } catch (readErr) {
-    return next(rejectAndCleanup(req.files, 'Failed to read uploaded file'));
+  } catch {
+    return next(rejectAndCleanup(courseUploads(req), 'Failed to read uploaded file'));
   }
 
   return next();
 }
 
 // Source documents are private and remain available until the course is deleted.
-router.get('/:courseId/files/:filename', async (req: any, res: any, next: any) => {
-  try {
-    const course = await Course.findOne({
-      _id: req.params.courseId,
-      userId: req.user.userId
-    }).lean();
-    const filename = req.params.filename;
-    if (
-      !course ||
-      typeof filename !== 'string' ||
-      path.basename(filename) !== filename ||
-      !course.files.some((file: any) => file.filename === filename)
-    ) {
-      return res.status(404).json({ error: 'Source file not found' });
-    }
-    const root = await fs.promises.realpath(path.resolve('uploads', 'courses', String(course._id)));
-    const target = await fs.promises.realpath(path.join(root, filename));
-    if (!target.startsWith(root + path.sep))
-      return res.status(404).json({ error: 'Source file not found' });
-    res.setHeader('Cache-Control', 'private, no-store');
-    res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'");
-    if (req.query.inline === '1') {
-      res.setHeader(
-        'Content-Disposition',
-        `inline; filename*=UTF-8''${encodeURIComponent(filename)}`
+router.get(
+  '/:courseId/files/:filename',
+  async (req: DomainRequest, res: Response, next: NextFunction) => {
+    try {
+      const course = await Course.findOne({
+        _id: req.params.courseId,
+        userId: req.user!.userId
+      }).lean();
+      const filename = req.params.filename;
+      if (
+        !course ||
+        typeof filename !== 'string' ||
+        path.basename(filename) !== filename ||
+        !course.files.some((file) => file.filename === filename)
+      ) {
+        return res.status(404).json({ error: 'Source file not found' });
+      }
+      const root = await fs.promises.realpath(
+        path.resolve('uploads', 'courses', String(course._id))
       );
-      return res.sendFile(target);
+      const target = await fs.promises.realpath(path.join(root, filename));
+      if (!target.startsWith(root + path.sep))
+        return res.status(404).json({ error: 'Source file not found' });
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'");
+      if (req.query.inline === '1') {
+        res.setHeader(
+          'Content-Disposition',
+          `inline; filename*=UTF-8''${encodeURIComponent(filename)}`
+        );
+        return res.sendFile(target);
+      }
+      return res.download(target, filename);
+    } catch (error) {
+      if (errorDetails(error).code === 'ENOENT')
+        return res.status(404).json({ error: 'Source file not found' });
+      return next(error);
     }
-    return res.download(target, filename);
-  } catch (error: any) {
-    if (error.code === 'ENOENT') return res.status(404).json({ error: 'Source file not found' });
-    return next(error);
   }
-});
+);
 
 // Get all courses for a user, optionally filtered by subject
-router.get('/', async (req: any, res: any) => {
+router.get('/', async (req: DomainRequest, res: Response) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const { subject_id } = req.query;
 
-    const query: Record<string, any> = { userId };
+    const query: FilterQuery<ICourse> = { userId };
     if (subject_id) {
       query.subjectId = subject_id;
     }
@@ -240,7 +292,7 @@ router.get('/', async (req: any, res: any) => {
 
     console.log('Found', courses.length, 'courses');
 
-    const coursesWithDetails = courses.map((course: any) => ({
+    const coursesWithDetails = courses.map((course) => ({
       id: course._id.toString(),
       title: course.title,
       description: course.description,
@@ -255,9 +307,11 @@ router.get('/', async (req: any, res: any) => {
     }));
 
     res.json({ courses: coursesWithDetails });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching courses:', error);
-    res.status(500).json({ error: 'Failed to fetch courses', details: error.message });
+    res
+      .status(500)
+      .json({ error: 'Failed to fetch courses', details: errorDetails(error).message });
   }
 });
 
@@ -268,16 +322,16 @@ router.post(
   requireMultipart,
   withUploadError(upload.array('files', 10)),
   sniffUploadedFiles,
-  async (req: any, res: any) => {
+  async (req: DomainRequest, res: Response) => {
     try {
-      const userId = req.user.userId;
+      const userId = req.user!.userId;
       const { title, description, subject_id } = req.body;
 
       if (!title || !subject_id) {
         return res.status(400).json({ error: 'title and subject_id are required' });
       }
 
-      if (!req.files || req.files.length === 0) {
+      if (!courseUploads(req) || courseUploads(req).length === 0) {
         return res.status(400).json({ error: 'At least one file is required' });
       }
 
@@ -294,7 +348,7 @@ router.post(
         subjectId: subject_id,
         userId,
         status: 'processing',
-        files: req.files.map((file: any) => ({
+        files: courseUploads(req).map((file: CourseUpload) => ({
           filename: file.filename,
           originalName: file.originalname,
           size: file.size
@@ -306,7 +360,7 @@ router.post(
       // INGEST-05: stage files under a course-scoped dir, then enqueue the
       // async ingestion job. The request returns 202 { jobId } immediately —
       // the worker (INGEST-06) parses/embeds and resolves the course status.
-      const staged = stageCourseFiles(req.files, course._id.toString());
+      const staged = stageCourseFiles(courseUploads(req), course._id.toString());
 
       try {
         const { jobId, correlationId } = await publishCourseIngestionJob({
@@ -329,13 +383,13 @@ router.post(
           courseId: course._id.toString(),
           status: 'processing'
         });
-      } catch (publishErr: any) {
-        console.error('Ingestion job enqueue failed:', publishErr.message);
+      } catch (publishErr) {
+        console.error('Ingestion job enqueue failed:', errorDetails(publishErr).message);
 
         // No job was enqueued → nothing will parse these files. Mark the course
         // failed and remove the staged files so nothing is orphaned.
         course.status = 'failed';
-        (course as any).warning = 'ingestion job could not be enqueued';
+        Object.assign(course, { warning: 'ingestion job could not be enqueued' });
         await course.save();
         cleanupCourseFiles(course._id.toString());
 
@@ -349,10 +403,10 @@ router.post(
 );
 
 // Get a specific course
-router.get('/:courseId', async (req: any, res: any) => {
+router.get('/:courseId', async (req: DomainRequest, res: Response) => {
   try {
     const { courseId } = req.params;
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
 
     const course = await Course.findOne({ _id: courseId, userId });
 
@@ -382,10 +436,10 @@ router.get('/:courseId', async (req: any, res: any) => {
 });
 
 // INGEST-07: current ingestion progress + status for a course
-router.get('/:courseId/ingest-status', async (req: any, res: any) => {
+router.get('/:courseId/ingest-status', async (req: DomainRequest, res: Response) => {
   try {
     const { courseId } = req.params;
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
 
     const course = await Course.findOne({ _id: courseId, userId });
     if (!course) {
@@ -402,10 +456,10 @@ router.get('/:courseId/ingest-status', async (req: any, res: any) => {
 });
 
 // Delete a course
-router.delete('/:courseId', async (req: any, res: any) => {
+router.delete('/:courseId', async (req: DomainRequest, res: Response) => {
   try {
     const { courseId } = req.params;
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
 
     const course = await Course.findOneAndDelete({ _id: courseId, userId });
 
@@ -416,8 +470,8 @@ router.delete('/:courseId', async (req: any, res: any) => {
     // BLOOM-06: remove learning objectives for deleted course
     try {
       await deleteObjectivesForDocument(course._id.toString());
-    } catch (objErr: any) {
-      console.warn('Learning objective cleanup failed (non-fatal):', objErr.message);
+    } catch (objErr) {
+      console.warn('Learning objective cleanup failed (non-fatal):', errorDetails(objErr).message);
     }
 
     res.json({ message: 'Course deleted successfully' });
@@ -434,12 +488,12 @@ router.post(
   requireMultipart,
   withUploadError(upload.array('files', 10)),
   sniffUploadedFiles,
-  async (req: any, res: any) => {
+  async (req: DomainRequest, res: Response) => {
     try {
       const { courseId } = req.params;
-      const userId = req.user.userId;
+      const userId = req.user!.userId;
 
-      if (!req.files || req.files.length === 0) {
+      if (!courseUploads(req) || courseUploads(req).length === 0) {
         return res.status(400).json({ error: 'At least one file is required' });
       }
 
@@ -450,7 +504,7 @@ router.post(
       }
 
       // Add new files to the course
-      const newFiles = req.files.map((file: any) => ({
+      const newFiles = courseUploads(req).map((file: CourseUpload) => ({
         filename: file.filename,
         originalName: file.originalname,
         size: file.size,
@@ -462,7 +516,7 @@ router.post(
       await course.save();
 
       // INGEST-05: stage the newly added files and enqueue async re-processing.
-      const staged = stageCourseFiles(req.files, course._id.toString());
+      const staged = stageCourseFiles(courseUploads(req), course._id.toString());
 
       try {
         const { jobId, correlationId } = await publishCourseIngestionJob({
@@ -488,8 +542,8 @@ router.post(
           courseId: course._id.toString(),
           status: 'processing'
         });
-      } catch (publishErr: any) {
-        console.error('Ingestion job enqueue failed:', publishErr.message);
+      } catch (publishErr) {
+        console.error('Ingestion job enqueue failed:', errorDetails(publishErr).message);
         course.status = 'failed';
         await course.save();
         cleanupCourseFiles(course._id.toString());
@@ -504,9 +558,9 @@ router.post(
 );
 
 // Create a manual course (no AI processing, available to all tiers including Normal)
-router.post('/manual', async (req: any, res: any) => {
+router.post('/manual', async (req: DomainRequest, res: Response) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const { title, description, subject_id, topics } = req.body;
 
     if (!title || !subject_id) {
@@ -526,9 +580,9 @@ router.post('/manual', async (req: any, res: any) => {
       subjectId: subject_id,
       userId,
       status: 'completed',
-      topics: (topics || []).map((t: any) => ({
+      topics: (topics || []).map((t: ICourseTopic) => ({
         title: t.title,
-        subtopics: (t.subtopics || []).map((sub: any) => ({
+        subtopics: (t.subtopics || []).map((sub: ISubtopic) => ({
           id: sub.id || `sub-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           title: sub.title,
           summary: sub.summary || '',
@@ -558,8 +612,8 @@ router.post('/manual', async (req: any, res: any) => {
           headers: buildInternalHeaders(req.headers.cookie)
         }
       );
-    } catch (xpErr: any) {
-      console.warn('XP award failed for manual course:', xpErr.message);
+    } catch (xpErr) {
+      console.warn('XP award failed for manual course:', errorDetails(xpErr).message);
     }
 
     res.status(201).json({

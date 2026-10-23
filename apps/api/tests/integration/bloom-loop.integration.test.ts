@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 /**
  * BLOOM-12 — End-to-end loop integration test (Node side).
  *
@@ -33,9 +34,7 @@ const {
 } = require('../../modules/study/src/models/index');
 const { syncObjectivesForDocument } = require('../../modules/study/src/services/objectives');
 const { processEvalResult } = require('../../modules/study/src/services/competencyUpdater');
-const {
-  getWeakCompetenciesForCourse
-} = require('../../modules/study/src/services/competencyQueries');
+import { getWeakCompetenciesForCourse } from '../../modules/study/src/services/competencyQueries';
 
 const USER = 'bloom-loop-user';
 const COURSE_ID = new mongoose.Types.ObjectId().toString();
@@ -275,6 +274,7 @@ describe('BLOOM-12 end-to-end loop (real Mongo + real services)', () => {
     expect(weak[0].unlocked_levels).toContain('apply');
     // A is at remember with no understand row, so apply must NOT be unlocked.
     const a = byTopic.get(TOPIC_A);
+    assert.ok(a, 'Expected the seeded topic competency');
     expect(a.unlocked_levels).not.toContain('apply');
   });
 

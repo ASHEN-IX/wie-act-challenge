@@ -15,6 +15,7 @@ export class ApiError extends Error {
 export async function api<T>(
   endpoint: string,
   options: RequestInit = {},
+  decode?: (value: unknown) => T,
 ): Promise<T> {
   await requireIdentity();
   if (!endpoint.startsWith("/api/v1/") || endpoint.includes(".."))
@@ -53,6 +54,13 @@ export async function api<T>(
         ? data.error.slice(0, 240)
         : "The request could not be completed.";
     throw new ApiError(response.status, message);
+  }
+  if (decode) {
+    try {
+      return decode(data);
+    } catch {
+      throw new ApiError(502, "The service returned an unsupported response.");
+    }
   }
   return data as T;
 }

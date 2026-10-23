@@ -168,7 +168,7 @@ describe('replayEvidence() properties', () => {
 
   test('ignores evidence with null masteryScore', () => {
     const evidence = [
-      { masteryScore: null as any, evaluatedAt: new Date('2024-01-01') },
+      { masteryScore: null, evaluatedAt: new Date('2024-01-01') },
       { masteryScore: 0.6, evaluatedAt: new Date('2024-01-02') }
     ];
     const { score } = replayEvidence(evidence);

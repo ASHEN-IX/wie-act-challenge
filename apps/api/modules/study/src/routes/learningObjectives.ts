@@ -1,3 +1,5 @@
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { Response } from 'express';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { createContracts } = require('@study-partner/shared/domainContracts');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -12,7 +14,7 @@ const router = createContracts();
 // back the accepted objective. Wire in a model + save once that's defined.
 router.post(
   '/',
-  asyncHandler(async (req: any, res: any) => {
+  asyncHandler(async (req: DomainRequest, res: Response) => {
     const objective = req.body;
     const result = validateLearningObjective(objective);
 

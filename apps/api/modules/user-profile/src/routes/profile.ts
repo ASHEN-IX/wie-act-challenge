@@ -1,3 +1,7 @@
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { Response, NextFunction, RequestHandler } from 'express';
+import type { IUserProfile } from '../models/UserProfile';
+import { errorDetails } from '@study-partner/shared/errors';
 import { createContracts } from '@study-partner/shared/domainContracts';
 import Joi from 'joi';
 import multer from 'multer';
@@ -58,7 +62,7 @@ const uploadVideo = multer({
 });
 
 // Multer error handler wrapper
-const handleMulterError = (err: any, req: any, res: any, next: any) => {
+const handleMulterError = (err: unknown, req: DomainRequest, res: Response, next: NextFunction) => {
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {
       const maxSize = req.path.includes('animated-background') ? '50MB' : '5MB';
@@ -67,18 +71,18 @@ const handleMulterError = (err: any, req: any, res: any, next: any) => {
     if (err.code === 'LIMIT_PART_COUNT') {
       return res.status(400).json({ error: 'Too many parts in upload' });
     }
-    return res.status(400).json({ error: `Upload error: ${err.message}` });
+    return res.status(400).json({ error: `Upload error: ${errorDetails(err).message}` });
   }
   if (err) {
-    return res.status(400).json({ error: err.message });
+    return res.status(400).json({ error: errorDetails(err).message });
   }
   next();
 };
 
 // Factory function to wrap multer middleware with error handling
-const withMulterError = (multerInstance: any) => {
-  return (req: any, res: any, next: any) => {
-    multerInstance(req, res, (err: any) => {
+const withMulterError = (multerInstance: RequestHandler) => {
+  return (req: DomainRequest, res: Response, next: NextFunction) => {
+    multerInstance(req, res, (err: unknown) => {
       handleMulterError(err, req, res, next);
     });
   };
@@ -118,8 +122,8 @@ const requireUserLevel = async (userId: string, minLevel: number) => {
 };
 
 // Get profile
-router.get('/', async (req: any, res: any) => {
-  const userId = req.user.userId;
+router.get('/', async (req: DomainRequest, res: Response) => {
+  const userId = req.user!.userId;
 
   let profile = await UserProfile.findOne({ userId });
 
@@ -140,7 +144,7 @@ router.get('/', async (req: any, res: any) => {
         req.headers['x-forwarded-proto'] || req.headers['x-forwarded-protocol'];
       const host = forwardedHost || req.get('host') || 'localhost:3000';
       const protocol = forwardedProto || req.protocol || 'http';
-      const profileObj: any = profile.toObject();
+      const profileObj = profile.toObject();
       profileObj.avatar = `${protocol}://${host}${profileObj.avatar}`;
       return res.json({ profile: profileObj });
     }
@@ -152,7 +156,7 @@ router.get('/', async (req: any, res: any) => {
 });
 
 // Update profile (supports file upload or JSON)
-router.put('/', upload.single('avatarFile'), async (req: any, res: any) => {
+router.put('/', upload.single('avatarFile'), async (req: DomainRequest, res: Response) => {
   // If file uploaded, convert to base64 data URL and store in body.avatar
   if (req.file && req.file.buffer) {
     const mime = req.file.mimetype || 'application/octet-stream';
@@ -171,7 +175,7 @@ router.put('/', upload.single('avatarFile'), async (req: any, res: any) => {
     return res.status(400).json({ error: error.details[0].message });
   }
 
-  const userId = req.user.userId;
+  const userId = req.user!.userId;
 
   let profile = await UserProfile.findOne({ userId });
 
@@ -210,8 +214,8 @@ router.put('/', upload.single('avatarFile'), async (req: any, res: any) => {
 });
 
 // Get stats
-router.get('/stats', async (req: any, res: any) => {
-  const userId = req.user.userId;
+router.get('/stats', async (req: DomainRequest, res: Response) => {
+  const userId = req.user!.userId;
 
   const profile = await UserProfile.findOne({ userId });
 
@@ -223,8 +227,8 @@ router.get('/stats', async (req: any, res: any) => {
 });
 
 // Update stats
-router.patch('/stats', async (req: any, res: any) => {
-  const userId = req.user.userId;
+router.patch('/stats', async (req: DomainRequest, res: Response) => {
+  const userId = req.user!.userId;
   const { studyTime, tasksCompleted } = req.body;
 
   const profile = await UserProfile.findOne({ userId });
@@ -250,8 +254,8 @@ router.patch('/stats', async (req: any, res: any) => {
 });
 
 // Get goals
-router.get('/goals', async (req: any, res: any) => {
-  const userId = req.user.userId;
+router.get('/goals', async (req: DomainRequest, res: Response) => {
+  const userId = req.user!.userId;
 
   const profile = await UserProfile.findOne({ userId });
 
@@ -263,13 +267,13 @@ router.get('/goals', async (req: any, res: any) => {
 });
 
 // Add goal
-router.post('/goals', async (req: any, res: any) => {
+router.post('/goals', async (req: DomainRequest, res: Response) => {
   const { error } = addGoalSchema.validate(req.body);
   if (error) {
     return res.status(400).json({ error: error.details[0].message });
   }
 
-  const userId = req.user.userId;
+  const userId = req.user!.userId;
 
   const profile = await UserProfile.findOne({ userId });
 
@@ -291,8 +295,8 @@ router.post('/goals', async (req: any, res: any) => {
 });
 
 // Update goal progress
-router.patch('/goals/:goalId', async (req: any, res: any) => {
-  const userId = req.user.userId;
+router.patch('/goals/:goalId', async (req: DomainRequest, res: Response) => {
+  const userId = req.user!.userId;
   const { goalId } = req.params;
   const { current, completed } = req.body;
 
@@ -302,7 +306,8 @@ router.patch('/goals/:goalId', async (req: any, res: any) => {
     return res.status(404).json({ error: 'Profile not found' });
   }
 
-  const goal = (profile.goals as any).id(goalId);
+  if (typeof goalId !== 'string') return res.status(404).json({ error: 'Goal not found' });
+  const goal = profile.goals.id(goalId);
 
   if (!goal) {
     return res.status(404).json({ error: 'Goal not found' });
@@ -325,8 +330,8 @@ router.patch('/goals/:goalId', async (req: any, res: any) => {
 });
 
 // Delete goal
-router.delete('/goals/:goalId', async (req: any, res: any) => {
-  const userId = req.user.userId;
+router.delete('/goals/:goalId', async (req: DomainRequest, res: Response) => {
+  const userId = req.user!.userId;
   const { goalId } = req.params;
 
   const profile = await UserProfile.findOne({ userId });
@@ -335,14 +340,14 @@ router.delete('/goals/:goalId', async (req: any, res: any) => {
     return res.status(404).json({ error: 'Profile not found' });
   }
 
-  (profile.goals as any).pull(goalId);
+  profile.goals.pull(goalId);
   await profile.save();
 
   res.json({ message: 'Goal deleted' });
 });
 
 // PUT /online-status — Update online status for current user
-router.put('/online-status', async (req: any, res: any) => {
+router.put('/online-status', async (req: DomainRequest, res: Response) => {
   try {
     const requesterId = req.user?.userId;
     const { userId, onlineStatus } = req.body;
@@ -358,7 +363,7 @@ router.put('/online-status', async (req: any, res: any) => {
       return res.status(403).json({ error: 'Forbidden: cannot update another user status' });
     }
 
-    const update: any = { onlineStatus };
+    const update: Partial<Pick<IUserProfile, 'onlineStatus' | 'lastSeenAt'>> = { onlineStatus };
     if (onlineStatus === 'offline') {
       update.lastSeenAt = new Date();
     }
@@ -372,7 +377,7 @@ router.put('/online-status', async (req: any, res: any) => {
 });
 
 // GET /online-status/batch?userIds=a,b,c — Resolve online states for leaderboard and social UI
-router.get('/online-status/batch', async (req: any, res: any) => {
+router.get('/online-status/batch', async (req: DomainRequest, res: Response) => {
   try {
     const rawUserIds = String(req.query.userIds || '')
       .split(',')
@@ -433,9 +438,9 @@ router.get('/online-status/batch', async (req: any, res: any) => {
 });
 
 // PUT /privacy — Update privacy settings
-router.put('/privacy', async (req: any, res: any) => {
+router.put('/privacy', async (req: DomainRequest, res: Response) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const { showOnlineStatus, showStudyActivity, showStats, allowRequests } = req.body;
 
     const profile = await UserProfile.findOne({ userId });
@@ -457,9 +462,9 @@ router.put('/privacy', async (req: any, res: any) => {
 // ==================== Background Customization Endpoints ====================
 
 // GET /background — Get current background settings
-router.get('/background', async (req: any, res: any) => {
+router.get('/background', async (req: DomainRequest, res: Response) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const profile = await UserProfile.findOne({ userId });
     if (!profile) return res.status(404).json({ error: 'Profile not found' });
 
@@ -474,9 +479,9 @@ router.get('/background', async (req: any, res: any) => {
 });
 
 // POST /background/apply — Apply static wallpaper settings (Level 10+)
-router.post('/background/apply', async (req: any, res: any) => {
+router.post('/background/apply', async (req: DomainRequest, res: Response) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const { imageUrl, type, opacity, blur, position, enabled } = req.body;
 
     const gate = await requireUserLevel(userId, 10);
@@ -534,13 +539,13 @@ router.post('/background/apply', async (req: any, res: any) => {
 router.post(
   '/background/upload',
   withMulterError(upload.single('backgroundImage')),
-  async (req: any, res: any) => {
+  async (req: DomainRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Authentication required' });
       }
 
-      const userId = req.user.userId;
+      const userId = req.user!.userId;
 
       if (!req.file) {
         return res.status(400).json({ error: 'No image file provided' });
@@ -594,44 +599,49 @@ router.post(
         backgroundSettings: profile.backgroundSettings,
         animatedBackgroundSettings: profile.animatedBackgroundSettings
       });
-    } catch (error: any) {
-      console.error('[Background Upload] Error:', error.message, error.stack);
+    } catch (error) {
+      console.error(
+        '[Background Upload] Error:',
+        errorDetails(error).message,
+        error instanceof Error ? error.stack : undefined
+      );
       res.status(500).json({
         error: 'Failed to upload background',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        details: process.env.NODE_ENV === 'development' ? errorDetails(error).message : undefined
       });
     }
   }
 );
 
-const requireLevelBeforeUpload = (minimum: number) => async (req: any, res: any, next: any) => {
-  try {
-    const gate = await requireUserLevel(req.user.userId, minimum);
-    if (!gate.allowed)
-      return res.status(403).json({
-        error: 'Level required',
-        code: 'LEVEL_REQUIRED',
-        requiredLevel: minimum,
-        currentLevel: gate.level
-      });
-    next();
-  } catch (error) {
-    next(error);
-  }
-};
-router.get('/media/:filename', async (req: any, res: any, next: any) => {
+const requireLevelBeforeUpload =
+  (minimum: number) => async (req: DomainRequest, res: Response, next: NextFunction) => {
+    try {
+      const gate = await requireUserLevel(req.user!.userId, minimum);
+      if (!gate.allowed)
+        return res.status(403).json({
+          error: 'Level required',
+          code: 'LEVEL_REQUIRED',
+          requiredLevel: minimum,
+          currentLevel: gate.level
+        });
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+router.get('/media/:filename', async (req: DomainRequest, res: Response, next: NextFunction) => {
   try {
     const filename = req.params.filename;
     if (typeof filename !== 'string' || !/^[a-f0-9-]{36}\.(mp4|webm|mov|avi)$/.test(filename))
       return res.sendStatus(404);
     const url = `/api/v1/users/profile/media/${filename}`;
     const owner = await UserProfile.exists({
-      userId: req.user.userId,
+      userId: req.user!.userId,
       'animatedBackgroundSettings.videoUrl': url
     });
     if (!owner) return res.sendStatus(404);
     res.setHeader('Cache-Control', 'private, no-store');
-    return res.sendFile(path.join(mediaDirectory, filename), (error: any) => {
+    return res.sendFile(path.join(mediaDirectory, filename), (error) => {
       if (error && !res.headersSent) next(error);
     });
   } catch (error) {
@@ -644,9 +654,9 @@ router.post(
   '/animated-background/upload',
   requireLevelBeforeUpload(20),
   withMulterError(uploadVideo.single('animatedVideo')),
-  async (req: any, res: any) => {
+  async (req: DomainRequest, res: Response) => {
     try {
-      const userId = req.user.userId;
+      const userId = req.user!.userId;
       const gate = await requireUserLevel(userId, 20);
       if (!gate.allowed) {
         return res.status(403).json({
@@ -715,20 +725,24 @@ router.post(
         animatedBackgroundSettings: profile.animatedBackgroundSettings,
         backgroundSettings: profile.backgroundSettings
       });
-    } catch (error: any) {
-      console.error('[Animated Background Upload] Error:', error.message, error.stack);
+    } catch (error) {
+      console.error(
+        '[Animated Background Upload] Error:',
+        errorDetails(error).message,
+        error instanceof Error ? error.stack : undefined
+      );
       res.status(500).json({
         error: 'Failed to upload animated background',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        details: process.env.NODE_ENV === 'development' ? errorDetails(error).message : undefined
       });
     }
   }
 );
 
 // POST /animated-background/apply — Apply animated background settings (Level 20+)
-router.post('/animated-background/apply', async (req: any, res: any) => {
+router.post('/animated-background/apply', async (req: DomainRequest, res: Response) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const { videoUrl, type, opacity, brightness, saturation, loop, speed, enabled } = req.body;
 
     const gate = await requireUserLevel(userId, 20);
@@ -784,7 +798,7 @@ router.post('/animated-background/apply', async (req: any, res: any) => {
 });
 
 // GET /background/presets — Get preset backgrounds gallery
-router.get('/background/presets', async (req: any, res: any) => {
+router.get('/background/presets', async (req: DomainRequest, res: Response) => {
   const presets = [
     {
       id: 'space-1',
@@ -861,7 +875,7 @@ router.get('/background/presets', async (req: any, res: any) => {
 });
 
 // GET /animated-background/presets — Get preset animated backgrounds
-router.get('/animated-background/presets', async (req: any, res: any) => {
+router.get('/animated-background/presets', async (req: DomainRequest, res: Response) => {
   const presets = [
     {
       id: 'anim-space-1',
@@ -922,9 +936,9 @@ router.get('/animated-background/presets', async (req: any, res: any) => {
 });
 
 // GET /level — Get user level info with unlocked features
-router.get('/level', async (req: any, res: any) => {
+router.get('/level', async (req: DomainRequest, res: Response) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     let gamification = await Gamification.findOne({ userId });
     if (!gamification) {
       gamification = await Gamification.create({ userId });
@@ -953,9 +967,9 @@ router.get('/level', async (req: any, res: any) => {
 });
 
 // PUT /notification-preferences — Update notification preferences
-router.put('/notification-preferences', async (req: any, res: any) => {
+router.put('/notification-preferences', async (req: DomainRequest, res: Response) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const { preferences } = req.body;
 
     if (!preferences || typeof preferences !== 'object') {

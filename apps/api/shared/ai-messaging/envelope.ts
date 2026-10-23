@@ -67,8 +67,8 @@ export interface AiJobEnvelope {
   userId: string;
   requestId: string;
   timestamp: string;
-  payload: Record<string, any>;
-  [key: string]: any;
+  payload: Record<string, unknown>;
+  [key: string]: unknown;
 }
 
 export interface AiResultEnvelope {
@@ -79,9 +79,9 @@ export interface AiResultEnvelope {
   requestId: string;
   timestamp: string;
   status: ResultStatus;
-  payload?: Record<string, any>;
+  payload?: Record<string, unknown>;
   error?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface AiProgressEnvelope {
@@ -95,31 +95,35 @@ export interface AiProgressEnvelope {
   stage: ProgressStage;
   progress?: number;
   detail?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
-function isNonEmptyString(value: any, maxLength = 256): boolean {
+function isNonEmptyString(value: unknown, maxLength = 256): value is string {
   return typeof value === 'string' && value.length > 0 && value.length <= maxLength;
 }
 
-function validateCommonFields(envelope: any, errors: string[]): boolean {
+function validateCommonFields(
+  envelope: unknown,
+  errors: string[]
+): envelope is Record<string, unknown> {
   if (!envelope || typeof envelope !== 'object' || Array.isArray(envelope)) {
     errors.push('envelope must be a JSON object');
     return false;
   }
-  if (!isNonEmptyString(envelope.messageId) || !UUID_V4_RE.test(envelope.messageId)) {
+  const fields = envelope as Record<string, unknown>;
+  if (!isNonEmptyString(fields.messageId) || !UUID_V4_RE.test(fields.messageId)) {
     errors.push('messageId must be a UUID v4 string');
   }
-  if (!isNonEmptyString(envelope.correlationId) || !UUID_V4_RE.test(envelope.correlationId)) {
+  if (!isNonEmptyString(fields.correlationId) || !UUID_V4_RE.test(fields.correlationId)) {
     errors.push('correlationId must be a UUID v4 string');
   }
-  if (!isNonEmptyString(envelope.requestId, 128)) {
+  if (!isNonEmptyString(fields.requestId, 128)) {
     errors.push('requestId must be a non-empty string (max 128 chars)');
   }
-  if (envelope.version !== ENVELOPE_VERSION) {
+  if (fields.version !== ENVELOPE_VERSION) {
     errors.push(`version must be "${ENVELOPE_VERSION}"`);
   }
-  if (!isNonEmptyString(envelope.timestamp, 40) || !ISO_8601_RE.test(envelope.timestamp)) {
+  if (!isNonEmptyString(fields.timestamp, 40) || !ISO_8601_RE.test(fields.timestamp)) {
     errors.push('timestamp must be an ISO-8601 UTC string');
   }
   return true;
@@ -128,12 +132,12 @@ function validateCommonFields(envelope: any, errors: string[]): boolean {
 /**
  * Validate an AI job (request) envelope.
  */
-export function validateAiJobEnvelope(envelope: any): ValidationResult {
+export function validateAiJobEnvelope(envelope: unknown): ValidationResult {
   const errors: string[] = [];
   if (!validateCommonFields(envelope, errors)) {
     return { valid: false, errors };
   }
-  if (!AI_JOB_TYPES.includes(envelope.type)) {
+  if (!AI_JOB_TYPES.some((type) => type === envelope.type)) {
     errors.push(`type must be one of: ${AI_JOB_TYPES.join(', ')}`);
   }
   if (!isNonEmptyString(envelope.userId, 128)) {
@@ -155,15 +159,15 @@ export function validateAiJobEnvelope(envelope: any): ValidationResult {
 /**
  * Validate an AI result event envelope.
  */
-export function validateAiResultEnvelope(envelope: any): ValidationResult {
+export function validateAiResultEnvelope(envelope: unknown): ValidationResult {
   const errors: string[] = [];
   if (!validateCommonFields(envelope, errors)) {
     return { valid: false, errors };
   }
-  if (!AI_JOB_TYPES.includes(envelope.type)) {
+  if (!AI_JOB_TYPES.some((type) => type === envelope.type)) {
     errors.push(`type must be one of: ${AI_JOB_TYPES.join(', ')}`);
   }
-  if (!RESULT_STATUSES.includes(envelope.status)) {
+  if (!RESULT_STATUSES.some((status) => status === envelope.status)) {
     errors.push('status must be "completed" or "failed"');
   }
   if (envelope.status === 'completed') {
@@ -191,18 +195,18 @@ export function validateAiResultEnvelope(envelope: any): ValidationResult {
 /**
  * Validate an AI progress event envelope (INGEST-06/07).
  */
-export function validateAiProgressEnvelope(envelope: any): ValidationResult {
+export function validateAiProgressEnvelope(envelope: unknown): ValidationResult {
   const errors: string[] = [];
   if (!validateCommonFields(envelope, errors)) {
     return { valid: false, errors };
   }
-  if (!AI_JOB_TYPES.includes(envelope.type)) {
+  if (!AI_JOB_TYPES.some((type) => type === envelope.type)) {
     errors.push(`type must be one of: ${AI_JOB_TYPES.join(', ')}`);
   }
   if (envelope.status !== PROGRESS_STATUS) {
     errors.push(`status must be "${PROGRESS_STATUS}"`);
   }
-  if (!PROGRESS_STAGES.includes(envelope.stage)) {
+  if (!PROGRESS_STAGES.some((stage) => stage === envelope.stage)) {
     errors.push(`stage must be one of: ${PROGRESS_STAGES.join(', ')}`);
   }
   if (envelope.progress !== undefined && envelope.progress !== null) {

@@ -6,10 +6,10 @@ Every agent talks to the LLM through :func:`ask`. Model wiring lives in
 (retries + fallback chains). The alias is passed to :func:`ask` — no code change
 needed to re-route, add providers, or change fallbacks, just edit the YAML.
 
-Mock behaviour mirrors the old per-agent mocks: when ``LLM_MOCK=1`` or none of
-the required provider API keys are present (or a key is the dummy test value),
-a caller-supplied ``mock_fn`` is used instead of a real network call. A failing
-real call raises :class:`LLMRequestError` so callers can decide fallback.
+Mock responders run only when ``LLM_MOCK=1`` is explicitly configured. Missing
+provider keys (including dummy values) raise :class:`LLMUnavailableError` and
+never silently substitute test output. A failing configured call raises
+:class:`LLMRequestError` so callers can choose an identified fallback.
 """
 
 import os
@@ -53,8 +53,14 @@ class LLMRequestError(RuntimeError):
     """A real LLM call failed after the router retries were exhausted."""
 
 
+class LLMUnavailableError(LLMRequestError):
+    """Inference cannot run because no provider credentials are configured."""
+
+    state = "UNAVAILABLE"
+
+
 class MissingMockResponderError(RuntimeError):
-    """A mock was requested (no keys available) but no ``mock_fn`` was given."""
+    """Explicit mock mode was requested but no ``mock_fn`` was given."""
 
 
 @dataclass(frozen=True)
@@ -152,10 +158,8 @@ def _keys_available(agent: str) -> bool:
     return False
 
 
-def _should_mock(agent: str) -> bool:
-    if os.getenv("LLM_MOCK") == "1":
-        return True
-    return not _keys_available(agent)
+def _should_mock(_agent: str) -> bool:
+    return os.getenv("LLM_MOCK") == "1"
 
 
 def _extract_text(response) -> str:
@@ -219,13 +223,22 @@ def ask(
     if _should_mock(agent):
         if mock_fn is None:
             raise MissingMockResponderError(
-                f"no API key available for agent {agent!r} and no mock_fn given"
+                f"LLM_MOCK=1 for agent {agent!r} but no mock_fn given"
             )
         logger.info(
             "llm_client_mock_response",
-            extra={"agent": agent, "trace_id": trace_id},
+            extra={"agent": agent, "trace_id": trace_id, "execution_mode": "MOCK_TEST"},
         )
         return mock_fn(user_prompt)
+
+    if not _keys_available(agent):
+        logger.warning(
+            "llm_client_unavailable",
+            extra={"agent": agent, "trace_id": trace_id, "execution_mode": "UNAVAILABLE"},
+        )
+        raise LLMUnavailableError(
+            f"UNAVAILABLE: no provider credentials configured for {agent!r}"
+        )
 
     messages = [
         {"role": "system", "content": build_system_block(system_prompt)},
