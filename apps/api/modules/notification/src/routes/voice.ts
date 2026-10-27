@@ -1,4 +1,4 @@
-import { verifySessionMembership } from '../utils/session-access';
+import { verifySessionMembership, verifyVoiceConsent } from '../utils/session-access';
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import { createContracts } from '@study-partner/shared/domainContracts';
 import Joi from 'joi';
@@ -24,6 +24,11 @@ router.use(async (req: DomainRequest, res: Response, next: NextFunction) => {
       ))
     ) {
       return res.status(403).json({ error: 'Not an active participant in this session' });
+    }
+    if (
+      !(await verifyVoiceConsent(req.headers.cookie, req.user.userId, String(req.params.sessionId)))
+    ) {
+      return res.status(403).json({ error: 'Explicit current microphone consent required' });
     }
     return next();
   } catch (error) {

@@ -2,6 +2,8 @@ import { load } from "@/lib/api";
 import { PageHeader } from "@/components/shared/page-header";
 import { DataError, EmptyState } from "@/components/shared/states";
 import { Badge } from "@/components/ui/badge";
+import { RewardSummary } from "@/features/rewards/reward-summary";
+import type { LearningRewards } from "@/features/rewards/types";
 interface Competency {
   subjectId: string;
   subjectName: string;
@@ -20,11 +22,7 @@ export const metadata = { title: "Progress" };
 export default async function Progress() {
   const [competency, rewards] = await Promise.all([
     load<{ competencies: Competency[] }>("/api/v1/competencies"),
-    load<{
-      total_xp: number;
-      level: number;
-      achievements: { name?: string; title?: string }[];
-    }>("/api/v1/users/gamification"),
+    load<LearningRewards>("/api/v1/users/learning-rewards"),
   ]);
   return (
     <>
@@ -33,20 +31,7 @@ export default async function Progress() {
         description="Review your learning evidence. XP reflects activity, not mastery."
       />
       <DataError message={competency.error || rewards.error} />
-      <div className="mb-10 flex gap-10 border-b pb-8">
-        <div>
-          <p className="text-sm text-muted-foreground">Activity XP</p>
-          <p className="mt-2 text-3xl font-semibold">
-            {rewards.data?.total_xp ?? "—"}
-          </p>
-        </div>
-        <div>
-          <p className="text-sm text-muted-foreground">Level</p>
-          <p className="mt-2 text-3xl font-semibold">
-            {rewards.data?.level ?? "—"}
-          </p>
-        </div>
-      </div>
+      {rewards.data && <RewardSummary rewards={rewards.data} />}
       {competency.data?.competencies.length ? (
         competency.data.competencies.map((subject) => (
           <section key={subject.subjectId} className="mb-8">

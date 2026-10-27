@@ -471,7 +471,7 @@ export function validateIngestPayload(payload: unknown): ValidationResult {
     return { valid: false, errors: ['payload must be an object'] };
   }
   for (const key of Object.keys(payload)) {
-    if (!['courseId', 'fileRef', 'files'].includes(key)) {
+    if (!['courseId', 'fileRef', 'files', 'revisionId'].includes(key)) {
       errors.push(`unknown field "${key}"`);
     }
   }
@@ -481,6 +481,15 @@ export function validateIngestPayload(payload: unknown): ValidationResult {
     payload.courseId.length > COURSE_ID_MAX_CHARS
   ) {
     errors.push(`courseId must be a non-empty string of at most ${COURSE_ID_MAX_CHARS} chars`);
+  }
+  if (
+    payload.revisionId !== undefined &&
+    (typeof payload.revisionId !== 'string' ||
+      !payload.revisionId.trim() ||
+      payload.revisionId.length > 64 ||
+      !/^[A-Za-z0-9_\-.]{1,64}$/.test(payload.revisionId))
+  ) {
+    errors.push('revisionId must be a safe identifier of at most 64 chars');
   }
   if (
     typeof payload.fileRef !== 'string' ||
@@ -498,6 +507,13 @@ export function validateIngestPayload(payload: unknown): ValidationResult {
       for (const file of payload.files) {
         if (typeof file !== 'object' || file === null || Array.isArray(file)) {
           errors.push('each file must be an object');
+          break;
+        }
+        if (
+          file.fileHash !== undefined &&
+          (typeof file.fileHash !== 'string' || !/^(sha256:)?[a-f0-9]{64}$/.test(file.fileHash))
+        ) {
+          errors.push('file.fileHash must be a SHA-256 digest');
           break;
         }
         const nameOk = (v: unknown) =>

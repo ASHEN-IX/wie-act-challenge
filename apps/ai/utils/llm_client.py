@@ -13,9 +13,12 @@ never silently substitute test output. A failing configured call raises
 """
 
 import os
+import json
+import time
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Literal, Optional, Union, overload
 
 from security.prompt_guard import build_system_block
 from utils.logger import get_logger
@@ -44,9 +47,360 @@ AGENT_GROUPS = (
     "evaluator",
 )
 
+
+class ModelTier(str, Enum):
+    """Categorization for model operations (ED-03)."""
+
+    COMPACT = "compact"
+    CAPABLE = "capable"
+
+
+class ExecutionMode(str, Enum):
+    """Explicit provider execution modes (ED-03)."""
+
+    REAL_APPROVED = "REAL_APPROVED"
+    MOCK_TEST = "MOCK_TEST"
+    DETERMINISTIC_FALLBACK = "DETERMINISTIC_FALLBACK"
+    UNAVAILABLE = "UNAVAILABLE"
+
+
+AGENT_TIERS: Dict[str, ModelTier] = {
+    "coach": ModelTier.COMPACT,
+    "course_ingestion": ModelTier.COMPACT,
+    "planner": ModelTier.CAPABLE,
+    "evaluator": ModelTier.CAPABLE,
+    "search": ModelTier.CAPABLE,
+    "reflection": ModelTier.CAPABLE,
+}
+
+
+# Explicit operator allow-list and shared durable request reservations. Missing
+# approval or unavailable durable accounting never triggers external traffic.
+_execution_records: Dict[str, dict] = {}
+
+
+def _approval(agent):
+    try:
+        approval = json.loads(os.getenv("LLM_APPROVALS_JSON", "{}")).get(agent, {})
+        cfg = agent_config(agent)
+        if (
+            not isinstance(approval.get("approvalId"), str)
+            or not 1 <= len(approval["approvalId"]) <= 200
+            or approval.get("model") != cfg.model
+            or approval.get("task") != agent
+            or float(approval.get("expiresAt", 0)) <= time.time()
+            or type(approval.get("maxRequests")) is not int
+            or approval["maxRequests"] < 1
+            or _provider_of(cfg.model) not in PROVIDER_KEY_ENV
+        ):
+            return None
+        if "maxTokens" in approval and (not isinstance(approval["maxTokens"], int) or approval["maxTokens"] < 1):
+            return None
+        if "maxCostUsd" in approval and (not isinstance(approval["maxCostUsd"], (int, float)) or float(approval["maxCostUsd"]) <= 0):
+            return None
+        return approval
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
+def _reserve_approved_call(agent):
+    approval = _approval(agent)
+    return approval if approval and _reserve_durable_budget(approval) else None
+
+
+def _reserve_durable_budget(approval):
+    """Reserve before dispatch; an uncertain write never authorizes a call.
+
+    Each approval ID is bound to its original task, model, limit and expiry.
+    Supports request caps, token caps, monetary caps and explicit revocation.
+    Attempts are consumed even if the process crashes or the provider fails.
+    """
+    uri = os.getenv("LLM_BUDGET_MONGODB_URI")
+    database = os.getenv("LLM_BUDGET_DB_NAME")
+    if not uri or not database:
+        return False
+    client = None
+    try:
+        from pymongo import MongoClient, ReturnDocument
+        from pymongo.errors import DuplicateKeyError
+        from pymongo.write_concern import WriteConcern
+
+        client = MongoClient(
+            uri,
+            serverSelectionTimeoutMS=2000,
+            connectTimeoutMS=2000,
+            socketTimeoutMS=3000,
+            retryWrites=False,
+        )
+        records = client[database].get_collection(
+            "llm_approval_budgets",
+            write_concern=WriteConcern(w="majority", j=True, wtimeout=2000),
+        )
+        identity = {
+            "_id": approval["approvalId"],
+            "task": approval["task"],
+            "model": approval["model"],
+            "limit": approval["maxRequests"],
+            "expiresAt": float(approval["expiresAt"]),
+        }
+        max_tokens = approval.get("maxTokens")
+        max_cost_usd = approval.get("maxCostUsd")
+
+        insert_doc: Dict[str, Any] = {
+            **identity,
+            "used": 0,
+            "usedTokens": 0,
+            "usedCostUsd": 0.0,
+        }
+        if max_tokens is not None:
+            insert_doc["maxTokens"] = max_tokens
+        if max_cost_usd is not None:
+            insert_doc["maxCostUsd"] = float(max_cost_usd)
+
+        try:
+            records.update_one(
+                {"_id": identity["_id"]},
+                {"$setOnInsert": insert_doc},
+                upsert=True,
+            )
+        except DuplicateKeyError:
+            # A concurrent process created the same ID; the exact identity
+            # predicate below still rejects conflicting approval records.
+            pass
+
+        filter_query: Dict[str, Any] = {
+            **identity,
+            "expiresAt": {"$eq": identity["expiresAt"], "$gt": time.time()},
+            "used": {"$lt": identity["limit"]},
+            "revokedAt": {"$exists": False},
+        }
+        if max_tokens is not None:
+            filter_query["usedTokens"] = {"$lt": max_tokens}
+        if max_cost_usd is not None:
+            filter_query["usedCostUsd"] = {"$lt": float(max_cost_usd)}
+
+        return bool(
+            records.find_one_and_update(
+                filter_query,
+                {"$inc": {"used": 1}},
+                return_document=ReturnDocument.AFTER,
+            )
+        )
+    except Exception:
+        # Do not log MongoDB URIs or credentials; failure denies dispatch.
+        logger.warning("llm_budget_reservation_unavailable")
+        return False
+    finally:
+        if client is not None:
+            client.close()
+
+
+def record_durable_usage(approval_id: str, tokens: int = 0, cost_usd: float = 0.0) -> bool:
+    """Record durable token count and monetary cost to MongoDB after execution."""
+    uri = os.getenv("LLM_BUDGET_MONGODB_URI")
+    database = os.getenv("LLM_BUDGET_DB_NAME")
+    if not uri or not database or not approval_id:
+        return False
+    client = None
+    try:
+        from pymongo import MongoClient
+        from pymongo.write_concern import WriteConcern
+
+        client = MongoClient(
+            uri,
+            serverSelectionTimeoutMS=2000,
+            connectTimeoutMS=2000,
+            socketTimeoutMS=3000,
+            retryWrites=False,
+        )
+        records = client[database].get_collection(
+            "llm_approval_budgets",
+            write_concern=WriteConcern(w="majority", j=True, wtimeout=2000),
+        )
+        update_inc: Dict[str, Any] = {}
+        if tokens > 0:
+            update_inc["usedTokens"] = tokens
+        if cost_usd > 0.0:
+            update_inc["usedCostUsd"] = float(cost_usd)
+        if not update_inc:
+            return True
+        records.update_one({"_id": approval_id}, {"$inc": update_inc})
+        return True
+    except Exception:
+        logger.warning("llm_budget_usage_record_unavailable")
+        return False
+    finally:
+        if client is not None:
+            client.close()
+
+
+def revoke_operator_approval(approval_id: str, reason: str = "operator_revocation") -> bool:
+    """Explicitly revoke an active operator approval, stopping further requests immediately."""
+    uri = os.getenv("LLM_BUDGET_MONGODB_URI")
+    database = os.getenv("LLM_BUDGET_DB_NAME")
+    if not uri or not database or not approval_id:
+        return False
+    client = None
+    try:
+        from pymongo import MongoClient
+        from pymongo.write_concern import WriteConcern
+
+        client = MongoClient(
+            uri,
+            serverSelectionTimeoutMS=2000,
+            connectTimeoutMS=2000,
+            socketTimeoutMS=3000,
+            retryWrites=False,
+        )
+        records = client[database].get_collection(
+            "llm_approval_budgets",
+            write_concern=WriteConcern(w="majority", j=True, wtimeout=2000),
+        )
+        res = records.update_one(
+            {"_id": approval_id, "revokedAt": {"$exists": False}},
+            {"$set": {"revokedAt": time.time(), "revocationReason": reason}},
+        )
+        return bool(res.modified_count > 0)
+    except Exception:
+        logger.warning("llm_approval_revocation_unavailable")
+        return False
+    finally:
+        if client is not None:
+            client.close()
+
+
+def get_approval_budget_status(approval_id: str) -> Optional[dict]:
+    """Inspect durable budget usage and revocation state."""
+    uri = os.getenv("LLM_BUDGET_MONGODB_URI")
+    database = os.getenv("LLM_BUDGET_DB_NAME")
+    if not uri or not database or not approval_id:
+        return None
+    client = None
+    try:
+        from pymongo import MongoClient
+        from pymongo.read_concern import ReadConcern
+
+        client = MongoClient(
+            uri,
+            serverSelectionTimeoutMS=2000,
+            connectTimeoutMS=2000,
+            socketTimeoutMS=3000,
+        )
+        records = client[database].get_collection(
+            "llm_approval_budgets", read_concern=ReadConcern("majority")
+        )
+        doc = records.find_one({"_id": approval_id})
+        if not doc:
+            return None
+        return {
+            "approvalId": doc.get("_id"),
+            "task": doc.get("task"),
+            "model": doc.get("model"),
+            "usedRequests": doc.get("used", 0),
+            "limitRequests": doc.get("limit", 0),
+            "usedTokens": doc.get("usedTokens", 0),
+            "limitTokens": doc.get("maxTokens"),
+            "usedCostUsd": doc.get("usedCostUsd", 0.0),
+            "limitCostUsd": doc.get("maxCostUsd"),
+            "revoked": "revokedAt" in doc,
+            "revocationReason": doc.get("revocationReason"),
+            "expiresAt": doc.get("expiresAt"),
+        }
+    except Exception:
+        return None
+    finally:
+        if client is not None:
+            client.close()
+
+
+def _budget_still_active(approval):
+    """Read the shared revocation state before dispatch and result delivery."""
+    uri = os.getenv("LLM_BUDGET_MONGODB_URI")
+    database = os.getenv("LLM_BUDGET_DB_NAME")
+    if not uri or not database:
+        return False
+    client = None
+    try:
+        from pymongo import MongoClient
+        from pymongo.read_concern import ReadConcern
+
+        client = MongoClient(
+            uri,
+            serverSelectionTimeoutMS=2000,
+            connectTimeoutMS=2000,
+            socketTimeoutMS=3000,
+        )
+        records = client[database].get_collection(
+            "llm_approval_budgets", read_concern=ReadConcern("majority")
+        )
+        return bool(
+            records.find_one(
+                {
+                    "_id": approval["approvalId"],
+                    "task": approval["task"],
+                    "model": approval["model"],
+                    "limit": approval["maxRequests"],
+                    "expiresAt": {
+                        "$eq": float(approval["expiresAt"]),
+                        "$gt": time.time(),
+                    },
+                    "used": {"$gte": 1},
+                    "revokedAt": {"$exists": False},
+                },
+                {"_id": 1},
+            )
+        )
+    except Exception:
+        logger.warning("llm_budget_status_unavailable")
+        return False
+    finally:
+        if client is not None:
+            client.close()
+
+
+def get_model_tier(agent: str) -> str:
+    """Return model tier ('compact' | 'capable') for given agent."""
+    if agent not in AGENT_TIERS:
+        raise KeyError(
+            f"unknown llm agent: {agent!r} (known: {', '.join(AGENT_GROUPS)})"
+        )
+    return AGENT_TIERS[agent].value
+
+
+@dataclass(frozen=True)
+class LLMResult:
+    """Sanitized LLM inference result with safe execution mode reporting."""
+
+    text: str
+    execution_mode: str
+    model: str
+    tier: str
+    agent: str
+    trace_id: str = ""
+    fallback_used: bool = False
+    usage: Optional[Dict[str, int]] = None
+    latency_ms: Optional[float] = None
+
+
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[1] / "litellm" / "config.yaml"
 
 MockResponder = Callable[[str], str]
+DeterministicFallback = Callable[[str], str]
+
+
+def sanitize_text(text: str) -> str:
+    """Scrub known API keys and tokens from text to guarantee zero credential leakage."""
+    if not text:
+        return text
+    scrubbed = str(text)
+    for env_var in PROVIDER_KEY_ENV.values():
+        key_val = os.getenv(env_var, "")
+        if key_val and len(key_val) >= 6:
+            scrubbed = scrubbed.replace(key_val, "[REDACTED_API_KEY]")
+    service_key = os.getenv("AI_SERVICE_API_KEY", "")
+    if service_key and len(service_key) >= 6:
+        scrubbed = scrubbed.replace(service_key, "[REDACTED_SERVICE_KEY]")
+    return scrubbed
 
 
 class LLMRequestError(RuntimeError):
@@ -119,14 +473,17 @@ def _fallback_chain(agent: str) -> List[str]:
 def agent_config(agent: str) -> AgentLLM:
     """Resolve an agent's wiring from the YAML (model + defaults + fallbacks)."""
     if agent not in AGENT_GROUPS:
-        raise KeyError(f"unknown llm agent: {agent!r} (known: {', '.join(AGENT_GROUPS)})")
+        raise KeyError(
+            f"unknown llm agent: {agent!r} (known: {', '.join(AGENT_GROUPS)})"
+        )
     params = _deployment(agent)["litellm_params"]
     return AgentLLM(
         model=params.get("model", ""),
         temperature=params.get("temperature"),
         max_tokens=params.get("max_tokens"),
         fallback_models=tuple(
-            _deployment(fb)["litellm_params"].get("model", "") for fb in _fallback_chain(agent)
+            _deployment(fb)["litellm_params"].get("model", "")
+            for fb in _fallback_chain(agent)
         ),
     )
 
@@ -153,7 +510,22 @@ def _keys_available(agent: str) -> bool:
     is key-less, so we only require at least one real key.)"""
     for key_env in _required_key_envs(agent):
         value = os.getenv(key_env, "")
-        if value and value not in DUMMY_KEYS:
+        if (
+            value
+            and value not in DUMMY_KEYS
+            and not any(
+                marker in value.lower()
+                for marker in (
+                    "synthetic",
+                    "invalid",
+                    "placeholder",
+                    "test-",
+                    "test_",
+                    "dummy",
+                    "changeme",
+                )
+            )
+        ):
             return True
     return False
 
@@ -189,8 +561,8 @@ def build_router():
         logger.warning("llm_router_unknown_setting", extra={"key": unused})
     _router = litellm.Router(
         model_list=cfg.get("model_list", []),
-        fallbacks=fallbacks,
-        **retry_kwargs,
+        fallbacks=[],
+        **{**retry_kwargs, "num_retries": 0},
     )
     return _router
 
@@ -201,6 +573,7 @@ def reset_router() -> None:
     _router = None
 
 
+@overload
 def ask(
     agent: str,
     system_prompt: str,
@@ -209,9 +582,40 @@ def ask(
     temperature: Optional[float] = None,
     max_tokens: Optional[int] = None,
     mock_fn: Optional[MockResponder] = None,
+    fallback_fn: Optional[DeterministicFallback] = None,
     trace_id: str = "",
-) -> str:
-    """Complete a chat for ``agent`` and return the assistant text.
+    return_metadata: Literal[False] = False,
+) -> str: ...
+
+
+@overload
+def ask(
+    agent: str,
+    system_prompt: str,
+    user_prompt: str,
+    *,
+    temperature: Optional[float] = None,
+    max_tokens: Optional[int] = None,
+    mock_fn: Optional[MockResponder] = None,
+    fallback_fn: Optional[DeterministicFallback] = None,
+    trace_id: str = "",
+    return_metadata: Literal[True],
+) -> LLMResult: ...
+
+
+def ask(
+    agent: str,
+    system_prompt: str,
+    user_prompt: str,
+    *,
+    temperature: Optional[float] = None,
+    max_tokens: Optional[int] = None,
+    mock_fn: Optional[MockResponder] = None,
+    fallback_fn: Optional[DeterministicFallback] = None,
+    trace_id: str = "",
+    return_metadata: bool = False,
+) -> Union[str, LLMResult]:
+    """Complete a chat for ``agent`` and return the assistant text or LLMResult.
 
     System content is placed in its own trusted, guarded block — user content is
     never concatenated into it (COACH-03 protection kept for every agent).
@@ -219,25 +623,86 @@ def ask(
     (normally the deployment's litellm_params carry them).
     """
     if agent not in AGENT_GROUPS:
-        raise KeyError(f"unknown llm agent: {agent!r} (known: {', '.join(AGENT_GROUPS)})")
+        raise KeyError(
+            f"unknown llm agent: {agent!r} (known: {', '.join(AGENT_GROUPS)})"
+        )
+
+    tier = get_model_tier(agent)
+    cfg = agent_config(agent)
+
     if _should_mock(agent):
         if mock_fn is None:
             raise MissingMockResponderError(
                 f"LLM_MOCK=1 for agent {agent!r} but no mock_fn given"
             )
+        start_time = time.perf_counter()
+        text = mock_fn(user_prompt)
+        latency_ms = (time.perf_counter() - start_time) * 1000.0
         logger.info(
             "llm_client_mock_response",
-            extra={"agent": agent, "trace_id": trace_id, "execution_mode": "MOCK_TEST"},
+            extra={
+                "agent": agent,
+                "trace_id": trace_id,
+                "execution_mode": ExecutionMode.MOCK_TEST.value,
+                "tier": tier,
+                "model": cfg.model,
+            },
         )
-        return mock_fn(user_prompt)
+        res = LLMResult(
+            text=text,
+            execution_mode=ExecutionMode.MOCK_TEST.value,
+            model=cfg.model,
+            tier=tier,
+            agent=agent,
+            trace_id=trace_id,
+            fallback_used=False,
+            latency_ms=latency_ms,
+        )
+        return res if return_metadata else res.text
 
-    if not _keys_available(agent):
+    approval = _reserve_approved_call(agent) if _keys_available(agent) else None
+    if approval and (
+        _approval(agent) != approval or not _budget_still_active(approval)
+    ):
+        approval = None
+    if not approval:
+        if fallback_fn is not None:
+            start_time = time.perf_counter()
+            text = fallback_fn(user_prompt)
+            latency_ms = (time.perf_counter() - start_time) * 1000.0
+            logger.warning(
+                "llm_client_deterministic_fallback",
+                extra={
+                    "agent": agent,
+                    "trace_id": trace_id,
+                    "execution_mode": ExecutionMode.DETERMINISTIC_FALLBACK.value,
+                    "tier": tier,
+                    "reason": "credentials_approval_or_budget_unavailable",
+                },
+            )
+            res = LLMResult(
+                text=text,
+                execution_mode=ExecutionMode.DETERMINISTIC_FALLBACK.value,
+                model="deterministic_fallback",
+                tier=tier,
+                agent=agent,
+                trace_id=trace_id,
+                fallback_used=True,
+                latency_ms=latency_ms,
+            )
+            return res if return_metadata else res.text
+
         logger.warning(
             "llm_client_unavailable",
-            extra={"agent": agent, "trace_id": trace_id, "execution_mode": "UNAVAILABLE"},
+            extra={
+                "agent": agent,
+                "trace_id": trace_id,
+                "execution_mode": ExecutionMode.UNAVAILABLE.value,
+                "tier": tier,
+            },
         )
         raise LLMUnavailableError(
-            f"UNAVAILABLE: no provider credentials configured for {agent!r}"
+            f"UNAVAILABLE: credentials, approval or durable budget unavailable for {agent!r}"
         )
 
     messages = [
@@ -249,12 +714,168 @@ def ask(
         kwargs["temperature"] = temperature
     if max_tokens is not None:
         kwargs["max_tokens"] = max_tokens
+
+    start_time = time.perf_counter()
     try:
         response = build_router().completion(**kwargs)
-        return _extract_text(response)
+        latency_ms = (time.perf_counter() - start_time) * 1000.0
+        text = _extract_text(response)
+        if not isinstance(text, str) or not text.strip():
+            raise LLMRequestError("Invalid empty model response")
+        current = _approval(agent)
+        if current != approval or not _budget_still_active(approval):
+            raise LLMUnavailableError("Approval revoked during inference")
+        if getattr(response, "model", None) != approval["model"]:
+            raise LLMRequestError("Provider/model identity did not match approval")
+        _execution_records[agent] = {
+            "approvalId": approval["approvalId"],
+            "model": approval["model"],
+            "executedAt": time.time(),
+            "outputValidated": True,
+            "executionMode": "REAL_APPROVED",
+        }
+
+        usage_dict = None
+        if hasattr(response, "usage") and response.usage:
+            usage_dict = {
+                "prompt_tokens": getattr(response.usage, "prompt_tokens", 0),
+                "completion_tokens": getattr(response.usage, "completion_tokens", 0),
+                "total_tokens": getattr(response.usage, "total_tokens", 0),
+            }
+        elif isinstance(response, dict) and "usage" in response:
+            u = response["usage"]
+            usage_dict = {
+                "prompt_tokens": u.get("prompt_tokens", 0),
+                "completion_tokens": u.get("completion_tokens", 0),
+                "total_tokens": u.get("total_tokens", 0),
+            }
+
+        if usage_dict and approval:
+            record_durable_usage(
+                approval["approvalId"],
+                tokens=usage_dict.get("total_tokens", 0),
+                cost_usd=float(getattr(response, "_response_cost", 0.0) or 0.0),
+            )
+
+        resolved_model = getattr(response, "model", cfg.model) or cfg.model
+        logger.info(
+            "llm_client_success",
+            extra={
+                "agent": agent,
+                "trace_id": trace_id,
+                "execution_mode": ExecutionMode.REAL_APPROVED.value,
+                "tier": tier,
+                "model": resolved_model,
+            },
+        )
+        res = LLMResult(
+            text=text,
+            execution_mode=ExecutionMode.REAL_APPROVED.value,
+            model=resolved_model,
+            tier=tier,
+            agent=agent,
+            trace_id=trace_id,
+            fallback_used=False,
+            usage=usage_dict,
+            latency_ms=latency_ms,
+        )
+        return res if return_metadata else res.text
     except Exception as exc:
+        sanitized_err = sanitize_text(str(exc))
         logger.warning(
             "llm_client_error",
-            extra={"agent": agent, "error": str(exc), "trace_id": trace_id},
+            extra={"agent": agent, "error": sanitized_err, "trace_id": trace_id},
         )
-        raise LLMRequestError(f"{agent}: {exc}") from exc
+        if fallback_fn is not None:
+            start_time_fallback = time.perf_counter()
+            text = fallback_fn(user_prompt)
+            latency_ms = (time.perf_counter() - start_time_fallback) * 1000.0
+            logger.warning(
+                "llm_client_deterministic_fallback",
+                extra={
+                    "agent": agent,
+                    "trace_id": trace_id,
+                    "execution_mode": ExecutionMode.DETERMINISTIC_FALLBACK.value,
+                    "tier": tier,
+                    "reason": "router_error",
+                },
+            )
+            res = LLMResult(
+                text=text,
+                execution_mode=ExecutionMode.DETERMINISTIC_FALLBACK.value,
+                model="deterministic_fallback",
+                tier=tier,
+                agent=agent,
+                trace_id=trace_id,
+                fallback_used=True,
+                latency_ms=latency_ms,
+            )
+            return res if return_metadata else res.text
+        raise LLMRequestError(f"{agent}: {sanitized_err}") from exc
+
+
+def ask_with_metadata(
+    agent: str,
+    system_prompt: str,
+    user_prompt: str,
+    *,
+    temperature: Optional[float] = None,
+    max_tokens: Optional[int] = None,
+    mock_fn: Optional[MockResponder] = None,
+    fallback_fn: Optional[DeterministicFallback] = None,
+    trace_id: str = "",
+) -> LLMResult:
+    """Complete a chat and return sanitized LLMResult with mode reporting (ED-03)."""
+    return ask(
+        agent,
+        system_prompt,
+        user_prompt,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        mock_fn=mock_fn,
+        fallback_fn=fallback_fn,
+        trace_id=trace_id,
+        return_metadata=True,
+    )
+
+
+def get_provider_status() -> Dict[str, Any]:
+    """Configuration is never successful inference. Status contains no credentials."""
+    mocked = os.getenv("LLM_MOCK") == "1"
+    agents = {}
+    for agent in AGENT_GROUPS:
+        cfg = agent_config(agent)
+        approval = _approval(agent)
+        record = _execution_records.get(agent)
+        verified = bool(
+            approval
+            and record
+            and record["approvalId"] == approval["approvalId"]
+            and _keys_available(agent)
+            and _budget_still_active(approval)
+        )
+        agents[agent] = {
+            "tier": get_model_tier(agent),
+            "model": cfg.model,
+            "fallback_models": list(cfg.fallback_models),
+            "configured": True,
+            "credentialsPresent": any(
+                bool(os.getenv(key)) for key in _required_key_envs(agent)
+            ),
+            "approved": bool(approval),
+            "connectivityVerified": verified,
+            "identityVerified": verified,
+            "successfullyExecuted": verified,
+            "outputValidated": verified,
+            "available": mocked or verified,
+            "lastExecution": record if verified else None,
+        }
+    any_real = any(a["successfullyExecuted"] for a in agents.values())
+    return {
+        "status": "ok" if mocked else ("degraded" if any_real else "unavailable"),
+        "execution_mode": (
+            "MOCK_TEST" if mocked else ("REAL_APPROVED" if any_real else "UNAVAILABLE")
+        ),
+        "agents": agents,
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }

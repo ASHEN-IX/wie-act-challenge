@@ -8,9 +8,14 @@ import { text, optionalText } from "@/lib/validation";
 import type { ActionState } from "@/lib/action-state";
 
 function replayFields(form: FormData) {
-  const commandId = optionalText(form, 'commandId', 64);
-  const expectedSeq = optionalText(form, 'expectedSeq', 20);
-  return commandId ? { commandId, ...(expectedSeq ? { expectedSeq: Number(expectedSeq) } : {}) } : {};
+  const commandId = optionalText(form, "commandId", 64);
+  const expectedSeq = optionalText(form, "expectedSeq", 20);
+  return commandId
+    ? {
+        commandId,
+        ...(expectedSeq ? { expectedSeq: Number(expectedSeq) } : {}),
+      }
+    : {};
 }
 
 export async function createRoom(
@@ -25,19 +30,16 @@ export async function createRoom(
 
     try {
       // Contract 10: Dedicated Study Room API
-      const data = await api<{ roomId: string }>(
-        "/api/v1/study/rooms",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            ...(courseId ? { courseId } : {}),
-            maxParticipants: 6,
-            moderatorMode: "guided",
-            enableVoice: false,
-            ...replayFields(form),
-          }),
-        },
-      );
+      const data = await api<{ roomId: string }>("/api/v1/study/rooms", {
+        method: "POST",
+        body: JSON.stringify({
+          ...(courseId ? { courseId } : {}),
+          maxParticipants: 6,
+          moderatorMode: "guided",
+          enableVoice: false,
+          ...replayFields(form),
+        }),
+      });
       id = data.roomId;
     } catch (error) {
       if (!(error instanceof ApiError) || error.status !== 404) throw error;
@@ -63,7 +65,11 @@ export async function createRoom(
       error: error instanceof Error ? error.message : "Unable to create room.",
     };
   }
-  redirect(`/study-together/${segment(id)}`);
+  return {
+    success: "Room command acknowledged.",
+    destination: `/study-together/${segment(id)}`,
+    destinationLabel: "Open room",
+  };
 }
 
 export async function joinRoom(
@@ -79,10 +85,14 @@ export async function joinRoom(
 
     try {
       // Contract 10: Dedicated Study Room Join
-      const data = await api<{ roomId: string }>(
-        "/api/v1/study/rooms/join",
-        { method: "POST", body: JSON.stringify({ inviteCode, hasVoiceConsent: false, ...replayFields(form) }) },
-      );
+      const data = await api<{ roomId: string }>("/api/v1/study/rooms/join", {
+        method: "POST",
+        body: JSON.stringify({
+          inviteCode,
+          hasVoiceConsent: false,
+          ...replayFields(form),
+        }),
+      });
       id = data.roomId;
     } catch (error) {
       if (!(error instanceof ApiError) || error.status !== 404) throw error;
@@ -99,7 +109,11 @@ export async function joinRoom(
       error: error instanceof Error ? error.message : "Unable to join room.",
     };
   }
-  redirect(`/study-together/${segment(id)}`);
+  return {
+    success: "Room command acknowledged.",
+    destination: `/study-together/${segment(id)}`,
+    destinationLabel: "Open room",
+  };
 }
 
 export async function startRoom(
@@ -112,10 +126,13 @@ export async function startRoom(
     try {
       await api(`/api/v1/study/rooms/${id}/phase`, {
         method: "PUT",
-        body: JSON.stringify({ currentPhase: "peer_discussion", ...replayFields(form) }),
+        body: JSON.stringify({
+          currentPhase: "peer_discussion",
+          ...replayFields(form),
+        }),
       });
     } catch (error) {
-      if (id.startsWith('room_')) throw error;
+      if (id.startsWith("room_")) throw error;
       await api(`/api/v1/study/sessions/team/${id}/start`, { method: "PUT" });
     }
     revalidatePath(`/study-together/${id}`);
@@ -136,13 +153,13 @@ export async function leaveRoom(
   try {
     const id = segment(text(form, "id"));
     try {
-      await api(`/api/v1/study/rooms/${id}/leave`, { method: "POST", body: JSON.stringify(replayFields(form)) });
+      await api(`/api/v1/study/rooms/${id}/leave`, {
+        method: "POST",
+        body: JSON.stringify(replayFields(form)),
+      });
     } catch (error) {
-      if (id.startsWith('room_')) throw error;
-      await api(
-        `/api/v1/study/sessions/team/${id}/leave`,
-        { method: "POST" },
-      );
+      if (id.startsWith("room_")) throw error;
+      await api(`/api/v1/study/sessions/team/${id}/leave`, { method: "POST" });
     }
   } catch (error) {
     unstable_rethrow(error);
@@ -163,10 +180,13 @@ export async function endRoom(
     try {
       await api(`/api/v1/study/rooms/${id}/phase`, {
         method: "PUT",
-        body: JSON.stringify({ currentPhase: "debrief", ...replayFields(form) }),
+        body: JSON.stringify({
+          currentPhase: "debrief",
+          ...replayFields(form),
+        }),
       });
     } catch (error) {
-      if (id.startsWith('room_')) throw error;
+      if (id.startsWith("room_")) throw error;
       await api(`/api/v1/study/sessions/team/${id}/end`, { method: "PUT" });
     }
     revalidatePath(`/study-together/${id}`);
@@ -257,7 +277,10 @@ export async function askFacilitator(
     const prompt = text(form, "prompt", 1000);
     await api(`/api/v1/study/rooms/${id}/facilitator/action`, {
       method: "POST",
-      body: JSON.stringify({ actionType: "ask_facilitator", promptText: prompt }),
+      body: JSON.stringify({
+        actionType: "ask_facilitator",
+        promptText: prompt,
+      }),
     });
     revalidatePath(`/study-together/${id}`);
     return { success: "Question presented to AI Facilitator." };
@@ -287,8 +310,7 @@ export async function requestFacilitatorHint(
   } catch (error) {
     unstable_rethrow(error);
     return {
-      error:
-        error instanceof Error ? error.message : "Unable to request hint.",
+      error: error instanceof Error ? error.message : "Unable to request hint.",
     };
   }
 }
@@ -317,28 +339,96 @@ export async function declineFacilitatorPrompt(
 }
 
 // Public peer text uses the authenticated API gateway; no AI or credential props.
-export async function sendPeerMessage(roomId: string, submissionId: string, message: string) {
+export async function sendPeerMessage(
+  roomId: string,
+  submissionId: string,
+  message: string,
+) {
   try {
-    const data = await api<{ message: import('./peer-text-state').PeerMessage }>(
-      `/api/v1/session-chat/${segment(roomId)}/messages`,
-      { method: 'POST', body: JSON.stringify({ submissionId, text: message }) },
-    );
+    const data = await api<{
+      message: import("./peer-text-state").PeerMessage;
+    }>(`/api/v1/session-chat/${segment(roomId)}/messages`, {
+      method: "POST",
+      body: JSON.stringify({ submissionId, text: message }),
+    });
     return { data };
   } catch (error) {
     unstable_rethrow(error);
-    return { error: error instanceof Error ? error.message : 'Message unavailable.',
-      status: error instanceof ApiError ? error.status : 503 };
+    return {
+      error: error instanceof Error ? error.message : "Message unavailable.",
+      status: error instanceof ApiError ? error.status : 503,
+    };
   }
 }
 export async function getPeerHistory(roomId: string, afterSeq: number) {
   try {
-    const data = await api<{ items: import('./peer-text-state').PeerMessage[]; lastSeq: number; nextAfterSeq: number; hasMore: boolean }>(
+    const data = await api<{
+      items: import("./peer-text-state").PeerMessage[];
+      lastSeq: number;
+      nextAfterSeq: number;
+      hasMore: boolean;
+    }>(
       `/api/v1/session-chat/${segment(roomId)}/history?kind=peer&afterSeq=${afterSeq}&limit=100`,
     );
     return { data };
   } catch (error) {
     unstable_rethrow(error);
-    return { error: error instanceof Error ? error.message : 'History unavailable.',
-      status: error instanceof ApiError ? error.status : 503 };
+    return {
+      error: error instanceof Error ? error.message : "History unavailable.",
+      status: error instanceof ApiError ? error.status : 503,
+    };
+  }
+}
+
+export async function getActivityDefinition(activityId: string) {
+  await requireIdentity();
+  try {
+    const data = await api<
+      import("@/lib/activity-contracts").ActivityDefinition
+    >(`/api/v1/study/activities/${segment(activityId)}`);
+    return { data };
+  } catch (error) {
+    unstable_rethrow(error);
+    return {
+      error: error instanceof Error ? error.message : "Activity unavailable.",
+    };
+  }
+}
+
+export async function submitRoomAttempt(
+  activityId: string,
+  payload: {
+    attemptId: string;
+    roomId: string;
+    answers: Record<string, unknown>;
+    timeSpentSeconds: number;
+    activity: {
+      courseId: string;
+      revisionId: string;
+      contentHash: string;
+      activityId: string;
+      activityRevision: string;
+      activityType: "InteractiveQuiz" | "GuidedProblem";
+    };
+  },
+) {
+  await requireIdentity();
+  try {
+    const data = await api<
+      import("@/features/learning/activity-renderer").AssessmentResultView
+    >(`/api/v1/study/activities/${segment(activityId)}/attempts`, {
+      method: "POST",
+      body: JSON.stringify({
+        schemaVersion: "1.0.0",
+        ...payload,
+      }),
+    });
+    return { data };
+  } catch (error) {
+    unstable_rethrow(error);
+    return {
+      error:
+        error instanceof Error ? error.message : "Failed to submit attempt.",
+    };
   }
 }

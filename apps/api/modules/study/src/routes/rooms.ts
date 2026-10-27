@@ -1,3 +1,5 @@
+import { readRoomVisualization } from '../services/roomVisualization';
+import { resolveRoomActivity, validateRoomRevision } from '../services/roomActivity';
 import type { Response, NextFunction } from 'express';
 import type { FilterQuery } from 'mongoose';
 import type { DomainRequest } from '../../../../src/framework/contracts';
@@ -31,10 +33,16 @@ import crypto from 'crypto';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const moduleClient = require('@study-partner/shared/moduleClient');
 import Joi from 'joi';
-import { StudyRoom, FacilitatorIntervention } from '../models';
+import { StudyRoom, FacilitatorIntervention, Course, StudentAttempt } from '../models';
 import { buildInternalHeaders } from '../utils/sessionHelpers';
 import { logger } from '@study-partner/shared';
 import { runRoomCommand } from '../services/roomCommands';
+import { canReadCourse } from '../services/resourceAccess';
+import {
+  generateLiveKitToken,
+  revokeLiveKitPublishPermissions,
+  removeLiveKitParticipant
+} from '../services/livekitControl';
 import type { DomainMiddleware } from '../../../../src/framework/contracts';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const aiClient = require('@study-partner/shared/aiClient');
@@ -55,7 +63,7 @@ function generateRoomId(): string {
   return `room_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
 }
 
-async function broadcastRoomState(room: IStudyRoom, req?: DomainRequest): Promise<void> {
+export async function broadcastRoomState(room: IStudyRoom, req?: DomainRequest): Promise<void> {
   try {
     const activeParticipants = (room.participants || []).filter((p) => !p.leftAt);
     const publicSubmissionsCount = activeParticipants.filter((p) => p.hasSubmitted).length;
@@ -67,6 +75,10 @@ async function broadcastRoomState(room: IStudyRoom, req?: DomainRequest): Promis
       timestamp: new Date().toISOString(),
       presenterUserId: room.presenterUserId,
       activeActivityId: room.activeActivityId || null,
+      courseId: room.courseId,
+      revisionId: room.revisionId,
+      activePin: room.activePin,
+      activityRound: room.activityRound,
       currentPhase: room.currentPhase,
       participants: activeParticipants.map((p) => ({
         userId: p.userId,
@@ -340,6 +352,19 @@ async function verifyCourseAccess(
     );
     return { authorized: !!response.data?.course, title: response.data?.course?.title };
   } catch {
+    if (req.user?.userId) {
+      try {
+        const canRead = await canReadCourse(req.user.userId, courseId);
+        if (canRead) {
+          const course = await Course.findOne({
+            $or: [{ courseId }, { _id: courseId.match(/^[0-9a-fA-F]{24}$/) ? courseId : null }]
+          }).lean();
+          return { authorized: true, title: course?.title };
+        }
+      } catch {
+        // Fall through
+      }
+    }
     return { authorized: false };
   }
 }
@@ -361,19 +386,153 @@ async function requireActiveRoom(req: RoomRequest, res: Response, next: NextFunc
     if (room.courseId && !(await verifyCourseAccess(room.courseId, req)).authorized) {
       return res.status(403).json({ error: 'Course access is no longer available' });
     }
-    if (room.revisionId) {
-      return res
-        .status(503)
-        .json({ error: 'Published course revision verification is unavailable' });
-    }
+    await validateRoomRevision(userId, room);
     req.studyRoom = room;
     return next();
   } catch (err) {
+    if (err && typeof err === 'object' && 'status' in err && typeof err.status === 'number')
+      return res
+        .status(err.status)
+        .json({ error: err instanceof Error ? err.message : 'Unavailable' });
     return next(err);
   }
 }
 
 // ── Routes ─────────────────────────────────────────────────────────────────────
+
+// Self-only consent is separate from join/replay and is idempotent. Missing
+// consent never grants voice transport rights.
+router.put('/:roomId/voice-consent', requireActiveRoom, async (req: RoomRequest, res: Response) => {
+  if (
+    !req.body ||
+    Object.keys(req.body).some((key) => key !== 'hasVoiceConsent') ||
+    typeof req.body.hasVoiceConsent !== 'boolean'
+  )
+    return res.status(400).json({ error: 'Explicit boolean consent required' });
+  const actor = req.user!.userId;
+  const member = { userId: actor, leftAt: { $exists: false } };
+  let room = await StudyRoom.findOneAndUpdate(
+    {
+      roomId: req.params.roomId,
+      status: 'active',
+      participants: {
+        $elemMatch: { ...member, hasVoiceConsent: { $ne: req.body.hasVoiceConsent } }
+      }
+    },
+    {
+      $set: {
+        'participants.$.hasVoiceConsent': req.body.hasVoiceConsent,
+        ...(!req.body.hasVoiceConsent ? { 'participants.$.isSpeaking': false } : {})
+      },
+      $inc: { seq: 1 }
+    },
+    { new: true }
+  );
+  if (!room)
+    room = await StudyRoom.findOne({
+      roomId: req.params.roomId,
+      status: 'active',
+      participants: { $elemMatch: member }
+    });
+  if (!room || (room.courseId && !(await canReadCourse(actor, room.courseId))))
+    return res.status(403).json({ error: 'Room authorization lost' });
+
+  // If consent was withdrawn, proactively revoke active LiveKit publish permission
+  if (!req.body.hasVoiceConsent) {
+    await revokeLiveKitPublishPermissions(room.roomId, actor).catch(() => {});
+  }
+
+  return res.json({
+    roomId: room.roomId,
+    hasVoiceConsent:
+      room.participants.find((participant) => participant.userId === actor && !participant.leftAt)
+        ?.hasVoiceConsent === true
+  });
+});
+
+// Contract 11: LiveKit Access Token Issuance
+router.post(
+  '/:roomId/livekit-token',
+  requireActiveRoom,
+  async (req: RoomRequest, res: Response) => {
+    const actor = req.user?.userId;
+    if (!actor) return res.status(401).json({ error: 'Authentication required' });
+    const room = await StudyRoom.findOne({
+      roomId: req.params.roomId,
+      status: 'active',
+      participants: { $elemMatch: { userId: actor, leftAt: { $exists: false } } }
+    }).lean();
+    if (!room) return res.status(403).json({ error: 'Not an active participant in this room' });
+
+    if (room.courseId && !(await canReadCourse(actor, room.courseId))) {
+      return res.status(403).json({ error: 'Room course authorization lost' });
+    }
+
+    const participant = (room.participants || []).find((p) => p.userId === actor && !p.leftAt);
+    const hasVoiceConsent = participant?.hasVoiceConsent === true;
+    const canPublishAudio = hasVoiceConsent;
+    const canSubscribeAudio = true;
+
+    const apiKey = process.env.LIVEKIT_API_KEY || 'devkey';
+    const apiSecret = process.env.LIVEKIT_API_SECRET || 'secret';
+    const livekitUrl = process.env.LIVEKIT_URL || 'wss://ednova-livekit.cloud.livekit.io';
+
+    const token = generateLiveKitToken({
+      apiKey,
+      apiSecret,
+      roomName: room.roomId,
+      identity: actor,
+      name: participant?.name || actor,
+      canPublishAudio,
+      canSubscribeAudio,
+      ttlSeconds: 3600
+    });
+
+    return res.json({
+      token,
+      livekitUrl,
+      roomName: room.roomId,
+      participantIdentity: actor,
+      participantName: participant?.name || actor,
+      expiresInSeconds: 3600,
+      canPublishAudio,
+      canSubscribeAudio
+    });
+  }
+);
+
+// Contract 12: AI Moderator Dispatch
+router.post(
+  '/:roomId/ai-moderator/dispatch',
+  requireActiveRoom,
+  async (req: RoomRequest, res: Response) => {
+    const actor = req.user?.userId;
+    if (!actor) return res.status(401).json({ error: 'Authentication required' });
+    const room = await StudyRoom.findOne({
+      roomId: req.params.roomId,
+      status: 'active',
+      participants: { $elemMatch: { userId: actor, leftAt: { $exists: false } } }
+    });
+    if (!room) return res.status(403).json({ error: 'Not an active participant in this room' });
+
+    if (room.courseId && !(await canReadCourse(actor, room.courseId))) {
+      return res.status(403).json({ error: 'Room course authorization lost' });
+    }
+
+    await StudyRoom.updateOne(
+      { roomId: room.roomId },
+      { $set: { facilitatorActive: true }, $inc: { seq: 1 } }
+    );
+
+    return res.json({
+      dispatched: true,
+      roomId: room.roomId,
+      agentIdentity: 'agent-ednova-moderator',
+      mode: 'peer_first_facilitator',
+      status: 'ready'
+    });
+  }
+);
 
 // Additive replay protocol on the existing contracts. Legacy callers without a
 // command ID retain their original behavior, but cannot claim durable replay.
@@ -393,6 +552,41 @@ function durableRoomCommand(kind: Parameters<typeof runRoomCommand>[0]): DomainM
     return res.status(result.status).json(result.body);
   };
 }
+
+// Demonstration cursor is separate from frozen assessed activity contracts.
+router.get('/:roomId/visualization', async (req: RoomRequest, res: Response) => {
+  res.setHeader('Cache-Control', 'private, no-store');
+  if (!req.user?.userId) return res.status(401).json({ error: 'Unauthorized' });
+  try {
+    return res.json(await readRoomVisualization(req.user.userId, req.params.roomId));
+  } catch (error) {
+    return res
+      .status((error as { status?: number }).status || 503)
+      .json({ error: 'Room visualization unavailable or unauthorized' });
+  }
+});
+router.put('/:roomId/visualization', async (req: RoomRequest, res: Response) => {
+  res.setHeader('Cache-Control', 'private, no-store');
+  if (!req.user?.userId) return res.status(401).json({ error: 'Unauthorized' });
+  if (!req.body?.commandId)
+    return res.status(400).json({ error: 'Durable command identity required' });
+  const result = await runRoomCommand(
+    'visualization',
+    { userId: req.user.userId },
+    req.body,
+    req.params.roomId,
+    (courseId) => verifyCourseAccess(courseId, req)
+  );
+  if (result.changedRoom) await broadcastRoomState(result.changedRoom, req);
+  if (result.status === 200) {
+    try {
+      await readRoomVisualization(req.user.userId, req.params.roomId);
+    } catch {
+      return res.status(403).json({ error: 'Room visualization access revoked' });
+    }
+  }
+  return res.status(result.status).json(result.body);
+});
 
 // POST / — Create study room (Contract 10)
 router.post('/', durableRoomCommand('create'), async (req: RoomRequest, res: Response) => {
@@ -415,11 +609,7 @@ router.post('/', durableRoomCommand('create'), async (req: RoomRequest, res: Res
         title = `${access.title} Study Group`;
       }
     }
-    if (value.revisionId) {
-      return res
-        .status(503)
-        .json({ error: 'Published course revision verification is unavailable' });
-    }
+    await validateRoomRevision(userId, value);
     if (!title) title = 'Study Together Room';
 
     let inviteCode = generateInviteCode();
@@ -475,7 +665,9 @@ router.post('/', durableRoomCommand('create'), async (req: RoomRequest, res: Res
     });
   } catch (err) {
     logger.error('Error creating study room:', err);
-    return res.status(500).json({ error: errorDetails(err).message || 'Internal server error' });
+    return res
+      .status((err as { status?: number }).status || 500)
+      .json({ error: errorDetails(err).message || 'Internal server error' });
   }
 });
 
@@ -507,11 +699,7 @@ router.post('/join', durableRoomCommand('join'), async (req: RoomRequest, res: R
           .json({ error: 'Forbidden: not enrolled or authorized for this course' });
       }
     }
-    if (room.revisionId) {
-      return res
-        .status(503)
-        .json({ error: 'Published course revision verification is unavailable' });
-    }
+    await validateRoomRevision(userId, room);
 
     const existingParticipant = room.participants.find((p) => p.userId === userId);
     const activeParticipants = room.participants.filter((p) => !p.leftAt);
@@ -649,7 +837,9 @@ router.post('/join', durableRoomCommand('join'), async (req: RoomRequest, res: R
     });
   } catch (err) {
     logger.error('Error joining study room:', err);
-    return res.status(500).json({ error: errorDetails(err).message || 'Internal server error' });
+    return res
+      .status((err as { status?: number }).status || 500)
+      .json({ error: errorDetails(err).message || 'Internal server error' });
   }
 });
 
@@ -668,7 +858,11 @@ router.get('/', async (req: RoomRequest, res: Response) => {
 
     const accessible = await Promise.all(
       rooms.map(async (r) =>
-        !r.revisionId && (!r.courseId || (await verifyCourseAccess(r.courseId, req)).authorized)
+        (!r.courseId || (await verifyCourseAccess(r.courseId, req)).authorized) &&
+        (await validateRoomRevision(userId, r).then(
+          () => true,
+          () => false
+        ))
           ? r
           : null
       )
@@ -689,7 +883,9 @@ router.get('/', async (req: RoomRequest, res: Response) => {
 
     return res.json({ rooms: formatted });
   } catch (err) {
-    return res.status(500).json({ error: errorDetails(err).message });
+    return res
+      .status((err as { status?: number }).status || 500)
+      .json({ error: errorDetails(err).message });
   }
 });
 
@@ -717,6 +913,8 @@ router.get('/:roomId', requireActiveRoom, async (req: RoomRequest, res: Response
         presenterUserId: room.presenterUserId,
         moderatorMode: room.moderatorMode,
         activeActivityId: room.activeActivityId,
+        activePin: room.activePin,
+        activityRound: room.activityRound,
         currentPhase: room.currentPhase,
         status: room.status,
         seq: room.seq,
@@ -735,7 +933,9 @@ router.get('/:roomId', requireActiveRoom, async (req: RoomRequest, res: Response
       }))
     });
   } catch (err) {
-    return res.status(500).json({ error: errorDetails(err).message });
+    return res
+      .status((err as { status?: number }).status || 500)
+      .json({ error: errorDetails(err).message });
   }
 });
 
@@ -764,7 +964,9 @@ router.get('/:roomId/participants', requireActiveRoom, async (req: RoomRequest, 
       }))
     });
   } catch (err) {
-    return res.status(500).json({ error: errorDetails(err).message });
+    return res
+      .status((err as { status?: number }).status || 500)
+      .json({ error: errorDetails(err).message });
   }
 });
 
@@ -821,12 +1023,17 @@ router.post(
       if (!updatedRoom)
         return res.status(409).json({ error: 'Room changed; reload and retry leaving' });
 
+      // If user was connected to LiveKit media session, proactively sever their connection
+      await removeLiveKitParticipant(room.roomId, userId).catch(() => {});
+
       await broadcastRoomState(updatedRoom, req);
 
       return res.status(200).json({ success: true, roomId: room.roomId });
     } catch (err) {
       logger.error('Error leaving study room:', err);
-      return res.status(500).json({ error: errorDetails(err).message });
+      return res
+        .status((err as { status?: number }).status || 500)
+        .json({ error: errorDetails(err).message });
     }
   }
 );
@@ -848,11 +1055,10 @@ router.put(
       if (room.presenterUserId !== userId) {
         return res.status(403).json({ error: 'Only the active presenter can advance room phase' });
       }
-      if (value.activeActivityId) {
-        return res
-          .status(503)
-          .json({ error: 'Shared activity validation and private attempts are unavailable' });
-      }
+      const selected = value.activeActivityId
+        ? await resolveRoomActivity(userId, room, value.activeActivityId)
+        : null;
+
       if (
         room.currentPhase === value.currentPhase &&
         (value.activeActivityId === undefined || room.activeActivityId === value.activeActivityId)
@@ -870,6 +1076,9 @@ router.put(
         $set: {
           currentPhase: RoomPhase;
           activeActivityId?: string | null;
+          activePin?: IStudyRoom['activePin'];
+          revisionId?: string;
+          activityRound?: string;
           'participants.$[].hasSubmitted'?: boolean;
         };
         $inc: { seq: number };
@@ -879,6 +1088,9 @@ router.put(
       };
       if (value.activeActivityId !== undefined) {
         updateOps.$set.activeActivityId = value.activeActivityId;
+        updateOps.$set.activePin = selected?.pin || null;
+        if (selected) updateOps.$set.revisionId = selected.pin.revisionId;
+        updateOps.$set.activityRound = crypto.randomUUID();
         // Reset submission flags for the new round
         updateOps.$set['participants.$[].hasSubmitted'] = false;
       }
@@ -914,7 +1126,9 @@ router.put(
         activeActivityId: updatedRoom.activeActivityId
       });
     } catch (err) {
-      return res.status(500).json({ error: errorDetails(err).message });
+      return res
+        .status((err as { status?: number }).status || 500)
+        .json({ error: errorDetails(err).message });
     }
   }
 );
@@ -994,7 +1208,9 @@ router.put(
         presenterUserId: updatedRoom.presenterUserId
       });
     } catch (err) {
-      return res.status(500).json({ error: errorDetails(err).message });
+      return res
+        .status((err as { status?: number }).status || 500)
+        .json({ error: errorDetails(err).message });
     }
   }
 );
@@ -1096,20 +1312,73 @@ router.post(
         proposal = evaluateLocalPeerFirstPolicy(obsInput);
       }
 
+      const { activeLearningRoom } = await import('../services/roomLearning.js');
+      const currentRoom = await activeLearningRoom(userId, room.roomId);
+      if (currentRoom.seq !== room.seq)
+        return res.status(409).json({ error: 'Room changed during facilitation' });
+      const proposalShape = Joi.object({
+        shouldIntervene: Joi.boolean().required(),
+        strategy: Joi.string()
+          .valid(
+            'PEER_CHALLENGE',
+            'SOCRATIC_NUDGE',
+            'CONCEPT_PROMPT',
+            'INCLUSIVE_INVITATION',
+            'CONSENSUS_CHECK',
+            'DISAGREEMENT_RESOLUTION'
+          )
+          .when('shouldIntervene', { is: true, then: Joi.required() }),
+        trigger: Joi.string().valid(
+          'explicit_ask',
+          'request_hint',
+          'misconception_detected',
+          'phase_transition',
+          'consensus_check'
+        ),
+        message: Joi.string().max(8000),
+        messageText: Joi.string().max(8000),
+        reasoning: Joi.string().max(2000),
+        interventionId: Joi.string().max(128),
+        targetSpeakerId: Joi.string().max(128),
+        targetUserId: Joi.string().max(128),
+        targetSpeakerName: Joi.string().max(200),
+        cooldownSeconds: Joi.number().integer().min(0).max(300),
+        proposedUICommand: Joi.object({
+          action: Joi.string().max(64).required(),
+          activityId: Joi.string().max(128),
+          reason: Joi.string().max(2000),
+          targetPhase: Joi.string().valid(
+            'idle',
+            'peer_discussion',
+            'individual_attempt',
+            'debrief'
+          )
+        }).allow(null)
+      }).unknown(false);
+      if (proposal && proposalShape.validate(proposal, { convert: false }).error)
+        return res.status(503).json({ error: 'Unsupported facilitator proposal' });
+      const target = proposal?.targetSpeakerId || proposal?.targetUserId;
+      if (target && !currentRoom.participants.some((p) => p.userId === target && !p.leftAt))
+        return res.status(503).json({ error: 'Unsupported facilitator recipient' });
       if (!proposal || !proposal.shouldIntervene || !(proposal.messageText || proposal.message)) {
         return res.status(200).json({ success: true, intervened: false });
       }
 
       const updatedRoom = await StudyRoom.findOneAndUpdate(
-        { _id: room._id, status: 'active' },
+        {
+          _id: room._id,
+          status: 'active',
+          seq: room.seq,
+          participants: { $elemMatch: { userId, leftAt: { $exists: false } } }
+        },
         { $inc: { seq: 1 } },
         { new: true }
       );
 
+      if (!updatedRoom) return res.status(409).json({ error: 'Room changed during facilitation' });
       const messageContent = proposal.message || proposal.messageText;
       const interventionDoc = await FacilitatorIntervention.create({
-        interventionId:
-          proposal.interventionId || `int_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`,
+        interventionId: `int_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`,
         roomId: room.roomId,
         strategy: proposal.strategy,
         trigger:
@@ -1128,6 +1397,7 @@ router.post(
         await broadcastFacilitatorIntervention(updatedRoom, interventionDoc, req);
       }
 
+      await activeLearningRoom(userId, room.roomId);
       return res.status(200).json({
         success: true,
         intervened: true,
@@ -1135,7 +1405,9 @@ router.post(
         intervention: interventionDoc
       });
     } catch (err) {
-      return res.status(500).json({ error: errorDetails(err).message });
+      return res
+        .status((err as { status?: number }).status || 500)
+        .json({ error: errorDetails(err).message });
     }
   }
 );
@@ -1216,20 +1488,73 @@ router.post(
         });
       }
 
+      const { activeLearningRoom } = await import('../services/roomLearning.js');
+      const currentRoom = await activeLearningRoom(userId, room.roomId);
+      if (currentRoom.seq !== room.seq)
+        return res.status(409).json({ error: 'Room changed during facilitation' });
+      const proposalShape = Joi.object({
+        shouldIntervene: Joi.boolean().required(),
+        strategy: Joi.string()
+          .valid(
+            'PEER_CHALLENGE',
+            'SOCRATIC_NUDGE',
+            'CONCEPT_PROMPT',
+            'INCLUSIVE_INVITATION',
+            'CONSENSUS_CHECK',
+            'DISAGREEMENT_RESOLUTION'
+          )
+          .when('shouldIntervene', { is: true, then: Joi.required() }),
+        trigger: Joi.string().valid(
+          'explicit_ask',
+          'request_hint',
+          'misconception_detected',
+          'phase_transition',
+          'consensus_check'
+        ),
+        message: Joi.string().max(8000),
+        messageText: Joi.string().max(8000),
+        reasoning: Joi.string().max(2000),
+        interventionId: Joi.string().max(128),
+        targetSpeakerId: Joi.string().max(128),
+        targetUserId: Joi.string().max(128),
+        targetSpeakerName: Joi.string().max(200),
+        cooldownSeconds: Joi.number().integer().min(0).max(300),
+        proposedUICommand: Joi.object({
+          action: Joi.string().max(64).required(),
+          activityId: Joi.string().max(128),
+          reason: Joi.string().max(2000),
+          targetPhase: Joi.string().valid(
+            'idle',
+            'peer_discussion',
+            'individual_attempt',
+            'debrief'
+          )
+        }).allow(null)
+      }).unknown(false);
+      if (proposal && proposalShape.validate(proposal, { convert: false }).error)
+        return res.status(503).json({ error: 'Unsupported facilitator proposal' });
+      const target = proposal?.targetSpeakerId || proposal?.targetUserId;
+      if (target && !currentRoom.participants.some((p) => p.userId === target && !p.leftAt))
+        return res.status(503).json({ error: 'Unsupported facilitator recipient' });
       if (!proposal || !proposal.shouldIntervene || !(proposal.messageText || proposal.message)) {
         return res.status(200).json({ success: true, intervened: false });
       }
 
       const updatedRoom = await StudyRoom.findOneAndUpdate(
-        { _id: room._id, status: 'active' },
+        {
+          _id: room._id,
+          status: 'active',
+          seq: room.seq,
+          participants: { $elemMatch: { userId, leftAt: { $exists: false } } }
+        },
         { $inc: { seq: 1 } },
         { new: true }
       );
 
+      if (!updatedRoom) return res.status(409).json({ error: 'Room changed during facilitation' });
       const messageContent = proposal.message || proposal.messageText;
       const interventionDoc = await FacilitatorIntervention.create({
-        interventionId:
-          proposal.interventionId || `int_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`,
+        interventionId: `int_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`,
         roomId: room.roomId,
         strategy: proposal.strategy,
         trigger:
@@ -1247,6 +1572,7 @@ router.post(
         await broadcastFacilitatorIntervention(updatedRoom, interventionDoc, req);
       }
 
+      await activeLearningRoom(userId, room.roomId);
       return res.status(200).json({
         success: true,
         intervened: true,
@@ -1254,7 +1580,9 @@ router.post(
         intervention: interventionDoc
       });
     } catch (err) {
-      return res.status(500).json({ error: errorDetails(err).message });
+      return res
+        .status((err as { status?: number }).status || 500)
+        .json({ error: errorDetails(err).message });
     }
   }
 );
@@ -1289,10 +1617,89 @@ router.get(
         interventions
       });
     } catch (err) {
-      return res.status(500).json({ error: errorDetails(err).message });
+      return res
+        .status((err as { status?: number }).status || 500)
+        .json({ error: errorDetails(err).message });
     }
   }
 );
 
+// GET /:roomId/debrief — Group recap & recipient-only private check outcome (ED-11)
+router.get('/:roomId/debrief', requireActiveRoom, async (req: RoomRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const room = req.studyRoom!;
+    const activeParticipants = room.participants.filter((p) => !p.leftAt);
+    const publicSubmissionsCount = activeParticipants.filter((p) => p.hasSubmitted).length;
+
+    // 1. Group Public Recap (Strictly zero private answers/scores)
+    const interventions = await FacilitatorIntervention.find({ roomId: room.roomId }).lean();
+    const groupRecap = {
+      roomId: room.roomId,
+      title: room.title,
+      courseId: room.courseId,
+      currentPhase: room.currentPhase,
+      activeActivityId: room.activeActivityId || null,
+      participantsCount: activeParticipants.length,
+      publicSubmissionsCount,
+      completionRate:
+        activeParticipants.length > 0 ? publicSubmissionsCount / activeParticipants.length : 0,
+      facilitatorSummary: {
+        totalInterventions: interventions.length,
+        strategiesUsed: [...new Set(interventions.map((i) => i.strategy))]
+      }
+    };
+
+    // 2. Per-Learner Private Outcome (Strictly recipient-only)
+    let privateOutcome: Record<string, unknown> = {
+      status: 'untested',
+      message: 'No attempt recorded for this activity.'
+    };
+
+    if (room.activeActivityId) {
+      const studentAttempt = await StudentAttempt.findOne({
+        userId,
+        activityId: room.activeActivityId,
+        roomId: room.roomId
+      })
+        .sort({ submittedAt: -1 })
+        .lean();
+
+      if (studentAttempt && studentAttempt.assessmentResult) {
+        const { getAttemptResult } = await import('../services/activityAttempt.js');
+        const verified = await getAttemptResult(
+          userId,
+          studentAttempt.attemptId,
+          room.activeActivityId
+        );
+        if (verified.status !== 'graded')
+          return res.json({ recap: groupRecap, privateOutcome: verified });
+        privateOutcome = {
+          status: studentAttempt.status,
+          score: verified.score,
+          isCorrect: verified.isCorrect,
+          feedback: verified.feedback,
+          socraticHint: verified.socraticHint,
+          recommendedNextStep: verified.recommendedNextStep,
+          evidenceId: studentAttempt.evidenceId || null,
+          evaluatedAt: verified.evaluatedAt
+        };
+      }
+    }
+
+    return res.json({
+      recap: groupRecap,
+      privateOutcome
+    });
+  } catch (err) {
+    return res
+      .status((err as { status?: number }).status || 500)
+      .json({ error: errorDetails(err).message });
+  }
+});
+
 export default router;
 module.exports = router;
+module.exports.broadcastRoomState = broadcastRoomState;

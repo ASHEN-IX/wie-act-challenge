@@ -14,6 +14,7 @@ key) is covered by test_real_progress_publish_uses_progress_routing_key.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import uuid
 from types import SimpleNamespace
@@ -23,7 +24,11 @@ import pytest
 from messaging.envelope import validate_job_envelope
 from messaging.failures import TerminalError
 from workers.idempotency import InMemoryIdempotencyStore
-from workers.ingestion_worker import IngestionWorker, _flatten_chunk_records, _strip_vectors
+from workers.ingestion_worker import (
+    IngestionWorker,
+    _flatten_chunk_records,
+    _strip_vectors,
+)
 
 UUID_B = "0f8e2d1a-3b4c-4d6e-8f80-91a2b3c4d5e6"
 
@@ -56,13 +61,23 @@ class FakeVectorStore:
     def __init__(self):
         self.added = []
 
-    def add_course(self, course_id, chunks, embeddings, metadatas=None):
+    def add_course(
+        self,
+        course_id,
+        chunks,
+        embeddings,
+        metadatas=None,
+        revision_id=None,
+        artifact=None,
+    ):
         self.added.append(
             {
                 "course_id": course_id,
                 "chunks": list(chunks),
                 "num": len(chunks),
-                "shape": tuple(embeddings.shape) if hasattr(embeddings, "shape") else None,
+                "shape": (
+                    tuple(embeddings.shape) if hasattr(embeddings, "shape") else None
+                ),
                 "metas": metadatas,
             }
         )
@@ -92,7 +107,10 @@ def make_subtopics():
             "title": "Graphs 101",
             "summary": "overview",
             "full_content": "Graphs are structures made of nodes and edges.",
-            "tokenized_chunks": ["Graphs are structures made of nodes.", "Edges connect nodes."],
+            "tokenized_chunks": [
+                "Graphs are structures made of nodes.",
+                "Edges connect nodes.",
+            ],
             "chunk_embeddings": [[0.1] * 384, [0.2] * 384],
         }
     ]
@@ -105,7 +123,11 @@ def worker(tmp_path):
 
 async def test_pipeline_completes_and_emits_progress_in_order(worker, tmp_path):
     subtopics = make_subtopics()
-    worker._parse_stage = lambda req: (subtopics, 3, ["uploads/courses/course-1/a.pdf"])
+    worker._parse_stage = lambda req, manifest: (
+        subtopics,
+        3,
+        ["uploads/courses/course-1/a.pdf"],
+    )
     worker._enrich_stage = lambda st: (
         st,
         {"extracted": 5, "truncated": 0, "dropped_duplicates": 1, "warnings": []},
@@ -147,12 +169,66 @@ async def test_pipeline_completes_and_emits_progress_in_order(worker, tmp_path):
 
 
 async def test_no_dedup_defaults_when_stages_produce_nothing(worker, tmp_path):
-    worker._parse_stage = lambda req: ([], 0, [])
+    worker._parse_stage = lambda req, manifest: ([], 0, [])
     worker._enrich_stage = lambda st: (st, {}, {})
     worker._embed_stage = lambda st: (st, 0)
 
     with pytest.raises(TerminalError):
         await worker.handle(dict(INGEST_PAYLOAD), SimpleNamespace())
+
+
+async def test_concurrent_jobs_keep_their_own_revision_manifest(worker):
+    from bson import ObjectId
+
+    first, second = "a" * 24, "b" * 24
+
+    class Revisions:
+        def find_one(self, query):
+            course = str(query["courseId"])
+            return {
+                "contentHash": "sha256:" + course[0] * 64,
+                "sourceManifest": [
+                    {"documentId": course, "storageRef": "originals/example"}
+                ],
+            }
+
+    worker.vector_store._db = SimpleNamespace(course_revisions=Revisions())
+    arrived = 0
+    ready = asyncio.Event()
+    observed = []
+
+    async def progress(envelope, *, stage, **kwargs):
+        nonlocal arrived
+        if stage == "parsing":
+            arrived += 1
+            if arrived == 2:
+                ready.set()
+            await asyncio.wait_for(ready.wait(), timeout=5)
+
+    def parse(request, manifest):
+        observed.append(("parse", request.courseId, manifest["courseId"]))
+        return make_subtopics(), 1, []
+
+    def index(course, *args, manifest, **kwargs):
+        observed.append(("index", course, manifest["courseId"]))
+        return {"courseId": course}
+
+    worker._publish_progress = progress
+    worker._parse_stage = parse
+    worker._enrich_stage = lambda subtopics: (subtopics, {}, {})
+    worker._embed_stage = lambda subtopics: (subtopics, 0)
+    worker._index_stage = index
+    assert ObjectId.is_valid(first) and ObjectId.is_valid(second)
+    payloads = [
+        {**INGEST_PAYLOAD, "courseId": course, "revisionId": "rev_1"}
+        for course in (first, second)
+    ]
+    results = await asyncio.gather(
+        *(worker.handle(p, SimpleNamespace()) for p in payloads)
+    )
+    assert {r["courseId"] for r in results} == {first, second}
+    assert len(observed) == 4
+    assert all(course == manifest_course for _, course, manifest_course in observed)
 
 
 def test_build_request_rejects_invalid_payload(worker):
@@ -166,12 +242,15 @@ def test_build_request_rejects_invalid_payload(worker):
 
 # ------------------------------------------------------------------ resolve
 
+
 def test_resolve_path_reads_staged_text_file(worker, tmp_path):
     (tmp_path / "courses" / "course-1").mkdir(parents=True)
     target = tmp_path / "courses" / "course-1" / "notes-a1b2.md"
     target.write_text("Hello world\n", encoding="utf-8")
     meta = SimpleNamespace(
-        path="courses/course-1/notes-a1b2.md", filename="notes.md", mimetype="text/plain"
+        path="courses/course-1/notes-a1b2.md",
+        filename="notes.md",
+        mimetype="text/plain",
     )
     path = worker._resolve_path(meta, "uploads/courses/course-1")
     assert path == target.resolve()
@@ -186,31 +265,44 @@ def test_resolve_path_falls_back_to_file_ref_filename(worker, tmp_path):
 
 
 def test_resolve_path_rejects_path_traversal(worker, tmp_path):
-    meta = SimpleNamespace(path="../../etc/passwd", filename="evil", mimetype="text/plain")
+    meta = SimpleNamespace(
+        path="../../etc/passwd", filename="evil", mimetype="text/plain"
+    )
     with pytest.raises(TerminalError):
         worker._resolve_path(meta, "uploads/courses/course-1")
 
 
 def test_resolve_path_rejects_missing_file(worker, tmp_path):
-    meta = SimpleNamespace(path="courses/course-1/nope.pdf", filename="nope.pdf", mimetype="application/pdf")
+    meta = SimpleNamespace(
+        path="courses/course-1/nope.pdf",
+        filename="nope.pdf",
+        mimetype="application/pdf",
+    )
     with pytest.raises(TerminalError):
         worker._resolve_path(meta, "uploads/courses/course-1")
 
 
 def test_resolve_path_rejects_unmounted_root(worker):
     worker._uploads_root = worker._uploads_root / "does-not-exist"
-    meta = SimpleNamespace(path="courses/course-1/a.pdf", filename="a.pdf", mimetype="application/pdf")
+    meta = SimpleNamespace(
+        path="courses/course-1/a.pdf", filename="a.pdf", mimetype="application/pdf"
+    )
     with pytest.raises(TerminalError):
         worker._resolve_path(meta, "uploads/courses/course-1")
 
 
 # ---------------------------------------------------------------- extraction
 
+
 def test_extract_text_reads_text_files_directly(worker, tmp_path):
     target = tmp_path / "courses" / "course-1" / "notes-a1b2.md"
     target.parent.mkdir(parents=True)
     target.write_text("markdown content\n", encoding="utf-8")
-    meta = SimpleNamespace(path="courses/course-1/notes-a1b2.md", filename="notes.md", mimetype="text/markdown")
+    meta = SimpleNamespace(
+        path="courses/course-1/notes-a1b2.md",
+        filename="notes.md",
+        mimetype="text/markdown",
+    )
     assert worker._extract_text(meta, target) == "markdown content\n"
 
 
@@ -228,7 +320,9 @@ def test_extract_text_pdf_rejection_is_terminal(worker, tmp_path, monkeypatch):
 
     target = tmp_path / "malformed.pdf"
     target.write_bytes(b"%PDF-1.7\n")
-    meta = SimpleNamespace(path="malformed.pdf", filename="malformed.pdf", mimetype="application/pdf")
+    meta = SimpleNamespace(
+        path="malformed.pdf", filename="malformed.pdf", mimetype="application/pdf"
+    )
 
     def boom(path):
         raise PdfValidationError("PDF parsing failed: truncated")
@@ -244,7 +338,9 @@ def test_extract_text_pdf_timeout_is_retryable(worker, tmp_path, monkeypatch):
 
     target = tmp_path / "hung.pdf"
     target.write_bytes(b"%PDF-1.7\n")
-    meta = SimpleNamespace(path="hung.pdf", filename="hung.pdf", mimetype="application/pdf")
+    meta = SimpleNamespace(
+        path="hung.pdf", filename="hung.pdf", mimetype="application/pdf"
+    )
 
     def boom(path):
         raise PdfParseTimeoutError("parse timed out after 45s")
@@ -259,14 +355,19 @@ def test_extract_text_uses_ocr_fallback_for_image_pdf(worker, tmp_path, monkeypa
 
     target = tmp_path / "scanned.pdf"
     target.write_bytes(b"%PDF-1.7\n")
-    meta = SimpleNamespace(path="scanned.pdf", filename="scanned.pdf", mimetype="application/pdf")
+    meta = SimpleNamespace(
+        path="scanned.pdf", filename="scanned.pdf", mimetype="application/pdf"
+    )
 
-    monkeypatch.setattr(pdf_loader, "extract_text_from_pdf_sandboxed", lambda p: "\n")  # < 50 chars
+    monkeypatch.setattr(
+        pdf_loader, "extract_text_from_pdf_sandboxed", lambda p: "\n"
+    )  # < 50 chars
     monkeypatch.setattr(ocr, "ocr_pdf", lambda p: "OCR EXTRACTED TEXT")
     assert worker._extract_text(meta, target) == "OCR EXTRACTED TEXT"
 
 
 # ------------------------------------------------------------------ helpers
+
 
 def test_flatten_chunk_records_builds_metadatas():
     course_json = normalize_course_wrapped()
@@ -281,7 +382,11 @@ def test_flatten_chunk_records_builds_metadatas():
 def test_strip_vectors_removes_heavy_fields():
     course = {
         "topics": [
-            {"subtopics": [{"tokenized_chunks": ["a"], "chunk_embeddings": [[1.0]], "id": "s"}]}
+            {
+                "subtopics": [
+                    {"tokenized_chunks": ["a"], "chunk_embeddings": [[1.0]], "id": "s"}
+                ]
+            }
         ]
     }
     stripped = _strip_vectors(course)
@@ -292,7 +397,11 @@ def test_strip_vectors_removes_heavy_fields():
 
 
 def normalize_course_wrapped():
-    from agents.course_ingestion.normalization.schema import CourseKnowledgeJSON, Subtopic, Topic
+    from agents.course_ingestion.normalization.schema import (
+        CourseKnowledgeJSON,
+        Subtopic,
+        Topic,
+    )
 
     sub = Subtopic(
         id="sub-1",
@@ -302,10 +411,13 @@ def normalize_course_wrapped():
         chunk_embeddings=[[0.1] * 384, [0.2] * 384],
     )
     topic = Topic(id="topic_1", title="T", summary="s", subtopics=[sub])
-    return CourseKnowledgeJSON(course_title="course-1", source_files=["a.pdf"], topics=[topic])
+    return CourseKnowledgeJSON(
+        course_title="course-1", source_files=["a.pdf"], topics=[topic]
+    )
 
 
 # ------------------------------------------------- real progress wire path
+
 
 async def test_real_progress_publish_uses_progress_routing_key(tmp_path):
     from messaging.envelope import PROGRESS_STAGES
@@ -333,7 +445,9 @@ async def test_real_progress_publish_uses_progress_routing_key(tmp_path):
     worker._channel = FakeChannel()
     job = validate_job_envelope({**VALID_BASE, "payload": INGEST_PAYLOAD})
 
-    await worker._publish_progress(job, stage="parsing", progress=0.4, detail="parsing 1 file(s)")
+    await worker._publish_progress(
+        job, stage="parsing", progress=0.4, detail="parsing 1 file(s)"
+    )
 
     rk, body = worker._channel.exchange.published[0]
     assert rk == "progress"
@@ -341,3 +455,55 @@ async def test_real_progress_publish_uses_progress_routing_key(tmp_path):
     assert body["stage"] == "parsing"
     assert body["progress"] == 0.4
     assert body["type"] == "study.ingest.course"
+
+
+def test_server_operation_cancellation_and_supersession_fence_stages(worker):
+    """New operation IDs must match both durable operation and current course."""
+    from bson import ObjectId
+
+    course_id = str(ObjectId())
+    request = SimpleNamespace(courseId=course_id, revisionId="rev_current")
+    envelope = SimpleNamespace(
+        messageId=str(uuid.uuid4()), correlationId=UUID_B, userId="owner"
+    )
+    operation = {
+        "state": "queued",
+        "courseId": ObjectId(course_id),
+        "revisionId": "rev_current",
+        "userId": "owner",
+    }
+    course = {
+        "_id": ObjectId(course_id),
+        "jobId": envelope.messageId,
+        "correlationId": UUID_B,
+    }
+
+    class Collection:
+        def __init__(self, row):
+            self.row = row
+
+        def find_one(self, query):
+            return (
+                self.row
+                if self.row and all(self.row.get(k) == v for k, v in query.items())
+                else None
+            )
+
+    operation["_id"] = envelope.messageId
+    operations, courses = Collection(operation), Collection(course)
+    worker.vector_store._db = SimpleNamespace(
+        course_ingestion_operations=operations, courses=courses
+    )
+    worker._ensure_current_operation(request, envelope)
+    for state in ("cancelled", "superseded", "completed", "failed"):
+        operation["state"] = state
+        with pytest.raises(TerminalError, match="cancelled, superseded or resolved"):
+            worker._ensure_current_operation(request, envelope)
+    operation["state"] = "queued"
+    course["jobId"] = "new-operation"
+    with pytest.raises(TerminalError, match="no longer current"):
+        worker._ensure_current_operation(request, envelope)
+    course["jobId"] = envelope.messageId
+    course["ingestDetail"] = "cancelled"
+    with pytest.raises(TerminalError, match="no longer current"):
+        worker._ensure_current_operation(request, envelope)

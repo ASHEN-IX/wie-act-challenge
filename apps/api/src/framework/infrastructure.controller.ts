@@ -48,4 +48,19 @@ export class InfrastructureController {
       timestamp: new Date().toISOString()
     });
   }
+  @Get('system/ai-status')
+  async aiStatus(@Res() res: Response): Promise<void> {
+    try {
+      const aiClient = require('../../shared/aiClient');
+      const report = await aiClient.getProviderStatus({ timeout: 3000 });
+      res.status(200).json(report);
+    } catch (error) {
+      res.status(503).json({
+        status: 'unavailable',
+        execution_mode: 'UNAVAILABLE',
+        error: error instanceof Error ? error.message : 'AI service unreachable',
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
 }

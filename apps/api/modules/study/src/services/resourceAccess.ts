@@ -1,10 +1,76 @@
-import { Course, StudyPlan } from '../models';
+import { Course, CourseEnrollment, Institution, InstitutionMembership, StudyPlan } from '../models';
 
-/** Current Study-owned grant: private personal ownership only. No admin,
- * room-invite or hypothetical enrollment bypass. Future grants belong here. */
+export type CourseAccessRole = 'owner' | 'instructor' | 'admin' | 'student';
+
+/** Content authority is distinct from institution metadata/enrollment administration.
+ * Institutional grants always require a currently active institution and membership.
+ * Legacy institutions without an explicit active state fail closed (no implicit migration).
+ */
+async function courseGrant(userId: string, courseId: unknown) {
+  if (!userId || typeof courseId !== 'string' || !/^[a-f\d]{24}$/i.test(courseId)) return null;
+  const course = await Course.findById(courseId)
+    .select('scope userId ownerUserId institutionId assignedInstructorIds')
+    .lean();
+  if (!course) return null;
+  if (!course.scope || course.scope === 'personal') {
+    return course.userId === userId || course.ownerUserId === userId
+      ? { course, role: 'owner' as const }
+      : null;
+  }
+  if (course.scope !== 'institutional' || !course.institutionId) return null;
+  if (!(await Institution.exists({ _id: course.institutionId, status: 'active' }))) return null;
+  const membership = await InstitutionMembership.findOne({
+    institutionId: course.institutionId,
+    userId,
+    status: 'active'
+  }).lean();
+  if (!membership) return null;
+  if (membership.role === 'instructor' && course.assignedInstructorIds?.includes(userId)) {
+    return { course, role: 'instructor' as const };
+  }
+  if (membership.role === 'university_admin') return { course, role: 'admin' as const };
+  if (
+    membership.role === 'university_student' &&
+    (await CourseEnrollment.exists({
+      courseId,
+      institutionId: course.institutionId,
+      userId,
+      status: 'active'
+    }))
+  )
+    return { course, role: 'student' as const };
+  return null;
+}
+
+export async function getCourseAccessRole(
+  userId: string,
+  courseId: unknown
+): Promise<CourseAccessRole | null> {
+  return (await courseGrant(userId, courseId))?.role || null;
+}
+
 export async function canReadCourse(userId: string, courseId: unknown): Promise<boolean> {
-  if (!userId || typeof courseId !== 'string' || !/^[a-f\d]{24}$/i.test(courseId)) return false;
-  return !!(await Course.exists({ _id: courseId, userId }));
+  const role = await getCourseAccessRole(userId, courseId);
+  return role === 'owner' || role === 'instructor' || role === 'student';
+}
+
+export async function canAuthorCourse(userId: string, courseId: unknown): Promise<boolean> {
+  const role = await getCourseAccessRole(userId, courseId);
+  return role === 'owner' || role === 'instructor';
+}
+
+// Separate named policy boundaries even where their current least-privilege rules agree.
+export const canReviewCourse = canAuthorCourse;
+export const canPublishCourse = canAuthorCourse;
+export const canManageCourse = canAuthorCourse;
+
+export async function canAdministerCourse(userId: string, courseId: unknown): Promise<boolean> {
+  return (await getCourseAccessRole(userId, courseId)) === 'admin';
+}
+
+export async function canManageEnrollments(userId: string, courseId: unknown): Promise<boolean> {
+  const role = await getCourseAccessRole(userId, courseId);
+  return role === 'admin' || role === 'instructor';
 }
 
 /** Materialized task/plan content inherits its current source grant. Legacy

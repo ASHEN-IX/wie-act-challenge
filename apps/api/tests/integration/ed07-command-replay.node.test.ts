@@ -491,7 +491,7 @@ test(
               activeActivityId: 'unsupported'
             })
           ).status,
-          503
+          404
         );
         assert.equal((await snapshot(id))!.commandReceipts.length, 2);
         await db

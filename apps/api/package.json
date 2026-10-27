@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "seed:users": "tsx seeds/demo-users.seed.ts",
+    "seed:learning-demo": "tsx --tsconfig tsconfig.json seeds/learning-demo.seed.ts",
     "dev": "pnpm build && node --watch dist/main.js",
     "start": "node dist/main.js",
     "build": "tsc",
@@ -25,7 +26,7 @@
     "generate:contracts": "tsx scripts/generate-http-contracts.ts",
     "test:routes": "tsx --test tests/routes.node.ts",
     "test:node": "tsx --tsconfig tsconfig.json --test tests/*.node.test.ts",
-    "test:node:integration": "AI_SERVICE_URL=http://127.0.0.1:1 tsx --tsconfig tsconfig.json --test tests/integration/*.node.test.ts tests/integration/ed07-study-rooms-e2e-real.test.ts tests/integration/ed09-facilitator.integration.test.ts"
+    "test:node:integration": "AI_SERVICE_URL=http://127.0.0.1:1 tsx --tsconfig tsconfig.json --test --test-concurrency=2 tests/integration/*.node.test.ts tests/integration/ed07-study-rooms-e2e-real.test.ts tests/integration/ed09-facilitator.integration.test.ts"
   },
   "devDependencies": {
     "@types/amqplib": "^0.10.8",

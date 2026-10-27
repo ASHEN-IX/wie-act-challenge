@@ -5,7 +5,7 @@ test('Next.js and NestJS: register, verify email, login, persist session, logout
   await page.goto('/dashboard');
   await expect(page).toHaveURL(/\/login/);
   const registration = await request.post('/api/auth/sign-up/email', {
-    headers: { origin: process.env.E2E_BASE_URL || 'http://localhost:5173' }, data: { name: 'Browser Test', email, password, callbackURL: '/verify-email?verified=true' }
+    headers: { origin: process.env.E2E_BASE_URL || process.env.AUTH_E2E_ORIGIN || 'http://localhost:5173' }, data: { name: 'Browser Test', email, password, callbackURL: '/verify-email?verified=true' }
   });
   expect(registration.status()).toBe(200);
   const messages = await (await request.get(`${process.env.AUTH_TEST_MAIL_URL || 'http://127.0.0.1:8026'}/api/v1/messages`)).json();
@@ -31,13 +31,13 @@ test('Next.js and NestJS: register, verify email, login, persist session, logout
   expect(authenticated.status()).toBe(200);
   expect((await page.request.get('/api/v1/auth/admin/stats')).status()).toBe(403);
   const oldCookie = cookies.map(cookie => `${cookie.name}=${cookie.value}`).join('; ');
-  expect((await page.request.post('/api/auth/sign-out', { data: {}, headers: { origin: process.env.E2E_BASE_URL || 'http://localhost:5173' } })).status()).toBe(200);
+  expect((await page.request.post('/api/auth/sign-out', { data: {}, headers: { origin: process.env.E2E_BASE_URL || process.env.AUTH_E2E_ORIGIN || 'http://localhost:5173' } })).status()).toBe(200);
   expect((await request.get('/api/v1/auth/me', { headers: { cookie: oldCookie } })).status()).toBe(401);
   await page.goto('/dashboard');
   await expect(page).toHaveURL(/\/login/);
 });
 test('password reset uses the delivered link and invalidates the previous session', async ({ page, request }) => {
-  const origin = process.env.E2E_BASE_URL || 'http://localhost:5173';
+  const origin = process.env.E2E_BASE_URL || process.env.AUTH_E2E_ORIGIN || 'http://localhost:5173';
   const login = await page.request.post('/api/auth/sign-in/email', { headers: { origin }, data: { email, password } });
   expect(login.status()).toBe(200);
   const oldCookie = (await page.context().cookies()).map(cookie => `${cookie.name}=${cookie.value}`).join('; ');

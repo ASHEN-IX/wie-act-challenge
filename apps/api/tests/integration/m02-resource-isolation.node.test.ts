@@ -3,7 +3,8 @@ import WebSocket from 'ws';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { mkdir, writeFile, rm, symlink } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, rm, symlink } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { MongoClient, ObjectId } from 'mongodb';
 import bcrypt from 'bcryptjs';
@@ -15,7 +16,10 @@ test(
   { timeout: 90000 },
   async (t) => {
     const database = `ednova_m02_${process.pid}_${Date.now()}`;
+    const uploads = await mkdtemp(path.join(os.tmpdir(), 'ednova-m02-uploads-'));
+    t.after(() => rm(uploads, { recursive: true, force: true }));
     Object.assign(process.env, {
+      INGEST_UPLOADS_DIR: uploads,
       MONGODB_URI: `mongodb://127.0.0.1:27018/${database}`,
       BETTER_AUTH_SECRET: 'm02-isolated-session-secret-at-least-thirty-two-characters',
       INTERNAL_API_SECRET: 'm02-isolated-internal-secret',
@@ -150,7 +154,7 @@ test(
       '../../modules/study/uploads/courses',
       String(courseId)
     );
-    const sourceRoot = path.resolve('uploads/courses', String(courseId));
+    const sourceRoot = path.join(uploads, 'courses', String(courseId));
     const publicFile = path.resolve(
       __dirname,
       '../../modules/study/uploads',
@@ -309,6 +313,15 @@ test(
       assert.equal(
         await db.collection('voicesessions').countDocuments({ sessionId: String(team) }),
         0
+      );
+      assert.equal((await request(peer, `/api/v1/voice/${team}/start`, 'POST', {})).status, 403);
+      assert.equal(
+        (
+          await request(peer, `/api/v1/study/sessions/team/${team}/voice-consent`, 'PUT', {
+            hasVoiceConsent: true
+          })
+        ).status,
+        200
       );
       assert.equal((await request(peer, `/api/v1/voice/${team}/start`, 'POST', {})).status, 201);
       await db
@@ -557,14 +570,18 @@ test(
     await t.test(
       'three sockets preserve room isolation, targeted signaling and revocation',
       async () => {
-        const room = await request(owner, '/api/v1/study/rooms', 'POST', { enableVoice: false });
+        const room = await request(owner, '/api/v1/study/rooms', 'POST', { enableVoice: true });
         assert.equal(room.status, 201);
         const id = String(room.data.roomId);
         const doc = await db.collection('study_rooms').findOne({ roomId: id });
         assert.ok(doc);
         assert.equal(
-          (await request(peer, '/api/v1/study/rooms/join', 'POST', { inviteCode: doc.inviteCode }))
-            .status,
+          (
+            await request(peer, '/api/v1/study/rooms/join', 'POST', {
+              inviteCode: doc.inviteCode,
+              hasVoiceConsent: true
+            })
+          ).status,
           200
         );
         const a1 = await connect(id, owner);

@@ -1,3 +1,10 @@
+import {
+  prepareRevisionSources,
+  SourceIntegrityError,
+  captureImmutableSources,
+  verifyRevisionArtifact,
+  verifyBlob
+} from '../services/revisionSources';
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response, NextFunction, RequestHandler } from 'express';
 import type { FilterQuery } from 'mongoose';
@@ -9,15 +16,70 @@ const { createContracts } = require('@study-partner/shared/domainContracts');
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const moduleClient = require('@study-partner/shared/moduleClient');
-import { Course, Subject } from '../models';
+import {
+  Course,
+  Subject,
+  Institution,
+  InstitutionMembership,
+  CourseRevision,
+  CourseEnrollment
+} from '../models';
+import { canReadCourse, canManageCourse } from '../services/resourceAccess';
+import {
+  getCourseDraft,
+  updateCourseDraft,
+  DraftForbiddenError,
+  DraftNotFoundError,
+  StaleRevisionError,
+  HierarchyValidationError
+} from '../services/courseDraft';
+import {
+  publishCourseRevision,
+  getPublishedCourseContext,
+  resolveCourseSource,
+  PublicationForbiddenError,
+  PublicationNotFoundError,
+  UnpublishedCourseError,
+  PublicationConflictError,
+  PublicationReviewRequiredError,
+  PublicationValidationError
+} from '../services/coursePublication';
+import {
+  askGroundedTutor,
+  TutorValidationError,
+  TutorServiceUnavailableError
+} from '../services/tutorGrounding';
+import {
+  generateActivityCandidate,
+  ObjectiveNotFoundError,
+  GenerationSettingsError
+} from '../services/courseStudio';
+import {
+  assignInstructorToCourse,
+  revokeInstructorAssignment,
+  issueCourseInvitation,
+  acceptCourseInvitation,
+  enrollStudentDirectly,
+  listCourseEnrollments,
+  withdrawOrRevokeEnrollment,
+  listAccessibleCourses,
+  EnrollmentError
+} from '../services/enrollments';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { tierGate } = require('@study-partner/shared/tierGate');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { requireMultipart } = require('@study-partner/shared/middleware');
 import { deleteObjectivesForDocument } from '../services/objectives';
-import { publishCourseIngestionJob } from '../services/ingestionJob';
+import {
+  enqueueCourseIngestionOperation,
+  cancelIngestionOperation,
+  retryIngestionOperation,
+  reconcileIngestionOperation,
+  IngestionConflictError
+} from '../services/ingestionControl';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { buildInternalHeaders } = require('@study-partner/shared/auth');
 
@@ -63,32 +125,37 @@ const router = createContracts();
 // async worker (INGEST-06) can find them via a single unambiguous fileRef.
 // Stored paths are relative to the uploads root.
 function stageCourseFiles(reqFiles: CourseUpload[], courseId: string) {
-  const courseUploadDir = path.join('uploads', 'courses', courseId);
+  const courseUploadDir = path.join(
+    process.env.INGEST_UPLOADS_DIR || 'uploads',
+    'courses',
+    courseId
+  );
   fs.mkdirSync(courseUploadDir, { recursive: true });
   return reqFiles.map((file) => {
     const newPath = path.join(courseUploadDir, file.filename);
     fs.renameSync(file.path, newPath);
+    let fileHash = '';
+    try {
+      const fileBuffer = fs.readFileSync(newPath);
+      fileHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+    } catch {
+      fileHash = '';
+    }
     return {
       filename: file.filename,
       originalName: file.originalname,
       mimetype: file.mimetype,
       size: file.size,
-      path: path.relative('uploads', newPath).replace(/\\/g, '/')
+      fileHash,
+      path: path.relative(process.env.INGEST_UPLOADS_DIR || 'uploads', newPath).replace(/\\/g, '/')
     };
   });
 }
 
 function courseFileRef(courseId: string) {
-  return path.join('uploads', 'courses', courseId).replace(/\\/g, '/');
-}
-
-function cleanupCourseFiles(courseId: string) {
-  const dir = path.join('uploads', 'courses', courseId);
-  try {
-    fs.rmSync(dir, { recursive: true, force: true });
-  } catch (err) {
-    console.warn(`Failed to cleanup course files for ${courseId}:`, errorDetails(err).message);
-  }
+  return path
+    .join(process.env.INGEST_UPLOADS_DIR || 'uploads', 'courses', courseId)
+    .replace(/\\/g, '/');
 }
 
 // SEC-11: storage filenames are server-generated and never echo the client
@@ -105,7 +172,9 @@ function sanitizeStoredFilename(file: Pick<NonNullable<DomainRequest['file']>, '
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/');
+    const root = process.env.INGEST_UPLOADS_DIR || 'uploads';
+    fs.mkdirSync(root, { recursive: true });
+    cb(null, root);
   },
   filename: (req, file, cb) => {
     cb(null, sanitizeStoredFilename(file));
@@ -238,6 +307,8 @@ router.get(
   '/:courseId/files/:filename',
   async (req: DomainRequest, res: Response, next: NextFunction) => {
     try {
+      if (!(await canReadCourse(req.user!.userId, String(req.params.courseId))))
+        return res.status(404).json({ error: 'Source file not found' });
       const course = await Course.findOne({
         _id: req.params.courseId,
         userId: req.user!.userId
@@ -252,10 +323,12 @@ router.get(
         return res.status(404).json({ error: 'Source file not found' });
       }
       const root = await fs.promises.realpath(
-        path.resolve('uploads', 'courses', String(course._id))
+        path.resolve(process.env.INGEST_UPLOADS_DIR || 'uploads', 'courses', String(course._id))
       );
       const target = await fs.promises.realpath(path.join(root, filename));
       if (!target.startsWith(root + path.sep))
+        return res.status(404).json({ error: 'Source file not found' });
+      if (!(await canReadCourse(req.user!.userId, String(req.params.courseId))))
         return res.status(404).json({ error: 'Source file not found' });
       res.setHeader('Cache-Control', 'private, no-store');
       res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'");
@@ -275,27 +348,58 @@ router.get(
   }
 );
 
-// Get all courses for a user, optionally filtered by subject
+function handleEnrollmentError(res: Response, error: unknown) {
+  if (error instanceof EnrollmentError) {
+    return res.status(error.status).json({ error: error.message });
+  }
+  const details = errorDetails(error);
+  return res.status(500).json({ error: details.message || 'Internal server error' });
+}
+
+function param(req: DomainRequest, name: string): string {
+  const value = req.params[name];
+  return Array.isArray(value) ? value[0] : value;
+}
+
+// Get all courses for a user, optionally filtered by subject or institutional scope
 router.get('/', async (req: DomainRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
-    const { subject_id } = req.query;
+    const { subject_id, institution_id } = req.query;
 
-    const query: FilterQuery<ICourse> = { userId };
-    if (subject_id) {
-      query.subjectId = subject_id;
+    let courses: ICourse[] = [];
+    if (institution_id && typeof institution_id === 'string') {
+      courses = (await listAccessibleCourses(userId, institution_id)) as unknown as ICourse[];
+    } else {
+      const enrolledIds = await CourseEnrollment.find({ userId, status: 'active' }).distinct(
+        'courseId'
+      );
+      const query: FilterQuery<ICourse> = {
+        $or: [
+          { userId },
+          { ownerUserId: userId },
+          { assignedInstructorIds: userId },
+          { _id: { $in: enrolledIds } }
+        ]
+      };
+      if (subject_id) {
+        query.subjectId = subject_id;
+      }
+      const candidates = (await Course.find(query)
+        .sort({ createdAt: -1 })
+        .lean()) as unknown as ICourse[];
+      for (const candidate of candidates) {
+        if (await canReadCourse(userId, candidate._id.toString())) courses.push(candidate);
+      }
     }
-
-    console.log('Fetching courses for user:', userId, 'subject:', subject_id);
-
-    const courses = await Course.find(query).sort({ createdAt: -1 }).lean();
-
-    console.log('Found', courses.length, 'courses');
 
     const coursesWithDetails = courses.map((course) => ({
       id: course._id.toString(),
       title: course.title,
       description: course.description,
+      scope: course.scope || 'personal',
+      institutionId: course.institutionId ? course.institutionId.toString() : undefined,
+      assignedInstructorIds: course.assignedInstructorIds || [],
       subjectId: course.subjectId,
       status: course.status,
       topicsCount: course.topics?.length || 0,
@@ -308,6 +412,9 @@ router.get('/', async (req: DomainRequest, res: Response) => {
 
     res.json({ courses: coursesWithDetails });
   } catch (error) {
+    if (error instanceof EnrollmentError) {
+      return res.status(error.status).json({ error: error.message });
+    }
     console.error('Error fetching courses:', error);
     res
       .status(500)
@@ -325,10 +432,38 @@ router.post(
   async (req: DomainRequest, res: Response) => {
     try {
       const userId = req.user!.userId;
-      const { title, description, subject_id } = req.body;
+      const { title, description, subject_id, scope, institutionId, institution_id } = req.body;
 
       if (!title || !subject_id) {
         return res.status(400).json({ error: 'title and subject_id are required' });
+      }
+
+      const targetInstitutionId = institutionId || institution_id;
+      let courseScope = 'personal';
+
+      if (scope === 'institutional' || targetInstitutionId) {
+        if (!targetInstitutionId) {
+          return res
+            .status(400)
+            .json({ error: 'institutionId is required for institutional courses' });
+        }
+        // Verify caller is instructor or admin in that institution
+        const membership = await InstitutionMembership.findOne({
+          institutionId: targetInstitutionId,
+          userId,
+          role: { $in: ['instructor', 'university_admin'] },
+          status: 'active'
+        });
+        if (
+          !membership ||
+          !(await Institution.exists({ _id: targetInstitutionId, status: 'active' }))
+        ) {
+          return res.status(403).json({
+            error:
+              'Forbidden: only active instructors and administrators can create institutional courses'
+          });
+        }
+        courseScope = 'institutional';
       }
 
       if (!courseUploads(req) || courseUploads(req).length === 0) {
@@ -347,6 +482,10 @@ router.post(
         description,
         subjectId: subject_id,
         userId,
+        ownerUserId: userId,
+        scope: courseScope,
+        institutionId: courseScope === 'institutional' ? targetInstitutionId : undefined,
+        assignedInstructorIds: courseScope === 'institutional' ? [userId] : [],
         status: 'processing',
         files: courseUploads(req).map((file: CourseUpload) => ({
           filename: file.filename,
@@ -361,21 +500,44 @@ router.post(
       // async ingestion job. The request returns 202 { jobId } immediately —
       // the worker (INGEST-06) parses/embeds and resolves the course status.
       const staged = stageCourseFiles(courseUploads(req), course._id.toString());
+      const revisionTag = `rev_${crypto.randomUUID().replace(/-/g, '')}`;
+      const fileHashes = staged.map((f) => f.fileHash).filter(Boolean);
+      const contentHash = crypto
+        .createHash('sha256')
+        .update(fileHashes.sort().join(':') || course._id.toString())
+        .digest('hex');
+
+      course.files = staged.map((file) => ({
+        filename: file.filename,
+        originalName: file.originalName,
+        size: file.size,
+        fileHash: file.fileHash,
+        uploadedAt: new Date()
+      }));
+
+      await course.save();
+      await CourseRevision.create({
+        courseId: course._id,
+        revisionTag,
+        contentHash,
+        status: 'draft',
+        isInstructorReviewed: false,
+        sourceManifest: await captureImmutableSources(course._id.toString(), course.files),
+        vectorIndexRef: `faiss/${course._id.toString()}/${revisionTag}.faiss`
+      });
 
       try {
-        const { jobId, correlationId } = await publishCourseIngestionJob({
-          userId,
-          courseId: course._id.toString(),
-          fileRef: courseFileRef(course._id.toString()),
-          files: staged,
-          requestId: req.get('X-Request-ID')
-        });
-
-        // INGEST-07: persist the job linkage so progress/result events can be
-        // correlated back to this course document.
-        course.jobId = jobId;
-        course.correlationId = correlationId;
-        await course.save();
+        const { jobId } = await enqueueCourseIngestionOperation(
+          {
+            userId,
+            courseId: course._id.toString(),
+            revisionId: revisionTag,
+            fileRef: courseFileRef(course._id.toString()),
+            files: staged,
+            requestId: req.get('X-Request-ID')
+          },
+          course.jobId
+        );
 
         console.log('Ingestion job triggered:', jobId);
         return res.status(202).json({
@@ -386,12 +548,10 @@ router.post(
       } catch (publishErr) {
         console.error('Ingestion job enqueue failed:', errorDetails(publishErr).message);
 
-        // No job was enqueued → nothing will parse these files. Mark the course
-        // failed and remove the staged files so nothing is orphaned.
-        course.status = 'failed';
-        Object.assign(course, { warning: 'ingestion job could not be enqueued' });
-        await course.save();
-        cleanupCourseFiles(course._id.toString());
+        // Retain bytes and the durable operation: a lost broker acknowledgement
+        // can follow successful publication. Reconciliation reuses its identity.
+        if (publishErr instanceof IngestionConflictError)
+          return res.status(409).json({ error: publishErr.code });
 
         return res.status(503).json({ error: 'AI job bus unavailable, retry later' });
       }
@@ -408,8 +568,12 @@ router.get('/:courseId', async (req: DomainRequest, res: Response) => {
     const { courseId } = req.params;
     const userId = req.user!.userId;
 
-    const course = await Course.findOne({ _id: courseId, userId });
+    const authorized = await canReadCourse(userId, courseId);
+    if (!authorized) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
 
+    const course = await Course.findById(courseId);
     if (!course) {
       return res.status(404).json({ error: 'Course not found' });
     }
@@ -419,6 +583,9 @@ router.get('/:courseId', async (req: DomainRequest, res: Response) => {
         id: course._id.toString(),
         title: course.title,
         description: course.description,
+        scope: course.scope || 'personal',
+        institutionId: course.institutionId ? course.institutionId.toString() : undefined,
+        assignedInstructorIds: course.assignedInstructorIds || [],
         subjectId: course.subjectId,
         status: course.status,
         topics: course.topics,
@@ -435,13 +602,318 @@ router.get('/:courseId', async (req: DomainRequest, res: Response) => {
   }
 });
 
+// ED-30: Get course draft hierarchy and objectives
+router.get('/:courseId/draft', async (req: DomainRequest, res: Response) => {
+  try {
+    const courseId = String(req.params.courseId);
+    const userId = req.user!.userId;
+
+    const draft = await getCourseDraft(userId, courseId);
+    res.json({ draft });
+  } catch (error) {
+    if (error instanceof DraftForbiddenError) {
+      return res.status(403).json({ error: 'FORBIDDEN', message: error.message });
+    }
+    if (error instanceof DraftNotFoundError) {
+      return res.status(404).json({ error: 'NOT_FOUND', message: error.message });
+    }
+    console.error('Error fetching course draft:', error);
+    res.status(500).json({ error: 'Failed to fetch course draft' });
+  }
+});
+
+// ED-30: Update course draft with optimistic concurrency control
+router.put('/:courseId/draft', async (req: DomainRequest, res: Response) => {
+  try {
+    const courseId = String(req.params.courseId);
+    const userId = req.user!.userId;
+    const { expectedRevisionTag, topics, summary, isInstructorReviewed } = req.body;
+
+    const result = await updateCourseDraft(userId, courseId, {
+      expectedRevisionTag,
+      topics,
+      summary,
+      isInstructorReviewed
+    });
+    res.status(200).json(result);
+  } catch (error) {
+    if (error instanceof DraftForbiddenError) {
+      return res.status(403).json({ error: 'FORBIDDEN', message: error.message });
+    }
+    if (error instanceof DraftNotFoundError) {
+      return res.status(404).json({ error: 'NOT_FOUND', message: error.message });
+    }
+    if (error instanceof StaleRevisionError) {
+      return res.status(409).json({
+        error: 'STALE_REVISION',
+        message: error.message,
+        currentRevisionTag: error.currentRevisionTag
+      });
+    }
+    if (error instanceof HierarchyValidationError) {
+      return res.status(400).json({ error: 'INVALID_HIERARCHY', message: error.message });
+    }
+    console.error('Error updating course draft:', error);
+    res.status(500).json({ error: 'Failed to update course draft' });
+  }
+});
+
+router.post('/:courseId/draft/sources/prepare', async (req: DomainRequest, res: Response) => {
+  try {
+    const result = await prepareRevisionSources(
+      req.user!.userId,
+      String(req.params.courseId),
+      String(req.body?.expectedRevisionTag || '')
+    );
+    res.status(200).json(result);
+  } catch (error) {
+    const status = (error as { status?: number }).status;
+    res.status(status === 403 ? 403 : status === 409 ? 409 : 503).json({
+      error:
+        status === 409
+          ? 'STALE_REVISION'
+          : status === 403
+            ? 'FORBIDDEN'
+            : 'SOURCE_INTEGRITY_UNAVAILABLE'
+    });
+  }
+});
+
+// ED-05: Publish reviewed course draft revision
+router.post('/:courseId/publish', async (req: DomainRequest, res: Response) => {
+  try {
+    const courseId = String(req.params.courseId);
+    const userId = req.user!.userId;
+    const { expectedRevisionTag } = req.body || {};
+
+    const result = await publishCourseRevision(userId, courseId, expectedRevisionTag);
+    res.status(200).json(result);
+  } catch (error) {
+    if (error instanceof PublicationForbiddenError) {
+      return res.status(403).json({ error: 'FORBIDDEN', message: error.message });
+    }
+    if (error instanceof PublicationNotFoundError) {
+      return res.status(404).json({ error: 'NOT_FOUND', message: error.message });
+    }
+    if (error instanceof PublicationConflictError) {
+      return res.status(409).json({ error: error.code, message: error.message });
+    }
+    if (error instanceof PublicationReviewRequiredError) {
+      return res.status(400).json({ error: error.code, message: error.message });
+    }
+    if (error instanceof PublicationValidationError) {
+      return res.status(400).json({ error: error.code, message: error.message });
+    }
+    if (error instanceof SourceIntegrityError) return res.status(503).json({ error: error.code });
+    if ((error as { status?: number }).status === 409)
+      return res.status(409).json({ error: 'STALE_REVISION' });
+    console.error('Error publishing course revision:', error);
+    res.status(500).json({ error: 'Failed to publish course revision' });
+  }
+});
+
+// ED-05 / Contract 03: Authoritative published course context
+router.get('/:courseId/published-context', async (req: DomainRequest, res: Response) => {
+  try {
+    const courseId = String(req.params.courseId);
+    const userId = req.user!.userId;
+    const revisionId = typeof req.query.revisionId === 'string' ? req.query.revisionId : undefined;
+
+    const context = await getPublishedCourseContext(userId, courseId, revisionId);
+    res.json(context);
+  } catch (error) {
+    if (error instanceof PublicationForbiddenError) {
+      return res.status(403).json({ error: 'FORBIDDEN', message: error.message });
+    }
+    if (error instanceof UnpublishedCourseError) {
+      return res.status(404).json({ error: error.code, message: error.message });
+    }
+    if (error instanceof PublicationNotFoundError) {
+      return res.status(404).json({ error: 'NOT_FOUND', message: error.message });
+    }
+    console.error('Error fetching published course context:', error);
+    res.status(500).json({ error: 'Failed to fetch published course context' });
+  }
+});
+
+// ED-05: Server-only source resolution with index reference
+router.get('/:courseId/source-resolution', async (req: DomainRequest, res: Response) => {
+  try {
+    const courseId = String(req.params.courseId);
+    const userId = req.user!.userId;
+    const revisionId = typeof req.query.revisionId === 'string' ? req.query.revisionId : undefined;
+
+    const resolution = await resolveCourseSource(userId, courseId, revisionId);
+    res.json(resolution);
+  } catch (error) {
+    if (error instanceof SourceIntegrityError) return res.status(503).json({ error: error.code });
+    if ((error as { status?: number }).status === 409)
+      return res.status(409).json({ error: 'STALE_REVISION' });
+    console.error('Error resolving course source:', error);
+    res.status(500).json({ error: 'Failed to resolve course source' });
+  }
+});
+
+// ED-10 / Contract 03: Source-grounded tutor Q&A
+router.post('/:courseId/tutor/ask', async (req: DomainRequest, res: Response) => {
+  try {
+    const courseId = String(req.params.courseId);
+    const userId = req.user!.userId;
+    const { question, topicId, objectiveId, revisionId } = req.body || {};
+
+    const result = await askGroundedTutor(userId, courseId, {
+      question,
+      revisionId,
+      topicId,
+      objectiveId
+    });
+    res.status(200).json(result);
+  } catch (error) {
+    if (error instanceof TutorValidationError) {
+      return res.status(400).json({ error: error.code, message: error.message });
+    }
+    if (error instanceof PublicationForbiddenError) {
+      return res.status(403).json({ error: 'FORBIDDEN', message: error.message });
+    }
+    if (error instanceof UnpublishedCourseError) {
+      return res.status(404).json({ error: error.code, message: error.message });
+    }
+    if (error instanceof PublicationNotFoundError) {
+      return res.status(404).json({ error: 'NOT_FOUND', message: error.message });
+    }
+    if (error instanceof TutorServiceUnavailableError) {
+      return res.status(503).json({ error: error.code, message: error.message });
+    }
+    console.error('Error answering tutor question:', error);
+    res.status(500).json({ error: 'Failed to answer tutor question' });
+  }
+});
+
+// ED-32 / ED-31: Course Studio - Generate grounded activity proposal candidate
+router.post('/:courseId/studio/generate-activity', async (req: DomainRequest, res: Response) => {
+  try {
+    const courseId = String(req.params.courseId);
+    const userId = req.user!.userId;
+    const {
+      objectiveId,
+      activityType,
+      title,
+      instructions,
+      expectedRevisionTag,
+      sourceChunkId,
+      language,
+      difficulty,
+      hintDepth,
+      sourceSectionId
+    } = req.body || {};
+
+    if (!objectiveId || !activityType) {
+      return res.status(400).json({
+        error: 'VALIDATION_ERROR',
+        message: 'objectiveId and activityType are required'
+      });
+    }
+
+    if (activityType !== 'InteractiveQuiz' && activityType !== 'GuidedProblem') {
+      return res.status(400).json({
+        error: 'VALIDATION_ERROR',
+        message: 'activityType must be either InteractiveQuiz or GuidedProblem'
+      });
+    }
+
+    if (
+      Object.keys(req.body || {}).some(
+        (key) =>
+          ![
+            'objectiveId',
+            'activityType',
+            'title',
+            'instructions',
+            'expectedRevisionTag',
+            'sourceChunkId',
+            'language',
+            'difficulty',
+            'hintDepth',
+            'sourceSectionId'
+          ].includes(key)
+      )
+    )
+      return res.status(400).json({ error: 'INVALID_SOURCE_CLAIM' });
+
+    const candidate = await generateActivityCandidate(userId, courseId, {
+      objectiveId,
+      activityType,
+      title,
+      instructions,
+      expectedRevisionTag,
+      sourceChunkId,
+      language,
+      difficulty,
+      hintDepth,
+      sourceSectionId
+    });
+
+    res.status(200).json(candidate);
+  } catch (error) {
+    if (error instanceof GenerationSettingsError)
+      return res.status(400).json({ error: error.code, message: error.message });
+    if (error instanceof PublicationForbiddenError) {
+      return res.status(403).json({ error: 'FORBIDDEN', message: error.message });
+    }
+    if (error instanceof DraftNotFoundError) {
+      return res.status(404).json({ error: 'NOT_FOUND', message: error.message });
+    }
+    if (error instanceof ObjectiveNotFoundError) {
+      return res.status(404).json({ error: 'OBJECTIVE_NOT_FOUND', message: error.message });
+    }
+    if (error instanceof SourceIntegrityError) return res.status(503).json({ error: error.code });
+    if ((error as { status?: number }).status === 409)
+      return res.status(409).json({ error: 'STALE_REVISION' });
+    console.error('Error generating activity candidate:', error);
+    res.status(500).json({ error: 'Failed to generate activity candidate' });
+  }
+});
+
+router.get(
+  '/:courseId/revisions/:revisionId/sources/:documentId',
+  async (req: DomainRequest, res: Response) => {
+    try {
+      const courseId = String(req.params.courseId),
+        revisionId = String(req.params.revisionId);
+      const resolution = await resolveCourseSource(req.user!.userId, courseId, revisionId);
+      if (resolution.access.decision !== 'allowed')
+        return res.status(403).json({ error: 'FORBIDDEN' });
+      const revision = await CourseRevision.findOne({ courseId, revisionTag: revisionId }).lean();
+      if (!revision) return res.status(404).json({ error: 'NOT_FOUND' });
+      const artifact = await verifyRevisionArtifact(revision),
+        document = artifact.metadata.documents.find(
+          (d) => d.documentId === String(req.params.documentId)
+        );
+      if (!document) return res.status(404).json({ error: 'NOT_FOUND' });
+      const file = await verifyBlob(document);
+      if (!(await canReadCourse(req.user!.userId, courseId)))
+        return res.status(403).json({ error: 'FORBIDDEN' });
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'");
+      return res.download(file, document.filename);
+    } catch {
+      return res.status(503).json({ error: 'SOURCE_INTEGRITY_UNAVAILABLE' });
+    }
+  }
+);
+
 // INGEST-07: current ingestion progress + status for a course
 router.get('/:courseId/ingest-status', async (req: DomainRequest, res: Response) => {
   try {
     const { courseId } = req.params;
     const userId = req.user!.userId;
 
-    const course = await Course.findOne({ _id: courseId, userId });
+    const authorized = await canReadCourse(userId, courseId);
+    if (!authorized) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+
+    const course = await Course.findById(courseId);
     if (!course) {
       return res.status(404).json({ error: 'Course not found' });
     }
@@ -461,7 +933,12 @@ router.delete('/:courseId', async (req: DomainRequest, res: Response) => {
     const { courseId } = req.params;
     const userId = req.user!.userId;
 
-    const course = await Course.findOneAndDelete({ _id: courseId, userId });
+    const authorized = await canManageCourse(userId, courseId);
+    if (!authorized) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+
+    const course = await Course.findByIdAndDelete(courseId);
 
     if (!course) {
       return res.status(404).json({ error: 'Course not found' });
@@ -481,6 +958,37 @@ router.delete('/:courseId', async (req: DomainRequest, res: Response) => {
   }
 });
 
+for (const [action, execute] of Object.entries({
+  cancel: cancelIngestionOperation,
+  retry: retryIngestionOperation,
+  reconcile: reconcileIngestionOperation
+})) {
+  router.post(`/:courseId/ingestion/${action}`, async (req: DomainRequest, res: Response) => {
+    try {
+      if (!req.body || Object.keys(req.body).some((key) => key !== 'expectedJobId'))
+        return res.status(400).json({ error: 'INVALID_INGESTION_COMMAND' });
+      const result = await execute(
+        req.user!.userId,
+        String(req.params.courseId),
+        req.body.expectedJobId
+      );
+      if (!(await canManageCourse(req.user!.userId, String(req.params.courseId))))
+        return res.status(403).json({ error: 'FORBIDDEN' });
+      return res.status(action === 'retry' ? 202 : 200).json(result);
+    } catch (error) {
+      const status = (error as { status?: number }).status;
+      return res.status(status === 403 ? 403 : status === 409 ? 409 : 503).json({
+        error:
+          status === 403
+            ? 'FORBIDDEN'
+            : status === 409
+              ? 'INGESTION_CONFLICT'
+              : 'INGESTION_CONTROL_UNAVAILABLE'
+      });
+    }
+  });
+}
+
 // Add files to an existing course (AI re-processing)
 router.post(
   '/:courseId/files',
@@ -498,44 +1006,68 @@ router.post(
       }
 
       // Find the course
-      const course = await Course.findOne({ _id: courseId, userId });
+      const authorized = await canManageCourse(userId, courseId);
+      if (!authorized) {
+        return res.status(404).json({ error: 'Course not found' });
+      }
+
+      const course = await Course.findById(courseId);
       if (!course) {
         return res.status(404).json({ error: 'Course not found' });
       }
 
-      // Add new files to the course
-      const newFiles = courseUploads(req).map((file: CourseUpload) => ({
-        filename: file.filename,
-        originalName: file.originalname,
-        size: file.size,
-        uploadedAt: new Date()
-      }));
-
-      course.files.push(...newFiles);
-      course.status = 'processing';
-      await course.save();
+      if (course.status === 'processing') {
+        return res.status(409).json({
+          error:
+            'Course is currently processing. Cancel or wait for completion before replacing files.',
+          code: 'INGESTION_CONFLICT'
+        });
+      }
 
       // INGEST-05: stage the newly added files and enqueue async re-processing.
       const staged = stageCourseFiles(courseUploads(req), course._id.toString());
+      const revisionTag = `rev_${crypto.randomUUID().replace(/-/g, '')}`;
+      const newFiles = staged.map((file) => ({
+        filename: file.filename,
+        originalName: file.originalName,
+        size: file.size,
+        fileHash: file.fileHash,
+        uploadedAt: new Date()
+      }));
+
+      const originalFiles = [...(course.files || [])];
+      course.files.push(...newFiles);
+      const allFileHashes = course.files
+        .map((f: { fileHash?: string }) => f.fileHash)
+        .filter(Boolean);
+      const contentHash = crypto
+        .createHash('sha256')
+        .update(allFileHashes.sort().join(':') || course._id.toString())
+        .digest('hex');
+
+      await course.save();
+      await CourseRevision.create({
+        courseId: course._id,
+        revisionTag,
+        contentHash,
+        status: 'draft',
+        isInstructorReviewed: false,
+        sourceManifest: await captureImmutableSources(course._id.toString(), course.files),
+        vectorIndexRef: `faiss/${course._id.toString()}/${revisionTag}.faiss`
+      });
 
       try {
-        const { jobId, correlationId } = await publishCourseIngestionJob({
-          userId,
-          courseId: course._id.toString(),
-          fileRef: courseFileRef(course._id.toString()),
-          files: staged,
-          requestId: req.get('X-Request-ID')
-        });
-
-        // INGEST-07: point this course at the new job and reset the previous
-        // ingestion's progress/failure state.
-        course.jobId = jobId;
-        course.correlationId = correlationId;
-        course.ingestStage = null;
-        course.ingestProgress = 0;
-        course.ingestDetail = '';
-        course.ingestError = '';
-        await course.save();
+        const { jobId } = await enqueueCourseIngestionOperation(
+          {
+            userId,
+            courseId: course._id.toString(),
+            revisionId: revisionTag,
+            fileRef: courseFileRef(course._id.toString()),
+            files: staged,
+            requestId: req.get('X-Request-ID')
+          },
+          course.jobId
+        );
 
         return res.status(202).json({
           jobId,
@@ -544,9 +1076,12 @@ router.post(
         });
       } catch (publishErr) {
         console.error('Ingestion job enqueue failed:', errorDetails(publishErr).message);
-        course.status = 'failed';
-        await course.save();
-        cleanupCourseFiles(course._id.toString());
+        if (publishErr instanceof IngestionConflictError) {
+          await Course.updateOne({ _id: course._id }, { $set: { files: originalFiles } });
+          await CourseRevision.deleteOne({ courseId: course._id, revisionTag });
+          return res.status(409).json({ error: publishErr.code });
+        }
+        // Failed and uncertain replacement bytes are retained for reconciliation.
 
         return res.status(503).json({ error: 'AI job bus unavailable, retry later' });
       }
@@ -561,10 +1096,39 @@ router.post(
 router.post('/manual', async (req: DomainRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
-    const { title, description, subject_id, topics } = req.body;
+    const { title, description, subject_id, topics, scope, institutionId, institution_id } =
+      req.body;
 
     if (!title || !subject_id) {
       return res.status(400).json({ error: 'title and subject_id are required' });
+    }
+
+    const targetInstitutionId = institutionId || institution_id;
+    let courseScope = 'personal';
+
+    if (scope === 'institutional' || targetInstitutionId) {
+      if (!targetInstitutionId) {
+        return res
+          .status(400)
+          .json({ error: 'institutionId is required for institutional courses' });
+      }
+      const membership = await InstitutionMembership.findOne({
+        institutionId: targetInstitutionId,
+        userId,
+        role: { $in: ['instructor', 'university_admin'] },
+        status: 'active'
+      });
+      const activeInstitution = await Institution.exists({
+        _id: targetInstitutionId,
+        status: 'active'
+      });
+      if (!membership || !activeInstitution) {
+        return res.status(403).json({
+          error:
+            'Forbidden: only active instructors and administrators can create institutional courses'
+        });
+      }
+      courseScope = 'institutional';
     }
 
     // Verify subject exists and belongs to user
@@ -579,6 +1143,10 @@ router.post('/manual', async (req: DomainRequest, res: Response) => {
       description: description || '',
       subjectId: subject_id,
       userId,
+      ownerUserId: userId,
+      scope: courseScope,
+      institutionId: courseScope === 'institutional' ? targetInstitutionId : undefined,
+      assignedInstructorIds: courseScope === 'institutional' ? [userId] : [],
       status: 'completed',
       topics: (topics || []).map((t: ICourseTopic) => ({
         title: t.title,
@@ -621,6 +1189,9 @@ router.post('/manual', async (req: DomainRequest, res: Response) => {
         id: course._id.toString(),
         title: course.title,
         description: course.description,
+        scope: course.scope || 'personal',
+        institutionId: course.institutionId ? course.institutionId.toString() : undefined,
+        assignedInstructorIds: course.assignedInstructorIds || [],
         subjectId: course.subjectId,
         status: course.status,
         topicsCount: course.topics?.length || 0,
@@ -635,6 +1206,121 @@ router.post('/manual', async (req: DomainRequest, res: Response) => {
     res.status(500).json({ error: 'Failed to create manual course' });
   }
 });
+
+// Assign instructor to course
+router.post('/:courseId/instructors', async (req: DomainRequest, res: Response) => {
+  try {
+    const actorUserId = req.user!.userId;
+    const courseId = param(req, 'courseId');
+    const { instructorUserId } = req.body || {};
+
+    const result = await assignInstructorToCourse(actorUserId, courseId, instructorUserId);
+    res.status(200).json(result);
+  } catch (error) {
+    handleEnrollmentError(res, error);
+  }
+});
+
+// Revoke instructor assignment
+router.delete(
+  '/:courseId/instructors/:instructorUserId',
+  async (req: DomainRequest, res: Response) => {
+    try {
+      const actorUserId = req.user!.userId;
+      const courseId = param(req, 'courseId');
+      const instructorUserId = param(req, 'instructorUserId');
+
+      const result = await revokeInstructorAssignment(actorUserId, courseId, instructorUserId);
+      res.status(200).json(result);
+    } catch (error) {
+      handleEnrollmentError(res, error);
+    }
+  }
+);
+
+// Issue course invitation
+router.post('/:courseId/invitations', async (req: DomainRequest, res: Response) => {
+  try {
+    const actorUserId = req.user!.userId;
+    const courseId = param(req, 'courseId');
+    const { role, expiresInHours } = req.body || {};
+
+    const result = await issueCourseInvitation(actorUserId, courseId, { role, expiresInHours });
+    res.status(201).json(result);
+  } catch (error) {
+    handleEnrollmentError(res, error);
+  }
+});
+
+// Accept course invitation (claim single-use token)
+router.post('/invitations/accept', async (req: DomainRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const { token } = req.body || {};
+
+    const result = await acceptCourseInvitation(userId, token);
+    res.status(200).json(result);
+  } catch (error) {
+    handleEnrollmentError(res, error);
+  }
+});
+
+// Direct administrative or instructor enrollment
+router.post('/:courseId/enrollments', async (req: DomainRequest, res: Response) => {
+  try {
+    const actorUserId = req.user!.userId;
+    const courseId = param(req, 'courseId');
+    const { studentUserId } = req.body || {};
+
+    const result = await enrollStudentDirectly(actorUserId, courseId, studentUserId);
+    res.status(201).json(result);
+  } catch (error) {
+    handleEnrollmentError(res, error);
+  }
+});
+
+// List enrolled students in a course
+router.get('/:courseId/enrollments', async (req: DomainRequest, res: Response) => {
+  try {
+    const actorUserId = req.user!.userId;
+    const courseId = param(req, 'courseId');
+
+    const enrollments = await listCourseEnrollments(actorUserId, courseId);
+    res.status(200).json({ enrollments });
+  } catch (error) {
+    handleEnrollmentError(res, error);
+  }
+});
+
+// Withdraw from course (self)
+router.delete('/:courseId/enrollments', async (req: DomainRequest, res: Response) => {
+  try {
+    const actorUserId = req.user!.userId;
+    const courseId = param(req, 'courseId');
+
+    const result = await withdrawOrRevokeEnrollment(actorUserId, courseId, undefined);
+    res.status(200).json(result);
+  } catch (error) {
+    handleEnrollmentError(res, error);
+  }
+});
+
+// Revoke a student enrollment (instructor/admin)
+router.delete(
+  '/:courseId/enrollments/:studentUserId',
+  async (req: DomainRequest, res: Response) => {
+    try {
+      const actorUserId = req.user!.userId;
+      const courseId = param(req, 'courseId');
+      const studentUserId = param(req, 'studentUserId');
+
+      const result = await withdrawOrRevokeEnrollment(actorUserId, courseId, studentUserId);
+      res.status(200).json(result);
+    } catch (error) {
+      handleEnrollmentError(res, error);
+    }
+  }
+);
 
 export default router;
 module.exports = router;

@@ -1,5 +1,6 @@
 import path from "node:path";
 export default {
+  distDir: process.env.EDNOVA_NEXT_DIST_DIR || ".next",
   outputFileTracingRoot: path.resolve(process.cwd(), "../.."),
   output: "standalone",
   devIndicators: false,

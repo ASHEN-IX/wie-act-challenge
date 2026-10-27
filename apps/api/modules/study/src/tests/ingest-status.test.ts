@@ -30,6 +30,14 @@ jest.mock('../services/ingestionJob', () => ({
   publishCourseIngestionJob: jest.fn()
 }));
 
+// Legacy projection fixtures have no durable operation record. New outbox
+// replay/cancel behavior is exercised with real Mongo in final-ingestion-recovery.
+jest.mock('../models/CourseIngestionOperation', () => ({
+  CourseIngestionOperation: {
+    findOne: jest.fn(() => ({ lean: async () => null })),
+    updateOne: jest.fn(async () => ({ matchedCount: 1, modifiedCount: 1 }))
+  }
+}));
 jest.mock('../models/index', () => {
   const mockCourse = Object.assign(
     jest.fn().mockImplementation(function (this: CourseFixture, data: object) {
@@ -42,6 +50,12 @@ jest.mock('../models/index', () => {
       instances: new Array<CourseFixture>(),
       find: jest.fn(),
       findOne: jest.fn(),
+      updateOne: jest.fn().mockResolvedValue({ matchedCount: 1, modifiedCount: 1 }),
+      findById: jest.fn().mockImplementation((id: string) => {
+        const value = mockCourse.findOne({ _id: id, userId: 'user-123' });
+        const result = Promise.resolve(value);
+        return Object.assign(result, { select: () => ({ lean: () => result }) });
+      }),
       findOneAndDelete: jest.fn()
     }
   );
@@ -108,7 +122,7 @@ const BASE = {
 } as const;
 
 const WORKER_COURSE = {
-  course_id: 'course-1',
+  course_id: '64a000000000000000000001',
   course_title: 'Graph Theory',
   source_files: ['notes.pdf'],
   topics: [
@@ -141,7 +155,7 @@ beforeEach(() => {
 describe('handleIngestProgress (progress routing key)', () => {
   test('records stage/percentage on the correlated course', async () => {
     const course = {
-      _id: 'course-1',
+      _id: '64a000000000000000000001',
       status: 'processing',
       ingestStage: null,
       ingestProgress: 0,
@@ -162,7 +176,11 @@ describe('handleIngestProgress (progress routing key)', () => {
     expect(course.ingestStage).toBe('embedding');
     expect(course.ingestProgress).toBe(0.6);
     expect(course.ingestDetail).toBe('chunking and embedding');
-    expect(course.save).toHaveBeenCalled();
+    expect(Course.updateOne).toHaveBeenCalledWith(
+      expect.objectContaining({ _id: course._id, correlationId: BASE.correlationId }),
+      expect.objectContaining({ $set: expect.any(Object) })
+    );
+    expect(course.save).not.toHaveBeenCalled();
   });
 
   test('ignores progress for non-ingest job types', async () => {
@@ -186,7 +204,7 @@ describe('handleIngestProgress (progress routing key)', () => {
 describe('handleIngestResult (ingest result routing key)', () => {
   test('completes the course and persists the whitelisted course structure', async () => {
     const course: CourseFixture = {
-      _id: 'course-1',
+      _id: '64a000000000000000000001',
       status: 'processing',
       ingestStage: 'embedding',
       ingestProgress: 0.6,
@@ -202,7 +220,7 @@ describe('handleIngestResult (ingest result routing key)', () => {
     await handleIngestResult({
       ...BASE,
       status: 'completed',
-      payload: { courseId: 'course-1', status: 'completed', course: WORKER_COURSE }
+      payload: { courseId: '64a000000000000000000001', status: 'completed', course: WORKER_COURSE }
     });
 
     expect(course.status).toBe('completed');
@@ -220,26 +238,34 @@ describe('handleIngestResult (ingest result routing key)', () => {
     expect(sub.learning_objectives).toEqual([{ level: 'knowledge', text: 'define a graph' }]);
     expect(Reflect.get(sub, 'tokenized_chunks')).toBeUndefined();
     expect(Reflect.get(sub, 'chunk_embeddings')).toBeUndefined();
-    expect(course.save).toHaveBeenCalled();
+    expect(Course.updateOne).toHaveBeenCalledWith(
+      expect.objectContaining({ _id: course._id, correlationId: BASE.correlationId }),
+      expect.objectContaining({ $set: expect.any(Object) })
+    );
+    expect(course.save).not.toHaveBeenCalled();
   });
 
   test('completing without a course payload keeps topics untouched', async () => {
     const course = {
-      _id: 'course-1',
+      _id: '64a000000000000000000001',
       status: 'processing',
       topics: [{ title: 'old' }],
       save: jest.fn().mockResolvedValue(true)
     };
     Course.findOne.mockResolvedValue(course);
 
-    await handleIngestResult({ ...BASE, status: 'completed', payload: { courseId: 'course-1' } });
+    await handleIngestResult({
+      ...BASE,
+      status: 'completed',
+      payload: { courseId: '64a000000000000000000001' }
+    });
     expect(course.status).toBe('completed');
     expect(course.topics).toEqual([{ title: 'old' }]);
   });
 
   test('fails the course with a sanitized reason', async () => {
     const course: CourseFixture = {
-      _id: 'course-1',
+      _id: '64a000000000000000000001',
       status: 'processing',
       ingestStage: null,
       ingestProgress: 0,
@@ -256,7 +282,11 @@ describe('handleIngestResult (ingest result routing key)', () => {
 
     expect(course.status).toBe('failed');
     expect(course.ingestError).toMatch(/encrypted/);
-    expect(course.save).toHaveBeenCalled();
+    expect(Course.updateOne).toHaveBeenCalledWith(
+      expect.objectContaining({ _id: course._id, correlationId: BASE.correlationId }),
+      expect.objectContaining({ $set: expect.any(Object) })
+    );
+    expect(course.save).not.toHaveBeenCalled();
   });
 
   test('ignores results for non-ingest job types', async () => {
@@ -292,7 +322,7 @@ describe('startIngestStatusTracker (INGEST-07)', () => {
 describe('buildIngestStatus (status shape)', () => {
   test('queued → stage "queued", retry null', () => {
     const status = buildIngestStatus({
-      _id: 'c1',
+      _id: '64a000000000000000000001',
       status: 'processing',
       jobId: 'job-1',
       ingestStage: null,
@@ -302,7 +332,7 @@ describe('buildIngestStatus (status shape)', () => {
       updatedAt: new Date('2026-08-19T00:00:00Z')
     });
     expect(status).toMatchObject({
-      courseId: 'c1',
+      courseId: '64a000000000000000000001',
       status: 'processing',
       jobId: 'job-1',
       stage: 'queued',
@@ -314,7 +344,7 @@ describe('buildIngestStatus (status shape)', () => {
 
   test('completed → progress 1, no error, no retry', () => {
     const status = buildIngestStatus({
-      _id: 'c1',
+      _id: '64a000000000000000000001',
       status: 'completed',
       ingestStage: 'indexing',
       ingestProgress: 1,
@@ -330,7 +360,7 @@ describe('buildIngestStatus (status shape)', () => {
 
   test('failed → sanitized error + retry action', () => {
     const status = buildIngestStatus({
-      _id: 'c1',
+      _id: '64a000000000000000000001',
       status: 'failed',
       jobId: 'job-1',
       ingestStage: 'parsing',
@@ -343,7 +373,7 @@ describe('buildIngestStatus (status shape)', () => {
     expect(status.error).toMatch(/encrypted/);
     expect(status.retry).toMatchObject({
       action: 're-upload',
-      endpoint: '/api/v1/study/courses/c1/files',
+      endpoint: '/api/v1/study/courses/64a000000000000000000001/files',
       method: 'POST'
     });
   });
@@ -352,7 +382,7 @@ describe('buildIngestStatus (status shape)', () => {
 describe('GET /api/v1/study/courses/:courseId/ingest-status', () => {
   test('returns progress + status for the authenticated user', async () => {
     Course.findOne.mockResolvedValue({
-      _id: 'c1',
+      _id: '64a000000000000000000001',
       userId: 'user-123',
       status: 'processing',
       jobId: 'job-1',
@@ -363,11 +393,13 @@ describe('GET /api/v1/study/courses/:courseId/ingest-status', () => {
       updatedAt: new Date('2026-08-19T03:00:00Z')
     });
 
-    const res = await request(app).get('/api/v1/study/courses/c1/ingest-status').set(authHeader());
+    const res = await request(app)
+      .get('/api/v1/study/courses/64a000000000000000000001/ingest-status')
+      .set(authHeader());
 
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({
-      courseId: 'c1',
+      courseId: '64a000000000000000000001',
       status: 'processing',
       jobId: 'job-1',
       stage: 'enriching',
@@ -375,20 +407,29 @@ describe('GET /api/v1/study/courses/:courseId/ingest-status', () => {
       detail: 'enriching 4 subtopic(s)',
       retry: null
     });
-    expect(Course.findOne).toHaveBeenCalledWith({ _id: 'c1', userId: 'user-123' });
+    expect(Course.findOne).toHaveBeenCalledWith({
+      _id: '64a000000000000000000001',
+      userId: 'user-123'
+    });
   });
 
   test('scopes the lookup to the authenticated user', async () => {
     Course.findOne.mockResolvedValue(null);
-    const res = await request(app).get('/api/v1/study/courses/c1/ingest-status').set(authHeader());
+    const res = await request(app)
+      .get('/api/v1/study/courses/64a000000000000000000001/ingest-status')
+      .set(authHeader());
     expect(res.status).toBe(404);
-    expect(Course.findOne).toHaveBeenCalledWith({ _id: 'c1', userId: 'user-123' });
+    expect(Course.findOne).toHaveBeenCalledWith({
+      _id: '64a000000000000000000001',
+      userId: 'user-123'
+    });
   });
 
   test('surfaces failure reason + retry for a failed course', async () => {
     Course.findOne.mockResolvedValue({
-      _id: 'c1',
+      _id: '64a000000000000000000001',
       status: 'failed',
+      userId: 'user-123',
       jobId: 'job-1',
       ingestStage: 'parsing',
       ingestProgress: 0.1,
@@ -398,7 +439,9 @@ describe('GET /api/v1/study/courses/:courseId/ingest-status', () => {
       updatedAt: new Date('2026-08-19T00:00:00Z')
     });
 
-    const res = await request(app).get('/api/v1/study/courses/c1/ingest-status').set(authHeader());
+    const res = await request(app)
+      .get('/api/v1/study/courses/64a000000000000000000001/ingest-status')
+      .set(authHeader());
 
     expect(res.status).toBe(200);
     expect(res.body.error).toMatch(/encrypted/);
@@ -409,7 +452,7 @@ describe('GET /api/v1/study/courses/:courseId/ingest-status', () => {
 describe('course gating (INGEST-07)', () => {
   test('session setup rejects a course that is still processing', async () => {
     Course.findOne.mockResolvedValue({
-      _id: 'c1',
+      _id: '64a000000000000000000001',
       userId: 'user-123',
       status: 'processing'
     });
@@ -417,7 +460,7 @@ describe('course gating (INGEST-07)', () => {
     const res = await request(app)
       .post('/api/v1/study/sessions/setup')
       .set(authHeader())
-      .send({ courseId: 'c1' });
+      .send({ courseId: '64a000000000000000000001' });
 
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/still being processed/);
@@ -425,7 +468,7 @@ describe('course gating (INGEST-07)', () => {
 
   test('session setup allows a completed course through the gate', async () => {
     Course.findOne.mockResolvedValue({
-      _id: 'c1',
+      _id: '64a000000000000000000001',
       userId: 'user-123',
       status: 'completed'
     });
@@ -437,7 +480,7 @@ describe('course gating (INGEST-07)', () => {
     const res = await request(app)
       .post('/api/v1/study/sessions/setup')
       .set(authHeader())
-      .send({ courseId: 'c1' });
+      .send({ courseId: '64a000000000000000000001' });
 
     expect([200, 201, 202, 204]).toContain(res.status);
   });

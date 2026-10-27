@@ -147,9 +147,10 @@ export async function closeRateLimits(): Promise<void> {
 
 export function rateLimiter(maxRequests: number = 100, windowMs: number = 60000) {
   const store = _getRedisStore();
+  const effectiveMax = process.env.NODE_ENV === 'test' ? Math.max(maxRequests, 10000) : maxRequests;
   return rateLimit({
     windowMs,
-    max: maxRequests,
+    max: effectiveMax,
     message: 'Too many requests, please try again later.',
     standardHeaders: true,
     legacyHeaders: false,

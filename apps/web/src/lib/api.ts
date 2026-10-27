@@ -47,12 +47,14 @@ export async function api<T>(
     response.status === 204 ? {} : await response.json().catch(() => ({}));
   if (!response.ok) {
     const message =
-      data &&
-      typeof data === "object" &&
-      "error" in data &&
-      typeof data.error === "string"
-        ? data.error.slice(0, 240)
-        : "The request could not be completed.";
+      response.status === 429
+        ? "Too many requests. Wait a minute, then retry the same submission."
+        : data &&
+            typeof data === "object" &&
+            "error" in data &&
+            typeof data.error === "string"
+          ? data.error.slice(0, 240)
+          : "The request could not be completed.";
     throw new ApiError(response.status, message);
   }
   if (decode) {

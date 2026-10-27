@@ -1,26 +1,14 @@
-"""
-PDF text extraction (INGEST-04).
+"""Bounded PDF extraction in a fresh, resource-limited Python process.
 
-Uploaded PDFs are untrusted input: a crafted document can make PyMuPDF spin,
-allocate unbounded memory, or hit parser edge cases. `extract_text_from_pdf`
-therefore only ever runs inside an OS-level sandbox spawned by
-`extract_text_from_pdf_sandboxed`:
-
-  * a fresh forked process (crashes/hangs stay contained),
-  * RLIMIT_AS + RLIMIT_CPU applied *before* any parsing code runs,
-  * a strict wall-clock timeout enforced by the supervisor (kills on breach).
-
-Encrypted/password-protected documents are rejected with a clear error
-(INGEST-04 acceptance criterion) instead of being passed to a parser we do not
-trust with attacker-chosen passwords.
+Untrusted PDF parsing and page extraction run only in the child. Starting a
+fresh interpreter avoids inheriting the large address space of an AI worker.
 """
 
-import multiprocessing as mp
+import json
+import math
 import os
-
-# ---------------------------------------------------------------------------
-# Error contract
-# ---------------------------------------------------------------------------
+import subprocess
+import sys
 
 
 class PdfValidationError(Exception):
@@ -28,137 +16,129 @@ class PdfValidationError(Exception):
 
 
 class EncryptedPdfError(PdfValidationError):
-    """Raised when a PDF is encrypted/password-protected and cannot be parsed."""
+    """A password-protected PDF is not supported."""
 
 
 class PdfParseTimeoutError(PdfValidationError):
-    """Raised when parsing exceeds the strict wall-clock sandbox timeout."""
+    """Parsing exceeded the wall-clock sandbox timeout."""
 
 
 class PdfParseLimitError(PdfValidationError):
-    """Raised when parsing exceeds the sandbox CPU/memory limits."""
+    """Parsing exceeded a sandbox CPU, memory or output limit."""
 
 
-# ---------------------------------------------------------------------------
-# Extraction — runs only inside the sandboxed child
-# ---------------------------------------------------------------------------
-
-
-def extract_text_from_pdf(pdf_path: str) -> str:
-    """
-    Extract text from a digital PDF using PyMuPDF.
-
-    PyMuPDF is imported lazily so importing this module never requires it (and
-    the repository stays testable / fast-to-start without fitz installed).
-    Called by the sandbox child only.
-    """
-    import fitz  # noqa: PLC0415 — lazy: startup-friendly, tests stay PyMuPDF-free
-
-    doc = fitz.open(pdf_path)
-    try:
-        if doc.needs_pass:
-            raise EncryptedPdfError(
-                f"PDF is encrypted/password-protected: {os.path.basename(pdf_path)}"
-            )
-        text = ""
-        for page in doc:
-            text += page.get_text()
-        return text
-    finally:
-        doc.close()
+MAX_PAGES = 2000
+MAX_TEXT_BYTES = 8 * 1024 * 1024
 
 
 def _apply_resource_limits(max_memory_mb: int, max_cpu_s: int) -> None:
-    """Constrain the child before any parsing code runs (POSIX only)."""
+    """Constrain the fresh child before importing or invoking the PDF parser."""
     try:
-        import resource  # noqa: PLC0415
-    except ImportError:  # non-POSIX: the wall-clock timeout still applies
+        import resource
+    except ImportError:
         return
     mem_bytes = max_memory_mb * 1024 * 1024
     resource.setrlimit(resource.RLIMIT_AS, (mem_bytes, mem_bytes))
     resource.setrlimit(resource.RLIMIT_CPU, (max_cpu_s, max_cpu_s))
 
 
-def _run_sandboxed_worker(pdf_path: str, conn, max_memory_mb: int, max_cpu_s: int) -> None:
-    """Child-process entrypoint: bound the process, parse, then report back."""
+def _extract_pages(pdf_path: str):
+    import fitz
+
+    document = fitz.open(pdf_path)
     try:
-        _apply_resource_limits(max_memory_mb, max_cpu_s)
-        text = extract_text_from_pdf(pdf_path)
-        conn.send(("ok", text))
-    except BaseException as exc:  # noqa: BLE001 — report every outcome to parent
-        try:
-            conn.send(("error", type(exc).__name__, str(exc)))
-        except Exception:  # noqa: BLE001 — parent may already have timed out
-            pass
+        if document.needs_pass:
+            raise EncryptedPdfError("PDF is encrypted/password-protected")
+        if len(document) > MAX_PAGES:
+            raise PdfParseLimitError("PDF exceeds page limit")
+        pages = []
+        total = 0
+        for number, page in enumerate(document, 1):
+            text = page.get_text()
+            total += len(text.encode("utf8"))
+            if total > MAX_TEXT_BYTES:
+                raise PdfParseLimitError("PDF exceeds extracted text limit")
+            pages.append([number, text])
+        return pages
     finally:
-        try:
-            conn.close()
-        except Exception:  # noqa: BLE001
-            pass
+        document.close()
 
 
-# ---------------------------------------------------------------------------
-# Sandbox supervisor — used by the ingestion agent
-# ---------------------------------------------------------------------------
+def extract_pages_from_pdf_sandboxed(
+    pdf_path: str, timeout_s: int = 45, max_memory_mb: int = 512
+):
+    """Return (page number, text) pairs from a bounded, fresh interpreter."""
+    try:
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-I",
+                os.path.abspath(__file__),
+                "--sandbox",
+                pdf_path,
+                str(max_memory_mb),
+                str(max(1, math.ceil(timeout_s))),
+            ],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=timeout_s,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        raise PdfParseTimeoutError("PDF parsing exceeded sandbox timeout") from None
+    except OSError:
+        raise PdfValidationError("PDF sandbox could not start") from None
+    if result.returncode != 0:
+        raise PdfParseLimitError(
+            "PDF parsing aborted inside sandbox (CPU/memory limits)"
+        )
+    try:
+        response = json.loads(result.stdout)
+        if response.get("status") == "ok":
+            pages = response["pages"]
+            if (
+                not isinstance(pages, list)
+                or len(pages) > MAX_PAGES
+                or any(
+                    not isinstance(p, list)
+                    or len(p) != 2
+                    or type(p[0]) is not int
+                    or p[0] != i
+                    or not isinstance(p[1], str)
+                    for i, p in enumerate(pages, 1)
+                )
+            ):
+                raise ValueError("Malformed sandbox result")
+            return [(number, text) for number, text in pages]
+        if response.get("kind") == "EncryptedPdfError":
+            raise EncryptedPdfError("PDF is encrypted/password-protected")
+        if response.get("kind") == "PdfParseLimitError":
+            raise PdfParseLimitError("PDF exceeds sandbox limits")
+    except (ValueError, TypeError, KeyError, AttributeError):
+        raise PdfValidationError("Invalid PDF sandbox response") from None
+    raise PdfValidationError("PDF parsing failed")
 
 
 def extract_text_from_pdf_sandboxed(
-    pdf_path: str,
-    timeout_s: int = 45,
-    max_memory_mb: int = 512,
+    pdf_path: str, timeout_s: int = 45, max_memory_mb: int = 512
 ) -> str:
-    """
-    Extract PDF text inside a bounded sandbox (INGEST-04).
-
-    Raises:
-        EncryptedPdfError: the document is encrypted/password-protected.
-        PdfParseTimeoutError: parsing exceeded `timeout_s`.
-        PdfParseLimitError: the child was killed by CPU/memory limits.
-        PdfValidationError: any other (reported) parse failure.
-    """
-    ctx = mp.get_context("fork")  # POSIX sandboxing; Windows is not a target
-    parent_conn, child_conn = ctx.Pipe()
-    proc = ctx.Process(
-        target=_run_sandboxed_worker,
-        args=(pdf_path, child_conn, max_memory_mb, timeout_s),
+    return "".join(
+        text
+        for _, text in extract_pages_from_pdf_sandboxed(
+            pdf_path, timeout_s, max_memory_mb
+        )
     )
-    proc.start()
-    child_conn.close()  # parent never uses the child end
 
-    proc.join(timeout_s)
-    if proc.is_alive():
-        proc.terminate()
-        proc.join(2)
-        if proc.is_alive():
-            proc.kill()
-        parent_conn.close()
-        raise PdfParseTimeoutError(
-            f"PDF parsing exceeded the {timeout_s}s sandbox timeout: "
-            f"{os.path.basename(pdf_path)}"
-        )
 
-    if not parent_conn.poll(0):
-        # Child ended without reporting (SIGXCPU / OOM / segfault).
-        parent_conn.close()
-        raise PdfParseLimitError(
-            f"PDF parsing exceeded sandbox CPU/memory limits: "
-            f"{os.path.basename(pdf_path)}"
-        )
-
+def _sandbox_main():
     try:
-        status = parent_conn.recv()
-    except (EOFError, OSError):
-        raise PdfParseLimitError(
-            f"PDF parsing aborted inside sandbox (CPU/memory limits): "
-            f"{os.path.basename(pdf_path)}"
-        ) from None
-    finally:
-        parent_conn.close()
+        _apply_resource_limits(int(sys.argv[3]), int(sys.argv[4]))
+        result = {"status": "ok", "pages": _extract_pages(sys.argv[2])}
+    except BaseException as exc:
+        result = {"status": "error", "kind": type(exc).__name__}
+    sys.stdout.write(json.dumps(result, ensure_ascii=True))
 
-    if status[0] == "ok":
-        return status[1]
 
-    _, kind, detail = status
-    if kind == "EncryptedPdfError":
-        raise EncryptedPdfError(detail)
-    raise PdfValidationError(f"PDF parsing failed: {detail}")
+if __name__ == "__main__" and len(sys.argv) == 5 and sys.argv[1] == "--sandbox":
+    _sandbox_main()

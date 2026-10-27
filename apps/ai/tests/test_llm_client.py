@@ -39,15 +39,26 @@ def _clean_state():
     reset_router()
 
 
+@pytest.fixture(autouse=True)
+def _simulated_budget_status(monkeypatch):
+    monkeypatch.setattr(llm_client, "_budget_still_active", lambda _: True)
+
+
 def _with_keys(monkeypatch, **keys):
     monkeypatch.delenv("LLM_MOCK", raising=False)
-    for key in ("GEMINI_API_KEY", "GROQ_API_KEY", "NVIDIA_API_KEY", "OPENROUTER_API_KEY"):
+    for key in (
+        "GEMINI_API_KEY",
+        "GROQ_API_KEY",
+        "NVIDIA_API_KEY",
+        "OPENROUTER_API_KEY",
+    ):
         monkeypatch.delenv(key, raising=False)
     for key, value in keys.items():
         monkeypatch.setenv(key, value)
 
 
 # ------------------------------------------------------------ config load #
+
 
 def test_config_has_every_agent_deployment():
     cfg = llm_client.load_config()
@@ -80,7 +91,7 @@ def test_unknown_agent_rejected():
 
 
 def test_config_path_env_override(tmp_path, monkeypatch):
-    alt = tmp_path / "litellm" 
+    alt = tmp_path / "litellm"
     alt.mkdir()
     (alt / "config.yaml").write_text(
         "model_list:\n- model_name: coach\n  litellm_params:\n    model: groq/llama-3.3-70b-versatile\n"
@@ -94,6 +105,7 @@ def test_config_path_env_override(tmp_path, monkeypatch):
 
 
 # ---------------------------------------------------------------- mocking #
+
 
 def test_no_keys_are_unavailable(monkeypatch):
     _with_keys(monkeypatch)
@@ -116,7 +128,9 @@ def test_dummy_gemini_key_is_unavailable_without_explicit_mock(monkeypatch):
         ask("coach", "sys", "user", mock_fn=lambda _: "synthetic")
     # A real fallback key is enough to attempt a real call (router will
     # fail over to groq if the primary provider key is missing).
-    _with_keys(monkeypatch, GEMINI_API_KEY="dummy_key_for_testing", GROQ_API_KEY="real-key")
+    _with_keys(
+        monkeypatch, GEMINI_API_KEY="dummy_key_for_testing", GROQ_API_KEY="real-key"
+    )
     assert not llm_client._should_mock("coach")
 
 
@@ -130,15 +144,36 @@ def test_missing_mock_fn_raises(monkeypatch):
 
 # -------------------------------------------------------------- real path #
 
+
 class _FakeCompletion:
     def completion(self, **kwargs):
         self.kwargs = dict(kwargs)
         return SimpleNamespace(
-            choices=[SimpleNamespace(message=SimpleNamespace(content="assistant-text"))]
+            model=llm_client.agent_config("coach").model,
+            choices=[
+                SimpleNamespace(message=SimpleNamespace(content="assistant-text"))
+            ],
         )
 
 
 def test_real_path_guards_system_and_passes_knobs(monkeypatch):
+    import json, time
+
+    monkeypatch.setattr(llm_client, "_reserve_durable_budget", lambda _: True)
+    monkeypatch.setenv(
+        "LLM_APPROVALS_JSON",
+        json.dumps(
+            {
+                "coach": {
+                    "approvalId": "local-simulated-" + str(time.time()),
+                    "model": llm_client.agent_config("coach").model,
+                    "task": "coach",
+                    "expiresAt": time.time() + 60,
+                    "maxRequests": 1,
+                }
+            }
+        ),
+    )
     _with_keys(monkeypatch, GEMINI_API_KEY="real-key")
     fake = _FakeCompletion()
     with patch.object(llm_client, "build_router", return_value=fake):
@@ -155,6 +190,23 @@ def test_real_path_guards_system_and_passes_knobs(monkeypatch):
 
 
 def test_real_path_per_call_override(monkeypatch):
+    import json, time
+
+    monkeypatch.setattr(llm_client, "_reserve_durable_budget", lambda _: True)
+    monkeypatch.setenv(
+        "LLM_APPROVALS_JSON",
+        json.dumps(
+            {
+                "coach": {
+                    "approvalId": "local-simulated-" + str(time.time()),
+                    "model": llm_client.agent_config("coach").model,
+                    "task": "coach",
+                    "expiresAt": time.time() + 60,
+                    "maxRequests": 1,
+                }
+            }
+        ),
+    )
     _with_keys(monkeypatch, GEMINI_API_KEY="real-key")
     fake = _FakeCompletion()
     with patch.object(llm_client, "build_router", return_value=fake):
@@ -164,6 +216,23 @@ def test_real_path_per_call_override(monkeypatch):
 
 
 def test_real_path_error_becomes_llm_request_error(monkeypatch):
+    import json, time
+
+    monkeypatch.setattr(llm_client, "_reserve_durable_budget", lambda _: True)
+    monkeypatch.setenv(
+        "LLM_APPROVALS_JSON",
+        json.dumps(
+            {
+                "coach": {
+                    "approvalId": "local-simulated-" + str(time.time()),
+                    "model": llm_client.agent_config("coach").model,
+                    "task": "coach",
+                    "expiresAt": time.time() + 60,
+                    "maxRequests": 1,
+                }
+            }
+        ),
+    )
     _with_keys(monkeypatch, GEMINI_API_KEY="real-key")
 
     class _Boom:
@@ -177,6 +246,7 @@ def test_real_path_error_becomes_llm_request_error(monkeypatch):
 
 
 # ----------------------------------------------------------- router wiring #
+
 
 def test_router_builds_from_yaml():
     router = build_router()
@@ -197,6 +267,7 @@ def test_reset_router_rebuilds():
 # ------------------------------------------------------------- end-to-end #
 # ask() must return a coach-style mock payload through the client when keys are
 # absent and explicit LLM_MOCK=1 is selected.
+
 
 def test_coach_decider_produces_mock_json_only_in_explicit_mock_mode(monkeypatch):
     import json as _json

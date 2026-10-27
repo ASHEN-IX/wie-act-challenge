@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { assertApiInstance } from '../../../src/framework/single-instance';
 import type { IncomingMessage, Server } from 'node:http';
 import { logger } from '@study-partner/shared';
 import moduleClient from '@study-partner/shared/moduleClient';
@@ -11,7 +12,7 @@ import {
 } from './websocket-handlers/voice-handler';
 import { joinParticipant, leaveParticipant } from './services/voiceService';
 import { normalizeSignalPayload } from './utils/rtc-signaling';
-import { verifySessionMembership } from './utils/session-access';
+import { verifySessionMembership, verifyVoiceConsent } from './utils/session-access';
 import { errorDetails } from '@study-partner/shared/errors';
 import type { IStudyRoom, IStudyRoomParticipant } from '../../study/src/models/StudyRoom';
 export { verifySessionMembership } from './utils/session-access';
@@ -33,7 +34,15 @@ type RegisteredSocket = ManagedSocket & { authRequest: IncomingMessage; userId: 
 interface RoomSnapshot {
   room?: Pick<
     IStudyRoom,
-    'roomId' | 'seq' | 'presenterUserId' | 'activeActivityId' | 'currentPhase'
+    | 'roomId'
+    | 'seq'
+    | 'presenterUserId'
+    | 'activeActivityId'
+    | 'currentPhase'
+    | 'activePin'
+    | 'courseId'
+    | 'revisionId'
+    | 'activityRound'
   >;
   participants?: IStudyRoomParticipant[];
 }
@@ -54,6 +63,7 @@ export async function broadcastToUser(
   userId: string,
   payload: Record<string, unknown>
 ): Promise<void> {
+  assertApiInstance();
   const userClients = clients.get(userId);
   if (!userClients) return;
   const msg = JSON.stringify(payload);
@@ -63,12 +73,20 @@ export async function broadcastToUser(
       continue;
     }
     if (
-      payload.type === 'session_start' &&
-      typeof payload.sessionId === 'string' &&
-      !(await verifySessionMembership(ws.authRequest.headers.cookie, userId, payload.sessionId))
+      (payload.type === 'session_start' &&
+        typeof payload.sessionId === 'string' &&
+        !(await verifySessionMembership(
+          ws.authRequest.headers.cookie,
+          userId,
+          payload.sessionId
+        ))) ||
+      (payload.type === 'PRIVATE_ROOM_HELP_READY' &&
+        typeof payload.roomId === 'string' &&
+        !(await verifySessionMembership(ws.authRequest.headers.cookie, userId, payload.roomId)))
     )
       continue;
     if (ws.readyState === 1) {
+      assertApiInstance();
       ws.send(msg);
     }
   }
@@ -118,6 +136,7 @@ export function broadcastToSession(
   const delivery = previous
     .catch(() => {})
     .then(async () => {
+      assertApiInstance();
       const sessionMap = sessionClients.get(sessionId);
       if (!sessionMap) return;
       const eligible: RegisteredSocket[] = [];
@@ -174,6 +193,12 @@ export function broadcastToSession(
           socket.userId !== payload.targetUserId
         )
           continue;
+        if (
+          typeof payload.type === 'string' &&
+          payload.type.startsWith('voice_') &&
+          !(await verifyVoiceConsent(socket.authRequest.headers.cookie, socket.userId, sessionId))
+        )
+          continue;
         if (socket.readyState === WebSocket.OPEN && socket.realtimeRegistered) socket.send(raw);
       }
     });
@@ -224,6 +249,12 @@ export async function authenticateWsRequest(
   }
 }
 
+function guardSocket(socket: WebSocket) {
+  socket.send = function (...args: unknown[]) {
+    assertApiInstance();
+    Reflect.apply(WebSocket.prototype.send, this, args);
+  };
+}
 export function attachRealtime(
   server: Server,
   options: { heartbeatMs?: number } = {}
@@ -234,10 +265,17 @@ export function attachRealtime(
   const pendingDisconnects = new Set<Promise<void>>();
 
   server.on('upgrade', (req, socket, head) => {
+    try {
+      assertApiInstance();
+    } catch {
+      socket.destroy();
+      return;
+    }
     const requestUrl = new URL(req.url || '/', `http://localhost:${PORT}`);
 
     if (requestUrl.pathname === '/ws/notifications') {
       wssNotifications.handleUpgrade(req, socket, head, (ws) => {
+        guardSocket(ws);
         wssNotifications.emit('connection', ws, req);
       });
       return;
@@ -245,6 +283,7 @@ export function attachRealtime(
 
     if (requestUrl.pathname === '/ws/realtime') {
       wssRealtime.handleUpgrade(req, socket, head, (ws) => {
+        guardSocket(ws);
         wssRealtime.emit('connection', ws, req);
       });
       return;
@@ -417,6 +456,10 @@ export function attachRealtime(
           timestamp: new Date().toISOString(),
           presenterUserId: r.presenterUserId,
           activeActivityId: r.activeActivityId || null,
+          courseId: r.courseId,
+          revisionId: r.revisionId,
+          activePin: r.activePin,
+          activityRound: r.activityRound,
           currentPhase: r.currentPhase,
           participants: parts.map((p) => ({
             userId: p.userId,
@@ -448,6 +491,16 @@ export function attachRealtime(
         return;
       }
 
+      if (
+        typeof payload.type === 'string' &&
+        payload.type.startsWith('voice_') &&
+        !(await verifyVoiceConsent(req.headers.cookie, userId!, sessionId))
+      ) {
+        ws.send(
+          JSON.stringify({ type: 'error', error: 'Explicit current microphone consent required' })
+        );
+        return;
+      }
       const context = {
         userId: userId!,
         sessionId,

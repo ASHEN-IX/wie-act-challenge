@@ -1,4 +1,3 @@
-import { errorDetails } from '@study-partner/shared/errors';
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response } from 'express';
 import { createContracts } from '@study-partner/shared/domainContracts';
@@ -8,7 +7,6 @@ type QuestTemplate = Pick<
   IQuest,
   'title' | 'description' | 'icon' | 'action' | 'targetCount' | 'xpReward'
 >;
-import Gamification from '../models/Gamification';
 import { requireInternal } from '@study-partner/shared/auth';
 
 const router = createContracts();
@@ -186,30 +184,16 @@ router.post('/progress', requireInternal, async (req: DomainRequest, res: Respon
       if (result.changed) {
         await quest.save();
 
-        // If quest completed, award bonus XP
-        if (result.completed) {
-          try {
-            let profile = await Gamification.findOne({ userId });
-            if (!profile) {
-              profile = await Gamification.create({ userId });
-            }
-            profile.awardXp(result.xpReward || 0, 'quest_complete', {
-              questId: quest._id.toString(),
-              questTitle: quest.title
-            });
-            await profile.save();
-          } catch (xpErr) {
-            console.warn('Quest XP award failed:', errorDetails(xpErr).message);
-          }
-        }
-
+        // Quest bookkeeping is not verified personal learning evidence. Preserve
+        // completion without minting XP through this legacy action pathway.
         results.push({
           questId: quest._id,
           title: quest.title,
           currentCount: quest.currentCount,
           targetCount: quest.targetCount,
           completed: result.completed || false,
-          xpReward: result.completed ? result.xpReward : 0
+          xpReward: 0,
+          rewardPolicy: 'Verified learning evidence required'
         });
       }
     }

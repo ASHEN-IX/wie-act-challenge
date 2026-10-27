@@ -14,6 +14,7 @@ process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/
 process.env.RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://localhost:5672/%2F';
 process.env.NODE_ENV = 'test';
 process.env.AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
+const startupAiUrl = process.env.AI_SERVICE_URL;
 
 // Prevent fail-fast app checks from terminating the Jest worker.
 const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => {
@@ -43,6 +44,10 @@ const app = require('../app');
 jest.mock('@study-partner/shared/moduleClient');
 
 describe('POST /api/v1/ai/coach', () => {
+  afterEach(() => {
+    process.env.AI_SERVICE_URL = startupAiUrl;
+  });
+
   beforeEach(() => {
     // Clear all mocks before each test
     jest.clearAllMocks();
@@ -252,7 +257,6 @@ describe('POST /api/v1/ai/coach', () => {
   });
 
   it('uses the AI endpoint resolved when the module starts', async () => {
-    const originalEnv = process.env.AI_SERVICE_URL;
     process.env.AI_SERVICE_URL = 'http://custom-ai-service:9000';
 
     const mockPythonResponse = {
@@ -271,19 +275,15 @@ describe('POST /api/v1/ai/coach', () => {
 
     await request(app).post('/api/v1/ai/coach').send({}).expect(200);
 
-    // Verify custom URL was used
+    // Changing process.env after import does not change the resolved endpoint.
     expect(moduleClient.post).toHaveBeenCalledWith(
-      expect.stringContaining('http://localhost:8000'),
+      `${startupAiUrl}/api/ai/coach/decision`,
       expect.any(Object),
       expect.objectContaining({ timeout: 30000 })
     );
-
-    // Restore original environment
-    process.env.AI_SERVICE_URL = originalEnv;
   });
 
-  it('should use default URL when environment variable not set', async () => {
-    const originalEnv = process.env.AI_SERVICE_URL;
+  it('retains the resolved endpoint if the environment variable is removed after startup', async () => {
     delete process.env.AI_SERVICE_URL;
 
     const mockPythonResponse = {
@@ -302,15 +302,11 @@ describe('POST /api/v1/ai/coach', () => {
 
     await request(app).post('/api/v1/ai/coach').send({}).expect(200);
 
-    // Verify default URL was used
     expect(moduleClient.post).toHaveBeenCalledWith(
-      expect.stringContaining('localhost:8000'),
+      `${startupAiUrl}/api/ai/coach/decision`,
       expect.any(Object),
       expect.objectContaining({ timeout: 30000 })
     );
-
-    // Restore original environment
-    process.env.AI_SERVICE_URL = originalEnv;
   });
 });
 

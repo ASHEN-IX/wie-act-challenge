@@ -450,6 +450,42 @@ router.put('/team/:sessionId/start', async (req: DomainRequest, res: Response) =
   }
 });
 
+// Self-only legacy-team consent is explicit and never inferred from membership.
+router.put('/team/:sessionId/voice-consent', async (req: DomainRequest, res: Response) => {
+  if (
+    !req.body ||
+    Object.keys(req.body).some((key) => key !== 'hasVoiceConsent') ||
+    typeof req.body.hasVoiceConsent !== 'boolean'
+  )
+    return res.status(400).json({ error: 'Explicit boolean consent required' });
+  const actor = req.user!.userId;
+  const session = await StudySession.findOne({
+    _id: req.params.sessionId,
+    type: 'team',
+    status: 'active'
+  });
+  if (
+    !session ||
+    !isTeamSessionMember(session, actor) ||
+    (session.courseId && !(await canReadCourse(actor, session.courseId)))
+  )
+    return res.status(403).json({ error: 'Session access denied' });
+  const changed = await StudySession.updateOne(
+    {
+      _id: session._id,
+      status: 'active',
+      participants: { $elemMatch: { userId: actor, leftAt: { $exists: false } } }
+    },
+    { $set: { 'participants.$.hasVoiceConsent': req.body.hasVoiceConsent } }
+  );
+  if (
+    !changed.matchedCount ||
+    (session.courseId && !(await canReadCourse(actor, session.courseId)))
+  )
+    return res.status(403).json({ error: 'Session access revoked' });
+  return res.json({ sessionId: String(session._id), hasVoiceConsent: req.body.hasVoiceConsent });
+});
+
 // GET /team/:sessionId/participants — List participants
 router.get('/team/:sessionId/participants', async (req: DomainRequest, res: Response) => {
   try {
@@ -468,7 +504,10 @@ router.get('/team/:sessionId/participants', async (req: DomainRequest, res: Resp
         error: 'Not a member of this session'
       });
     }
+    if (session.courseId && !(await canReadCourse(userId, session.courseId)))
+      return res.status(403).json({ error: 'Source access revoked' });
     const participants = session.participants.map((p) => ({
+      hasVoiceConsent: p.hasVoiceConsent === true,
       userId: p.userId,
       name: p.name,
       avatar: p.avatar,

@@ -1,4 +1,5 @@
-FROM python:3.12-slim-bookworm
+# syntax=docker/dockerfile:1
+FROM python:3.12-slim-bookworm AS runtime-base
 
 WORKDIR /app
 
@@ -6,24 +7,52 @@ ENV PYTHONPATH=/app:/app/agents/evaluator/src \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     VIRTUAL_ENV=/opt/venv \
-    PATH=/opt/venv/bin:$PATH \
-    POETRY_NO_INTERACTION=1
+    PATH=/opt/venv/bin:$PATH
 
-# Native document/OCR/image libraries used by the existing ingestion pipeline.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl poppler-utils tesseract-ocr libgl1 libglib2.0-0 \
-    && rm -rf /var/lib/apt/lists/*
+# Keep downloaded Debian packages and indexes across retries, outside the image.
+# Debian's default docker-clean hook would otherwise delete cached .deb files.
+RUN --mount=type=cache,id=ednova-ai-apt-archives,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=ednova-ai-apt-lists,target=/var/lib/apt/lists,sharing=locked \
+    rm -f /etc/apt/apt.conf.d/docker-clean \
+    && apt-get update && apt-get install -y --no-install-recommends \
+    poppler-utils tesseract-ocr libgl1 libglib2.0-0
+
+FROM runtime-base AS build
+
+ENV POETRY_NO_INTERACTION=1
 
 # Keep Poetry's dependencies separate from the locked application environment.
-RUN python -m venv /opt/poetry && /opt/poetry/bin/pip install --no-cache-dir poetry==2.5.1 \
+RUN --mount=type=cache,id=ednova-ai-pip,target=/root/.cache/pip,sharing=locked \
+    python -m venv /opt/poetry && /opt/poetry/bin/pip install poetry==2.5.1 \
     && python -m venv /opt/venv
 COPY pyproject.toml poetry.lock ./
 # Retain verified downloads across interrupted builds without baking wheels into the image.
-RUN --mount=type=cache,id=ednova-ai-poetry-artifacts,target=/root/.cache/pypoetry/artifacts,sharing=locked \
+# Limit competing transfers and tolerate slow connections to the wheel indexes.
+RUN --mount=type=cache,id=ednova-ai-poetry,target=/root/.cache/pypoetry,sharing=locked \
     /opt/poetry/bin/poetry check --lock \
-    && /opt/poetry/bin/poetry install --only main --no-ansi
+    && POETRY_INSTALLER_MAX_WORKERS=4 \
+       POETRY_REQUESTS_TIMEOUT=120 \
+       POETRY_REQUESTS_MAX_RETRIES=5 \
+       /opt/poetry/bin/poetry install --only main --no-ansi
 
+FROM runtime-base AS runtime
+
+COPY --from=build /opt/venv /opt/venv
 COPY . .
+
+# New named volumes inherit these owners. Existing mounts are never re-owned;
+# startup fails with an actionable error if their permissions are incompatible.
+RUN groupadd --gid 10001 ednova \
+    && useradd --uid 10001 --gid ednova --create-home ednova \
+    && mkdir -p /app/uploads /app/faiss /home/ednova/.cache \
+    && chown ednova:ednova /app/uploads /app/faiss /home/ednova/.cache \
+    && chmod 750 /app/uploads /app/faiss \
+    && chmod 755 /app/scripts/container-entrypoint.sh
+
+ENV HOME=/home/ednova \
+    HF_HOME=/home/ednova/.cache/huggingface
+USER 10001:10001
+ENTRYPOINT ["/app/scripts/container-entrypoint.sh"]
 
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

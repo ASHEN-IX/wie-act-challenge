@@ -132,6 +132,32 @@ test('ED-07 real Nest/Mongo authorization regressions', { timeout: 60000 }, asyn
   }
 
   await t.test(
+    'microphone consent is explicit, current and distinct from room membership',
+    async () => {
+      const id = await create();
+      await join(id);
+      assert.equal(
+        (await request(peer, `/api/v1/voice/${id}/participant`, 'POST', {})).status,
+        403
+      );
+      assert.equal(
+        (await request(peer, path(id, '/voice-consent'), 'PUT', { hasVoiceConsent: true })).status,
+        200
+      );
+      assert.equal(
+        (await request(peer, `/api/v1/voice/${id}/participant`, 'POST', {})).status,
+        201
+      );
+      assert.equal((await request(outsider, `/api/v1/voice/${id}/status`)).status, 403);
+      assert.equal(
+        (await request(peer, path(id, '/voice-consent'), 'PUT', { hasVoiceConsent: false })).status,
+        200
+      );
+      assert.equal((await request(peer, `/api/v1/voice/${id}/status`)).status, 403);
+      assert.equal((await request(peer, path(id))).status, 200);
+    }
+  );
+  await t.test(
     'unauthenticated and outsider HTTP reads cannot disclose room or roster',
     async () => {
       const id = await create();
@@ -275,7 +301,7 @@ test('ED-07 real Nest/Mongo authorization regressions', { timeout: 60000 }, asyn
             activeActivityId: 'forged'
           })
         ).status,
-        503
+        404
       );
       assert.equal((await snapshot(id))!.seq, first.body.seq);
       assert.equal((await request(host, path(id, '/submit-flag'), 'POST')).status, 503);
@@ -283,20 +309,22 @@ test('ED-07 real Nest/Mongo authorization regressions', { timeout: 60000 }, asyn
     }
   );
   await t.test(
-    'revision pins fail explicitly until the published-context contract exists',
+    'source-free rooms reject revision pins without an authorized published course context',
     async () => {
+      const countBefore = await db.collection('study_rooms').countDocuments({});
       const response = await request(host, '/api/v1/study/rooms', 'POST', {
         revisionId: 'forged_revision'
       });
-      assert.equal(response.status, 503);
+      assert.equal(response.status, 403);
+      assert.equal(await db.collection('study_rooms').countDocuments({}), countBefore);
       const id = await create();
       await db
         .collection('study_rooms')
         .updateOne({ roomId: id }, { $set: { revisionId: 'unverifiable' } });
-      assert.equal((await request(host, path(id))).status, 503);
+      assert.equal((await request(host, path(id))).status, 403);
       assert.equal(
         (await request(peer, '/api/v1/study/rooms/join', 'POST', { roomId: id })).status,
-        503
+        403
       );
     }
   );

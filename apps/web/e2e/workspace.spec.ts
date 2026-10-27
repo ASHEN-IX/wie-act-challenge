@@ -105,6 +105,7 @@ test("room creation and invite-code joining work across two separate users", asy
   await account(page);
   await page.goto("/study-together");
   await page.getByRole("button", { name: "Create room", exact: true }).click();
+  await page.getByRole("link", { name: "Open room", exact: true }).first().click();
   await expect(page).toHaveURL(/\/study-together\/[a-z0-9]+/i);
   const roomUrl = page.url();
   const code = await page.getByTestId("invite-code").innerText();
@@ -114,6 +115,7 @@ test("room creation and invite-code joining work across two separate users", asy
   await peer.goto("/study-together");
   await peer.getByLabel("Invite code").fill(code);
   await peer.getByRole("button", { name: "Join room", exact: true }).click();
+  await peer.getByRole("link", { name: "Open room", exact: true }).first().click();
   await expect(peer).toHaveURL(roomUrl);
   await expect(
     peer.getByRole("heading", { name: /^Room Members \(2\)$/ }),

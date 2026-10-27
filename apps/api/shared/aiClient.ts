@@ -3,6 +3,24 @@ import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 
 export const getBaseUrl = (): string => process.env.AI_SERVICE_URL || 'http://localhost:8000';
 
+export type ModelTier = 'compact' | 'capable';
+export type ExecutionMode =
+  'REAL_APPROVED' | 'MOCK_TEST' | 'DETERMINISTIC_FALLBACK' | 'UNAVAILABLE';
+
+export interface ProviderAgentStatus {
+  tier: ModelTier;
+  model: string;
+  fallback_models?: string[];
+  available: boolean;
+}
+
+export interface ProviderStatusReport {
+  status: 'ok' | 'degraded' | 'unavailable';
+  execution_mode: ExecutionMode;
+  agents: Record<string, ProviderAgentStatus>;
+  timestamp: string;
+}
+
 export async function request(
   method: 'GET' | 'DELETE' | 'POST' | 'PUT' | 'PATCH',
   address: string,
@@ -55,6 +73,13 @@ export async function request(
   }
 }
 
+export async function getProviderStatus(
+  config?: AxiosRequestConfig
+): Promise<ProviderStatusReport> {
+  const res = await request('GET', '/provider/status', null, config);
+  return res.data as ProviderStatusReport;
+}
+
 const aiClient = {
   getBaseUrl,
   request,
@@ -65,7 +90,8 @@ const aiClient = {
   put: (url: string, data?: unknown, config?: AxiosRequestConfig) =>
     request('PUT', url, data, config),
   patch: (url: string, data?: unknown, config?: AxiosRequestConfig) =>
-    request('PATCH', url, data, config)
+    request('PATCH', url, data, config),
+  getProviderStatus
 };
 
 export default aiClient;

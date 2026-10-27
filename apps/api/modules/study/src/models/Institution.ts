@@ -26,6 +26,7 @@ export interface IInstitution {
   slug: string;
   domain?: string;
   isVerified: boolean;
+  status: 'active' | 'suspended';
   createdByUserId: string;
   createdAt: Date;
   updatedAt: Date;
@@ -74,6 +75,7 @@ const institutionSchema = new Schema<IInstitution>(
     },
     domain: { type: String, trim: true, lowercase: true, maxlength: 253 },
     isVerified: { type: Boolean, default: false },
+    status: { type: String, enum: ['active', 'suspended'], default: 'active', required: true },
     createdByUserId: { type: String, required: true }
   },
   { collection: 'institutions', timestamps: true }

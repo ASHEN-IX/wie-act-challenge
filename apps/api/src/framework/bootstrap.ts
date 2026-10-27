@@ -11,6 +11,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { AppModule } from './app.module';
 import { ApiExceptionFilter } from './exception.filter';
 import { recordRequest } from './metrics';
+import { assertApiInstance } from './single-instance';
 
 export async function createNestApp() {
   const nest = await NestFactory.create(AppModule, {
@@ -19,6 +20,34 @@ export async function createNestApp() {
   });
   nest.getHttpAdapter().getInstance().set('trust proxy', 1);
   const shared = require('../../shared');
+  nest.use((_req: Request, res: Response, next: NextFunction) => {
+    try {
+      assertApiInstance();
+      const end = res.end,
+        write = res.write;
+      res.end = function (...args: unknown[]) {
+        try {
+          assertApiInstance();
+        } catch {
+          this.destroy();
+          return this;
+        }
+        return Reflect.apply(end, this, args);
+      };
+      res.write = function (...args: unknown[]) {
+        try {
+          assertApiInstance();
+        } catch {
+          this.destroy();
+          return false;
+        }
+        return Reflect.apply(write, this, args);
+      };
+      next();
+    } catch {
+      res.status(503).json({ error: 'API instance unavailable' });
+    }
+  });
   nest.use(
     shared.securityMiddleware(),
     shared.corsMiddleware(),

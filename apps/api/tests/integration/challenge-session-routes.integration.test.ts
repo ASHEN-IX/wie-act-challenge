@@ -7,7 +7,18 @@ jest.mock('@study-partner/shared/moduleClient');
 const mockFindOne = jest.fn();
 const mockCreate = jest.fn();
 jest.mock('../../modules/study/src/models', () => ({
-  Course: { exists: jest.fn().mockResolvedValue({ _id: '64a000000000000000000001' }) },
+  Course: {
+    exists: jest.fn().mockResolvedValue({ _id: '64a000000000000000000001' }),
+    findById: jest.fn().mockReturnValue({
+      select: jest.fn().mockReturnValue({
+        lean: jest.fn().mockResolvedValue({
+          _id: '64a00000000000000000001',
+          userId: 'user-1',
+          scope: 'personal'
+        })
+      })
+    })
+  },
   StudySession: {
     findOne: (...args: unknown[]) => mockFindOne(...args),
     create: (...args: unknown[]) => mockCreate(...args)

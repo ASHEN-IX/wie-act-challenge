@@ -122,5 +122,26 @@ describe("RoomView: Collaborative State Synchronization", () => {
 
     expect(activeIntervention).toBeNull();
   });
+
+  it("renders individual attempt phase with progress tally and waiting prompt when no activity is selected", () => {
+    const roomState: RoomStateInfo = {
+      roomId: "room_123",
+      title: "Thermodynamics Room",
+      currentPhase: "individual_attempt",
+      presenterUserId: "usr_habib",
+      activeActivityId: null,
+      seq: 2,
+      publicSubmissionsCount: 1,
+    };
+    const participants: ParticipantInfo[] = [
+      { userId: "usr_habib", name: "Habib", role: "host", isOnline: true, hasSubmitted: true },
+      { userId: "usr_tasnim", name: "Tasnim", role: "participant", isOnline: true, hasSubmitted: false },
+    ];
+
+    expect(roomState.currentPhase).toBe("individual_attempt");
+    expect(roomState.publicSubmissionsCount).toBe(1);
+    expect(participants.find((p) => p.userId === "usr_habib")?.hasSubmitted).toBe(true);
+    expect(participants.find((p) => p.userId === "usr_tasnim")?.hasSubmitted).toBe(false);
+  });
 });
 

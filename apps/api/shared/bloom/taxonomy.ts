@@ -47,11 +47,5 @@ export function nextLevel(level: string): string | null {
   return BLOOM_LEVELS[idx + 1];
 }
 
-module.exports = {
-  BLOOM_LEVELS,
-  KNOWLEDGE_TYPES,
-  VERB_MAP,
-  UNLOCK_THRESHOLD,
-  unlockThreshold: UNLOCK_THRESHOLD, // camelCase alias to match story wording
-  nextLevel
-};
+/** Retain the CommonJS property name through TypeScript's generated exports. */
+export const unlockThreshold = UNLOCK_THRESHOLD;

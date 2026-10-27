@@ -17,6 +17,7 @@ Subclasses implement `handle(payload, envelope) -> dict`.
 from __future__ import annotations
 
 import asyncio
+from contextvars import ContextVar
 import json
 import logging
 import signal
@@ -85,7 +86,16 @@ class BaseAIWorker:
         self._queue = None
         self._consumer_tag: Optional[str] = None
         self._shutdown = asyncio.Event()
-        self._in_flight: asyncio.Task | None = None
+        self._in_flight: set[asyncio.Task] = set()
+        self._attempt_context: ContextVar[int] = ContextVar("worker_attempt", default=0)
+
+    @property
+    def current_attempt(self) -> int:
+        return self._attempt_context.get()
+
+    @current_attempt.setter
+    def current_attempt(self, value: int) -> None:
+        self._attempt_context.set(value)
 
     # ------------------------------------------------------------------ API
 
@@ -128,15 +138,17 @@ class BaseAIWorker:
 
     async def stop(self) -> None:
         """Graceful drain: stop consuming, let the in-flight handler finish."""
-        self._shutdown.set()
         try:
             if self._queue is not None and self._consumer_tag:
                 await self._queue.cancel(self._consumer_tag)
-            if self._in_flight is not None:
-                await asyncio.wait([self._in_flight], timeout=30)
+            if self._in_flight:
+                await asyncio.wait(self._in_flight.copy(), timeout=30)
         finally:
-            if self._connection is not None:
-                await self._connection.close()
+            try:
+                if self._connection is not None:
+                    await self._connection.close()
+            finally:
+                self._shutdown.set()
 
     def run(self) -> None:
         """Blocking entrypoint with SIGTERM/SIGINT handling."""
@@ -174,8 +186,11 @@ class BaseAIWorker:
                     await self.store.renew(key)
 
             renewal = asyncio.create_task(renew_lease())
-            self._in_flight = asyncio.current_task()
-            self.current_attempt = self._attempt(message)
+            task = asyncio.current_task()
+            if task is not None:
+                self._in_flight.add(task)
+                task.add_done_callback(self._in_flight.discard)
+            attempt_token = self._attempt_context.set(self._attempt(message))
             try:
                 try:
                     result_payload = await self.handle(envelope.payload, envelope)
@@ -204,7 +219,7 @@ class BaseAIWorker:
             finally:
                 renewal.cancel()
                 await asyncio.gather(renewal, return_exceptions=True)
-                self._in_flight = None
+                self._attempt_context.reset(attempt_token)
                 await self.store.release(key)
 
     @staticmethod

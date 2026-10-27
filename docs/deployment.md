@@ -4,42 +4,60 @@ This is a configuration guide, not evidence of a successful deployment. Current 
 
 ## Main stack
 
-Root `Dockerfile` builds the API; `study-partner-web/Dockerfile` builds Next standalone. `docker-compose.yml` defines app/API (:3000 bound localhost), web (:5173 internally), nginx edge (:8080), MongoDB (:27017), Redis, RabbitMQ and Mailpit (:1025/:8025). Persistent volumes hold Mongo, RabbitMQ and two upload roots. Do not remove them to resolve application errors.
+Backend and frontend run locally from the workspace with `pnpm dev`. The main `docker-compose.yml` runs only the Python AI service and ingestion worker, MongoDB (:27017), Redis, RabbitMQ and Mailpit (:1025/:8025). Persistent volumes hold Mongo, RabbitMQ, FAISS indexes and uploads.
 
-Copy/configure root `.env.example` into `study-partner-api/.env` and review the Compose environment interpolation separately from `env_file`. Set real local/deployment secrets, broker credentials/vhost, database URI, common Better Auth secret, trusted public URL/origins, email delivery and independent AI endpoint/key. Node and Next must resolve the same identity database and auth secret. In production use HTTPS and an explicitly configured public auth origin.
+Configure `apps/api/.env` from `apps/api/.env.example` and review Compose environment interpolation separately from `env_file`. Set local/deployment secrets, broker credentials/vhost, database URI, common Better Auth secret, trusted public URL/origins, email delivery and independent AI endpoint/key. Node and Next must resolve the same identity database and auth secret. In production use HTTPS and an explicitly configured public auth origin.
 
-Main configured launcher:
-
-```bash
-docker compose --env-file study-partner-api/.env up -d --build
-```
-
-For the provided production override (review bind ports, resource/security/edge settings first):
+Start the Python and infrastructure services:
 
 ```bash
-docker compose --env-file study-partner-api/.env -f docker-compose.yml -f docker-compose.prod.yml config --quiet
+docker compose --env-file apps/api/.env up -d --build
 ```
 
-The production override and `deploy/Caddyfile` are retained infrastructure; configuration validation does not prove a working public deployment, TLS or zero-downtime rollout. nginx forwards API/WS to app and web traffic/auth engine to Next. Preserve forwarded origins/cookies and WS upgrade headers.
+Run the backend and frontend separately from the repository root:
+
+```bash
+pnpm dev
+```
+
+There is no current production Compose override in this checkout. `deploy/Caddyfile` is an existing reference configuration, not a complete reviewed deployment. Configuration validation does not prove a working public deployment, TLS or zero-downtime rollout.
 
 ## Independent Python AI
 
-`docker-compose.ai.yml` is a separate lifecycle; copy `.env.ai.example` to a local `.env.ai` and set reachable `AI_MONGODB_URI`/`AI_RABBITMQ_URL` plus the service secret/model env in the expected Python environment. The file optionally loads `study-partner-ai/.env`. Confirm effective Compose config privately; never print credentials into shared logs.
+`docker-compose.ai.yml` is a separate lifecycle; copy `.env.ai.example` to a local `.env.ai` and set reachable `AI_MONGODB_URI`/`AI_RABBITMQ_URL` plus the service secret/model env in the expected Python environment. The file optionally loads `apps/ai/.env`. Confirm effective Compose config privately; never print credentials into shared logs.
 
 ```bash
 docker compose --env-file .env.ai -f docker-compose.ai.yml config --quiet
 ```
 
-Its HTTP command starts uvicorn only, not RabbitMQ consumers. Launch needed workers separately using the same database/broker/key and shared upload path, as described in [AI operations](ai-service.md). The external volume is named `study-partner-api_study_uploads`; verify it matches actual API staging paths before ingestion. DB names and `aiCourseId`/file references are not automatically reconciled by Compose. AI Compose must not accidentally point to unrelated persistent services.
+The Compose file defines separate HTTP and ingestion-worker services. Both require the same database/broker/key and shared upload and revision FAISS paths. Both write revision indexes: ingestion writes its artifact and the authenticated HTTP source-preparation operation creates an exact reviewed revision index. The named upload volume is `study-partner-api_study_uploads`; a host-run API does not automatically see it or the named FAISS volume. Configure shared mounts explicitly and verify Node can read both artifacts. Other worker types require separate processes as described in [AI operations](ai-service.md). AI Compose must not accidentally point to unrelated persistent services.
 
-Python Docker uses a CUDA/PyTorch base and direct pip list that differs from Poetry (including missing messaging dependencies); the organizer inference service has its own constraints. Do not assume this image builds/runs all workers or satisfies challenge inference requirements. Record and fix install/entrypoint parity under ED-01/ED-03, without silently migrating infrastructure.
+The current Python Dockerfile uses Python 3.12 and locked Poetry dependencies. A successful build or HTTP health check does not establish worker, source storage or approved inference readiness. The organizer inference service has separate authorization requirements.
+
+The image now defaults to UID/GID `10001:10001` and refuses incompatible upload
+or index mounts without changing their ownership. Review [storage migration and
+runtime verification](runbooks/ai-container-storage.md) before upgrading existing
+volumes. Main Compose explicitly requires shared Redis for durable worker leases
+and uses a persistent AOF volume; independent AI Compose requires `AI_REDIS_URL`.
 
 ## Checks and recovery
 
 API `/api/v1/health` is a basic check; `/api/v1/monitoring/health` includes independent AI reachability and can report degraded state. `/api/v1/monitoring/metrics` requires session plus admin/internal access. Python `/health` is intentionally lightweight and does not initialize agents/models/workers. Healthy HTTP containers are insufficient evidence of job execution.
 
-Verify: cookie login and authorization; private course download; Node->broker->worker->result; upload volume mapping; slow/limited model behavior; two-browser room transport; source isolation; mail delivery. Run required builds/tests and inspect redacted logs before promotion. Retain backup/restore scripts in `study-partner-api/scripts`; inspect targets and test restore in an isolated environment. Old rollback details are historical guidance, not an instruction to delete databases/queues. The [RabbitMQ runbook](runbooks/rabbitmq-topology-v2-migration.md) describes a specific topology migration and its production cautions.
+Verify: cookie login and authorization; private course download; Node->broker->worker->result; upload volume mapping; slow/limited model behavior; two-browser room transport; source isolation; mail delivery. Run required builds/tests and inspect redacted logs before promotion. Review backup/restore scripts in `apps/api/scripts`, inspect targets and test restore in an isolated environment. Old rollback details are historical guidance, not an instruction to delete databases/queues. The [RabbitMQ runbook](runbooks/rabbitmq-topology-v2-migration.md) describes a specific topology migration and its production cautions.
 
 ## CI limitations
 
-Root `.github/workflows/ci.yml` runs Node checks/browser tests, but its AI install points to absent `requirements.txt` and an absent URL test filename. The nested `study-partner-ai/.github/workflows/ai.yml` is a former standalone workflow and is not a root workflow in this checkout. Repair install/test paths and required coverage rather than removing checks (ED-01). No CI/CD success or deployed status is claimed.
+Root `.github/workflows/ci.yml` runs Node checks, browser tests, locked Poetry checks and a source-foundation job. A workflow definition does not establish a green remote execution or deployment readiness. Verify current-source Actions results and all operational gates independently.
+
+## Enforced single API instance
+
+The current WebSocket registry is process-local. Run one API process/replica with
+`NODE_ENV=production`, `WEB_CONCURRENCY=1` and `EDNOVA_REALTIME_MODE=single` (default).
+Production startup obtains a renewable Mongo lease scoped to the application DB;
+a second owner is refused. An expired or lost lease fences request/response and
+WebSocket delivery and stops the instance. Clean shutdown releases its lease;
+a killed instance requires lease expiry before takeover. All instances must use
+the same application database. This is single-instance enforcement, not a
+multi-replica delivery adapter. See [verification](../reports/EDNOVA-SINGLE-INSTANCE-VERIFICATION.md)
+for executed scope and remaining production rollout tests.

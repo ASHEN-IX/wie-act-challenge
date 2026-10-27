@@ -123,6 +123,19 @@ export const ACHIEVEMENT_CATALOG = [
 export interface IGamification extends Document {
   userId: string;
   totalXp: number;
+  evidenceAwards?: Array<{
+    awardId: string;
+    completionKey: string;
+    evidenceId: string;
+    policyVersion: string;
+    xp: number;
+    reason: string;
+    day: string;
+    topicKey: string;
+    group: boolean;
+    timestamp: Date;
+  }>;
+
   level: number;
   xpHistory: Array<{
     action: string;
@@ -185,6 +198,9 @@ const gamificationSchema = new Schema<IGamification>(
       default: 1,
       min: 1
     },
+    // Compact atomic application markers are retained, never pruned silently.
+    // The evidence service fails closed at its documented document bound.
+    evidenceAwards: { type: [Schema.Types.Mixed], default: [] },
     xpHistory: [
       {
         action: {
@@ -253,7 +269,8 @@ const gamificationSchema = new Schema<IGamification>(
     }
   },
   {
-    timestamps: true
+    timestamps: true,
+    optimisticConcurrency: true
   }
 );
 

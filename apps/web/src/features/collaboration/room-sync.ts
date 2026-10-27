@@ -99,6 +99,14 @@ export function applyRoomSnapshot(
       presenterUserId: event.presenterUserId,
       activeActivityId: event.activeActivityId as string | null,
       publicSubmissionsCount: event.publicSubmissionsCount as number,
+      courseId: typeof event.courseId === "string" ? event.courseId : undefined,
+      revisionId:
+        typeof event.revisionId === "string" ? event.revisionId : undefined,
+      activityRound:
+        typeof event.activityRound === "string"
+          ? event.activityRound
+          : undefined,
+      activePin: event.activePin as RoomStateInfo["activePin"],
     },
     participants:
       event.presenceEpoch === undefined

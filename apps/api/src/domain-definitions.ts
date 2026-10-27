@@ -31,6 +31,7 @@ const definitions: DomainTuple[] = [
       ['/api/v1/users/profile', 'profile'],
       ['/api/v1/users/availability', 'availability'],
       ['/api/v1/users/gamification', 'gamification'],
+      ['/api/v1/users/learning-rewards', 'learningRewards'],
       ['/api/v1/users/gamification/rank', 'ranking'],
       ['/api/v1/users/quests', 'quests'],
       ['/api/v1/users/friends', 'friends']
@@ -50,7 +51,11 @@ const definitions: DomainTuple[] = [
       ['/api/v1/competencies', 'competencies'],
       ['/api/v1/coach', 'coach'],
       ['/api/v1/study/rooms', 'rooms'],
-      ['/api/v1/study/institutions', 'institutions']
+      ['/api/v1/study/institutions', 'institutions'],
+      ['/api/v1/study/activities', 'activities'],
+      ['/api/v1/study/learning', 'learning'],
+      ['/api/v1/study/insights', 'instructorAnalytics'],
+      ['/api/v1/study/private-help', 'privateHelp']
     ]
   ],
   [

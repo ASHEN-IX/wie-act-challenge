@@ -264,7 +264,17 @@ export async function createAuth(
 export async function getAuth() {
   if (!singleton)
     singleton = (async () => {
-      client = new MongoClient(process.env.MONGODB_URI as string);
+      let uri =
+        process.env.MONGODB_URI ||
+        process.env.DOCKER_MONGODB_URI ||
+        'mongodb://localhost:27017/study_partner';
+      // If running outside Docker and DOCKER_MONGODB_URI points to service name 'mongodb'
+      if (uri.includes('mongodb:') && !uri.includes('localhost') && !uri.includes('127.0.0.1')) {
+        uri = uri
+          .replace('mongodb://mongodb', 'mongodb://127.0.0.1')
+          .replace('mongodb://mongodb:', 'mongodb://127.0.0.1:');
+      }
+      client = new MongoClient(uri);
       await client.connect();
       return createAuth(client.db());
     })().catch((error) => {

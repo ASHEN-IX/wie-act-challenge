@@ -25,9 +25,16 @@ export default async function CoursePage({
           course.description || "Your source material and extracted topics."
         }
         action={
-          <Button variant="outline" asChild>
-            <Link href="/practice">Practice this material</Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" asChild>
+              <Link href={`/courses/${course.id}/studio`}>Course Studio</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href={`/courses/${course.id}/learn`}>
+                Open published learning
+              </Link>
+            </Button>
+          </div>
         }
       />
       <Badge variant="secondary">{course.status}</Badge>

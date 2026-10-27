@@ -1,3 +1,4 @@
+import type { BinarySearchState } from '../../../../shared/visualization';
 import mongoose, { Document, Model, Schema } from 'mongoose';
 
 export type RoomPhase = 'idle' | 'peer_discussion' | 'individual_attempt' | 'debrief';
@@ -28,7 +29,18 @@ export interface IStudyRoom extends Document {
   title: string;
   maxParticipants: number;
   moderatorMode: ModeratorMode;
+  facilitatorActive?: boolean;
   activeActivityId?: string | null;
+  activePin?: {
+    courseId: string;
+    revisionId: string;
+    contentHash: string;
+    activityId: string;
+    activityRevision: string;
+    activityType: string;
+  } | null;
+  activityRound?: string;
+  visualizationState?: BinarySearchState;
   currentPhase: RoomPhase;
   status: 'active' | 'closed';
   seq: number;
@@ -94,9 +106,9 @@ const studyRoomSchema = new Schema<IStudyRoom>(
       type: String,
       index: true
     },
-    revisionId: {
-      type: String
-    },
+    revisionId: { type: String },
+    activePin: { type: Schema.Types.Mixed, default: null },
+    activityRound: String,
     hostUserId: {
       type: String,
       required: true,
@@ -124,10 +136,15 @@ const studyRoomSchema = new Schema<IStudyRoom>(
       enum: ['guided', 'on_demand', 'muted'],
       default: 'guided'
     },
+    facilitatorActive: {
+      type: Boolean,
+      default: false
+    },
     activeActivityId: {
       type: String,
       default: null
     },
+    visualizationState: { type: Schema.Types.Mixed },
     currentPhase: {
       type: String,
       enum: ['idle', 'peer_discussion', 'individual_attempt', 'debrief'],

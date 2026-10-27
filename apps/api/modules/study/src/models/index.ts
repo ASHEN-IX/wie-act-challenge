@@ -25,6 +25,7 @@ export interface IParticipant {
   name?: string;
   avatar?: string;
   role?: 'host' | 'member';
+  hasVoiceConsent?: boolean;
   joinedAt?: Date;
   leftAt?: Date;
 }
@@ -141,11 +142,20 @@ export interface ICourseFile {
   filename?: string;
   originalName?: string;
   size?: number;
+  fileHash?: string;
   uploadedAt?: Date;
 }
 
+export const COURSE_SCOPES = ['personal', 'institutional'] as const;
+export type CourseScope = (typeof COURSE_SCOPES)[number];
+
 export interface ICourse extends Document {
   userId: string;
+  scope?: CourseScope;
+  institutionId?: mongoose.Types.ObjectId;
+  ownerUserId?: string;
+  assignedInstructorIds?: string[];
+  activeRevisionId?: string;
   subjectId: string;
   title: string;
   description?: string;
@@ -372,6 +382,7 @@ const studySessionSchema = new Schema<IStudySession>(
         name: { type: String },
         avatar: { type: String },
         role: { type: String, enum: ['host', 'member'], default: 'member' },
+        hasVoiceConsent: { type: Boolean, default: false },
         joinedAt: { type: Date, default: Date.now },
         leftAt: { type: Date }
       }
@@ -527,6 +538,27 @@ const courseSchema = new Schema<ICourse>(
       required: true,
       index: true
     },
+    scope: {
+      type: String,
+      enum: ['personal', 'institutional'],
+      default: 'personal',
+      required: true
+    },
+    institutionId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Institution',
+      index: true
+    },
+    ownerUserId: {
+      type: String
+    },
+    assignedInstructorIds: {
+      type: [String],
+      default: []
+    },
+    activeRevisionId: {
+      type: String
+    },
     subjectId: {
       type: String,
       required: true,
@@ -604,6 +636,7 @@ const courseSchema = new Schema<ICourse>(
         filename: String,
         originalName: String,
         size: Number,
+        fileHash: String,
         uploadedAt: {
           type: Date,
           default: Date.now
@@ -622,6 +655,22 @@ const courseSchema = new Schema<ICourse>(
     timestamps: true
   }
 );
+
+courseSchema.index({ institutionId: 1, scope: 1 });
+courseSchema.index({ ownerUserId: 1 });
+courseSchema.index({ assignedInstructorIds: 1 });
+
+courseSchema.pre('validate', function () {
+  if (!this.ownerUserId && this.userId) {
+    this.ownerUserId = this.userId;
+  }
+  if (!this.userId && this.ownerUserId) {
+    this.userId = this.ownerUserId;
+  }
+  if (this.institutionId && (!this.scope || this.scope === 'personal')) {
+    this.scope = 'institutional';
+  }
+});
 
 const learningObjectiveSchema = new Schema<ILearningObjective>(
   {
@@ -930,6 +979,29 @@ export {
 } from './StudyRoom';
 
 export {
+  CourseEnrollment,
+  ICourseEnrollment,
+  CourseEnrollmentStatus,
+  COURSE_ENROLLMENT_STATUSES
+} from './CourseEnrollment';
+
+export {
+  CourseInvitation,
+  ICourseInvitation,
+  CourseInvitationRole,
+  CourseInvitationStatus,
+  COURSE_INVITATION_ROLES,
+  COURSE_INVITATION_STATUSES
+} from './CourseInvitation';
+
+export {
+  CourseRevision,
+  ICourseRevision,
+  CourseRevisionStatus,
+  COURSE_REVISION_STATUSES
+} from './CourseRevision';
+
+export {
   Institution,
   InstitutionMembership,
   InstitutionInvitation,
@@ -954,11 +1026,23 @@ export {
   FacilitatorTrigger,
   InterventionStatus
 } from './FacilitatorIntervention';
+export { StudentAttempt, IStudentAttempt } from './StudentAttempt';
+export { LearningEvidence, ILearningEvidence } from './LearningEvidence';
+export { ActivityRecord, IActivityRecord } from './ActivityRecord';
 
 module.exports = {
   StudySession,
   StudyRoom: require('./StudyRoom').StudyRoom,
   FacilitatorIntervention: require('./FacilitatorIntervention').FacilitatorIntervention,
+  Institution: require('./Institution').Institution,
+  InstitutionMembership: require('./Institution').InstitutionMembership,
+  InstitutionInvitation: require('./Institution').InstitutionInvitation,
+  CourseEnrollment: require('./CourseEnrollment').CourseEnrollment,
+  CourseInvitation: require('./CourseInvitation').CourseInvitation,
+  CourseRevision: require('./CourseRevision').CourseRevision,
+  StudentAttempt: require('./StudentAttempt').StudentAttempt,
+  LearningEvidence: require('./LearningEvidence').LearningEvidence,
+  ActivityRecord: require('./ActivityRecord').ActivityRecord,
   Task,
   Topic,
   Subject,

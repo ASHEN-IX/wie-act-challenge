@@ -39,7 +39,8 @@ const {
 } = require('@study-partner/shared/ai-messaging');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { logger } = require('@study-partner/shared');
-import { Course } from '../models';
+import { Course, CourseRevision } from '../models';
+import { CourseIngestionOperation } from '../models/CourseIngestionOperation';
 import { INGEST_JOB_TYPE } from './ingestionJob';
 
 // Whitelist of subtopic fields a worker result may write into Course.topics.
@@ -115,6 +116,15 @@ function buildIngestStatus(
     error: course.status === 'failed' ? course.ingestError || '' : '',
     processedAt: course.processedAt || null,
     retry: retryAction(course._id.toString(), course.status),
+    cancelled: course.ingestDetail === 'cancelled',
+    controls: course.jobId
+      ? {
+          expectedJobId: course.jobId,
+          reconcile: `/api/v1/study/courses/${course._id}/ingestion/reconcile`,
+          retry: `/api/v1/study/courses/${course._id}/ingestion/retry`,
+          cancel: `/api/v1/study/courses/${course._id}/ingestion/cancel`
+        }
+      : null,
     updatedAt: course.updatedAt || null
   };
 }
@@ -136,7 +146,26 @@ async function handleIngestProgress(
   course.ingestStage = progress.stage;
   course.ingestProgress = progress.progress!;
   course.ingestDetail = progress.detail || '';
-  await course.save();
+  const current = await Course.updateOne(
+    {
+      _id: course._id,
+      correlationId: progress.correlationId,
+      status: 'processing',
+      ingestProgress: { $lte: progress.progress! }
+    },
+    {
+      $set: {
+        ingestStage: course.ingestStage,
+        ingestProgress: course.ingestProgress,
+        ingestDetail: course.ingestDetail
+      }
+    }
+  );
+  if (!current.modifiedCount) return;
+  await CourseIngestionOperation.updateOne(
+    { correlationId: progress.correlationId, state: { $in: ['prepared', 'queued', 'processing'] } },
+    { $set: { state: 'processing' } }
+  );
   logger.info('ingest_progress_recorded', {
     courseId: course._id.toString(),
     stage: progress.stage,
@@ -157,6 +186,53 @@ async function handleIngestResult(
     return;
   }
 
+  const operation = await CourseIngestionOperation.findOne({
+    correlationId: result.correlationId
+  }).lean();
+  if (operation && ['cancelled', 'superseded'].includes(operation.state)) return;
+  if (
+    operation &&
+    result.status === 'completed' &&
+    (result.payload?.revisionId !== operation.revisionId ||
+      (result.payload?.courseId !== undefined &&
+        result.payload.courseId !== String(operation.courseId)))
+  ) {
+    logger.warn('ingest_result_operation_pin_mismatch');
+    return;
+  }
+
+  if (operation?.resultApplied) return;
+  if (operation?.result) result = operation.result;
+  if (operation && !operation.result) {
+    await CourseIngestionOperation.updateOne(
+      {
+        _id: operation._id,
+        result: { $exists: false },
+        state: { $nin: ['cancelled', 'superseded'] }
+      },
+      { $set: { result } }
+    );
+    // The first durable outcome wins, including concurrent/conflicting delivery.
+    const recorded = await CourseIngestionOperation.findById(operation._id).lean();
+    if (!recorded || ['cancelled', 'superseded'].includes(recorded.state) || !recorded.result)
+      return;
+    result = recorded.result;
+  }
+  const terminalStatus = result.status === 'completed' ? 'completed' : 'failed';
+  const claimed = await Course.updateOne(
+    {
+      _id: course._id,
+      correlationId: result.correlationId,
+      $or: [
+        { status: 'processing' },
+        { status: 'failed', ingestDetail: 'dispatch_unconfirmed' },
+        ...(operation?.result && !operation.resultApplied ? [{ status: terminalStatus }] : [])
+      ]
+    },
+    { $set: { status: terminalStatus } }
+  );
+  if (!claimed.matchedCount) return;
+
   if (result.status === 'completed') {
     course.status = 'completed';
     course.ingestStage = 'indexing';
@@ -165,7 +241,48 @@ async function handleIngestResult(
     course.ingestError = '';
     if (result.payload && result.payload.course) {
       // Preserve the existing schema-cast boundary for legacy objective metadata.
-      course.set('topics', sanitizeCourseFromResult(result.payload.course));
+      const sanitizedTopics = sanitizeCourseFromResult(result.payload.course);
+      if (result.payload.revisionId && typeof result.payload.revisionId === 'string') {
+        const rev = await CourseRevision.findOne({
+          courseId: course._id,
+          revisionTag: result.payload.revisionId
+        });
+        if (rev) {
+          if (rev.isInstructorReviewed) {
+            logger.warn('ingest_result_skipped_instructor_reviewed', {
+              courseId: course._id.toString(),
+              revisionTag: rev.revisionTag
+            });
+          } else {
+            const expectedIndex =
+              'faiss/' + course._id.toString() + '/' + rev.revisionTag + '.faiss';
+            const changed = await CourseRevision.updateOne(
+              {
+                _id: rev._id,
+                revisionTag: rev.revisionTag,
+                status: 'draft',
+                activationState: { $ne: 'prepared' },
+                isInstructorReviewed: false,
+                __v: rev.__v
+              },
+              {
+                $set: {
+                  topics: sanitizedTopics,
+                  ...(result.payload.vectorIndexRef === expectedIndex
+                    ? { vectorIndexRef: expectedIndex }
+                    : {})
+                },
+                $inc: { __v: 1 }
+              }
+            );
+            if (changed.modifiedCount) course.set('topics', sanitizedTopics);
+          }
+        } else {
+          course.set('topics', sanitizedTopics);
+        }
+      } else {
+        course.set('topics', sanitizedTopics);
+      }
     }
     course.processedAt = new Date();
     logger.info('ingest_completed', { courseId: course._id.toString() });
@@ -177,7 +294,25 @@ async function handleIngestResult(
       error: course.ingestError
     });
   }
-  await course.save();
+  const applied = await Course.updateOne(
+    { _id: course._id, correlationId: result.correlationId, status: terminalStatus },
+    {
+      $set: {
+        status: course.status,
+        ingestStage: course.ingestStage,
+        ingestProgress: course.ingestProgress,
+        ingestDetail: course.ingestDetail,
+        ingestError: course.ingestError,
+        ...(course.processedAt ? { processedAt: course.processedAt } : {}),
+        topics: course.topics
+      }
+    }
+  );
+  if (operation && applied.matchedCount)
+    await CourseIngestionOperation.updateOne(
+      { _id: operation._id, state: { $nin: ['cancelled', 'superseded'] } },
+      { $set: { state: terminalStatus, resultApplied: true } }
+    );
 }
 
 /**

@@ -46,8 +46,9 @@ async def test_concurrent_workers_share_store_via_async_calls():
     assert await store.get("sess-42") == '{"i": 42}'
 
 
-def test_build_default_store_returns_in_memory_without_redis():
+def test_build_default_store_returns_in_memory_without_redis(monkeypatch):
     from workers.session_store import build_default_session_store
 
+    monkeypatch.setenv("REDIS_URL", "")
     store = build_default_session_store()
     assert isinstance(store, InMemorySessionStore)

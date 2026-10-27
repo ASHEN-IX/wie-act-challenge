@@ -3,7 +3,7 @@
  */
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { publishAiJob } = require('@study-partner/shared/ai-messaging');
+const aiMessaging = require('@study-partner/shared/ai-messaging');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { validateJobPayload } = require('@study-partner/shared/ai-messaging/payloadSchemas');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -17,14 +17,27 @@ interface IngestFileInfo {
   mimetype: string;
   size: number;
   path: string;
+  fileHash?: string;
 }
 
-interface PublishIngestionParams {
+export interface PublishIngestionParams {
   userId: string;
   courseId: string;
+  revisionId?: string;
   fileRef: string;
   files?: IngestFileInfo[];
   requestId?: string;
+  messageId?: string;
+  correlationId?: string;
+}
+
+let customPublisher:
+  ((...args: unknown[]) => Promise<{ messageId: string; correlationId: string }>) | null = null;
+
+function setCustomPublisher(
+  fn: ((...args: unknown[]) => Promise<{ messageId: string; correlationId: string }>) | null
+) {
+  customPublisher = fn;
 }
 
 /**
@@ -33,11 +46,17 @@ interface PublishIngestionParams {
 async function publishCourseIngestionJob({
   userId,
   courseId,
+  revisionId,
   fileRef,
   files,
-  requestId
+  requestId,
+  messageId: requestedMessageId,
+  correlationId: requestedCorrelationId
 }: PublishIngestionParams): Promise<{ jobId: string; correlationId: string }> {
-  const payload = { courseId, fileRef, files: files || [] };
+  const payload: Record<string, unknown> = { courseId, fileRef, files: files || [] };
+  if (revisionId) {
+    payload.revisionId = revisionId;
+  }
   const check = validateJobPayload(INGEST_JOB_TYPE, payload);
   if (!check.valid) {
     const err = Object.assign(new Error(`invalid ingestion payload: ${check.errors.join('; ')}`), {
@@ -46,8 +65,11 @@ async function publishCourseIngestionJob({
     throw err;
   }
 
-  const { messageId, correlationId } = await publishAiJob(INGEST_JOB_TYPE, userId, payload, {
-    requestId: requestId || `req-${Date.now()}`
+  const publishFn = customPublisher || aiMessaging.publishAiJob;
+  const { messageId, correlationId } = await publishFn(INGEST_JOB_TYPE, userId, payload, {
+    requestId: requestId || `req-${Date.now()}`,
+    ...(requestedMessageId ? { messageId: requestedMessageId } : {}),
+    ...(requestedCorrelationId ? { correlationId: requestedCorrelationId } : {})
   });
 
   logger.info('ingest_job_enqueued', {
@@ -55,10 +77,10 @@ async function publishCourseIngestionJob({
     courseId,
     correlationId,
     userId,
-    fileCount: payload.files.length
+    fileCount: files?.length || 0
   });
   return { jobId: messageId, correlationId };
 }
 
-export { publishCourseIngestionJob, INGEST_JOB_TYPE };
-module.exports = { publishCourseIngestionJob, INGEST_JOB_TYPE };
+export { publishCourseIngestionJob, INGEST_JOB_TYPE, setCustomPublisher };
+module.exports = { publishCourseIngestionJob, INGEST_JOB_TYPE, setCustomPublisher };

@@ -171,7 +171,7 @@ router.put('/', upload.single('avatarFile'), async (req: DomainRequest, res: Res
   // `role`, `tier`, `userId` etc. from the client are dropped)
   const { error, value } = updateProfileSchema.validate(req.body, { stripUnknown: true });
   if (error) {
-    console.error('Profile validation error:', error.details[0].message, req.body);
+    console.error('Profile validation failed', { code: error.details[0].type });
     return res.status(400).json({ error: error.details[0].message });
   }
 

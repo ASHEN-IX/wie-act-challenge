@@ -15,6 +15,10 @@ from services.api.routers.search import router as search_router
 from services.api.routers.reflection import router as reflection_router
 from services.api.routers.schedule import router as schedule_router
 from services.api.routers.facilitator import router as facilitator_router
+from services.api.routers.provider import router as provider_router
+from services.api.routers.tutor import router as tutor_router
+from services.api.routers.sources import router as sources_router
+from utils.llm_client import get_provider_status
 
 app = FastAPI(title="Study Partner AI API", version="1.0.0")
 
@@ -28,8 +32,19 @@ app.add_middleware(
 )
 
 # Mount routers
-for router in (ingestion_router, planning_router, coaching_router, signals_router,
-               search_router, reflection_router, schedule_router, facilitator_router):
+for router in (
+    ingestion_router,
+    planning_router,
+    coaching_router,
+    signals_router,
+    search_router,
+    reflection_router,
+    schedule_router,
+    facilitator_router,
+    provider_router,
+    tutor_router,
+    sources_router,
+):
     app.include_router(router, dependencies=[Depends(require_service)])
 
 
@@ -39,11 +54,17 @@ for router in (ingestion_router, planning_router, coaching_router, signals_route
 @app.get("/health")
 async def health_check():
     """Health check endpoint - fast response for docker healthcheck.
-    
+
     Does NOT initialize services to avoid timeouts during startup.
     Services are lazy-loaded on first actual request.
     """
     return {"status": "healthy"}
+
+
+@app.get("/provider/status")
+async def public_provider_status():
+    """Unauthenticated provider health/status endpoint for monitoring and preflight."""
+    return get_provider_status()
 
 
 if __name__ == "__main__":

@@ -224,6 +224,24 @@ export class UsersController {
   ): Promise<void> {
     return this.service.execute('GET /api/v1/users/gamification/leaderboard', req, res);
   }
+  @Get('/api/v1/users/learning-rewards')
+  get_api_v1_users_learningrewards_2af2b4dd(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('GET /api/v1/users/learning-rewards', req, res);
+  }
+  @Post('/api/v1/users/learning-rewards/evidence/:evidenceId')
+  post_api_v1_users_learningrewards_evidence_e3cd59db(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute(
+      'POST /api/v1/users/learning-rewards/evidence/:evidenceId',
+      req,
+      res
+    );
+  }
   @Get('/api/v1/users/gamification/rank/seasons/current')
   get_api_v1_users_gamification_rank_seasons_current_8a1e1b0c(
     @Req() req: DomainRequest,

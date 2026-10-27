@@ -1,9 +1,11 @@
+import { parseBinarySearchState } from '../../../../shared/visualization';
+import { resolveRoomActivity, validateRoomRevision } from './roomActivity';
 import { createHash, randomUUID, randomInt } from 'node:crypto';
 import Joi from 'joi';
 import { StudyRoom, type IStudyRoom, type IRoomCommandReceipt } from '../models/StudyRoom';
 
 export const MAX_ROOM_COMMANDS = 512;
-type Kind = 'create' | 'join' | 'leave' | 'phase' | 'presenter';
+type Kind = 'create' | 'join' | 'leave' | 'phase' | 'presenter' | 'visualization';
 type ResponseBody = IRoomCommandReceipt['response'];
 type Room = Pick<
   IStudyRoom,
@@ -21,6 +23,9 @@ type Room = Pick<
   | 'status'
   | 'currentPhase'
   | 'activeActivityId'
+  | 'activePin'
+  | 'activityRound'
+  | 'visualizationState'
   | 'createdAt'
   | 'closedAt'
   | 'createCommandId'
@@ -75,6 +80,14 @@ const schemas = {
     expectedSeq: seq,
     presenterUserId: Joi.string().max(128).required()
   }),
+  visualization: Joi.object({
+    commandId: id,
+    expectedSeq: seq,
+    exampleId: Joi.string().valid('binary-search-v1').required(),
+    values: Joi.array().items(Joi.number().integer().min(-999).max(999)).min(1).max(12).required(),
+    target: Joi.number().integer().min(-999).max(999).required(),
+    step: Joi.number().integer().min(0).max(12).required()
+  }),
   leave: Joi.object({ commandId: id, expectedSeq: seq })
 };
 const writeConcern = { w: 'majority' as const, j: true };
@@ -111,6 +124,7 @@ function lifecycleResponse(room: Room): ResponseBody {
     roomId: room.roomId,
     inviteCode: room.inviteCode,
     ...(room.courseId ? { courseId: room.courseId } : {}),
+    ...(room.revisionId ? { revisionId: room.revisionId } : {}),
     title: room.title,
     presenterUserId: room.presenterUserId,
     moderatorMode: room.moderatorMode,
@@ -142,8 +156,7 @@ export async function runRoomCommand(
         if (!access.authorized) throw new CommandError(403, 'Course access is unavailable');
         if (!value.title && access.title) title = `${access.title} Study Group`;
       }
-      if (value.revisionId)
-        throw new CommandError(503, 'Published course revision verification is unavailable');
+      await validateRoomRevision(actor.userId, value);
       // Ensure the required unique index exists even when autoIndex is disabled.
       // This creates no new collection and never removes existing indexes.
       await StudyRoom.collection.createIndex(
@@ -172,6 +185,7 @@ export async function runRoomCommand(
         inviteCode: Array.from({ length: 6 }, () => chars[randomInt(chars.length)]).join(''),
         createCommandId: commandId,
         ...(value.courseId ? { courseId: value.courseId } : {}),
+        ...(value.revisionId ? { revisionId: value.revisionId } : {}),
         title,
         hostUserId: actor.userId,
         presenterUserId: actor.userId,
@@ -235,8 +249,7 @@ export async function runRoomCommand(
       const room = document.toObject() as Room;
       if (room.courseId && !(await authorizeCourse(room.courseId)).authorized)
         throw new CommandError(403, 'Course access is unavailable');
-      if (room.revisionId)
-        throw new CommandError(503, 'Published course revision verification is unavailable');
+      await validateRoomRevision(actor.userId, room);
       const saved = receipt(room, actor.userId, commandId, payloadHash);
       // Leaving removes membership itself. Only its own minimal, already completed
       // acknowledgement may be replayed; this grants no room read/mutation access.
@@ -244,7 +257,10 @@ export async function runRoomCommand(
       const member = membership(room, actor.userId);
       if (kind !== 'join' && !member)
         throw new CommandError(403, 'Not an active participant in this room');
-      if ((kind === 'phase' || kind === 'presenter') && room.presenterUserId !== actor.userId)
+      if (
+        (kind === 'phase' || kind === 'presenter' || kind === 'visualization') &&
+        room.presenterUserId !== actor.userId
+      )
         throw new CommandError(403, 'Only the active presenter may issue this command');
       if (kind === 'join' && saved && !member)
         throw new CommandError(403, 'Completed join cannot restore revoked membership');
@@ -263,11 +279,11 @@ export async function runRoomCommand(
       let changed = false;
       let body: ResponseBody;
       if (kind === 'phase') {
-        if (value.activeActivityId)
-          throw new CommandError(
-            503,
-            'Shared activity validation and private attempts are unavailable'
-          );
+        if (value.activeActivityId) {
+          const resolved = await resolveRoomActivity(actor.userId, room, value.activeActivityId);
+          room.activePin = resolved.pin;
+          room.revisionId = resolved.pin.revisionId;
+        }
         changed =
           room.currentPhase !== value.currentPhase ||
           (value.activeActivityId !== undefined &&
@@ -275,6 +291,8 @@ export async function runRoomCommand(
         room.currentPhase = value.currentPhase;
         if (value.activeActivityId !== undefined) {
           room.activeActivityId = value.activeActivityId;
+          if (!value.activeActivityId) room.activePin = null;
+          if (changed) room.activityRound = commandId;
           if (changed)
             room.participants.forEach((p) => {
               p.hasSubmitted = false;
@@ -288,6 +306,22 @@ export async function runRoomCommand(
           currentPhase: room.currentPhase,
           activeActivityId: room.activeActivityId ?? null
         };
+      } else if (kind === 'visualization') {
+        let state;
+        try {
+          state = parseBinarySearchState({
+            exampleId: value.exampleId,
+            values: value.values,
+            target: value.target,
+            step: value.step
+          });
+        } catch {
+          throw new CommandError(400, 'Unsupported or out-of-range visualization state');
+        }
+        changed = JSON.stringify(room.visualizationState) !== JSON.stringify(state);
+        room.visualizationState = state;
+        room.seq += changed ? 1 : 0;
+        body = { success: true, roomId: room.roomId, seq: room.seq };
       } else if (kind === 'presenter') {
         if (!room.participants.some((p) => p.userId === value.presenterUserId && !p.leftAt))
           throw new CommandError(400, 'Target is not an active participant');
@@ -346,6 +380,11 @@ export async function runRoomCommand(
         status: 200,
         response: body
       };
+      if (kind === 'visualization' && room.courseId) {
+        if (!(await authorizeCourse(room.courseId)).authorized)
+          throw new CommandError(403, 'Course access is unavailable');
+        await validateRoomRevision(actor.userId, room);
+      }
       try {
         const updated = await StudyRoom.findOneAndUpdate(
           {
@@ -358,13 +397,19 @@ export async function runRoomCommand(
                   participants: { $elemMatch: { userId: actor.userId, leftAt: { $exists: false } } }
                 }
               : {}),
-            ...(kind === 'phase' || kind === 'presenter' ? { presenterUserId: actor.userId } : {}),
+            ...(kind === 'phase' || kind === 'presenter' || kind === 'visualization'
+              ? { presenterUserId: actor.userId }
+              : {}),
             [`commandReceipts.${receiptLimit - 1}`]: { $exists: false }
           },
           {
             $set: {
               currentPhase: room.currentPhase,
               activeActivityId: room.activeActivityId,
+              activePin: room.activePin,
+              revisionId: room.revisionId,
+              activityRound: room.activityRound,
+              ...(room.visualizationState ? { visualizationState: room.visualizationState } : {}),
               presenterUserId: room.presenterUserId,
               participants: room.participants,
               status: room.status,
@@ -384,6 +429,11 @@ export async function runRoomCommand(
     }
     throw new CommandError(409, 'Room changed repeatedly; retry the same command');
   } catch (error) {
+    if (error && typeof error === 'object' && 'status' in error && typeof error.status === 'number')
+      return {
+        status: error.status,
+        body: { error: error instanceof Error ? error.message : 'Unavailable' }
+      };
     if (error instanceof CommandError)
       return { status: error.status, body: { error: error.message } };
     return {

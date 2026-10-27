@@ -18,7 +18,7 @@ afterAll(() => exitSpy.mockRestore());
 
 // ── Mock Models ──────────────────────────────────
 const mockCourse = {
-  _id: 'course-1',
+  _id: '64a000000000000000000001',
   userId: 'user-123',
   title: 'Test Course',
   status: 'active',
@@ -46,6 +46,9 @@ const mockPlan = {
 };
 
 jest.mock('../models/index', () => ({
+  CourseEnrollment: {
+    find: jest.fn().mockReturnValue({ distinct: jest.fn().mockResolvedValue([]) })
+  },
   Course: {
     exists: jest.fn().mockResolvedValue({ _id: '64a000000000000000000001' }),
     find: jest.fn(),
@@ -196,7 +199,14 @@ describe('POST /api/v1/study/learning-objectives (route)', () => {
 });
 
 describe('Study Service', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    Course.findById.mockImplementation(() =>
+      Object.assign(Promise.resolve(mockCourse), {
+        select: () => ({ lean: async () => mockCourse })
+      })
+    );
+  });
 
   // ── Courses ──────────────────────────────────
   describe('Courses', () => {
@@ -218,7 +228,7 @@ describe('Study Service', () => {
       it('should return a specific course', async () => {
         Course.findOne.mockResolvedValue(mockCourse);
 
-        const res = await request(app).get('/api/v1/study/courses/course-1');
+        const res = await request(app).get('/api/v1/study/courses/64a000000000000000000001');
         expect(res.status).toBe(200);
       });
 
@@ -232,9 +242,9 @@ describe('Study Service', () => {
 
     describe('DELETE /api/v1/study/courses/:id', () => {
       it('should delete a course', async () => {
-        Course.findOneAndDelete.mockResolvedValue(mockCourse);
+        Course.findByIdAndDelete.mockResolvedValue(mockCourse);
 
-        const res = await request(app).delete('/api/v1/study/courses/course-1');
+        const res = await request(app).delete('/api/v1/study/courses/64a000000000000000000001');
         expect(res.status).toBe(200);
       });
     });
@@ -258,6 +268,7 @@ describe('Study Service', () => {
     describe('GET /api/v1/study/plans/:id', () => {
       it('should return a specific plan', async () => {
         StudyPlan.findOne.mockReturnValue({
+          select: jest.fn().mockReturnThis(),
           lean: jest.fn().mockResolvedValue(mockPlan)
         });
         Task.find.mockReturnValue({
@@ -270,6 +281,7 @@ describe('Study Service', () => {
 
       it('should return 404 for missing plan', async () => {
         StudyPlan.findOne.mockReturnValue({
+          select: jest.fn().mockReturnThis(),
           lean: jest.fn().mockResolvedValue(null)
         });
 

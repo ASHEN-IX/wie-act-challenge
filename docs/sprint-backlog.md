@@ -1,6 +1,6 @@
 # EdNova v1.2 implementation backlog — canonical
 
-As of 18 October 2026; aligned to [brief v1.2 §§39–43](reference/ednova-brief-v1.2.md). EdNova feature acceptance remains incomplete; subsequent repository preparation rebuilt the frontend foundation and repaired startup/auth fixtures. See [preparation results](audit/cleanup.md). No parent task is DONE without its full acceptance gate. **DONE** requires source/test/document evidence matching its acceptance; **PARTIAL** has reusable implementation but target acceptance is unmet; **TODO** has no completed target implementation; **BLOCKED** awaits an external prerequisite. P0 is the team's hackathon boundary, not a claim every feature is mandated by organizers. Complexity S/M/L is relative effort, not a delivery-time promise.
+Baseline as of 18 October 2026; 27 October continuation: earlier dated DONE claims cover their stated narrow scopes, while full current-source parent acceptance is tracked conservatively in [the implementation tracker](../reports/EDNOVA-IMPLEMENTATION-TRACKER.md). Canonical requirements and ownership remain unchanged. Aligned to [brief v1.2 §§39–43](reference/ednova-brief-v1.2.md). EdNova feature acceptance remains incomplete; subsequent repository preparation rebuilt the frontend foundation and repaired startup/auth fixtures. See [preparation results](audit/cleanup.md). No parent task is DONE without its full acceptance gate. **DONE** requires source/test/document evidence matching its acceptance; **PARTIAL** has reusable implementation but target acceptance is unmet; **TODO** has no completed target implementation; **BLOCKED** awaits an external prerequisite. P0 is the team's hackathon boundary, not a claim every feature is mandated by organizers. Complexity S/M/L is relative effort, not a delivery-time promise.
 
 The [audit](audit/ednova-audit.md) classifies retained subsystems, [product](product-specification.md) owns feature contracts, [testing](testing-plan.md) owns validation scenarios, and [delivery](hackathon-delivery.md) owns organizer rules. Historical MindFlow tasks/checkmarks moved to [legacy backlog](sprint-backlog.md); they are not completion evidence for EdNova.
 
@@ -25,8 +25,8 @@ All execution notes below are **TARGET recommendations, not changes performed**.
 
 | ID | Module owner | Priority | Status | Complexity | Title |
 |---|---|---|---|---|---|
-| ED-01 | Habib | P0 | DONE | L | Repair and revalidate baseline |
-| ED-02 | Habib | P0 | DONE | L | Close resource and transport isolation gaps |
+| ED-01 | Habib | P0 | PARTIAL | L | Repair and revalidate baseline |
+| ED-02 | Habib | P0 | PARTIAL | L | Close resource and transport isolation gaps |
 | ED-03 | Tasnim | P0 | BLOCKED | M | Confirm and connect organizer inference service |
 | ED-04 | Habib | P0 | PARTIAL | L | Minimal institutional membership and access contexts |
 | ED-05 | Habib | P0 | PARTIAL | L | Instructor versioned draft/review/publication flow |
@@ -50,7 +50,7 @@ All execution notes below are **TARGET recommendations, not changes performed**.
 | ED-23 | Habib | Post-hackathon | TODO | L | Decide legacy commercial/social scope |
 | ED-24 | Habib | Post-hackathon | TODO | L | Institutional product expansion |
 | ED-25 | Aziz | P2 | TODO | L | Explore consented speech-aware assistance |
-| ED-DOC | Aziz | P0 | DONE | M | Audit and realign documentation |
+| ED-DOC | Aziz | P0 | PARTIAL | M | Audit and realign documentation |
 | ED-26 | Habib | P0 | PARTIAL | M | Freeze versioned cross-member activity/content/evidence contracts |
 | ED-27 | Tasnim | P0 | PARTIAL | L | Trusted quiz/guided-problem renderer and learner flow |
 | ED-28 | Tasnim | P0 | PARTIAL | M | AI intent-to-activity selection and safe output validation |
@@ -71,7 +71,7 @@ All execution notes below are **TARGET recommendations, not changes performed**.
 - **Existing implementation:** Preparation repaired Nest route normalization and shared exports; production builds, full root tests and native browser flows pass. Strict typing/lint, full locked Python installation, AI image/import/health and isolated worker transport now pass; see [final M01 verification](../reports/EDNOVA-M01-FINAL-RUNTIME-VERIFICATION.md). Approved provider, GPU/media and feature acceptance are separate gates.
 - **Required changes:** Keep the repaired build/route/auth/lease fixtures and corrected Poetry CI covered; resolve remaining API strict test typing/lint findings and Python Docker/dependency parity without weakening checks. Habib coordinates; each owner repairs their module UI/API/Python. Tasnim stewards shared inference configuration; Aziz coordinates integrated browser checks.
 - **Dependencies:** None.
-- **Priority / complexity / status:** P0 / L / **DONE**.
+- **Priority / complexity / status:** P0 / L / **PARTIAL**.
 - **Acceptance criteria:** API/web production builds, lint/typecheck and required unit/integration/auth/browser suites pass; skips and Python install policy explicit.
 - **Validation approach:** Run documented full checks, compare route/auth behavior; record versions, exits and skips.
 
@@ -93,7 +93,7 @@ All execution notes below are **TARGET recommendations, not changes performed**.
 - **Existing implementation:** Owner course download and AI policy; WS membership checks; HTTP chat/voice and team course lookup gaps.
 - **Required changes:** Habib owns course/account/source checks; Tasnim owns private learning/evidence checks; Aziz owns HTTP chat/history/voice/team resource checks and their UI handling; verify static upload bypass, current-member broadcasts/revocation and course/invite/cache isolation.
 - **Dependencies:** ED-01.
-- **Priority / complexity / status:** P0 / L / **DONE**.
+- **Priority / complexity / status:** P0 / L / **PARTIAL**.
 - **Acceptance criteria:** Cross-user course summaries/files/chat/voice denied before lookup/inference; revoked users receive no further scoped data; existing legitimate team flow works.
 - **Validation approach:** API negative access matrix plus two-browser revocation, guessed IDs and alternate download paths.
 
@@ -132,7 +132,7 @@ All execution notes below are **TARGET recommendations, not changes performed**.
 - **Required changes:** The M04-A foundations are implemented. Remaining target work is course enrollment, course-scoped instructor assignment, and any institutional source grant after the ED-26/Contract 03 decisions are frozen. Course invite semantics must not be invented while Contract 03 remains unfrozen. Recipient-bound invitation policy also remains unresolved.
 - **Dependencies:** ED-01, ED-02, and ED-26/Contract 03 for enrollment/source grants.
 - **Priority / complexity / status:** P0 / L / **PARTIAL**.
-- **Acceptance criteria:** Membership and invitation isolation, role-escalation denial and revocation pass. Two institution scopes plus personal mode are isolated for membership context. Course enrollment and course-invite acceptance remain absent, so full ED-04 acceptance is unmet.
+- **Acceptance criteria:** Membership and invitation isolation, role-escalation denial and revocation pass. Two institution scopes plus personal mode are isolated for membership context. Course enrollment and course-invite acceptance remain absent, so full ED-04 acceptance is unmet. **27 October clarification:** the preceding absence statement is historical. Provisional enrollment/invitation services and authenticated UI now exist and are locally tested; full acceptance still requires complete scope/revocation evidence and genuine ED-26 source-grant decisions. No owner approval is inferred.
 - **Validation approach:** Real NestJS/MongoDB membership matrix, multiple pending invitations, same-actor retry recovery, expiry/revocation, concurrent acceptance/suspension and browser acceptance with two users/two synthetic institutions pass in M04-A.1. Course enrollment remains absent.
 - **M04-A evidence:** [EDNOVA-M04A-INSTITUTION-FOUNDATION-VERIFICATION.md](../reports/EDNOVA-M04A-INSTITUTION-FOUNDATION-VERIFICATION.md); [M04-A.1 invitation reliability](../reports/EDNOVA-M04A1-INVITATION-RELIABILITY-VERIFICATION.md). No enrollment or source-access claim is made.
 
@@ -540,7 +540,7 @@ All execution notes below are **TARGET recommendations, not changes performed**.
 - **Existing implementation:** This audit/specification set, immutable sources and inventory.
 - **Required changes:** Keep CURRENT/REUSABLE/TARGET/TODO distinctions, source-linked gaps, one active backlog and actual validation record; align v1.2 Studio/activity/reward contracts and three-member ownership without feature changes.
 - **Dependencies:** Static source audit and documentation/link checks.
-- **Priority / complexity / status:** P0 / M / **DONE**.
+- **Priority / complexity / status:** P0 / M / **PARTIAL**.
 - **Acceptance criteria:** Maintained navigation/specs/roles/models/workflows/AI/roadmap/testing/delivery and v1.2 ownership/contract plan exist; no runtime feature changes; history labeled. DONE refers only to documentation, not implementation.
 - **Validation approach:** Review documentation diff, local links, IDs/statuses and source-only scope; see audit results.
 

@@ -99,6 +99,18 @@ This register is engineering evidence only. It does not approve a decision, sati
 
 The provisional artifact hashes identify the review bytes; they are not a freeze record or a substitute for owner-signed hashes.
 
+### 3A.2 Per-decision implementation links
+
+- **H-2:** `docs/contracts/ednova-v1.md`, `docs/data-model.md`, `docs/contracts/technical-contracts.md`, `apps/api/shared/ednova/contracts.ts`, `apps/ai/contracts/ednova.py`. Tests: `H-2 keeps revisionId as a course-scoped revision tag`, `test_h2_revision_identity_is_a_course_scoped_tag`; fixture `resolution internal persistence id rejected`.
+- **H-3:** `apps/api/shared/ednova/contracts.ts`, `apps/ai/contracts/ednova.py`, `docs/contracts/ednova-v1.md`, `docs/contracts/technical-contracts.md`, `docs/data-model.md`, `docs/architecture-decisions.md`. Fixtures: `server resolution` plus the nine `resolution ...` negatives; schema drift check.
+- **T-1:** `docs/data-model.md`, `docs/contracts/ednova-v1.md`, `docs/contracts/technical-contracts.md`. Tests: `T-1 does not make a global attemptId the receipt identity`, `test_t1_does_not_make_a_global_attempt_id_the_receipt_identity`.
+- **T-2:** `docs/contracts/ednova-v1.md`, `docs/contracts/technical-contracts.md`, `docs/data-model.md`, `docs/architecture-decisions.md`. Fixtures: `unsupported visualizer activity type`, `unsupported parameter explorer activity type`, plus existing unsupported-type cases.
+- **T-3:** `apps/api/shared/ednova/contracts.ts`, `apps/ai/contracts/ednova.py`, `docs/contracts/ednova-v1.md`, `docs/contracts/technical-contracts.md`, `apps/web/src/lib/activity-contracts.ts`, `apps/web/src/lib/activity-contracts.test.ts`. Tests: `T-3 accepts max-bounded private guidance and rejects overflow`, `test_t3_accepts_max_bounded_private_guidance_and_rejects_overflow`, web `decodes private guidance only for its authenticated recipient`; fixtures `graded result with guidance`, explicit-null positives, missing/oversized/type/public/recipient negatives.
+- **A-1:** `apps/api/shared/ednova/contracts.ts`, `apps/ai/contracts/ednova.py`, `docs/contracts/ednova-v1.md`, `docs/contracts/technical-contracts.md`. Fixtures: `source-free room state`, `pinned room state without activity`, `source-free facilitator context`, `source-free facilitator proposal`, plus invalid activity-without-pin and partial-pin negatives; web source-free room decoder test.
+- **A-2:** `apps/api/shared/ednova/contracts.ts`, `apps/ai/contracts/ednova.py`, `docs/contracts/ednova-v1.md`, `docs/contracts/technical-contracts.md`, `docs/contracts/ednova-v1-fixtures.json`. Fixtures: `proposal rejected` (corrected), `proposal rejected unpublished/revoked/unsupported version`, `proposal stale`, `proposal unavailable`, and seven illegal/unknown mapping negatives.
+
+These links point to engineering evidence only. Owner decisions remain `PENDING`.
+
 ## 4. Linked contradiction confirmations
 
 These are confirmations already represented by an owner decision above. They are not separate approval paths and cannot be used to bypass a missing decision.
