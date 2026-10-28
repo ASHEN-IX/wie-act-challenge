@@ -73,7 +73,7 @@ def run_facilitator(
             )
 
             response = ask(
-                "coach",  # reuse coach deployment alias in litellm for speed + judgment
+                "facilitator",  # capable tier: weighs several learners' dialogue
                 FACILITATOR_SYSTEM_PROMPT,
                 user_prompt,
                 mock_fn=lambda _: _generate_mock_response(obs),

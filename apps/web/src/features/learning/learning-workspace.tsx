@@ -1,6 +1,10 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  AiModeNote,
+  AiWaitStatus,
+} from "@/features/ai-status/ai-status-view";
 import { ActivityRenderer } from "./activity-renderer";
 import {
   learningProgress,
@@ -371,7 +375,7 @@ export function LearningWorkspace({
           </Button>
           {support && (
             <div role="status">
-              <p>{support.executionMode}</p>
+              <AiModeNote mode={support.executionMode} />
               <p className="whitespace-pre-wrap">{support.text}</p>
               <p>{support.policy}</p>
             </div>
@@ -411,9 +415,10 @@ export function LearningWorkspace({
         >
           {busy ? "Loading…" : "Ask from sources"}
         </Button>
+        {busy && <AiWaitStatus />}
         {answer && (
           <div data-testid="tutor-answer">
-            <p>{answer.executionMode || "Inference unavailable"}</p>
+            <AiModeNote mode={answer.executionMode} />
             <p className="whitespace-pre-wrap">
               {answer.answer || "No verified answer available."}
             </p>

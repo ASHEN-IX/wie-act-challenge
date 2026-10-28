@@ -17,8 +17,8 @@ const secret = () => randomBytes(32).toString('hex');
 const common = {
   MONGODB_URI: existingApi.MONGODB_URI || existingWeb.MONGODB_URI || 'mongodb://127.0.0.1:27018/ednova_dev',
   BETTER_AUTH_SECRET: existingApi.BETTER_AUTH_SECRET || existingWeb.BETTER_AUTH_SECRET || secret(),
-  BETTER_AUTH_URL: 'http://localhost:5173',
-  AUTH_TRUSTED_ORIGINS: 'http://localhost:5173',
+  BETTER_AUTH_URL: 'http://localhost:3000',
+  AUTH_TRUSTED_ORIGINS: 'http://localhost:3000',
   SMTP_HOST: '127.0.0.1', SMTP_PORT: '1026', SMTP_SECURE: 'false'
 };
 const broker = existingApi.RABBITMQ_URL || 'amqp://ednova:ednova-local@127.0.0.1:5673/ednova';
@@ -34,8 +34,8 @@ function create(name, values) {
 }
 create('apps/api/.env', {
   ...readEnv('.env.example'), ...common,
-  NODE_ENV: 'development', PORT: '3000', INTERNAL_API_SECRET: secret(),
-  FRONTEND_URL: 'http://localhost:5173', APP_URL: 'http://localhost:5173', CORS_ORIGIN: 'http://localhost:5173',
+  NODE_ENV: 'development', PORT: '3001', INTERNAL_API_SECRET: secret(),
+  FRONTEND_URL: 'http://localhost:3000', APP_URL: 'http://localhost:3000', CORS_ORIGIN: 'http://localhost:3000',
   RABBITMQ_URL: broker,
   RABBITMQ_USER: 'ednova', RABBITMQ_PASS: 'ednova-local', RABBITMQ_VHOST: 'ednova',
   REDIS_URL: redis, AI_SERVICE_API_KEY: serviceKey,
@@ -43,7 +43,7 @@ create('apps/api/.env', {
 });
 create('apps/web/.env.local', {
   ...readEnv('apps/web/.env.example'), ...common,
-  BACKEND_URL: 'http://localhost:3000', NEXT_PUBLIC_WS_URL: 'ws://localhost:3000'
+  BACKEND_URL: 'http://localhost:3001', NEXT_PUBLIC_WS_URL: 'ws://localhost:3001'
 });
 create('apps/ai/.env', {
   MONGODB_URI: common.MONGODB_URI,

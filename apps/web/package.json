@@ -4,8 +4,8 @@
   "description": "EdNova native Next.js App Router workspace",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 5173",
-    "start": "next start --port 5173",
+    "dev": "next dev --port 3000",
+    "start": "next start --port 3000",
     "build": "next build --webpack",
     "test": "vitest run --maxWorkers=2",
     "test:watch": "vitest",

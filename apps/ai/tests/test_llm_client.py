@@ -69,15 +69,16 @@ def test_config_has_every_agent_deployment():
 
 def test_agent_config_resolves_model_and_defaults():
     coach = agent_config("coach")
-    assert coach.model == "gemini/gemini-2.0-flash"
+    assert coach.model == "groq/openai/gpt-oss-20b"
     assert coach.temperature == 0.5
-    assert coach.max_tokens == 512
-    assert "groq/llama-3.3-70b-versatile" in coach.fallback_models
+    assert coach.max_tokens == 1024
+    assert "groq/openai/gpt-oss-120b" in coach.fallback_models
 
 
 def test_agent_config_fallback_chain_from_yaml():
     planner = agent_config("planner")
-    assert planner.model.startswith("nvidia_nim/")
+    assert planner.model.startswith("groq/")
+    assert "nvidia_nim/meta/llama-3.2-11b-vision-instruct" in planner.fallback_models
     assert len(planner.fallback_models) >= 1
     evaluator = agent_config("evaluator")
     assert len(evaluator.fallback_models) >= 2
@@ -115,23 +116,23 @@ def test_no_keys_are_unavailable(monkeypatch):
 
 
 def test_mock_forced_by_env(monkeypatch):
-    _with_keys(monkeypatch, GEMINI_API_KEY="real-key")
+    _with_keys(monkeypatch, GROQ_API_KEY="real-key")
     monkeypatch.setenv("LLM_MOCK", "1")
     assert ask("coach", "sys", "hi", mock_fn=lambda up: "m") == "m"
 
 
-def test_dummy_gemini_key_is_unavailable_without_explicit_mock(monkeypatch):
-    _with_keys(monkeypatch, GEMINI_API_KEY="dummy_key_for_testing")
+def test_dummy_groq_key_is_unavailable_without_explicit_mock(monkeypatch):
+    _with_keys(monkeypatch, GROQ_API_KEY="dummy_key_for_testing")
     # Dummy counts as absent and must not enable mock mode.
     assert not llm_client._should_mock("coach")
     with pytest.raises(LLMUnavailableError):
         ask("coach", "sys", "user", mock_fn=lambda _: "synthetic")
-    # A real fallback key is enough to attempt a real call (router will
-    # fail over to groq if the primary provider key is missing).
+    # A real fallback key is enough to attempt a real call: planner falls back
+    # to NVIDIA when its Groq primary key is only a dummy.
     _with_keys(
-        monkeypatch, GEMINI_API_KEY="dummy_key_for_testing", GROQ_API_KEY="real-key"
+        monkeypatch, GROQ_API_KEY="dummy_key_for_testing", NVIDIA_API_KEY="real-key"
     )
-    assert not llm_client._should_mock("coach")
+    assert not llm_client._should_mock("planner")
 
 
 def test_missing_mock_fn_raises(monkeypatch):
@@ -174,7 +175,7 @@ def test_real_path_guards_system_and_passes_knobs(monkeypatch):
             }
         ),
     )
-    _with_keys(monkeypatch, GEMINI_API_KEY="real-key")
+    _with_keys(monkeypatch, GROQ_API_KEY="real-key")
     fake = _FakeCompletion()
     with patch.object(llm_client, "build_router", return_value=fake):
         out = ask("coach", "sys prompt", "user prompt", trace_id="tr")
@@ -187,6 +188,59 @@ def test_real_path_guards_system_and_passes_knobs(monkeypatch):
     assert fake.kwargs["model"] == "coach"
     assert "temperature" not in fake.kwargs
     assert "max_tokens" not in fake.kwargs
+
+
+class _ReportedModel:
+    """Router double that echoes whichever model id the provider reports."""
+
+    def __init__(self, model):
+        self.model = model
+
+    def completion(self, **kwargs):
+        return SimpleNamespace(
+            model=self.model,
+            choices=[SimpleNamespace(message=SimpleNamespace(content="assistant-text"))],
+        )
+
+
+def _approve_coach(monkeypatch):
+    import json, time
+
+    monkeypatch.setattr(llm_client, "_reserve_durable_budget", lambda _: True)
+    monkeypatch.setenv(
+        "LLM_APPROVALS_JSON",
+        json.dumps(
+            {
+                "coach": {
+                    "approvalId": "identity-test-" + str(time.time()),
+                    "model": llm_client.agent_config("coach").model,
+                    "task": "coach",
+                    "expiresAt": time.time() + 60,
+                    "maxRequests": 1,
+                }
+            }
+        ),
+    )
+    _with_keys(monkeypatch, GROQ_API_KEY="real-key")
+
+
+@pytest.mark.parametrize(
+    "reported",
+    ["groq/openai/gpt-oss-20b", "openai/gpt-oss-20b"],
+)
+def test_real_path_accepts_approved_route_or_bare_provider_id(monkeypatch, reported):
+    _approve_coach(monkeypatch)
+    with patch.object(llm_client, "build_router", return_value=_ReportedModel(reported)):
+        assert ask("coach", "sys", "user") == "assistant-text"
+
+
+def test_real_path_rejects_a_different_model_than_approved(monkeypatch):
+    _approve_coach(monkeypatch)
+    with patch.object(
+        llm_client, "build_router", return_value=_ReportedModel("openai/gpt-oss-120b")
+    ):
+        with pytest.raises(LLMRequestError, match="identity did not match"):
+            ask("coach", "sys", "user")
 
 
 def test_real_path_per_call_override(monkeypatch):
@@ -207,7 +261,7 @@ def test_real_path_per_call_override(monkeypatch):
             }
         ),
     )
-    _with_keys(monkeypatch, GEMINI_API_KEY="real-key")
+    _with_keys(monkeypatch, GROQ_API_KEY="real-key")
     fake = _FakeCompletion()
     with patch.object(llm_client, "build_router", return_value=fake):
         ask("coach", "sys", "user", temperature=0.9, max_tokens=64)
@@ -233,7 +287,7 @@ def test_real_path_error_becomes_llm_request_error(monkeypatch):
             }
         ),
     )
-    _with_keys(monkeypatch, GEMINI_API_KEY="real-key")
+    _with_keys(monkeypatch, GROQ_API_KEY="real-key")
 
     class _Boom:
         def completion(self, **kwargs):

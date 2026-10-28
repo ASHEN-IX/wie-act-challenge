@@ -1,0 +1,160 @@
+/**
+ * Dev-only demo course: a synthetic normalization text, prepared and indexed through the
+ * real source pipeline, with reviewed quizzes published for the demo learner.
+ *
+ * Requires the learning-demo seed first (instructor@ednova.test and learner@ednova.test).
+ * Loopback MongoDB only. Idempotent: an existing demo course is reported, not duplicated.
+ */
+import { config } from 'dotenv';
+import path from 'node:path';
+import fs from 'node:fs/promises';
+import crypto from 'node:crypto';
+import mongoose from 'mongoose';
+import { Course, CourseRevision, CourseEnrollment } from '../modules/study/src/models';
+import { sourceRoots, contentHash } from '../modules/study/src/services/revisionSources';
+import { prepareRevisionSources } from '../modules/study/src/services/revisionSources';
+import { generateActivityCandidate } from '../modules/study/src/services/courseStudio';
+import { registerActivity } from '../modules/study/src/services/activityAttempt';
+import { publishCourseRevision } from '../modules/study/src/services/coursePublication';
+
+config({ path: path.resolve(__dirname, '../.env') });
+
+const COURSE_TITLE = 'Demo: Database normalization basics';
+const REVISION_TAG = 'rev_demo_1';
+const FILENAME = 'normalization-notes.txt';
+
+// Synthetic teaching text written for this demo. It is not taken from any external source.
+const SOURCE_TEXT = [
+  'Normalization organizes a relational table so that each fact is stored once.',
+  'First normal form (1NF) requires every column to hold atomic values. A column must not contain a list, a set or repeating groups, so a phone list is split into separate rows or a related table.',
+  'Second normal form (2NF) applies to tables with a composite primary key. Every non-key column must depend on the whole key, not on part of it. A column that depends only on the student id in an enrollment table breaks 2NF.',
+  'Third normal form (3NF) requires that non-key columns depend only on the key. If a city depends on a postal code, and the postal code depends on the student, the city belongs in its own table.',
+  'A primary key uniquely identifies each row, but uniqueness alone does not make a table atomic. Atomicity is about the values inside each column, while keys are about row identity.',
+  'Normalization can make writes safer because each fact changes in one place. Denormalization is a deliberate trade-off for read speed and must be justified.',
+].join('\n');
+
+const OBJECTIVES = [
+  { id: 'obj-1nf-atomic', statement: 'Identify values that break first normal form', bloomLevel: 'understand' },
+  { id: 'obj-2nf-dependency', statement: 'Explain partial dependency on a composite key', bloomLevel: 'understand' },
+];
+
+async function userIdFor(email: string): Promise<string> {
+  const identity = await mongoose.connection
+    .collection('auth_users')
+    .findOne({ email }, { projection: { _id: 1 } });
+  if (!identity) throw new Error(`Missing demo account ${email}; run seed:learning-demo first`);
+  return identity._id.toString();
+}
+
+async function main() {
+  const uri = process.env.MONGODB_URI;
+  if (!uri || !['localhost', '127.0.0.1', '[::1]'].includes(new URL(uri).hostname))
+    throw new Error('Demo course seeding requires a loopback MongoDB URI');
+  if (process.env.NODE_ENV === 'production') throw new Error('Demo seeding is development only');
+
+  await mongoose.connect(uri);
+  try {
+    const instructor = await userIdFor('instructor@ednova.test');
+    const learner = await userIdFor('learner@ednova.test');
+
+    const existing = await Course.findOne({ ownerUserId: instructor, title: COURSE_TITLE }).lean();
+    if (existing) {
+      console.log(`Demo course already exists: ${existing._id}`);
+      return;
+    }
+
+    // Personal courses are owner-only, so the learner needs an institutional course:
+    // active membership in the demo institution plus an active enrollment.
+    const institution = await mongoose.connection
+      .collection('institutions')
+      .findOne({ slug: 'ednova-learning-demo' }, { projection: { _id: 1 } });
+    if (!institution) throw new Error('Missing demo institution; run seed:learning-demo first');
+
+    const bytes = Buffer.from(SOURCE_TEXT, 'utf8');
+    const fileHash = contentHash(bytes).replace(/^sha256:/, '');
+    const course = await Course.create({
+      title: COURSE_TITLE,
+      description: 'Synthetic demo course for the learning workspace.',
+      subjectId: 'demo',
+      userId: instructor,
+      ownerUserId: instructor,
+      scope: 'institutional',
+      institutionId: institution._id,
+      assignedInstructorIds: [instructor],
+      status: 'completed',
+      files: [
+        {
+          filename: FILENAME,
+          originalName: FILENAME,
+          size: bytes.length,
+          fileHash,
+          uploadedAt: new Date(),
+        },
+      ],
+    });
+    const courseId = course._id.toString();
+
+    // Same bytes-on-disk layout the upload route writes: uploads/courses/<courseId>/<filename>.
+    const courseDir = path.join(sourceRoots().uploads, 'courses', courseId);
+    await fs.mkdir(courseDir, { recursive: true });
+    await fs.writeFile(path.join(courseDir, FILENAME), bytes);
+
+    const topics = [
+      {
+        title: 'Normalization',
+        subtopics: [
+          {
+            id: 'sub-normalization',
+            title: 'Normal forms',
+            learning_objectives: OBJECTIVES,
+          },
+        ],
+      },
+    ];
+    await CourseRevision.create({
+      courseId,
+      revisionTag: REVISION_TAG,
+      contentHash: crypto.createHash('sha256').update(JSON.stringify(topics)).digest('hex'),
+      status: 'draft',
+      isInstructorReviewed: true,
+      topics,
+    });
+
+    await prepareRevisionSources(instructor, courseId, REVISION_TAG);
+    for (const objective of OBJECTIVES) {
+      const candidate = await generateActivityCandidate(instructor, courseId, {
+        objectiveId: objective.id,
+        activityType: 'InteractiveQuiz',
+      });
+      await registerActivity(
+        instructor,
+        courseId,
+        candidate.candidateActivity,
+        candidate.candidateEvaluation,
+      );
+    }
+    await publishCourseRevision(instructor, courseId, REVISION_TAG);
+
+    await CourseEnrollment.updateOne(
+      { courseId: course._id, userId: learner },
+      {
+        $set: {
+          institutionId: institution._id,
+          status: 'active',
+          enrolledByUserId: instructor,
+        },
+        $setOnInsert: { enrolledAt: new Date() },
+      },
+      { upsert: true },
+    );
+    console.log(`Demo course ready: ${courseId}`);
+    console.log(`Learner ${'learner@ednova.test'} is enrolled.`);
+  } finally {
+    await mongoose.disconnect();
+  }
+}
+
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : 'Demo course seed failed');
+  process.exitCode = 1;
+});
