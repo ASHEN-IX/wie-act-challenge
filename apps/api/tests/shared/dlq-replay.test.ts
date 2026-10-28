@@ -6,7 +6,17 @@
 const { replayDeadLetters } = require('../../shared/ai-messaging/dlq-replay');
 const { EXCHANGE_JOBS, retryHeader } = require('../../shared/ai-messaging/topology');
 
-function fakeMessage({ body = '{"x":1}', messageId, correlationId, headers = {} } = {}) {
+function fakeMessage({
+  body = '{"x":1}',
+  messageId,
+  correlationId,
+  headers = {}
+}: {
+  body?: string;
+  messageId?: string;
+  correlationId?: string;
+  headers?: Record<string, unknown>;
+} = {}) {
   return {
     content: Buffer.from(body),
     properties: {
@@ -18,20 +28,35 @@ function fakeMessage({ body = '{"x":1}', messageId, correlationId, headers = {} 
   };
 }
 
-function fakeChannel(queueContents, queue = 'ai.dlq.study.search.query') {
+type FakeMessage = ReturnType<typeof fakeMessage>;
+function fakeChannel(queueContents: FakeMessage[], queue = 'ai.dlq.study.search.query') {
   const pending = [...queueContents];
-  const state = { published: [], acked: [], nacked: [] };
+  const state = {
+    published: [] as Array<{
+      exchange: string;
+      rk: string;
+      content: Buffer;
+      opts: { messageId?: string; correlationId?: string; headers: Record<string, unknown> };
+    }>,
+    acked: [] as FakeMessage[],
+    nacked: [] as Array<{ msg: FakeMessage; all: boolean; requeue: boolean }>
+  };
   const ch = {
-    publish(exchange, rk, content, opts) {
+    publish(
+      exchange: string,
+      rk: string,
+      content: Buffer,
+      opts: { messageId?: string; correlationId?: string; headers: Record<string, unknown> }
+    ) {
       state.published.push({ exchange, rk, content, opts });
     },
-    ack(msg) {
+    ack(msg: FakeMessage) {
       state.acked.push(msg);
     },
-    nack(msg, all, requeue) {
+    nack(msg: FakeMessage, all: boolean, requeue: boolean) {
       state.nacked.push({ msg, all, requeue });
     },
-    async get(q) {
+    async get(q: string) {
       if (q !== queue) throw new Error('wrong queue ' + q);
       return pending.length ? pending.shift() : null;
     }

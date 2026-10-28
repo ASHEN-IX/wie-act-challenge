@@ -7,7 +7,7 @@ from typing import Optional
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from deps import (
+from services.api.deps import (
     _frame_last_request,
     get_focus_detector,
     get_fatigue_detector,

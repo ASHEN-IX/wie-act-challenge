@@ -1,3 +1,8 @@
+import { canDeliverJob } from '../../../ai-orchestrator/src/services/jobAccess';
+import type { IAiJob } from '../../../ai-orchestrator/src/models/AiJob';
+import { errorDetails } from '@study-partner/shared/errors';
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { Response } from 'express';
 /**
  * Coach API (COACH-10) — async nudge trigger over the job bus.
  *
@@ -36,14 +41,14 @@ const nudgeSchema = Joi.object({
 });
 
 // POST /api/v1/coach/nudge → 202 { jobId }
-router.post('/nudge', tierGate('vip_plus', 'trial'), async (req: any, res: any) => {
+router.post('/nudge', tierGate('vip_plus', 'trial'), async (req: DomainRequest, res: Response) => {
   try {
     const { error, value } = nudgeSchema.validate(req.body || {}, { stripUnknown: true });
     if (error) {
       return res.status(400).json({ error: error.details[0].message });
     }
 
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
 
     let sessionId = value.session_id;
     let session = null;
@@ -67,7 +72,7 @@ router.post('/nudge', tierGate('vip_plus', 'trial'), async (req: any, res: any) 
       sessionId = active._id.toString();
     }
 
-    const payload: Record<string, any> = { session_id: sessionId };
+    const payload: Record<string, unknown> = { session_id: sessionId };
     for (const field of [
       'focus_score',
       'focus_state',
@@ -87,7 +92,7 @@ router.post('/nudge', tierGate('vip_plus', 'trial'), async (req: any, res: any) 
     const streakDays = profile?.stats?.currentStreak ?? 0;
     payload.session_stats = resolveSessionStats({
       session,
-      now: new Date(payload.current_time),
+      now: new Date(String(payload.current_time)),
       currentStreakDays: streakDays
     });
 
@@ -99,7 +104,7 @@ router.post('/nudge', tierGate('vip_plus', 'trial'), async (req: any, res: any) 
     const requestId = req.get('X-Request-ID') || `req-${Date.now()}`;
     const orchestratorUrl = 'module://ai';
 
-    let response: any;
+    let response: { data: { jobId: string; correlationId: string } };
     try {
       response = await moduleClient.post(
         `${orchestratorUrl}/api/v1/ai/jobs`,
@@ -112,10 +117,10 @@ router.post('/nudge', tierGate('vip_plus', 'trial'), async (req: any, res: any) 
           timeout: 10000
         }
       );
-    } catch (err: any) {
+    } catch (err) {
       logger.error('coach_job_create_failed', {
-        status: err.response?.status,
-        error: err.message
+        status: errorDetails(err).status,
+        error: errorDetails(err).message
       });
       return res.status(503).json({ error: 'AI job bus unavailable, retry later' });
     }
@@ -135,21 +140,21 @@ router.post('/nudge', tierGate('vip_plus', 'trial'), async (req: any, res: any) 
       correlationId,
       message: 'Nudge scheduled. Poll /api/v1/coach/jobs/:jobId for completion.'
     });
-  } catch (err: any) {
-    logger.error('coach_nudge_failed', { error: err.message });
+  } catch (err) {
+    logger.error('coach_nudge_failed', { error: errorDetails(err).message });
     return res.status(503).json({ error: 'AI job bus unavailable, retry later' });
   }
 });
 
 // GET /api/v1/coach/jobs/:jobId → status + nudge (owner-scoped)
-router.get('/jobs/:jobId', async (req: any, res: any) => {
+router.get('/jobs/:jobId', async (req: DomainRequest, res: Response) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const job = await mongoose.connection
-      .collection('ai_jobs')
-      .findOne({ jobId: req.params.jobId, userId });
+      .collection<IAiJob>('ai_jobs')
+      .findOne({ jobId: req.params.jobId, userId, type: 'study.coach.nudge' });
 
-    if (!job) {
+    if (!job || !(await canDeliverJob(job))) {
       return res.status(404).json({ error: 'Job not found' });
     }
 
@@ -162,8 +167,8 @@ router.get('/jobs/:jobId', async (req: any, res: any) => {
       createdAt: job.createdAt,
       updatedAt: job.updatedAt
     });
-  } catch (err: any) {
-    logger.error('coach_job_status_failed', { error: err.message });
+  } catch (err) {
+    logger.error('coach_job_status_failed', { error: errorDetails(err).message });
     return res.status(500).json({ error: 'Failed to fetch job status' });
   }
 });

@@ -37,15 +37,42 @@ export interface EvalResultRecord {
  * @param {object} result ai.results envelope {userId, correlationId, messageId, type, status, payload}
  * @returns {EvalResultRecord|null} EvalResult doc fields, or null when not an eval step
  */
-export function buildEvalResultRecord(result: any): EvalResultRecord | null {
-  if (!result || !result.payload || result.type !== EVAL_JOB_TYPE) return null;
+export function buildEvalResultRecord(result: unknown): EvalResultRecord | null {
+  if (
+    !result ||
+    typeof result !== 'object' ||
+    !('type' in result) ||
+    result.type !== EVAL_JOB_TYPE ||
+    !('payload' in result) ||
+    !result.payload ||
+    typeof result.payload !== 'object'
+  )
+    return null;
+  if (
+    !('correlationId' in result) ||
+    typeof result.correlationId !== 'string' ||
+    !('messageId' in result) ||
+    typeof result.messageId !== 'string' ||
+    !('userId' in result) ||
+    typeof result.userId !== 'string'
+  )
+    return null;
 
-  const payload = result.payload;
-  if (typeof payload.sessionId !== 'string' || !Number.isInteger(payload.step)) {
+  const payload = result.payload as Record<string, unknown>;
+  if (
+    typeof payload.sessionId !== 'string' ||
+    typeof payload.step !== 'number' ||
+    !Number.isInteger(payload.step)
+  ) {
     return null;
   }
 
-  const evaluationOutput = payload.evaluation_output || {};
+  const evaluationOutput: Record<string, unknown> =
+    payload.evaluation_output && typeof payload.evaluation_output === 'object'
+      ? (payload.evaluation_output as Record<string, unknown>)
+      : {};
+  const optionalText = (value: unknown): string | null =>
+    typeof value === 'string' ? value : null;
   const scores: Record<string, number> = {};
   for (const field of SCORE_FIELDS) {
     if (typeof evaluationOutput[field] === 'number') {
@@ -56,24 +83,26 @@ export function buildEvalResultRecord(result: any): EvalResultRecord | null {
   return {
     correlationId: result.correlationId,
     messageId: result.messageId,
-    // userId comes from the authenticated result envelope — the only trusted
-    // source of identity (the payload deliberately never carries a userId).
+    // The consumer supplies the correlated persisted job actor here. A broker
+    // payload or callback actor claim never establishes learner authority.
     userId: result.userId,
     sessionId: payload.sessionId,
     step: payload.step,
-    status: payload.state || evaluationOutput.session_status || 'CONTINUE',
+    status:
+      optionalText(payload.state) || optionalText(evaluationOutput.session_status) || 'CONTINUE',
     masteryScore: typeof payload.mastery_score === 'number' ? payload.mastery_score : null,
     scores,
     nextQuestion:
       evaluationOutput.next_question !== undefined && evaluationOutput.next_question !== null
-        ? evaluationOutput.next_question
-        : payload.next_question || null,
+        ? optionalText(evaluationOutput.next_question)
+        : optionalText(payload.next_question) || null,
     demonstratedBloomLevel:
       payload.demonstratedBloomLevel !== undefined && payload.demonstratedBloomLevel !== null
-        ? payload.demonstratedBloomLevel
-        : evaluationOutput.demonstrated_bloom_level || null,
-    objectiveId: payload.objectiveId !== undefined ? payload.objectiveId : null,
-    targetBloomLevel: payload.targetBloomLevel !== undefined ? payload.targetBloomLevel : null
+        ? optionalText(payload.demonstratedBloomLevel)
+        : optionalText(evaluationOutput.demonstrated_bloom_level) || null,
+    objectiveId: payload.objectiveId !== undefined ? optionalText(payload.objectiveId) : null,
+    targetBloomLevel:
+      payload.targetBloomLevel !== undefined ? optionalText(payload.targetBloomLevel) : null
   };
 }
 

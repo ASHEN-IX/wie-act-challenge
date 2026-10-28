@@ -12,9 +12,9 @@ logger = get_logger(__name__)
 class LLMDecomposerReal:
     """
     Real LLM decomposer routed through the shared LiteLLM client (S-MIG-01).
-    The `planner` model is configured in litellm/config.yaml; without any
-    provider key the call short-circuits to `None` so the caller can fall back
-    to the rule-based `SimpleGoalDecomposer`.
+    The `planner` model is configured in litellm/config.yaml. Explicit mock mode
+    without a responder returns an empty task list so the caller can use the
+    existing rule-based `SimpleGoalDecomposer`. Provider failures retain retries.
     """
 
     def __init__(self, endpoint: str | None = None):
@@ -142,11 +142,10 @@ class LLMDecomposerReal:
         try:
             raw = ask("planner", system, user_prompt)
         except MissingMockResponderError:
-            # No provider key and no mock responder → deterministic rule
-            # fallback (SimpleGoalDecomposer) wins, as in the LM Studio era
-            # when no local model was running.
+            # Explicit mock mode without a responder is not malformed output.
+            # An empty task list selects the caller's existing rule fallback.
             logger.info("planner_llm_unavailable_rule_fallback")
-            return None
+            return []
         except LLMRequestError as exc:
             # COACH-08 parity: transient timeout/quota/infra failures surface
             # as RetryableError so the job-bus retry policy (AI-COM-06) owns

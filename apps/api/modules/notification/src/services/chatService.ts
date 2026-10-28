@@ -1,3 +1,19 @@
+interface SearchSource {
+  title?: string;
+  source?: string;
+  snippet?: string;
+  content?: string;
+  url?: string;
+  relevance_score?: number;
+  relevanceScore?: number;
+}
+interface SearchResponse {
+  answer?: string;
+  response?: string;
+  summary?: string;
+  sources?: SearchSource[];
+  results?: SearchSource[];
+}
 import moduleClient from '@study-partner/shared/moduleClient';
 import { getBaseUrl } from '@study-partner/shared/aiClient';
 import SessionChat, { ISessionChat } from '../models/SessionChat';
@@ -29,7 +45,7 @@ export interface StoreResultMessageArgs {
   userId: string;
   query: string;
   answer?: string;
-  results?: any[];
+  results?: SearchSource[];
 }
 
 export async function storeResultMessage({
@@ -63,8 +79,12 @@ export interface RunSearchArgs {
   sessionId: string;
 }
 
-export async function runSearch({ question, userId, sessionId }: RunSearchArgs): Promise<any> {
-  const response = await moduleClient.post(
+export async function runSearch({
+  question,
+  userId,
+  sessionId
+}: RunSearchArgs): Promise<SearchResponse> {
+  const response: { data: SearchResponse } = await moduleClient.post(
     `${AI_SERVICE_URL}/api/ai/search/ask`,
     {
       question,
@@ -83,11 +103,7 @@ export interface ProcessSearchQueryArgs {
   query: string;
 }
 
-export async function processSearchQuery({
-  sessionId,
-  userId,
-  query
-}: ProcessSearchQueryArgs): Promise<any> {
+export async function processSearchQuery({ sessionId, userId, query }: ProcessSearchQueryArgs) {
   await storeQueryMessage({ sessionId, userId, query });
 
   const aiResult = await runSearch({ question: query, userId, sessionId });
@@ -119,12 +135,8 @@ export interface GetHistoryArgs {
   offset?: number;
 }
 
-export async function getHistory({
-  sessionId,
-  limit = 50,
-  offset = 0
-}: GetHistoryArgs): Promise<any[]> {
-  const items = await SessionChat.find({ sessionId })
+export async function getHistory({ sessionId, limit = 50, offset = 0 }: GetHistoryArgs) {
+  const items = await SessionChat.find({ sessionId, messageType: { $ne: 'peer_stream' } })
     .sort({ createdAt: -1 })
     .skip(offset)
     .limit(limit)
@@ -145,7 +157,7 @@ export async function deleteMessage({
 }: DeleteMessageArgs): Promise<{ deleted: boolean; reason?: string }> {
   const message = await SessionChat.findOne({ _id: messageId, sessionId });
   if (!message) return { deleted: false, reason: 'not_found' };
-  if (String(message.userId) !== String(userId)) {
+  if (message.messageType === 'peer_stream' || String(message.userId) !== String(userId)) {
     return { deleted: false, reason: 'forbidden' };
   }
   await SessionChat.deleteOne({ _id: messageId });

@@ -1,6 +1,8 @@
 export interface ActionState {
   error?: string;
   success?: string;
+  destination?: string;
+  destinationLabel?: string;
   jobId?: string;
   correlationId?: string;
 }

@@ -1,3 +1,4 @@
+import { errorDetails } from '@study-partner/shared/errors';
 import VoiceSession, { IVoiceSession } from '../models/VoiceSession';
 
 function findParticipantIndex(session: IVoiceSession, userId: string): number {
@@ -7,9 +8,17 @@ function findParticipantIndex(session: IVoiceSession, userId: string): number {
 export async function ensureVoiceSession(sessionId: string): Promise<IVoiceSession> {
   let session = await VoiceSession.findOne({ sessionId });
   if (!session) {
-    session = await VoiceSession.create({ sessionId, isActive: true, participants: [] });
+    try {
+      session = await VoiceSession.create({ sessionId, isActive: true, participants: [] });
+    } catch (err) {
+      if (errorDetails(err).code === 11000) {
+        session = await VoiceSession.findOne({ sessionId });
+      } else {
+        throw err;
+      }
+    }
   }
-  return session;
+  return session!;
 }
 
 export async function startVoiceSession(sessionId: string): Promise<IVoiceSession> {
@@ -136,7 +145,7 @@ export async function updateSpeakingStatus({
   return session;
 }
 
-export async function getVoiceStatus(sessionId: string): Promise<any | null> {
+export async function getVoiceStatus(sessionId: string) {
   const session = await VoiceSession.findOne({ sessionId }).lean();
   if (!session) return null;
 

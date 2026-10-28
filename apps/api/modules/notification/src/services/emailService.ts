@@ -1,15 +1,16 @@
 import moduleClient from '@study-partner/shared/moduleClient';
 import nodemailer from 'nodemailer';
 import type { Request } from 'express';
+import type { INotification } from '../models/Notification';
 
-let transporter: any = null;
+let transporter: ReturnType<typeof nodemailer.createTransport> | null = null;
 let mailerDisabled = false;
 
 export const isEmailEnabled = (): boolean => {
   return process.env.EMAIL_NOTIFICATIONS_ENABLED === 'true';
 };
 
-export const getTransporter = (): any => {
+export const getTransporter = (): ReturnType<typeof nodemailer.createTransport> | null => {
   if (mailerDisabled || !isEmailEnabled()) {
     return null;
   }
@@ -42,7 +43,7 @@ export const getTransporter = (): any => {
   }
 };
 
-const escapeHtml = (value: any): string =>
+const escapeHtml = (value: unknown): string =>
   String(value ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -58,11 +59,15 @@ export const resolveUserEmail = async ({ req }: { req: Request }): Promise<strin
 
   const AUTH_SERVICE_URL = 'module://auth';
   try {
-    const meRes: any = await moduleClient.get(`${AUTH_SERVICE_URL}/api/v1/auth/me`, {
-      headers: { Cookie: authHeader },
-      timeout: 5000
-    });
-    return meRes.data?.user?.email || null;
+    const meRes: { data?: { user?: { email?: unknown } } } = await moduleClient.get(
+      `${AUTH_SERVICE_URL}/api/v1/auth/me`,
+      {
+        headers: { Cookie: authHeader },
+        timeout: 5000
+      }
+    );
+    const email = meRes.data?.user?.email;
+    return typeof email === 'string' ? email || null : null;
   } catch {
     return null;
   }
@@ -72,7 +77,7 @@ export interface BuildEmailTemplateArgs {
   title: string;
   message: string;
   type: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export const buildEmailTemplate = ({
@@ -126,7 +131,7 @@ export const sendNotificationEmail = async ({
   notification
 }: {
   req: Request;
-  notification: any;
+  notification: Pick<INotification, 'title' | 'message' | 'type' | 'metadata'>;
 }): Promise<{ sent: boolean; reason?: string }> => {
   const t = getTransporter();
   if (!t) return { sent: false, reason: 'email_disabled' };

@@ -1,3 +1,6 @@
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { Response, NextFunction } from 'express';
+import type { ContractHandler } from '@study-partner/shared/domainContracts';
 /**
  * SEC-10 — Mass-assignment protection regression tests.
  */
@@ -30,7 +33,7 @@ jest.mock('@study-partner/shared/moduleClient', () => ({
 jest.mock('../models', () => {
   const createFn = jest
     .fn()
-    .mockImplementation((doc: any) => Promise.resolve({ _id: 'new-1', ...doc }));
+    .mockImplementation((doc: object) => Promise.resolve({ _id: 'new-1', ...doc }));
   const findFn = jest.fn();
   const findOneFn = jest.fn();
   const updateOneFn = jest.fn();
@@ -64,13 +67,13 @@ jest.mock('../models', () => {
 });
 
 jest.mock('@study-partner/shared/middleware', () => ({
-  asyncHandler: (fn: any) => (req: any, res: any, next: any) =>
+  asyncHandler: (fn: ContractHandler) => (req: DomainRequest, res: Response, next: NextFunction) =>
     Promise.resolve(fn(req, res, next)).catch(next)
 }));
 
 jest.mock('@study-partner/shared/auth', () => ({
-  requireAuth: (req: any, res: any, next: any) => next(),
-  requireRole: () => (req: any, res: any, next: any) => next(),
+  requireAuth: (req: DomainRequest, res: Response, next: NextFunction) => next(),
+  requireRole: () => (req: DomainRequest, res: Response, next: NextFunction) => next(),
   buildInternalHeaders: () => ({})
 }));
 
@@ -84,8 +87,8 @@ import request from 'supertest';
 // ── Shared app ──────────────────────────────────────────────────────
 const app = express();
 app.use(express.json());
-app.use((req: any, _res: any, next: any) => {
-  req.user = { userId: 'user-123' };
+app.use((req: DomainRequest, _res: Response, next: NextFunction) => {
+  req.user = { userId: 'user-123', role: 'student' };
   req.headers.cookie = 'mindflow.test_session=tok';
   next();
 });
@@ -145,7 +148,7 @@ describe('SEC-10 task routes reject privileged fields', () => {
   });
 
   it('PUT /tasks/:id updates with stripped body', async () => {
-    const task: any = mockTask();
+    const task = mockTask();
     MockTask.findOne.mockResolvedValue(task);
 
     const res = await request(app)
@@ -154,9 +157,9 @@ describe('SEC-10 task routes reject privileged fields', () => {
 
     expect(res.status).toBe(200);
     expect(task.save).toHaveBeenCalled();
-    expect(task.role).toBeUndefined();
-    expect(task.isAdmin).toBeUndefined();
-    expect(task.tier).toBeUndefined();
+    expect(Reflect.get(task, 'role')).toBeUndefined();
+    expect(Reflect.get(task, 'isAdmin')).toBeUndefined();
+    expect(Reflect.get(task, 'tier')).toBeUndefined();
     expect(task.status).toBe('completed');
   });
 });
@@ -176,7 +179,7 @@ describe('SEC-10 topic routes reject privileged fields', () => {
   });
 
   it('PUT /topics/:id updates with stripped body', async () => {
-    const topic: any = {
+    const topic = {
       _id: 'topic-1',
       userId: 'user-123',
       name: 'Math',
@@ -188,7 +191,7 @@ describe('SEC-10 topic routes reject privileged fields', () => {
 
     expect(res.status).toBe(200);
     expect(topic.name).toBe('Physics');
-    expect(topic.role).toBeUndefined();
+    expect(Reflect.get(topic, 'role')).toBeUndefined();
   });
 });
 
@@ -212,7 +215,7 @@ describe('SEC-10 core session routes reject privileged fields', () => {
   });
 
   it('PUT /sessions/:id completes with stripped body', async () => {
-    const session: any = mockSession({
+    const session = mockSession({
       startTime: new Date('2026-01-01T10:00:00Z'),
       endTime: null
     });
@@ -224,8 +227,8 @@ describe('SEC-10 core session routes reject privileged fields', () => {
 
     expect(res.status).toBe(200);
     expect(session.save).toHaveBeenCalled();
-    expect(session.role).toBeUndefined();
-    expect(session.isAdmin).toBeUndefined();
+    expect(Reflect.get(session, 'role')).toBeUndefined();
+    expect(Reflect.get(session, 'isAdmin')).toBeUndefined();
     expect(session.status).toBe('completed');
   });
 });
@@ -233,7 +236,7 @@ describe('SEC-10 core session routes reject privileged fields', () => {
 // ── Challenge session tests ─────────────────────────────────────────
 describe('SEC-10 challenge session complete rejects privileged fields', () => {
   it('PUT /challenge/:id/complete assigns only allowed fields', async () => {
-    const session: any = mockSession({ mode: 'exam', status: 'active' });
+    const session = mockSession({ mode: 'exam', status: 'active' });
     MockStudySession.findOne.mockResolvedValue(session);
 
     const res = await request(app).put('/challenge/session-1/complete').send({
@@ -246,10 +249,10 @@ describe('SEC-10 challenge session complete rejects privileged fields', () => {
 
     expect(res.status).toBe(200);
     expect(session.save).toHaveBeenCalled();
-    expect(session.role).toBeUndefined();
+    expect(Reflect.get(session, 'role')).toBeUndefined();
     expect(session.mode).toBe('exam');
     expect(session.status).toBe('completed');
     expect(session.duration).toBe(30);
-    expect(session.focusScore).toBe(90);
+    expect(Reflect.get(session, 'focusScore')).toBe(90);
   });
 });

@@ -1,3 +1,6 @@
+import { errorDetails } from '@study-partner/shared/errors';
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { Response } from 'express';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { createContracts } = require('@study-partner/shared/domainContracts');
 import multer from 'multer';
@@ -32,9 +35,9 @@ const upload = multer({
 });
 
 // Get all subjects for a user
-router.get('/', async (req: any, res: any) => {
+router.get('/', async (req: DomainRequest, res: Response) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
 
     const subjects = await Subject.find({ userId }).sort({ createdAt: -1 });
 
@@ -65,9 +68,9 @@ router.get('/', async (req: any, res: any) => {
 });
 
 // Create a new subject
-router.post('/', upload.single('image'), async (req: any, res: any) => {
+router.post('/', upload.single('image'), async (req: DomainRequest, res: Response) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const { name, description } = req.body;
 
     if (!name) {
@@ -104,11 +107,11 @@ router.post('/', upload.single('image'), async (req: any, res: any) => {
       await moduleClient.post(`${USER_PROFILE_URL}/api/v1/users/gamification/award-xp`, payload, {
         headers: buildInternalHeaders(req.headers.cookie)
       });
-    } catch (xpErr: any) {
-      const respData = xpErr && xpErr.response ? xpErr.response.data : null;
+    } catch (xpErr) {
+      const respData = errorDetails(xpErr).data ?? null;
       console.warn(
         'XP award failed for subject creation:',
-        xpErr && xpErr.message,
+        xpErr && (xpErr instanceof Error ? xpErr.message : String(xpErr)),
         'responseData:',
         respData
       );
@@ -132,10 +135,10 @@ router.post('/', upload.single('image'), async (req: any, res: any) => {
 });
 
 // Get a specific subject
-router.get('/:subjectId', async (req: any, res: any) => {
+router.get('/:subjectId', async (req: DomainRequest, res: Response) => {
   try {
     const { subjectId } = req.params;
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
 
     const subject = await Subject.findOne({ _id: subjectId, userId });
 
@@ -167,11 +170,11 @@ router.get('/:subjectId', async (req: any, res: any) => {
 });
 
 // Update a subject
-router.put('/:subjectId', upload.single('image'), async (req: any, res: any) => {
+router.put('/:subjectId', upload.single('image'), async (req: DomainRequest, res: Response) => {
   try {
     const { subjectId } = req.params;
     const { name, description } = req.body;
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
 
     const subject = await Subject.findOne({ _id: subjectId, userId });
 
@@ -208,10 +211,10 @@ router.put('/:subjectId', upload.single('image'), async (req: any, res: any) => 
 });
 
 // Delete a subject
-router.delete('/:subjectId', async (req: any, res: any) => {
+router.delete('/:subjectId', async (req: DomainRequest, res: Response) => {
   try {
     const { subjectId } = req.params;
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
 
     const subject = await Subject.findOneAndDelete({ _id: subjectId, userId });
 

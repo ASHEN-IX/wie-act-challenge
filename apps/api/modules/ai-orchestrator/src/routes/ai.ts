@@ -1,14 +1,46 @@
+import { canReadCourse } from '../../../study/src/services/resourceAccess';
 import { createContracts } from '@study-partner/shared/domainContracts';
 import Joi from 'joi';
 import moduleClient from '@study-partner/shared/moduleClient';
 import FormData from 'form-data';
 import { createProxy } from '../utils/proxyBuilder';
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { Response } from 'express';
+import { errorDetails } from '@study-partner/shared/errors';
 import { tierGate } from '@study-partner/shared/tierGate';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const aiClient = require('@study-partner/shared/aiClient');
 const AI_URL = (aiClient.getBaseUrl ? aiClient.getBaseUrl() : null) || 'http://localhost:8000';
 const router = createContracts();
+
+// Upstream JSON is untrusted; only object responses support these projections.
+function responseObject(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Invalid AI response object');
+  }
+  return value as Record<string, unknown>;
+}
+// Consume the current Study-owned projection instead of asking Python to
+// resolve a raw ID against an unscoped course collection.
+async function authorizedCourseContext(req: DomainRequest, courseId: string) {
+  const response = await moduleClient.get<{
+    course: { id: string; title: string; topics?: unknown[] };
+  }>(`module://study/api/v1/study/courses/${encodeURIComponent(courseId)}`, {
+    headers: { Cookie: req.headers.cookie }
+  });
+  const course = response.data.course;
+  if (!course || course.id !== courseId) throw new Error('Authorized context unavailable');
+  return { _id: course.id, title: course.title, topics: course.topics || [] };
+}
+
+interface AvailabilitySlot {
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  label?: string;
+  isRecurring?: boolean;
+}
 
 // Validation Schemas
 const ingestCourseSchema = Joi.object({
@@ -74,14 +106,14 @@ router.post(
     tier: ['vip', 'vip_plus', 'trial'],
     schema: ingestCourseSchema,
     userIdField: 'userId',
-    mapResponse: (data) => ({ message: 'Course ingested successfully', ...data })
+    mapResponse: (data) => ({ message: 'Course ingested successfully', ...responseObject(data) })
   })
 );
 router.get(
   '/plan/list',
   ...createProxy({
     method: 'GET',
-    path: (req: any) => `/api/ai/planner/plans/${req.user.userId}`,
+    path: (req) => `/api/ai/planner/plans/${req.user!.userId}`,
     targetUrl: AI_URL,
     tier: ['vip', 'vip_plus', 'trial'],
     mapResponse: (data) => ({ plans: data })
@@ -95,16 +127,18 @@ router.post(
     targetUrl: AI_URL,
     timeout: 120000,
     schema: generatePlanSchema,
-    mapBody: (req: any) => {
+    mapBody: async (req) => {
       const { courseId, deadline, hoursPerWeek } = req.body;
+      const course_knowledge = await authorizedCourseContext(req, courseId);
       return {
-        user_id: req.user.userId,
+        user_id: req.user!.userId,
         goal: `Complete course ${courseId || 'general'} by ${deadline || 'flexible'}`,
         available_time_minutes: (hoursPerWeek || 10) * 60,
-        course_id: courseId
+        course_id: courseId,
+        course_knowledge
       };
     },
-    mapResponse: (data) => ({ message: 'Study plan generated', ...data })
+    mapResponse: (data) => ({ message: 'Study plan generated', ...responseObject(data) })
   })
 );
 router.post(
@@ -116,12 +150,12 @@ router.post(
     timeout: 120000,
     tier: ['vip', 'vip_plus', 'trial'],
     schema: scheduleTasksSchema,
-    mapBody: (req: any) => ({
-      user_id: req.user.userId,
+    mapBody: (req) => ({
+      user_id: req.user!.userId,
       plan_id: req.body.planId,
       preferences: req.body.preferences
     }),
-    mapResponse: (data) => ({ message: 'Tasks scheduled', ...data })
+    mapResponse: (data) => ({ message: 'Tasks scheduled', ...responseObject(data) })
   })
 );
 router.post(
@@ -143,7 +177,7 @@ router.post(
     targetUrl: AI_URL,
     tier: ['vip_plus', 'trial'],
     schema: Joi.object({ coach_action: Joi.object().required() }),
-    mapBody: (req: any) => ({ user_id: req.user.userId, coach_action: req.body.coach_action }),
+    mapBody: (req) => ({ user_id: req.user!.userId, coach_action: req.body.coach_action }),
     mapResponse: (data) => ({ message: 'Coach action applied to schedule', result: data })
   })
 );
@@ -151,7 +185,7 @@ router.get(
   '/schedule/status',
   ...createProxy({
     method: 'GET',
-    path: (req: any) => `/api/ai/scheduler/status/${req.user.userId}`,
+    path: (req) => `/api/ai/scheduler/status/${req.user!.userId}`,
     targetUrl: AI_URL,
     tier: ['vip', 'vip_plus', 'trial']
   })
@@ -166,7 +200,7 @@ router.put(
     schema: Joi.object({
       reason: Joi.string().trim().max(500).optional().default('manual_optimize')
     }),
-    mapBody: (req: any) => ({ user_id: req.user.userId, reason: req.body.reason }),
+    mapBody: (req) => ({ user_id: req.user!.userId, reason: req.body.reason }),
     mapResponse: (data) => ({ message: 'Schedule optimization complete', result: data })
   })
 );
@@ -216,7 +250,7 @@ router.get(
   '/vector/status/:courseId',
   ...createProxy({
     method: 'GET',
-    path: (req: any) => `/api/ai/vector/status/${req.params.courseId}`,
+    path: (req) => `/api/ai/vector/status/${req.params.courseId}`,
     targetUrl: AI_URL,
     tier: ['vip', 'vip_plus', 'trial']
   })
@@ -225,7 +259,7 @@ router.post(
   '/vector/rebuild/:courseId',
   ...createProxy({
     method: 'POST',
-    path: (req: any) => `/api/ai/vector/rebuild/${req.params.courseId}`,
+    path: (req) => `/api/ai/vector/rebuild/${req.params.courseId}`,
     targetUrl: AI_URL,
     tier: ['vip', 'vip_plus', 'trial']
   })
@@ -238,7 +272,7 @@ router.post(
     targetUrl: AI_URL,
     tier: ['vip_plus', 'trial'],
     schema: coachAdviceSchema,
-    mapBody: (req: any) => {
+    mapBody: (req) => {
       const {
         ignored_count = 0,
         do_not_disturb = false,
@@ -247,7 +281,7 @@ router.post(
         fatigue_score,
         fatigue_state
       } = req.body;
-      const payload: any = {
+      const payload: Record<string, unknown> = {
         user_id: req.user?.userId || 'anonymous',
         ignored_count,
         do_not_disturb
@@ -258,21 +292,25 @@ router.post(
       if (fatigue_state) payload.fatigue_state = fatigue_state;
       return payload;
     },
-    mapResponse: (data) => ({
-      message: 'Coach executed successfully',
-      action_type: data.coach_action.action_type,
-      coach_message: data.coach_action.message,
-      reasoning: data.coach_action.reasoning,
-      schedule_update: data.schedule_update,
-      timestamp: new Date().toISOString()
-    })
+    mapResponse: (data) => {
+      const result = responseObject(data);
+      const action = responseObject(result.coach_action);
+      return {
+        message: 'Coach executed successfully',
+        action_type: action.action_type,
+        coach_message: action.message,
+        reasoning: action.reasoning,
+        schedule_update: result.schedule_update,
+        timestamp: new Date().toISOString()
+      };
+    }
   })
 );
 router.get(
   '/coach/history/:userId',
   ...createProxy({
     method: 'GET',
-    path: (req: any) => `/api/ai/coach/history/${req.params.userId}`,
+    path: (req) => `/api/ai/coach/history/${req.params.userId}`,
     targetUrl: AI_URL,
     tier: ['vip_plus', 'trial'],
     requireOwnership: true,
@@ -283,7 +321,7 @@ router.get(
   '/signals/current/:userId',
   ...createProxy({
     method: 'GET',
-    path: (req: any) => `/api/ai/signals/current/${req.params.userId}`,
+    path: (req) => `/api/ai/signals/current/${req.params.userId}`,
     targetUrl: AI_URL,
     tier: ['vip_plus', 'trial'],
     requireOwnership: true
@@ -293,7 +331,7 @@ router.get(
   '/signals/history/:userId',
   ...createProxy({
     method: 'GET',
-    path: (req: any) => `/api/ai/signals/history/${req.params.userId}`,
+    path: (req) => `/api/ai/signals/history/${req.params.userId}`,
     targetUrl: AI_URL,
     tier: ['vip_plus', 'trial'],
     requireOwnership: true,
@@ -307,14 +345,14 @@ router.post(
     path: '/api/ai/signals/process',
     targetUrl: AI_URL,
     tier: ['vip_plus', 'trial'],
-    mapBody: (req: any) => ({ user_id: req.user?.userId })
+    mapBody: (req) => ({ user_id: req.user?.userId })
   })
 );
 router.get(
   '/signals/latest/:userId',
   ...createProxy({
     method: 'GET',
-    path: (req: any) => `/api/ai/signals/latest/${req.params.userId}`,
+    path: (req) => `/api/ai/signals/latest/${req.params.userId}`,
     targetUrl: AI_URL,
     tier: ['vip_plus', 'trial'],
     requireOwnership: true,
@@ -325,7 +363,7 @@ router.get(
   '/search/history/:userId',
   ...createProxy({
     method: 'GET',
-    path: (req: any) => `/api/ai/search/history/${req.params.userId}`,
+    path: (req) => `/api/ai/search/history/${req.params.userId}`,
     targetUrl: AI_URL,
     tier: ['vip', 'vip_plus', 'trial'],
     requireOwnership: true,
@@ -336,7 +374,7 @@ router.delete(
   '/search/history/:userId',
   ...createProxy({
     method: 'DELETE',
-    path: (req: any) => `/api/ai/search/history/${req.params.userId}`,
+    path: (req) => `/api/ai/search/history/${req.params.userId}`,
     targetUrl: AI_URL,
     tier: ['vip', 'vip_plus', 'trial'],
     requireOwnership: true
@@ -349,7 +387,7 @@ router.post(
     path: '/api/ai/reviews/schedule',
     targetUrl: AI_URL,
     tier: ['vip', 'vip_plus', 'trial'],
-    mapBody: (req: any) => ({ ...req.body, user_id: req.user?.userId })
+    mapBody: (req) => ({ ...req.body, user_id: req.user?.userId })
   })
 );
 router.post(
@@ -359,7 +397,7 @@ router.post(
     path: '/api/ai/reviews/record-result',
     targetUrl: AI_URL,
     tier: ['vip', 'vip_plus', 'trial'],
-    mapBody: (req: any) => ({
+    mapBody: (req) => ({
       user_id: req.user?.userId,
       review_id:
         req.body?.review_id ||
@@ -369,7 +407,8 @@ router.post(
         req.body?.topicId,
       quality_score: req.body?.quality_score ?? req.body?.qualityScore ?? req.body?.quality
     }),
-    validateBody: (body: any) => {
+    validateBody: (value) => {
+      const body = responseObject(value);
       if (!body.user_id || !body.review_id || body.quality_score === undefined) {
         return 'Invalid review result payload. Required fields: user_id, review_id, quality_score';
       }
@@ -380,7 +419,7 @@ router.get(
   '/reviews/pending/:userId',
   ...createProxy({
     method: 'GET',
-    path: (req: any) => `/api/ai/reviews/pending/${req.params.userId}`,
+    path: (req) => `/api/ai/reviews/pending/${req.params.userId}`,
     targetUrl: AI_URL,
     tier: ['vip', 'vip_plus', 'trial'],
     requireOwnership: true,
@@ -391,7 +430,7 @@ router.get(
   '/reviews/stats/:userId',
   ...createProxy({
     method: 'GET',
-    path: (req: any) => `/api/ai/reviews/stats/${req.params.userId}`,
+    path: (req) => `/api/ai/reviews/stats/${req.params.userId}`,
     targetUrl: AI_URL,
     tier: ['vip', 'vip_plus', 'trial'],
     requireOwnership: true
@@ -400,121 +439,137 @@ router.get(
 
 // Custom Routes (multi-service orchestration, multipart, special error handling)
 
-router.post('/plan/create', tierGate('vip', 'vip_plus', 'trial'), async (req: any, res: any) => {
-  const { error } = planCreateSchema.validate(req.body);
-  if (error) return res.status(400).json({ error: error.details[0].message });
+router.post(
+  '/plan/create',
+  tierGate('vip', 'vip_plus', 'trial'),
+  async (req: DomainRequest, res: Response) => {
+    const { error } = planCreateSchema.validate(req.body);
+    if (error) return res.status(400).json({ error: error.details[0].message });
 
-  const userId = req.user.userId;
-  const { goal, available_time_minutes, course_id, start_date } = req.body;
+    const userId = req.user!.userId;
+    const { goal, available_time_minutes, course_id, start_date } = req.body;
 
-  try {
-    const USER_PROFILE_URL = 'module://users';
-    let calendar_events: any[] = [];
     try {
-      const availabilityResponse = await (moduleClient as any).get(
-        `${USER_PROFILE_URL}/api/v1/users/availability`,
-        { headers: { Cookie: req.headers.cookie } }
-      );
-      calendar_events = availabilityResponse.data.map((s: any) => ({
-        day_of_week: s.dayOfWeek,
-        start_time: s.startTime,
-        end_time: s.endTime,
-        label: s.label || 'Blocked',
-        is_recurring: s.isRecurring !== false
-      }));
-    } catch (availErr: any) {
-      console.warn('Failed to fetch user availability:', availErr.message);
-    }
+      const USER_PROFILE_URL = 'module://users';
+      let calendar_events: {
+        day_of_week: number;
+        start_time: string;
+        end_time: string;
+        label: string;
+        is_recurring: boolean;
+      }[] = [];
+      try {
+        const availabilityResponse = await moduleClient.get<AvailabilitySlot[]>(
+          `${USER_PROFILE_URL}/api/v1/users/availability`,
+          { headers: { Cookie: req.headers.cookie } }
+        );
+        calendar_events = availabilityResponse.data.map((s) => ({
+          day_of_week: s.dayOfWeek,
+          start_time: s.startTime,
+          end_time: s.endTime,
+          label: s.label || 'Blocked',
+          is_recurring: s.isRecurring !== false
+        }));
+      } catch (availErr) {
+        console.warn('Failed to fetch user availability:', errorDetails(availErr).message);
+      }
 
-    const response = await (moduleClient as any).post(
-      `${AI_URL}/api/ai/planner/create-plan`,
-      { user_id: userId, goal, available_time_minutes, course_id, start_date, calendar_events },
-      { timeout: 60000 }
-    );
-    res.json({ message: 'Study plan created successfully', plan: response.data });
-  } catch (err: any) {
-    console.error('Plan creation failed:', err.message);
-    if (err.response) {
-      res
-        .status(err.response.status)
-        .json({ error: 'Plan creation failed', details: err.response.data.detail || err.message });
-    } else if (err.request) {
-      res
-        .status(503)
-        .json({ error: 'AI service unavailable', details: 'Cannot connect to Python AI service' });
-    } else {
-      res.status(500).json({ error: 'Plan creation failed', details: err.message });
+      const course_knowledge = course_id
+        ? await authorizedCourseContext(req, course_id)
+        : undefined;
+      const response = await moduleClient.post(
+        `${AI_URL}/api/ai/planner/create-plan`,
+        {
+          user_id: userId,
+          goal,
+          available_time_minutes,
+          course_id,
+          course_knowledge,
+          start_date,
+          calendar_events
+        },
+        { timeout: 60000 }
+      );
+      if (course_id && !(await canReadCourse(userId, course_id)))
+        return res.status(404).json({ error: 'Resource not found' });
+      res.json({ message: 'Study plan created successfully', plan: response.data });
+    } catch (err) {
+      console.error('Plan creation failed:', errorDetails(err).code || 'AI_UPSTREAM_ERROR');
+      return res
+        .status(errorDetails(err).status ? 502 : 503)
+        .json({ error: 'AI service unavailable' });
     }
   }
-});
+);
 
-router.post('/signals/analyze-frame', tierGate('vip_plus', 'trial'), async (req: any, res: any) => {
-  try {
-    const formData = new FormData();
-    formData.append('user_id', req.user.userId);
-    if (req.file) {
-      formData.append('frame', req.file.buffer, {
-        filename: 'frame.jpg',
-        contentType: req.file.mimetype
-      });
-    } else if (req.files?.frame) {
-      const frame = Array.isArray(req.files.frame) ? req.files.frame[0] : req.files.frame;
-      formData.append('frame', frame.data, { filename: frame.name, contentType: frame.mimetype });
-    }
-    const response = await (moduleClient as any).post(
-      `${AI_URL}/api/ai/signals/analyze-frame`,
-      formData,
-      {
+router.post(
+  '/signals/analyze-frame',
+  tierGate('vip_plus', 'trial'),
+  async (req: DomainRequest, res: Response) => {
+    try {
+      const formData = new FormData();
+      formData.append('user_id', req.user!.userId);
+      if (req.file) {
+        formData.append('frame', req.file.buffer, {
+          filename: 'frame.jpg',
+          contentType: req.file.mimetype
+        });
+      } else if (req.files?.frame) {
+        const frame = Array.isArray(req.files.frame) ? req.files.frame[0] : req.files.frame;
+        formData.append('frame', frame.data, { filename: frame.name, contentType: frame.mimetype });
+      }
+      const response = await moduleClient.post(`${AI_URL}/api/ai/signals/analyze-frame`, formData, {
         headers: formData.getHeaders(),
         timeout: 30000,
         maxContentLength: 10 * 1024 * 1024
-      }
-    );
-    res.json(response.data);
-  } catch (err: any) {
-    console.error('Frame analysis proxy failed:', err.message);
-    if (err.response) res.status(err.response.status).json(err.response.data);
-    else res.status(503).json({ error: 'AI service unavailable' });
-  }
-});
-
-router.post('/search/ask', tierGate('vip', 'vip_plus', 'trial'), async (req: any, res: any) => {
-  const normalizedBody: any = {
-    question: (req.body?.question || req.body?.query || '').toString().trim()
-  };
-  if (req.user?.userId) normalizedBody.user_id = req.user.userId;
-  if (req.body?.session_id) normalizedBody.session_id = req.body.session_id;
-
-  const { error } = searchAskSchema.validate(normalizedBody);
-  if (error) return res.status(400).json({ error: error.details[0].message });
-
-  try {
-    const response = await (moduleClient as any).post(
-      `${AI_URL}/api/ai/search/ask`,
-      normalizedBody,
-      {
-        timeout: 120000
-      }
-    );
-    res.json(response.data);
-  } catch (err: any) {
-    if (err.code === 'ECONNABORTED') {
-      return res.status(200).json({
-        success: true,
-        question: normalizedBody.question,
-        answer: 'Search took too long to complete. Please try again with a more specific question.',
-        sources_count: 0,
-        urls: [],
-        degraded: true,
-        reason: 'Search timeout at AI orchestrator'
       });
+      res.json(response.data);
+    } catch (err) {
+      console.error('Frame analysis proxy failed:', errorDetails(err).message);
+      if (errorDetails(err).status) res.status(502).json({ error: 'Upstream service error' });
+      else res.status(503).json({ error: 'AI service unavailable' });
     }
-    if (err.response) res.status(err.response.status).json(err.response.data);
-    else res.status(503).json({ error: 'AI service unavailable' });
   }
-});
+);
 
-router.get('/status', async (req: any, res: any) => {
+router.post(
+  '/search/ask',
+  tierGate('vip', 'vip_plus', 'trial'),
+  async (req: DomainRequest, res: Response) => {
+    const normalizedBody: { question: string; user_id?: string; session_id?: string } = {
+      question: (req.body?.question || req.body?.query || '').toString().trim()
+    };
+    if (req.user?.userId) normalizedBody.user_id = req.user!.userId;
+    if (req.body?.session_id) normalizedBody.session_id = req.body.session_id;
+
+    const { error } = searchAskSchema.validate(normalizedBody);
+    if (error) return res.status(400).json({ error: error.details[0].message });
+
+    try {
+      const response = await moduleClient.post(`${AI_URL}/api/ai/search/ask`, normalizedBody, {
+        timeout: 120000
+      });
+      res.json(response.data);
+    } catch (err) {
+      if (errorDetails(err).code === 'ECONNABORTED') {
+        return res.status(200).json({
+          success: true,
+          question: normalizedBody.question,
+          answer:
+            'Search took too long to complete. Please try again with a more specific question.',
+          sources_count: 0,
+          urls: [],
+          degraded: true,
+          reason: 'Search timeout at AI orchestrator'
+        });
+      }
+      if (errorDetails(err).status) res.status(502).json({ error: 'Upstream service error' });
+      else res.status(503).json({ error: 'AI service unavailable' });
+    }
+  }
+);
+
+router.get('/status', async (req: DomainRequest, res: Response) => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const aiCli = require('@study-partner/shared/aiClient');
   res.json({

@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 /**
  * BLOOM-10 — weakest-first planner targeting (Node side).
  */
@@ -28,7 +29,7 @@ const courseDoc = {
 
 beforeEach(() => jest.clearAllMocks());
 
-function courseQueryResult(doc: any) {
+function courseQueryResult(doc: typeof courseDoc) {
   return { lean: jest.fn().mockResolvedValue(doc) };
 }
 
@@ -52,7 +53,8 @@ describe('getWeakCompetenciesForCourse', () => {
 
     const out = await getWeakCompetenciesForCourse('user-123', 'course-1');
     expect(Course.findOne).toHaveBeenCalledWith({ _id: 'course-1', userId: 'user-123' });
-    const sorting = out.find((w: any) => w.topic_id === 'sorting');
+    const sorting = out.find((w) => w.topic_id === 'sorting');
+    assert.ok(sorting);
     expect(sorting.topic_title).toBe('Sorting Algorithms');
     expect(sorting.scores).toEqual({ remember: 0.9, understand: 0.8, apply: 0.4 });
     // gate: understand (0.8 >= 0.7) unlocks apply; apply (0.4 < 0.7) does NOT unlock analyze
@@ -72,7 +74,8 @@ describe('getWeakCompetenciesForCourse', () => {
       ])
     });
     const out = await getWeakCompetenciesForCourse('user-123', 'course-1');
-    const sorting = out.find((w: any) => w.topic_id === 'sorting');
+    const sorting = out.find((w) => w.topic_id === 'sorting');
+    assert.ok(sorting);
     // apply unlocked (understand 0.8 >= 0.7), analyze unlocked (apply 0.7 >= 0.7)
     expect(sorting.scores).toHaveProperty('analyze', 0.3);
     expect(sorting.unlocked_levels).toContain('analyze');
@@ -106,10 +109,12 @@ describe('getWeakCompetenciesForCourse', () => {
       ])
     });
     const out = await getWeakCompetenciesForCourse('user-123', 'course-1', 10);
-    const sorting = out.find((w: any) => w.topic_id === 'sorting');
+    const sorting = out.find((w) => w.topic_id === 'sorting');
+    assert.ok(sorting);
     expect(sorting.current_level).toBe('understand');
     // arrays & graphs have no rows -> current_level null
-    const graphs = out.find((w: any) => w.topic_id === 'graphs');
+    const graphs = out.find((w) => w.topic_id === 'graphs');
+    assert.ok(graphs);
     expect(graphs.current_level).toBeNull();
     expect(graphs.scores).toEqual({});
     // not-started topics rank first (weakest)

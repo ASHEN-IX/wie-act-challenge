@@ -1,3 +1,5 @@
+import type { Response, NextFunction } from 'express';
+import type { DomainRequest } from '../../src/framework/contracts';
 const express = require('express');
 const request = require('supertest');
 const axios = require('@study-partner/shared/moduleClient');
@@ -12,9 +14,10 @@ const { StudySession } = require('../../modules/study/src/models');
 function buildApp(authUserId = 'host-1') {
   const app = express();
   app.use(express.json());
-  app.use((req, res, next) => {
+  app.use((req: DomainRequest, res: Response, next: NextFunction) => {
     req.user = {
-      userId: authUserId
+      userId: authUserId,
+      role: 'student'
     };
     next();
   });
@@ -34,13 +37,13 @@ function makeActiveTeamSession() {
         userId: 'host-1',
         role: 'host',
         joinedAt: new Date(now - 60 * 60 * 1000),
-        leftAt: null
+        leftAt: null as Date | null
       },
       {
         userId: 'member-2',
         role: 'member',
         joinedAt: new Date(now - 45 * 60 * 1000),
-        leftAt: null
+        leftAt: null as Date | null
       }
     ],
     save: jest.fn().mockResolvedValue(undefined)
@@ -49,7 +52,7 @@ function makeActiveTeamSession() {
 describe('Team Session Rewards Integration', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    axios.post.mockImplementation(async (url) => {
+    axios.post.mockImplementation(async (url: string) => {
       if (String(url).includes('/api/v1/users/gamification/award-xp')) {
         return {
           data: {
@@ -70,7 +73,7 @@ describe('Team Session Rewards Integration', () => {
         data: {}
       };
     });
-    axios.get.mockImplementation(async (url) => {
+    axios.get.mockImplementation(async (url: string) => {
       if (String(url).includes('/api/v1/users/gamification')) {
         return {
           data: {
@@ -98,8 +101,12 @@ describe('Team Session Rewards Integration', () => {
     expect(response.body.message).toBe('Team session ended');
     expect(Array.isArray(response.body.teamRewards)).toBe(true);
     expect(response.body.teamRewards).toHaveLength(2);
-    const hostReward = response.body.teamRewards.find((reward) => reward.userId === 'host-1');
-    const memberReward = response.body.teamRewards.find((reward) => reward.userId === 'member-2');
+    const hostReward = response.body.teamRewards.find(
+      (reward: { userId: string }) => reward.userId === 'host-1'
+    );
+    const memberReward = response.body.teamRewards.find(
+      (reward: { userId: string }) => reward.userId === 'member-2'
+    );
     expect(hostReward).toEqual(
       expect.objectContaining({
         action: 'team_session_host',
@@ -120,12 +127,16 @@ describe('Team Session Rewards Integration', () => {
         (participant) => participant.leftAt instanceof Date && participant.leftAt.getTime() > 0
       )
     ).toBe(true);
-    const awardedActions = axios.post.mock.calls.map((call) => call[1]?.action).sort();
+    const awardedActions = axios.post.mock.calls
+      .map((call: [string, { action?: string }]) => call[1]?.action)
+      .sort();
     expect(awardedActions).toEqual(['team_session', 'team_session_host']);
-    const awardCalls = axios.post.mock.calls.filter(([url]) =>
+    const awardCalls = axios.post.mock.calls.filter(([url]: [string]) =>
       String(url).includes('/users/gamification/award-xp')
     );
-    expect(awardCalls.map(([, payload]) => payload.userId).sort()).toEqual(['host-1', 'member-2']);
+    expect(
+      awardCalls.map(([, payload]: [string, { userId: string }]) => payload.userId).sort()
+    ).toEqual(['host-1', 'member-2']);
     expect(axios.get).not.toHaveBeenCalled();
   });
   test('PUT /team/:sessionId/end blocks non-host users', async () => {
@@ -169,7 +180,7 @@ describe('Team Session Rewards Integration', () => {
         awardedXP: 60
       })
     );
-    const awardCall = axios.post.mock.calls.find((call) =>
+    const awardCall = axios.post.mock.calls.find((call: [string, { action?: string }]) =>
       String(call[0] || '').includes('/gamification/award-xp')
     );
     expect(awardCall).toBeTruthy();

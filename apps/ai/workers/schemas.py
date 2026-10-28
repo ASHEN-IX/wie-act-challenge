@@ -80,6 +80,7 @@ class WeakCompetencyRequest(BaseModel):
     current_level: Optional[str] = Field(default=None, max_length=16)
     unlocked_levels: List[str] = Field(default_factory=list, max_length=6)
 
+
 # Session stats bounds (COACH-13) — keep in sync with payloadSchemas.js
 SESSION_STATS_MAX_PROGRESS_PCT = 100
 SESSION_STATS_MAX_MINUTES_ELAPSED = 600
@@ -130,9 +131,13 @@ class PlannerRequest(BaseModel):
 
     @field_validator("weak_competencies")
     @classmethod
-    def _weak_competencies_bounded(cls, v: List[WeakCompetencyRequest]) -> List[WeakCompetencyRequest]:
+    def _weak_competencies_bounded(
+        cls, v: List[WeakCompetencyRequest]
+    ) -> List[WeakCompetencyRequest]:
         if len(v) > WEAK_COMPETENCIES_MAX_ITEMS:
-            raise ValueError(f"weak_competencies exceeds {WEAK_COMPETENCIES_MAX_ITEMS} items")
+            raise ValueError(
+                f"weak_competencies exceeds {WEAK_COMPETENCIES_MAX_ITEMS} items"
+            )
         for wc in v:
             for level, score in wc.scores.items():
                 if not isinstance(score, (int, float)) or not (0 <= score <= 1):
@@ -264,8 +269,12 @@ class CoachRequest(BaseModel):
         default=None, max_length=COACH_SESSION_ID_MAX_CHARS
     )
     session_stats: Optional[CoachSessionStats] = None
-    signals: List[CoachSignal] = Field(default_factory=list, max_length=COACH_MAX_SIGNALS)
-    messages: List[CoachMessage] = Field(default_factory=list, max_length=COACH_MAX_MESSAGES)
+    signals: List[CoachSignal] = Field(
+        default_factory=list, max_length=COACH_MAX_SIGNALS
+    )
+    messages: List[CoachMessage] = Field(
+        default_factory=list, max_length=COACH_MAX_MESSAGES
+    )
     focus_state: Optional[Literal["Focused", "Drifting", "Lost"]] = None
     focus_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     fatigue_state: Optional[Literal["Alert", "Moderate", "High", "Critical"]] = None
@@ -296,8 +305,7 @@ class CoachRequest(BaseModel):
             size = len(json.dumps(value, separators=(",", ":")).encode("utf-8"))
             if size > COACH_MAX_PAYLOAD_BYTES:
                 raise ValueError(
-                    f"payload exceeds {COACH_MAX_PAYLOAD_BYTES} bytes "
-                    f"(got {size})"
+                    f"payload exceeds {COACH_MAX_PAYLOAD_BYTES} bytes " f"(got {size})"
                 )
         return value
 
@@ -432,6 +440,7 @@ class IngestFileMeta(BaseModel):
     originalName: str = Field(..., min_length=1, max_length=INGEST_FILENAME_MAX_CHARS)
     mimetype: str = Field(..., min_length=1, max_length=INGEST_MIME_MAX_CHARS)
     size: int = Field(..., ge=0)
+    fileHash: Optional[str] = Field(default=None, pattern=r"^(sha256:)?[a-f0-9]{64}$")
     path: Optional[str] = Field(
         default=None, min_length=1, max_length=CONTENT_REF_MAX_CHARS
     )
@@ -449,14 +458,29 @@ class IngestionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     courseId: str = Field(..., min_length=1, max_length=COURSE_ID_MAX_CHARS)
+    revisionId: Optional[str] = Field(default=None, max_length=64)
     fileRef: str = Field(..., min_length=1, max_length=CONTENT_REF_MAX_CHARS)
-    files: List[IngestFileMeta] = Field(default_factory=list, max_length=INGEST_MAX_FILES)
+    files: List[IngestFileMeta] = Field(
+        default_factory=list, max_length=INGEST_MAX_FILES
+    )
 
     @field_validator("courseId", "fileRef")
     @classmethod
     def _not_blank(cls, v: str) -> str:
         if not v.strip():
             raise ValueError("must be a non-empty string")
+        return v
+
+    @field_validator("revisionId")
+    @classmethod
+    def _validate_revision_id(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            import re
+
+            if not v.strip() or not re.match(r"^[A-Za-z0-9_\-\.]{1,64}$", v):
+                raise ValueError(
+                    "revisionId must be a safe identifier of at most 64 chars"
+                )
         return v
 
 
@@ -537,7 +561,9 @@ class SearchRequest(BaseModel):
         strict=True,
     )
     voiceMode: bool = Field(default=False, strict=True)
-    sessionId: Optional[str] = Field(default=None, max_length=SEARCH_SESSION_ID_MAX_CHARS)
+    sessionId: Optional[str] = Field(
+        default=None, max_length=SEARCH_SESSION_ID_MAX_CHARS
+    )
 
     @field_validator("query")
     @classmethod
@@ -589,9 +615,7 @@ class ScheduleApplyRequest(BaseModel):
     )
     reasoning: str = Field(default="", max_length=SCHEDULE_REASONING_MAX_CHARS)
 
-    @field_validator(
-        "duration_minutes", "affected_task_ids", mode="before"
-    )
+    @field_validator("duration_minutes", "affected_task_ids", mode="before")
     @classmethod
     def _no_boolean_ints(cls, v):
         if isinstance(v, list):

@@ -1,3 +1,7 @@
+import { resolveObjectiveContext } from '../services/objectiveContext';
+import { canDeliverJob } from '../services/jobAccess';
+import type { IAiJob } from '../models/AiJob';
+import type { FilterQuery } from 'mongoose';
 /**
  * AI jobs API (F01 / AI-COM-07).
  *
@@ -15,9 +19,9 @@ import crypto from 'crypto';
 
 const router = createContracts();
 
-router.post('/jobs', async (req: any, res: any, next: any) => {
+router.post('/jobs', async (req, res, next) => {
   try {
-    const userId = req.user.userId; // from authenticated context — never body
+    const userId = req.user!.userId; // from authenticated context — never body
     const { type, payload } = req.body || {};
 
     if (!AI_JOB_TYPES.includes(type)) {
@@ -25,6 +29,9 @@ router.post('/jobs', async (req: any, res: any, next: any) => {
     }
     if (!payload || typeof payload !== 'object') {
       return res.status(400).json({ error: 'payload must be an object' });
+    }
+    if (type === 'study.ingest.course' || type === 'study.knowledge.extract') {
+      return res.status(403).json({ error: 'Use the authorized course upload endpoint' });
     }
     // Strict per-type payload validation (PLAN-02). Over-length or malformed
     // payloads are rejected here, BEFORE persisting or publishing.
@@ -35,20 +42,35 @@ router.post('/jobs', async (req: any, res: any, next: any) => {
         .json({ error: 'payload failed validation', details: payloadCheck.errors });
     }
 
+    const scopeSnapshot = {
+      ...payload,
+      ...(res.locals.sourceCourseId ? { courseId: res.locals.sourceCourseId } : {})
+    };
+    if (type === 'study.eval.step' && payload.objectiveId) {
+      const context = await resolveObjectiveContext(payload.objectiveId, userId);
+      if (!context) return res.status(422).json({ error: 'Objective unavailable' });
+      if (payload.courseId && payload.courseId !== context.courseId)
+        return res.status(422).json({ error: 'Objective scope mismatch' });
+      scopeSnapshot.courseId = context.courseId;
+      payload.targetBloomLevel = context.targetBloomLevel;
+      payload.knowledgeType = context.knowledgeType;
+    }
+
     const requestId = req.get('X-Request-ID') || `req-${Date.now()}`;
     const messageId = crypto.randomUUID();
     const correlationId = crypto.randomUUID();
 
     // Persist BEFORE publishing: a fast worker's result event must always
     // find its job (AI-COM-07 correlation guarantee).
-    let job: any;
+    let job: IAiJob;
     try {
-      job = await (AiJob as any).createPending({
+      job = await AiJob.createPending({
         type,
         userId,
         requestId,
         correlationId,
-        messageId
+        messageId,
+        payloadSnapshot: scopeSnapshot
       });
     } catch (err) {
       return next(err);
@@ -56,7 +78,7 @@ router.post('/jobs', async (req: any, res: any, next: any) => {
 
     try {
       await publishAiJob(type, userId, payload, { requestId, correlationId, messageId });
-    } catch (err) {
+    } catch {
       await job.deleteOne(); // no silent loss, no orphan PENDING rows
       logger.error('ai_job_publish_failed_rolling_back', { jobId: job.jobId });
       return res.status(503).json({ error: 'AI job bus unavailable, retry later' });
@@ -81,12 +103,13 @@ router.post('/jobs', async (req: any, res: any, next: any) => {
   }
 });
 
-router.get('/jobs/:jobId', async (req: any, res: any, next: any) => {
+router.get('/jobs/:jobId', async (req, res, next) => {
   try {
-    const query: any = { jobId: req.params.jobId };
-    if (req.user.role !== 'admin') query.userId = req.user.userId;
+    const query: FilterQuery<IAiJob> = { jobId: req.params.jobId };
+    query.userId = req.user!.userId;
     const job = await AiJob.findOne(query).lean();
-    if (!job) return res.status(404).json({ error: 'job not found' });
+    if (!job || job.userId !== req.user!.userId || !(await canDeliverJob(job)))
+      return res.status(404).json({ error: 'job not found' });
     return res.json({
       jobId: job.jobId,
       type: job.type,
@@ -103,17 +126,29 @@ router.get('/jobs/:jobId', async (req: any, res: any, next: any) => {
   }
 });
 
-router.get('/jobs', async (req: any, res: any, next: any) => {
+router.get('/jobs', async (req, res, next) => {
   try {
-    const filter: any = { userId: req.user.userId };
+    const filter: FilterQuery<IAiJob> = { userId: req.user!.userId };
     if (req.query.status) filter.status = String(req.query.status);
     const limit = Math.min(parseInt(req.query.limit as string, 10) || 20, 100);
     const jobs = await AiJob.find(filter)
       .sort({ createdAt: -1 })
       .limit(limit)
-      .select('jobId type status attempts error createdAt updatedAt')
+      .select('jobId type status attempts error createdAt updatedAt userId resourceScope')
       .lean();
-    return res.json({ jobs });
+    const authorized = [];
+    for (const job of jobs)
+      if (await canDeliverJob(job))
+        authorized.push({
+          jobId: job.jobId,
+          type: job.type,
+          status: job.status,
+          attempts: job.attempts,
+          error: job.error,
+          createdAt: job.createdAt,
+          updatedAt: job.updatedAt
+        });
+    return res.json({ jobs: authorized });
   } catch (err) {
     return next(err);
   }

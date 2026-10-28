@@ -3,7 +3,7 @@ const moduleClient = require('@study-partner/shared/moduleClient');
 jest.mock('@study-partner/shared/moduleClient');
 
 describe('API Integration Tests', () => {
-  let authToken;
+  let authToken: string;
 
   beforeAll(() => {
     // Mock authentication token
@@ -158,7 +158,7 @@ describe('API Integration Tests', () => {
       try {
         await moduleClient.post('http://localhost:3000/api/v1/courses');
       } catch (error) {
-        expect(error.message).toBe('Request timeout');
+        expect(error instanceof Error ? error.message : String(error)).toBe('Request timeout');
       }
     });
 
@@ -170,7 +170,7 @@ describe('API Integration Tests', () => {
       let result;
       try {
         result = await moduleClient.post('http://localhost:3000/api/v1/users');
-      } catch (e) {
+      } catch {
         result = await moduleClient.post('http://localhost:3000/api/v1/users');
       }
 
@@ -184,7 +184,7 @@ describe('API Integration Tests', () => {
       try {
         await moduleClient.get('http://localhost:3000/api/v1/courses');
       } catch (error) {
-        expect(error.message).toContain('Network');
+        expect(error instanceof Error ? error.message : String(error)).toContain('Network');
       }
     });
   });
@@ -194,7 +194,7 @@ describe('API Integration Tests', () => {
       moduleClient.post.mockResolvedValue({ status: 200 });
 
       const userRequests = Array(10)
-        .fill()
+        .fill(undefined)
         .map((_, i) =>
           moduleClient.post('http://localhost:3000/api/v1/users', {
             email: `user${i}@example.com`
@@ -226,7 +226,7 @@ describe('API Integration Tests', () => {
           headers: {} // No auth token
         });
       } catch (error) {
-        expect(error.status).toBe(401);
+        expect(error).toMatchObject({ status: 401 });
       }
     });
 
@@ -248,7 +248,7 @@ describe('API Integration Tests', () => {
 
   describe('Data Validation', () => {
     test('should validate required fields', () => {
-      const validateUser = (user) => {
+      const validateUser = (user: { email?: string; password?: string; name?: string }) => {
         if (!user.email) throw new Error('Email required');
         if (!user.password) throw new Error('Password required');
         if (!user.name) throw new Error('Name required');

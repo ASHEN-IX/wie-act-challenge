@@ -18,14 +18,18 @@ const STATS_BOUNDS: Record<string, [number, number]> = {
   current_streak_days: [0, 365]
 };
 
-function clampInt(value: any, lo: number, hi: number): number {
+function clampInt(value: unknown, lo: number, hi: number): number {
   const n = Math.floor(Number(value));
   if (!Number.isFinite(n)) return 0;
   return Math.min(hi, Math.max(lo, n));
 }
 
 export interface ResolveSessionStatsParams {
-  session?: any;
+  session?: {
+    startTime?: Date | string;
+    taskProgress?: { totalTasks?: unknown; completedTasks?: unknown; currentTaskIndex?: unknown };
+    breakStats?: { totalBreaks?: unknown };
+  } | null;
   now?: Date;
   currentStreakDays?: number;
 }

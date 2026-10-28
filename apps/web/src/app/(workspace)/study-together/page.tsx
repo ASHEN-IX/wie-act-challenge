@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { randomUUID } from 'node:crypto';
 import { load } from "@/lib/api";
 import { getCourses } from "@/features/courses/queries";
 import { createRoom, joinRoom } from "@/features/collaboration/actions";
@@ -12,9 +13,20 @@ import {
   NativeSelectOption,
 } from "@/components/ui/native-select";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+
 export const metadata = { title: "Study together" };
+
+interface StudyRoomItem {
+  roomId: string;
+  inviteCode: string;
+  title: string;
+  currentPhase: string;
+  participantsCount: number;
+}
+
 export default async function Rooms() {
-  const [courses, sessions] = await Promise.all([
+  const [courses, sessions, studyRooms] = await Promise.all([
     getCourses(),
     load<{
       sessions: {
@@ -24,10 +36,16 @@ export default async function Rooms() {
         inviteCode?: string;
       }[];
     }>("/api/v1/study/sessions"),
+    load<{
+      rooms: StudyRoomItem[];
+    }>("/api/v1/study/rooms"),
   ]);
-  const rooms = (sessions.data?.sessions || []).filter(
+
+  const dedicatedRooms = studyRooms.data?.rooms || [];
+  const legacyRooms = (sessions.data?.sessions || []).filter(
     (s) => s.type === "team" && s.status === "active",
   );
+
   return (
     <>
       <PageHeader
@@ -39,6 +57,7 @@ export default async function Rooms() {
         <section className="rounded-lg border p-6">
           <h2 className="mb-5 text-lg font-semibold">Create a room</h2>
           <ActionForm action={createRoom} submit="Create room">
+            <input type="hidden" name="commandId" value={randomUUID()} />
             <FieldGroup>
               <Field>
                 <FieldLabel htmlFor="courseId">Course (optional)</FieldLabel>
@@ -57,13 +76,14 @@ export default async function Rooms() {
               </Field>
             </FieldGroup>
             <p className="text-sm text-muted-foreground">
-              Up to four participants. Share the invite code with your peers.
+              Up to six participants. Generates an invite code for your peers.
             </p>
           </ActionForm>
         </section>
         <section className="rounded-lg border p-6">
           <h2 className="mb-5 text-lg font-semibold">Have an invite?</h2>
           <ActionForm action={joinRoom} submit="Join room" variant="outline">
+            <input type="hidden" name="commandId" value={randomUUID()} />
             <FieldGroup>
               <TextField
                 name="code"
@@ -72,21 +92,55 @@ export default async function Rooms() {
                 minLength={6}
                 maxLength={6}
                 autoComplete="off"
+                placeholder="e.g. DB1NF2"
               />
             </FieldGroup>
           </ActionForm>
         </section>
       </div>
-      <h2 className="mb-5 text-xl font-semibold">Rooms you host</h2>
-      {rooms.length ? (
+
+      <h2 className="mb-5 text-xl font-semibold">Active study rooms</h2>
+      {dedicatedRooms.length > 0 || legacyRooms.length > 0 ? (
         <div className="flex flex-col gap-3">
-          {rooms.map((room) => (
+          {dedicatedRooms.map((room) => (
+            <div
+              key={room.roomId}
+              className="flex items-center justify-between rounded-lg border p-5"
+            >
+              <div className="flex flex-col gap-1">
+                <span className="font-semibold text-foreground">
+                  {room.title}
+                </span>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>
+                    Invite code:{" "}
+                    <code className="font-mono font-bold text-foreground">
+                      {room.inviteCode}
+                    </code>
+                  </span>
+                  <span>•</span>
+                  <span>{room.participantsCount} participants</span>
+                  <Badge variant="outline" className="text-xs capitalize">
+                    {room.currentPhase.replaceAll("_", " ")}
+                  </Badge>
+                </div>
+              </div>
+              <Button asChild variant="outline">
+                <Link href={`/study-together/${room.roomId}`}>Open room</Link>
+              </Button>
+            </div>
+          ))}
+
+          {legacyRooms.map((room) => (
             <div
               key={room._id}
               className="flex items-center justify-between rounded-lg border p-5"
             >
               <p className="text-sm">
-                Invite code: <strong>{room.inviteCode}</strong>
+                Invite code:{" "}
+                <code className="font-mono font-bold text-foreground">
+                  {room.inviteCode}
+                </code>
               </p>
               <Button asChild variant="outline">
                 <Link href={`/study-together/${room._id}`}>Open room</Link>

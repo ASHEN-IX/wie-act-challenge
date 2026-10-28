@@ -24,7 +24,7 @@ from bloom.taxonomy import (
 )
 
 FIXTURE_PATH = (
-    Path(__file__).resolve().parents[2] / "docs" / "contracts" / "bloom-fixture.json"
+    Path(__file__).resolve().parents[3] / "docs" / "contracts" / "bloom-fixture.json"
 )
 
 

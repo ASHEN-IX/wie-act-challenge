@@ -1,7 +1,9 @@
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { IUser } from '../models/User';
 import { reserveCoupon } from '../services/couponRedemption';
 import { createContracts } from '@study-partner/shared/domainContracts';
 import Joi from 'joi';
-import type { Request, Response } from 'express';
+import type { Response } from 'express';
 import User from '../models/User';
 import Coupon from '../models/Coupon';
 import { sendSubscriptionExpiryNotice } from '../services/emailService';
@@ -21,7 +23,7 @@ function testCouponsEnabled(): boolean {
   return process.env.ALLOW_TEST_COUPONS !== 'false';
 }
 
-function resolveTestTierFromCoupon(rawCoupon: string): string | null {
+function resolveTestTierFromCoupon(rawCoupon: string): IUser['tier'] | null {
   if (!testCouponsEnabled()) return null;
 
   const normalized = String(rawCoupon || '')
@@ -38,7 +40,10 @@ function resolveTestTierFromCoupon(rawCoupon: string): string | null {
         .toLowerCase()
     );
     if (!code || !tier) continue;
-    if (normalized === code && ['trial', 'normal', 'vip', 'vip_plus'].includes(tier)) {
+    if (
+      normalized === code &&
+      (tier === 'trial' || tier === 'normal' || tier === 'vip' || tier === 'vip_plus')
+    ) {
       return tier;
     }
   }
@@ -46,7 +51,7 @@ function resolveTestTierFromCoupon(rawCoupon: string): string | null {
   return null;
 }
 
-function getSubscriptionSnapshot(user: any) {
+function getSubscriptionSnapshot(user: Pick<IUser, 'subscriptionEndAt' | 'tier'>) {
   const now = new Date();
   const endDate = user.subscriptionEndAt ? new Date(user.subscriptionEndAt) : null;
   const hasActiveSubscription =
@@ -67,8 +72,8 @@ function getSubscriptionSnapshot(user: any) {
   };
 }
 
-function withSubscriptionMeta(user: any) {
-  const safeUser = typeof user.toJSON === 'function' ? user.toJSON() : user;
+function withSubscriptionMeta(user: IUser) {
+  const safeUser = typeof user.toJSON === 'function' ? user.toJSON<IUser>() : user;
   return {
     ...safeUser,
     ...getSubscriptionSnapshot(safeUser)
@@ -79,8 +84,8 @@ function withSubscriptionMeta(user: any) {
 router.get(
   '/me',
   authenticate,
-  asyncHandler(async (req: Request, res: Response) => {
-    const user = await User.findById((req as any).user.userId);
+  asyncHandler(async (req: DomainRequest, res: Response) => {
+    const user = await User.findById(req.user!.userId);
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -147,7 +152,7 @@ router.get(
 router.post(
   '/coupon/redeem',
   authenticate,
-  asyncHandler(async (req: Request, res: Response) => {
+  asyncHandler(async (req: DomainRequest, res: Response) => {
     const { error, value } = redeemCouponSchema.validate(req.body || {});
     if (error) {
       return res.status(400).json({ error: error.details[0].message });
@@ -171,7 +176,7 @@ router.post(
       });
     }
 
-    const user = await User.findById((req as any).user.userId);
+    const user = await User.findById(req.user!.userId);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -186,7 +191,7 @@ router.post(
     const reservation = storedCoupon ? await reserveCoupon(storedCoupon._id, user._id) : null;
     const redeemedAt = reservation?.redeemedAt || new Date();
 
-    user.tier = resolvedTier as any;
+    user.tier = resolvedTier;
     user.tierChangedAt = new Date();
     user.subscriptionId = null;
     user.autoRenew = false;
@@ -259,7 +264,7 @@ router.post(
 router.get(
   '/coupon/list',
   authenticate,
-  asyncHandler(async (req: Request, res: Response) => {
+  asyncHandler(async (req: DomainRequest, res: Response) => {
     if (!testCouponsEnabled()) {
       return res.status(403).json({ error: 'Coupon listing disabled' });
     }
@@ -281,7 +286,7 @@ router.get(
     return res.json({
       coupons: [
         ...envCoupons,
-        ...dbCoupons.map((c: any) => ({
+        ...dbCoupons.map((c) => ({
           code: c.code,
           tier: c.targetTier,
           durationDays: c.durationDays,

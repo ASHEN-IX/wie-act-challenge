@@ -4,12 +4,12 @@
  * so both sides validate the `progress` routing-key events identically.
  */
 
-const {
+import {
   validateAiProgressEnvelope,
   validateAiResultEnvelope,
   PROGRESS_STAGES,
   PROGRESS_STATUS
-} = require('../../shared/ai-messaging/envelope');
+} from '../../shared/ai-messaging/envelope';
 
 const VALID_BASE = {
   messageId: 'a40ad024-8492-4cb5-a9a7-6ca2d2bc47c9',

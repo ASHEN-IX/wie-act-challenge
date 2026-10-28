@@ -1,8 +1,11 @@
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { IUser } from '../models/User';
+import { errorDetails } from '@study-partner/shared/errors';
 import { createContracts } from '@study-partner/shared/domainContracts';
 import Joi from 'joi';
 import Stripe from 'stripe';
 import { authenticate } from '@study-partner/shared/auth';
-import type { Request, Response } from 'express';
+import type { Response } from 'express';
 import User from '../models/User';
 import Payment from '../models/Payment';
 import { MONTH_OPTIONS, calculatePlanPrice } from '../config/pricing';
@@ -26,12 +29,12 @@ const confirmCheckoutSchema = Joi.object({
 const stripeSecret = process.env.STRIPE_SECRET_KEY;
 const stripe = stripeSecret ? new Stripe(stripeSecret) : null;
 
-router.get('/config', (req: Request, res: Response) => {
+router.get('/config', (req: DomainRequest, res: Response) => {
   return res.json({ stripeConfigured: Boolean(stripe) });
 });
 
-function logError(label: string, err: any): void {
-  const message = err && err.message ? err.message : String(err);
+function logError(label: string, err: unknown): void {
+  const message = errorDetails(err).message;
   process.stderr.write(`[stripe] ${label}: ${message}\n`);
 }
 
@@ -41,7 +44,7 @@ function addMonths(baseDate: Date, months: number): Date {
   return next;
 }
 
-function getSubscriptionSnapshot(user: any) {
+function getSubscriptionSnapshot(user: IUser) {
   const now = new Date();
   if (!user.subscriptionEndAt || !['vip', 'vip_plus'].includes(user.tier)) {
     return { hasActiveSubscription: false, daysRemaining: 0, canChangePlan: true };
@@ -68,7 +71,7 @@ function getFrontendBaseUrl(): string {
 }
 
 export async function applyCheckoutSession(
-  session: any,
+  session: Stripe.Checkout.Session,
   { stripeEventId = null }: { stripeEventId?: string | null } = {}
 ) {
   const userId = session.metadata?.userId;
@@ -76,7 +79,7 @@ export async function applyCheckoutSession(
   const durationMonths = Number(session.metadata?.durationMonths || 1);
   if (
     !userId ||
-    !['vip', 'vip_plus'].includes(targetTier) ||
+    !['vip', 'vip_plus'].some((tier) => tier === targetTier) ||
     !MONTH_OPTIONS.some((months) => months === durationMonths) ||
     session.payment_status !== 'paid' ||
     !session.id ||
@@ -141,7 +144,7 @@ export async function applyCheckoutSession(
   return { applied: true, userId, tier: targetTier, durationMonths };
 }
 
-async function upsertCustomer(user: any): Promise<string> {
+async function upsertCustomer(user: IUser): Promise<string> {
   if (user.stripeCustomerId) {
     return user.stripeCustomerId;
   }
@@ -157,7 +160,7 @@ async function upsertCustomer(user: any): Promise<string> {
   return customer.id;
 }
 
-router.post('/subscribe', authenticate, async (req: Request, res: Response): Promise<any> => {
+router.post('/subscribe', authenticate, async (req: DomainRequest, res: Response) => {
   try {
     if (!stripe) {
       return res.status(503).json({ error: 'Stripe is not configured' });
@@ -168,7 +171,7 @@ router.post('/subscribe', authenticate, async (req: Request, res: Response): Pro
       return res.status(400).json({ error: error.details[0].message });
     }
 
-    const user = await User.findById((req as any).user.userId);
+    const user = await User.findById(req.user!.userId);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -236,30 +239,26 @@ router.post('/subscribe', authenticate, async (req: Request, res: Response): Pro
   }
 });
 
-router.get(
-  '/subscription/status',
-  authenticate,
-  async (req: Request, res: Response): Promise<any> => {
-    try {
-      const user = await User.findById((req as any).user.userId);
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      return res.json({
-        tier: user.tier,
-        subscriptionId: user.subscriptionId || null,
-        stripeCustomerId: user.stripeCustomerId || null,
-        stripeConfigured: Boolean(stripe)
-      });
-    } catch (err) {
-      logError('stripe_subscription_status_error', err);
-      return res.status(500).json({ error: 'Failed to fetch subscription status' });
+router.get('/subscription/status', authenticate, async (req: DomainRequest, res: Response) => {
+  try {
+    const user = await User.findById(req.user!.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
     }
-  }
-);
 
-router.post('/confirm', authenticate, async (req: Request, res: Response): Promise<any> => {
+    return res.json({
+      tier: user.tier,
+      subscriptionId: user.subscriptionId || null,
+      stripeCustomerId: user.stripeCustomerId || null,
+      stripeConfigured: Boolean(stripe)
+    });
+  } catch (err) {
+    logError('stripe_subscription_status_error', err);
+    return res.status(500).json({ error: 'Failed to fetch subscription status' });
+  }
+});
+
+router.post('/confirm', authenticate, async (req: DomainRequest, res: Response) => {
   try {
     if (!stripe) {
       return res.status(503).json({ error: 'Stripe is not configured' });
@@ -270,13 +269,15 @@ router.post('/confirm', authenticate, async (req: Request, res: Response): Promi
       return res.status(400).json({ error: error.details[0].message });
     }
 
-    const session: any = await stripe.checkout.sessions.retrieve(value.sessionId);
+    const session: Stripe.Checkout.Session = await stripe.checkout.sessions.retrieve(
+      value.sessionId
+    );
     if (!session) {
       return res.status(404).json({ error: 'Checkout session not found' });
     }
 
     const sessionUserId = session.metadata?.userId;
-    if (!sessionUserId || String(sessionUserId) !== String((req as any).user.userId)) {
+    if (!sessionUserId || String(sessionUserId) !== String(req.user!.userId)) {
       return res.status(403).json({ error: 'Session does not belong to current user' });
     }
 
@@ -304,7 +305,7 @@ router.post('/confirm', authenticate, async (req: Request, res: Response): Promi
   }
 });
 
-async function processWebhookEvent(event: any): Promise<void> {
+async function processWebhookEvent(event: Stripe.Event): Promise<void> {
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
     await applyCheckoutSession(session, { stripeEventId: event.id });
@@ -344,7 +345,7 @@ async function processWebhookEvent(event: any): Promise<void> {
   }
 }
 
-export async function webhookHandler(req: Request, res: Response): Promise<any> {
+export async function webhookHandler(req: DomainRequest, res: Response) {
   try {
     if (!stripe) {
       return res.status(503).json({ error: 'Stripe is not configured' });

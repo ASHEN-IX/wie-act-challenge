@@ -1,24 +1,31 @@
+import { errorDetails } from '@study-partner/shared/errors';
+import type { IStudySession } from '../models';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { buildInternalHeaders } = require('@study-partner/shared/auth');
 
 const DEFAULT_TASK_ESTIMATED_MINUTES = 30;
 
-const toSafeInteger = (value: any, fallback = 0): number => {
+const toSafeInteger = (value: unknown, fallback = 0): number => {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return Math.max(0, Math.trunc(Number(fallback) || 0));
   return Math.max(0, Math.trunc(numeric));
 };
 
-const getAxiosErrorDetails = (error: any): { message: string; status?: number; data?: any } => ({
-  message: error.message,
-  status: error.response?.status,
-  data: error.response?.data
-});
+const getAxiosErrorDetails = (
+  error: unknown
+): { message: string; status?: number; data?: unknown } => {
+  const { message, status, data } = errorDetails(error);
+  return { message, status, data };
+};
 
-const isTeamSessionMember = (session: any, userId: string): boolean => {
+const isTeamSessionMember = (
+  session: Partial<Pick<IStudySession, 'userId' | 'participants'>> | null | undefined,
+  userId: string
+): boolean => {
   if (!session || !userId) return false;
-  if (String(session.userId) === String(userId)) return true;
-  return session.participants?.some((p: any) => String(p.userId) === String(userId) && !p.leftAt);
+  const records = session.participants?.filter((p) => String(p.userId) === String(userId)) || [];
+  if (records.length) return records.some((p) => !p.leftAt);
+  return String(session.userId) === String(userId) && !session.participants?.length;
 };
 
 const isObjectId = (str: string): boolean => /^[a-f\d]{24}$/i.test(str);

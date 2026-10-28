@@ -1,3 +1,4 @@
+import type { Request, Response, NextFunction } from 'express';
 /**
  * SEC-09 — admin user search ReDoS.
  *
@@ -32,7 +33,7 @@ jest.mock('../models/Payment', () => ({
   aggregate: jest.fn()
 }));
 jest.mock('@study-partner/shared/auth', () => ({
-  requireRole: () => (req: any, res: any, next: any) => next()
+  requireRole: () => (req: Request, res: Response, next: NextFunction) => next()
 }));
 
 import User from '../models/User';
@@ -44,8 +45,8 @@ const app = express();
 app.use(express.json());
 app.use('/', adminRoutes);
 
-function mockFindChain(rows: any[]) {
-  const chain: any = {
+function mockFindChain(rows: unknown[]) {
+  const chain = {
     select: () => chain,
     sort: () => chain,
     skip: () => chain,

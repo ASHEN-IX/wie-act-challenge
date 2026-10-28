@@ -201,7 +201,7 @@ Course materials must be retrieved with low latency and zero external SaaS depen
 Retain the existing **FAISS disk-mounted vector indexing** pipeline in `study-partner-ai`.
 - Documents are parsed into 512-token chunks with 64-token overlaps.
 - Embeddings are generated using standard models (`text-embedding-3-small` or local `all-MiniLM-L6-v2`).
-- Indexes are serialized to disk mounted on shared Docker volumes, namespaced by `courseId` and `revisionId`.
+- Target indexes are serialized to disk mounted on shared Docker volumes as `faiss/<courseId>/<revisionTag>.faiss`, with metadata at `faiss/<courseId>/<revisionTag>.meta.json`. The current adapter still writes course-scoped artifacts; migration to revision-aware reads/writes, chunk keys and caches is a later designated mission.
 - Prohibit introducing external vector databases (Qdrant, Pinecone, Milvus) unless FAISS demonstrates an architectural bottleneck.
 
 ### Consequences
@@ -271,11 +271,10 @@ AI agents must provide dynamic exercises, diagrams, and quizzes without introduc
 ### Decision
 Enforce **validated declarative JSON schemas rendered by trusted, pre-compiled React components**.
 - The AI never returns raw HTML or JavaScript.
-- Supported core activity types:
+- Contract `1.0.0` wire activity types:
   1. `InteractiveQuiz` (multiple choice, multi-select, immediate feedback).
   2. `GuidedProblem` (step-by-step Socratic walkthrough with progressive hints).
-  3. `StepByStepVisualizer` (algorithmic or process state progression).
-  4. `ParameterExplorer` (interactive sliders/inputs showing mathematical or physical relationships).
+- Future reviewed types: `StepByStepVisualizer` (algorithmic or process state progression) and `ParameterExplorer` (interactive sliders/inputs showing mathematical or physical relationships). They are not accepted by the P0 v1.0.0 contract.
 - Client schemas **never contain answer keys or evaluation rubrics**.
 - Evaluation is executed server-side via authenticated Server Actions.
 

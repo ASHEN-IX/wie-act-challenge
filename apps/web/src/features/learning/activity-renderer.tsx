@@ -1,328 +1,532 @@
 "use client";
 
-import React, { useState } from "react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { useState, useRef } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { submitActivityAttempt } from "./actions";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Textarea } from "@/components/ui/textarea";
+import type { ActivityDefinition } from "@/lib/activity-contracts";
 
-export type ActivityType =
-  | "InteractiveQuiz"
-  | "GuidedProblem"
-  | "StepByStepVisualizer"
-  | "ParameterExplorer";
-
-export interface QuizOption {
-  id: string;
-  label: string;
-}
-
-export interface InteractiveQuizData {
-  question: string;
-  options: QuizOption[];
-  isMultiSelect: boolean;
-}
-
-export interface GuidedProblemStep {
-  stepNumber: number;
-  prompt: string;
-  hint?: string;
-}
-
-export interface GuidedProblemData {
-  scenario: string;
-  steps: GuidedProblemStep[];
-}
-
-export interface VisualizerStep {
-  stepIndex: number;
-  title: string;
-  description: string;
-  stateRepresentation: Record<string, unknown>;
-}
-
-export interface StepByStepVisualizerData {
-  concept: string;
-  steps: VisualizerStep[];
-}
-
-export interface LearningActivity {
-  activityId: string;
-  activityType: ActivityType;
-  schemaVersion: string;
-  courseId: string;
-  revisionId: string;
-  objectiveId: string;
-  title: string;
-  instructions: string;
-  timeLimitSeconds?: number;
-  presentationData: InteractiveQuizData | GuidedProblemData | StepByStepVisualizerData | Record<string, unknown>;
-  constraints?: {
-    maxAttempts?: number;
-    allowCalculator?: boolean;
-  };
-}
-
-export interface AssessmentResult {
+export interface GradedAssessmentView {
+  schemaVersion: "1.0.0";
+  visibility: "recipient_only";
+  userId: string;
   attemptId: string;
-  status: "graded" | "in_review" | "failed";
+  status: "graded";
   score: number;
   isCorrect: boolean;
   feedback: string;
-  bloomLevelDemonstrated?: string;
   socraticHint?: string | null;
   recommendedNextStep?: {
-    type: "advance" | "remediate" | "retry";
-    nextObjectiveId?: string;
-    title?: string;
-  };
+    type: "advance";
+    nextObjectiveId: string;
+    title: string;
+  } | null;
+  evidenceId?: string | null;
+  evaluatedAt: string;
+  masteryAchieved?: boolean;
+}
+
+export type AssessmentResultView =
+  | GradedAssessmentView
+  | {
+      status: "pending" | "unavailable" | "failed" | "rejected";
+      code: string;
+      retryable: boolean;
+      attemptId: string;
+      userId: string;
+    };
+
+export interface ActivityRendererProps {
+  activity: ActivityDefinition;
+  authenticatedUserId: string;
+  initialResult?: AssessmentResultView;
+  onSubmitAttempt?: (
+    answers: Record<string, unknown>,
+    timeSpentSeconds: number,
+  ) => Promise<AssessmentResultView>;
+  mode?: "solo" | "room" | "preview";
 }
 
 export function ActivityRenderer({
   activity,
-  onComplete,
-}: {
-  activity: LearningActivity;
-  onComplete?: (result: AssessmentResult) => void;
-}) {
-  const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [result, setResult] = useState<AssessmentResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  authenticatedUserId: _authenticatedUserId,
+  initialResult,
+  onSubmitAttempt,
+  mode = "solo",
+}: ActivityRendererProps) {
+  const ownResult =
+    initialResult?.userId === _authenticatedUserId ? initialResult : undefined;
+  const privateSubmit = onSubmitAttempt
+    ? async (answers: Record<string, unknown>, seconds: number) => {
+        const result = await onSubmitAttempt(answers, seconds);
+        if (result.userId !== _authenticatedUserId)
+          throw new Error("Private recipient mismatch");
+        return result;
+      }
+    : undefined;
+  // Allowlist dispatch
+  if (activity.activityType === "InteractiveQuiz") {
+    return (
+      <InteractiveQuizRenderer
+        activity={activity}
+        initialResult={ownResult}
+        onSubmitAttempt={privateSubmit}
+        mode={mode}
+      />
+    );
+  }
 
-  const handleOptionToggle = (optionId: string, isMulti: boolean) => {
-    if (result) return;
+  if (activity.activityType === "GuidedProblem") {
+    return (
+      <GuidedProblemRenderer
+        activity={activity}
+        initialResult={ownResult}
+        onSubmitAttempt={privateSubmit}
+        mode={mode}
+      />
+    );
+  }
+
+  // Safe fallback for unknown activity types (zero eval/execution)
+  return (
+    <Card className="w-full max-w-2xl border-destructive">
+      <CardHeader>
+        <CardTitle className="text-base font-semibold text-destructive">
+          Unsupported Activity Type
+        </CardTitle>
+        <CardDescription>
+          This activity cannot be rendered interactively.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+          {(activity as { instructions?: string }).instructions ||
+            "Interactive content unavailable."}
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function InteractiveQuizRenderer({
+  activity,
+  initialResult,
+  onSubmitAttempt,
+  mode,
+}: {
+  activity: Extract<ActivityDefinition, { activityType: "InteractiveQuiz" }>;
+  initialResult?: AssessmentResultView;
+  onSubmitAttempt?: (
+    answers: Record<string, unknown>,
+    timeSpentSeconds: number,
+  ) => Promise<AssessmentResultView>;
+  mode: "solo" | "room" | "preview";
+}) {
+  const [selectedOptionIds, setSelectedOptionIds] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [result, setResult] = useState<AssessmentResultView | null>(
+    initialResult ?? null,
+  );
+  const [error, setError] = useState<string | null>(null);
+  const [startTime] = useState<number>(Date.now());
+  const submittedSeconds = useRef<number | null>(null);
+
+  const presentation = activity.presentationData;
+  const isMulti = presentation.isMultiSelect;
+
+  const handleSelect = (optionId: string) => {
+    if (result || submittedSeconds.current !== null) return; // Retry keeps the original response
     if (isMulti) {
-      setSelectedOptions((prev) =>
+      setSelectedOptionIds((prev) =>
         prev.includes(optionId)
           ? prev.filter((id) => id !== optionId)
-          : [...prev, optionId]
+          : [...prev, optionId],
       );
     } else {
-      setSelectedOptions([optionId]);
+      setSelectedOptionIds([optionId]);
     }
   };
 
   const handleSubmit = async () => {
+    if (selectedOptionIds.length === 0 || !onSubmitAttempt || isSubmitting)
+      return;
+
     setIsSubmitting(true);
     setError(null);
-    try {
-      const payload = {
-        activityId: activity.activityId,
-        courseId: activity.courseId,
-        revisionId: activity.revisionId,
-        timeSpentSeconds: 30,
-        answers: {
-          selectedOptionIds: selectedOptions,
-          completedSteps: currentStepIndex + 1,
-        },
-      };
+    const timeSpent =
+      submittedSeconds.current ??
+      Math.max(1, Math.round((Date.now() - startTime) / 1000));
+    submittedSeconds.current = timeSpent;
 
-      const res = await submitActivityAttempt(payload);
-      setResult(res);
-      if (onComplete) onComplete(res);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to submit attempt");
+    try {
+      const assessment = await onSubmitAttempt(
+        { selectedOptionIds },
+        timeSpent,
+      );
+      setResult(assessment);
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error ? err.message : "Failed to submit attempt.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleReset = () => {
+    submittedSeconds.current = null;
+    setSelectedOptionIds([]);
+    setResult(null);
+    setError(null);
+  };
+
+  return (
+    <Card className="w-full max-w-2xl shadow-sm" data-testid="quiz-renderer">
+      <CardHeader>
+        <div className="flex items-center justify-between gap-2">
+          <Badge variant="outline">{activity.activityType}</Badge>
+          {activity.timeLimitSeconds && (
+            <span className="text-xs text-muted-foreground">
+              Limit: {Math.round(activity.timeLimitSeconds / 60)} min
+            </span>
+          )}
+        </div>
+        <CardTitle className="text-xl font-bold">{activity.title}</CardTitle>
+        <CardDescription className="text-sm">
+          {activity.instructions}
+        </CardDescription>
+      </CardHeader>
+
+      <CardContent className="space-y-6">
+        <div className="rounded-md border p-4 bg-muted/40">
+          <h3 className="font-medium text-sm text-foreground">
+            {presentation.question}
+          </h3>
+        </div>
+
+        {/* Options list */}
+        <div
+          className="space-y-2"
+          role={isMulti ? "group" : "radiogroup"}
+          aria-label={presentation.question}
+        >
+          {presentation.options.map((opt) => {
+            const isSelected = selectedOptionIds.includes(opt.id);
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                role={isMulti ? "checkbox" : "radio"}
+                aria-checked={isSelected}
+                disabled={
+                  Boolean(result) ||
+                  submittedSeconds.current !== null ||
+                  isSubmitting ||
+                  mode === "preview"
+                }
+                onClick={() => handleSelect(opt.id)}
+                className={`w-full text-start p-3.5 rounded-lg border text-sm font-medium transition-colors flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-primary ${
+                  isSelected
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border hover:bg-muted/50 text-foreground"
+                } ${result ? "cursor-default" : "cursor-pointer"}`}
+              >
+                <span>{opt.label}</span>
+                {isSelected && (
+                  <Badge variant="default" className="text-xs">
+                    Selected
+                  </Badge>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Assessment feedback panel (solo mode only - never leaked to room) */}
+        {result?.status === "graded" && (
+          <div className="space-y-4 pt-4 border-t">
+            <Alert variant={result.isCorrect ? "default" : "destructive"}>
+              <AlertTitle className="flex items-center gap-2">
+                <Badge variant={result.isCorrect ? "default" : "destructive"}>
+                  {result.isCorrect ? "Correct" : "Incorrect"}
+                </Badge>
+                <span>Score: {Math.round(result.score * 100)}%</span>
+              </AlertTitle>
+              <AlertDescription className="mt-2 text-sm">
+                {result.feedback}
+              </AlertDescription>
+            </Alert>
+
+            {result.socraticHint && (
+              <div className="p-3 bg-muted rounded-md border text-sm">
+                <p className="font-semibold text-xs text-muted-foreground mb-1">
+                  Pedagogical Socratic Hint:
+                </p>
+                <p>{result.socraticHint}</p>
+              </div>
+            )}
+
+            {result.recommendedNextStep && (
+              <div className="p-3 bg-primary/5 rounded-md border border-primary/20 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-primary">
+                    Recommended Next Step:
+                  </p>
+                  <p className="text-sm font-medium">
+                    {result.recommendedNextStep.title}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {result && result.status !== "graded" && (
+          <Alert>
+            <AlertTitle>{result.status}</AlertTitle>
+            <AlertDescription>
+              No mastery awarded. {result.code} If this persists, ask your
+              instructor or presenter for a new reviewed check.
+              {result.retryable && (
+                <Button variant="outline" onClick={() => setResult(null)}>
+                  Retry same submission
+                </Button>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
+        {result?.status === "graded" && (
+          <p>
+            Evidence:{" "}
+            {result.evidenceId
+              ? "recorded; see private progress for mastery"
+              : "none"}
+            . Private feedback.
+          </p>
+        )}
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+      </CardContent>
+
+      <CardFooter className="flex justify-between items-center border-t pt-4">
+        {mode !== "preview" && (
+          <>
+            {result && mode !== "room" ? (
+              <Button variant="outline" onClick={handleReset} size="sm">
+                Try Again
+              </Button>
+            ) : (
+              <Button
+                onClick={handleSubmit}
+                disabled={
+                  !!result || selectedOptionIds.length === 0 || isSubmitting
+                }
+                size="sm"
+              >
+                {isSubmitting ? "Submitting..." : "Submit Answer"}
+              </Button>
+            )}
+          </>
+        )}
+      </CardFooter>
+    </Card>
+  );
+}
+
+function GuidedProblemRenderer({
+  activity,
+  initialResult,
+  onSubmitAttempt,
+  mode,
+}: {
+  activity: Extract<ActivityDefinition, { activityType: "GuidedProblem" }>;
+  initialResult?: AssessmentResultView;
+  onSubmitAttempt?: (
+    answers: Record<string, unknown>,
+    timeSpentSeconds: number,
+  ) => Promise<AssessmentResultView>;
+  mode: "solo" | "room" | "preview";
+}) {
+  const presentation = activity.presentationData;
+  const [stepAnswers, setStepAnswers] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [result, setResult] = useState<AssessmentResultView | null>(
+    initialResult ?? null,
+  );
+  const [error, setError] = useState<string | null>(null);
+  const [startTime] = useState<number>(Date.now());
+  const submittedSeconds = useRef<number | null>(null);
+
+  const handleStepChange = (stepId: string, text: string) => {
+    if (result || submittedSeconds.current !== null) return;
+    setStepAnswers((prev) => ({ ...prev, [stepId]: text }));
+  };
+
+  const handleSubmit = async () => {
+    if (!onSubmitAttempt || isSubmitting) return;
+
+    const formattedSteps = presentation.steps.map((s) => ({
+      stepId: s.stepId,
+      answer: stepAnswers[s.stepId] || "",
+    }));
+
+    setIsSubmitting(true);
+    setError(null);
+    const timeSpent =
+      submittedSeconds.current ??
+      Math.max(1, Math.round((Date.now() - startTime) / 1000));
+    submittedSeconds.current = timeSpent;
+
+    try {
+      const assessment = await onSubmitAttempt(
+        { steps: formattedSteps },
+        timeSpent,
+      );
+      setResult(assessment);
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error ? err.message : "Failed to submit guided attempt.",
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <Card className="w-full max-w-3xl mx-auto border-border/80 shadow-md">
+    <Card
+      className="w-full max-w-2xl shadow-sm"
+      data-testid="guided-problem-renderer"
+    >
       <CardHeader>
-        <div className="flex items-center justify-between gap-4 mb-2">
-          <Badge variant="outline" className="text-xs uppercase tracking-wider font-semibold">
-            {activity.activityType}
-          </Badge>
-          {activity.timeLimitSeconds && (
-            <span className="text-xs text-muted-foreground">
-              ⏱ {activity.timeLimitSeconds}s
-            </span>
-          )}
+        <div className="flex items-center justify-between gap-2">
+          <Badge variant="outline">Guided Problem</Badge>
+          <span className="text-xs text-muted-foreground">
+            {presentation.steps.length} Steps
+          </span>
         </div>
-        <CardTitle className="text-xl font-bold tracking-tight">{activity.title}</CardTitle>
-        <CardDescription className="text-sm text-muted-foreground">{activity.instructions}</CardDescription>
+        <CardTitle className="text-xl font-bold">{activity.title}</CardTitle>
+        <CardDescription className="text-sm">
+          {activity.instructions}
+        </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-6">
-        {/* Type 1: InteractiveQuiz */}
-        {activity.activityType === "InteractiveQuiz" && (
-          <div className="space-y-4">
-            <p className="font-medium text-foreground">
-              {(activity.presentationData as InteractiveQuizData).question}
-            </p>
-            <div className="space-y-2">
-              {(activity.presentationData as InteractiveQuizData).options.map((opt) => {
-                const isSelected = selectedOptions.includes(opt.id);
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() =>
-                      handleOptionToggle(
-                        opt.id,
-                        (activity.presentationData as InteractiveQuizData).isMultiSelect
-                      )
-                    }
-                    disabled={isSubmitting || !!result}
-                    className={`w-full text-left p-3.5 rounded-lg border text-sm font-medium transition-all ${
-                      isSelected
-                        ? "border-primary bg-primary/10 text-primary font-semibold ring-1 ring-primary"
-                        : "border-border hover:bg-muted/50 text-foreground"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-4 h-4 rounded flex items-center justify-center border ${
-                          isSelected
-                            ? "bg-primary border-primary text-primary-foreground text-xs"
-                            : "border-muted-foreground/40"
-                        }`}
-                      >
-                        {isSelected && "✓"}
-                      </div>
-                      <span>{opt.label}</span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        <div className="rounded-md border p-4 bg-muted/30">
+          <h3 className="font-semibold text-sm mb-1">Problem Scenario</h3>
+          <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+            {presentation.problem}
+          </p>
+        </div>
 
-        {/* Type 2: GuidedProblem */}
-        {activity.activityType === "GuidedProblem" && (
-          <div className="space-y-4">
-            <div className="p-3 bg-muted/30 rounded-lg border border-border/60 text-sm">
-              {(activity.presentationData as GuidedProblemData).scenario}
-            </div>
-            <div className="space-y-3">
-              {(activity.presentationData as GuidedProblemData).steps.map((step, idx) => (
-                <div
-                  key={step.stepNumber}
-                  className={`p-3 rounded-lg border text-sm ${
-                    idx === currentStepIndex
-                      ? "border-primary/60 bg-primary/5"
-                      : idx < currentStepIndex
-                      ? "border-border/40 opacity-70 bg-muted/20"
-                      : "border-border/20 opacity-40"
-                  }`}
-                >
-                  <div className="font-semibold mb-1">
-                    Step {step.stepNumber}: {step.prompt}
-                  </div>
-                  {step.hint && idx === currentStepIndex && (
-                    <div className="text-xs text-muted-foreground mt-2 italic">
-                      💡 Socratic Hint: {step.hint}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Type 3: StepByStepVisualizer */}
-        {activity.activityType === "StepByStepVisualizer" && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Concept: {(activity.presentationData as StepByStepVisualizerData).concept}</span>
-              <span>
-                Step {currentStepIndex + 1} of{" "}
-                {(activity.presentationData as StepByStepVisualizerData).steps.length}
-              </span>
-            </div>
-            {(() => {
-              const currentStep = (
-                activity.presentationData as StepByStepVisualizerData
-              ).steps[currentStepIndex];
-              return (
-                <div className="p-4 bg-muted/40 rounded-lg border border-border space-y-3">
-                  <h4 className="font-bold text-sm text-foreground">{currentStep.title}</h4>
-                  <p className="text-xs text-muted-foreground">{currentStep.description}</p>
-                  <pre className="p-3 bg-background rounded border text-xs overflow-x-auto font-mono">
-                    {JSON.stringify(currentStep.stateRepresentation, null, 2)}
-                  </pre>
-                </div>
-              );
-            })()}
-            <div className="flex gap-2 justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={currentStepIndex === 0}
-                onClick={() => setCurrentStepIndex((prev) => Math.max(0, prev - 1))}
-              >
-                Previous
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
+        <div className="space-y-4">
+          {presentation.steps.map((step, idx) => (
+            <div key={step.stepId} className="space-y-2 rounded-lg border p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase text-primary">
+                  Step {idx + 1}
+                </span>
+              </div>
+              <p className="text-sm font-medium">{step.prompt}</p>
+              <Textarea
+                placeholder="Type your mathematical / conceptual reasoning here..."
+                value={stepAnswers[step.stepId] || ""}
                 disabled={
-                  currentStepIndex >=
-                  (activity.presentationData as StepByStepVisualizerData).steps.length - 1
+                  Boolean(result) ||
+                  submittedSeconds.current !== null ||
+                  isSubmitting ||
+                  mode === "preview"
                 }
-                onClick={() => setCurrentStepIndex((prev) => prev + 1)}
-              >
-                Next Step
-              </Button>
+                onChange={(e) => handleStepChange(step.stepId, e.target.value)}
+                rows={3}
+                className="text-sm mt-2"
+              />
             </div>
+          ))}
+        </div>
+
+        {result?.status === "graded" && (
+          <div className="space-y-3 pt-4 border-t">
+            <Alert variant={result.isCorrect ? "default" : "destructive"}>
+              <AlertTitle className="flex items-center gap-2">
+                <Badge variant={result.isCorrect ? "default" : "destructive"}>
+                  {result.isCorrect ? "Completed" : "Needs Work"}
+                </Badge>
+                <span>Score: {Math.round(result.score * 100)}%</span>
+              </AlertTitle>
+              <AlertDescription className="mt-2 text-sm">
+                {result.feedback}
+              </AlertDescription>
+            </Alert>
+            {result.socraticHint && (
+              <div className="p-3 bg-muted rounded-md border text-sm">
+                <p className="font-semibold text-xs text-muted-foreground mb-1">
+                  Socratic Guidance:
+                </p>
+                <p>{result.socraticHint}</p>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Results & Socratic Feedback (Contract 06) */}
-        {result && (
-          <Alert variant={result.isCorrect ? "default" : "destructive"} className="mt-4">
-            <AlertTitle className="font-bold flex items-center justify-between">
-              <span>{result.isCorrect ? "✅ Correct!" : "⚠️ Needs Revision"}</span>
-              {result.bloomLevelDemonstrated && (
-                <Badge variant="secondary" className="text-xs">
-                  Bloom: {result.bloomLevelDemonstrated}
-                </Badge>
-              )}
-            </AlertTitle>
-            <AlertDescription className="space-y-2 mt-2 text-sm">
-              <p>{result.feedback}</p>
-              {result.socraticHint && (
-                <div className="p-2.5 bg-background/80 rounded border text-xs mt-2">
-                  <span className="font-bold">Coach Nudge:</span> {result.socraticHint}
-                </div>
-              )}
-              {result.recommendedNextStep && (
-                <div className="text-xs text-muted-foreground mt-2">
-                  👉 Recommended: {result.recommendedNextStep.title}
-                </div>
+        {result && result.status !== "graded" && (
+          <Alert>
+            <AlertTitle>{result.status}</AlertTitle>
+            <AlertDescription>
+              No mastery awarded. {result.code} If this persists, ask your
+              instructor or presenter for a new reviewed check.
+              {result.retryable && (
+                <Button variant="outline" onClick={() => setResult(null)}>
+                  Retry same submission
+                </Button>
               )}
             </AlertDescription>
           </Alert>
         )}
-
+        {result?.status === "graded" && (
+          <p>
+            Evidence:{" "}
+            {result.evidenceId
+              ? "recorded; see private progress for mastery"
+              : "none"}
+            . Private feedback.
+          </p>
+        )}
         {error && (
           <Alert variant="destructive">
-            <AlertTitle>Submission Error</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
       </CardContent>
 
-      <CardFooter className="flex justify-between border-t pt-4">
-        <span className="text-xs text-muted-foreground">
-          {activity.constraints?.maxAttempts
-            ? `Max attempts: ${activity.constraints.maxAttempts}`
-            : "Self-paced mastery"}
-        </span>
-        {!result && (
+      <CardFooter className="flex justify-between items-center border-t pt-4">
+        {mode === "solo" && result?.status === "graded" && (
           <Button
-            onClick={handleSubmit}
-            disabled={
-              isSubmitting ||
-              (activity.activityType === "InteractiveQuiz" && selectedOptions.length === 0)
-            }
+            variant="outline"
+            onClick={() => {
+              setStepAnswers({});
+              setResult(null);
+              setError(null);
+              submittedSeconds.current = null;
+            }}
           >
-            {isSubmitting ? "Submitting..." : "Check Answer"}
+            Try Again
+          </Button>
+        )}
+        {mode !== "preview" && !result && (
+          <Button onClick={handleSubmit} disabled={isSubmitting} size="sm">
+            {isSubmitting ? "Evaluating..." : "Submit Steps for Feedback"}
           </Button>
         )}
       </CardFooter>

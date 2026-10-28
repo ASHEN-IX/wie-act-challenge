@@ -4,7 +4,35 @@
  * Read-side aggregation of CompetencyProfile rows for the competency API.
  */
 
-import { Subject, Course, CompetencyProfile, ICompetencyProfile } from '../models/index';
+import { Subject, Course, CompetencyProfile } from '../models/index';
+import type { ICompetencyProfile } from '../models/index';
+
+type CompetencyRow = Pick<
+  ICompetencyProfile,
+  'topicId' | 'knowledgeType' | 'bloomLevel' | 'score' | 'confidence' | 'evidence'
+>;
+interface CompetencyLevel {
+  bloomLevel: string;
+  score: number;
+  confidence: number;
+  count: number;
+  knowledgeTypes?: KnowledgeTypeGroup[];
+}
+interface CompetencyTopic {
+  topicId: string;
+  topicName: string;
+  parentTopic: string;
+  subjectId: string;
+  courseId: string;
+  levels: CompetencyLevel[];
+}
+interface WeakCompetency {
+  topic_id: string;
+  topic_title: string | undefined;
+  scores: Record<string, number>;
+  current_level: string | null;
+  unlocked_levels: string[];
+}
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { BLOOM_LEVELS, UNLOCK_THRESHOLD } = require('@study-partner/shared/bloom/taxonomy');
@@ -71,7 +99,7 @@ interface KnowledgeTypeGroup {
 /**
  * Group one level's rows by knowledgeType. Used when ?knowledgeType=breakdown.
  */
-function groupKnowledgeTypes(rows: any[]): KnowledgeTypeGroup[] {
+function groupKnowledgeTypes(rows: CompetencyRow[]): KnowledgeTypeGroup[] {
   const byType: Record<string, KnowledgeTypeEntry[]> = {};
   for (const row of rows) {
     if (!byType[row.knowledgeType]) byType[row.knowledgeType] = [];
@@ -110,13 +138,19 @@ async function getUserCompetencyMap(
     buildTopicIndex(userId)
   ]);
 
-  const topicsByTopicId: Record<string, any[]> = {};
+  const topicsByTopicId: Record<string, CompetencyRow[]> = {};
   for (const row of profiles) {
     if (!topicsByTopicId[row.topicId]) topicsByTopicId[row.topicId] = [];
     topicsByTopicId[row.topicId].push(row);
   }
 
-  const subjects = new Map<string, { subjectId: string; topics: Map<string, any> }>();
+  const subjects = new Map<
+    string,
+    {
+      subjectId: string;
+      topics: Map<string, TopicMeta & { topicId: string; rows: CompetencyRow[] }>;
+    }
+  >();
 
   for (const [topicId, rows] of Object.entries(topicsByTopicId)) {
     const meta = topicIndex.get(topicId);
@@ -139,13 +173,17 @@ async function getUserCompetencyMap(
         .select('name')
         .lean()
     : [];
-  const nameById = new Map(subjectDocs.map((s: any) => [String(s._id), s.name]));
+  const nameById = new Map(subjectDocs.map((s) => [String(s._id), s.name]));
 
-  const result: any[] = [];
+  const result: Array<{
+    subjectId: string;
+    subjectName: string | null;
+    topics: CompetencyTopic[];
+  }> = [];
   for (const [sid, subject] of subjects) {
-    const topics: any[] = [];
+    const topics: CompetencyTopic[] = [];
     for (const [topicId, topic] of subject.topics) {
-      const levelsByBloom = new Map<string, any[]>();
+      const levelsByBloom = new Map<string, CompetencyRow[]>();
       for (const row of topic.rows) {
         if (!levelsByBloom.has(row.bloomLevel)) levelsByBloom.set(row.bloomLevel, []);
         levelsByBloom.get(row.bloomLevel)!.push(row);
@@ -154,15 +192,18 @@ async function getUserCompetencyMap(
       const levels = BLOOM_ORDER.filter((lvl: string) => levelsByBloom.has(lvl)).map(
         (lvl: string) => {
           const levelRows = levelsByBloom.get(lvl)!;
-          const level: any = {
+          const level: CompetencyLevel = {
             bloomLevel: lvl,
             score:
               Math.round(
-                (levelRows.reduce((s: number, r: any) => s + r.score, 0) / levelRows.length) * 1000
+                (levelRows.reduce((s: number, r: CompetencyRow) => s + r.score, 0) /
+                  levelRows.length) *
+                  1000
               ) / 1000,
             confidence:
               Math.round(
-                (levelRows.reduce((s: number, r: any) => s + r.confidence, 0) / levelRows.length) *
+                (levelRows.reduce((s: number, r: CompetencyRow) => s + r.confidence, 0) /
+                  levelRows.length) *
                   1000
               ) / 1000,
             count: levelRows.length
@@ -203,8 +244,8 @@ async function getTopicDetail(userId: string, topicId: string) {
 
   if (!profiles || profiles.length === 0) return null;
 
-  const meta: any = topicIndex.get(topicId) || {};
-  const competencies = profiles.map((row: any) => ({
+  const meta: Partial<TopicMeta> = topicIndex.get(topicId) || {};
+  const competencies = profiles.map((row) => ({
     topicId: row.topicId,
     topicName: meta.title || topicId,
     parentTopic: meta.parentTopic || null,
@@ -214,7 +255,7 @@ async function getTopicDetail(userId: string, topicId: string) {
     score: row.score,
     confidence: row.confidence,
     needsReview: row.confidence < NEEDS_REVIEW_MIN_CONFIDENCE,
-    evidence: (row.evidence || []).slice(-5).map((e: any) => ({
+    evidence: (row.evidence || []).slice(-5).map((e) => ({
       objectiveId: e.objectiveId,
       demonstratedBloomLevel: e.demonstratedBloomLevel,
       masteryScore: e.masteryScore,
@@ -266,7 +307,7 @@ async function getWeakCompetenciesForCourse(userId: string, courseId: string, li
     scores.get(key)!.count += 1;
   }
 
-  const scored: any[] = [];
+  const scored: WeakCompetency[] = [];
   for (const topicId of validTopicIds) {
     const scoresMap = buckets.get(topicId);
     const scores: Record<string, number> = {};
@@ -309,7 +350,7 @@ async function getWeakCompetenciesForCourse(userId: string, courseId: string, li
     });
   }
 
-  const sortScore = (wc: any): number => {
+  const sortScore = (wc: WeakCompetency): number => {
     if (wc.current_level == null) return -1;
     return wc.scores[wc.current_level] != null ? wc.scores[wc.current_level] : 1;
   };

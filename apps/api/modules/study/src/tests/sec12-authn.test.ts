@@ -19,7 +19,7 @@ const tasksRouter = require('../routes/tasks');
 jest.mock('../models', () => {
   const chain = {
     select: () => chain,
-    sort: () => chain,
+    sort: () => Promise.resolve([]),
     lean: () => []
   };
   return {

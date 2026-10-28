@@ -1,3 +1,8 @@
+import { canReadCourse } from '../services/resourceAccess';
+import type { FilterQuery } from 'mongoose';
+import type { IStudySession } from '../models';
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { Response } from 'express';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { createContracts } = require('@study-partner/shared/domainContracts');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -62,30 +67,35 @@ const updateSessionSchema = Joi.object({
 // Get all sessions
 router.get(
   '/',
-  asyncHandler(async (req: any, res: any) => {
-    const userId = req.user.userId;
+  asyncHandler(async (req: DomainRequest, res: Response) => {
+    const userId = req.user!.userId;
     const { topicId, taskId, startDate, endDate } = req.query;
 
-    const filter: Record<string, any> = { userId };
+    const filter: FilterQuery<IStudySession> = { userId };
     if (topicId) filter.topicId = topicId;
     if (taskId) filter.taskId = taskId;
     if (startDate || endDate) {
       filter.completedAt = {};
-      if (startDate) filter.completedAt.$gte = new Date(startDate);
-      if (endDate) filter.completedAt.$lte = new Date(endDate);
+      if (startDate) filter.completedAt.$gte = new Date(String(startDate));
+      if (endDate) filter.completedAt.$lte = new Date(String(endDate));
     }
 
     const sessions = await StudySession.find(filter).sort({ completedAt: -1 });
 
-    res.json({ sessions });
+    const authorized = [];
+    for (const session of sessions) {
+      if (!session.courseId || (await canReadCourse(userId, session.courseId)))
+        authorized.push(session);
+    }
+    res.json({ sessions: authorized });
   })
 );
 
 // Get session by ID
 router.get(
   '/:sessionId',
-  asyncHandler(async (req: any, res: any) => {
-    const userId = req.user.userId;
+  asyncHandler(async (req: DomainRequest, res: Response) => {
+    const userId = req.user!.userId;
     const { sessionId } = req.params;
 
     const session = await StudySession.findOne({ _id: sessionId, userId });
@@ -101,13 +111,13 @@ router.get(
 // Create session
 router.post(
   '/',
-  asyncHandler(async (req: any, res: any) => {
+  asyncHandler(async (req: DomainRequest, res: Response) => {
     const { error, value } = createSessionSchema.validate(req.body, { stripUnknown: true });
     if (error) {
       return res.status(400).json({ error: error.details[0].message });
     }
 
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
 
     const session = await StudySession.create({
       userId,
@@ -125,13 +135,13 @@ router.post(
 // Update/End session
 router.put(
   '/:sessionId',
-  asyncHandler(async (req: any, res: any) => {
+  asyncHandler(async (req: DomainRequest, res: Response) => {
     const { error, value } = updateSessionSchema.validate(req.body, { stripUnknown: true });
     if (error) {
       return res.status(400).json({ error: error.details[0].message });
     }
 
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const { sessionId } = req.params;
 
     const session = await StudySession.findOne({ _id: sessionId, userId });
@@ -184,15 +194,15 @@ router.put(
 // Get session statistics
 router.get(
   '/stats/summary',
-  asyncHandler(async (req: any, res: any) => {
-    const userId = req.user.userId;
+  asyncHandler(async (req: DomainRequest, res: Response) => {
+    const userId = req.user!.userId;
     const { startDate, endDate } = req.query;
 
-    const filter: Record<string, any> = { userId };
+    const filter: FilterQuery<IStudySession> = { userId };
     if (startDate || endDate) {
       filter.completedAt = {};
-      if (startDate) filter.completedAt.$gte = new Date(startDate);
-      if (endDate) filter.completedAt.$lte = new Date(endDate);
+      if (startDate) filter.completedAt.$gte = new Date(String(startDate));
+      if (endDate) filter.completedAt.$lte = new Date(String(endDate));
     }
 
     const sessions = await StudySession.find(filter);

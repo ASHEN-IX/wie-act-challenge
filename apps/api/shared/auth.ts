@@ -1,16 +1,18 @@
-import type { Request, Response, NextFunction } from 'express';
+import type { Response, NextFunction } from 'express';
+import type { DomainRequest } from '../src/framework/contracts';
 
 export const UserRole = { STUDENT: 'student', ADMIN: 'admin' } as const;
 export type UserRoleType = (typeof UserRole)[keyof typeof UserRole];
 
-export async function authenticate(req: Request, res: Response, next: NextFunction): Promise<any> {
+export async function authenticate(req: DomainRequest, res: Response, next: NextFunction) {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { resolveIdentity } = require('./sessionIdentity');
     const auth = await resolveIdentity(req.headers);
     if (!auth) return res.status(401).json({ error: 'Authentication required' });
-    (req as any).user = auth.identity;
-    (req as any).auth = auth;
+    res.setHeader('Cache-Control', 'private, no-store');
+    req.user = auth.identity;
+    req.auth = auth;
     next();
   } catch (error) {
     next(error);
@@ -22,12 +24,12 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
  * @param {string} role
  */
 export function requireRole(role: string) {
-  return (req: Request, res: Response, next: NextFunction): any => {
-    if (!(req as any).user) {
+  return (req: DomainRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    if ((req as any).user.role !== role) {
+    if (req.user.role !== role) {
       return res.status(403).json({
         error: `Insufficient permissions. Required role: ${role}`
       });
@@ -44,8 +46,8 @@ export function requireRole(role: string) {
  * Fails closed: if INTERNAL_API_SECRET is not configured, only admins pass.
  * Single canonical implementation (SEC-05); callers must not re-implement this.
  */
-export function requireInternal(req: Request, res: Response, next: NextFunction): any {
-  const user = (req as any).user;
+export function requireInternal(req: DomainRequest, res: Response, next: NextFunction) {
+  const user = req.user;
   if (user && (user.role === 'admin' || user.isAdmin === true)) {
     return next();
   }
@@ -78,7 +80,7 @@ export function buildInternalHeaders(authorization?: string): Record<string, str
  * differs from the session identity; normal user requests must never be treated as
  * internal.
  */
-export function isInternalRequest(req: Request): boolean {
+export function isInternalRequest(req: DomainRequest): boolean {
   const expectedSecret = process.env.INTERNAL_API_SECRET;
   if (!expectedSecret) return false;
   return req.headers['x-internal-secret'] === expectedSecret;

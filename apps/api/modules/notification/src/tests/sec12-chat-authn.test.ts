@@ -11,10 +11,16 @@ process.env.MONGODB_URI = 'mongodb://localhost:27017/test';
 process.env.INTERNAL_API_SECRET = 'sec12-chat-internal';
 process.env.RABBITMQ_URL = 'amqp://localhost:5672/%2F';
 process.env.NODE_ENV = 'test';
-process.exit = jest.fn() as any;
+const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => {
+  throw new Error(`Unexpected process.exit(${code})`);
+});
+afterAll(() => exitSpy.mockRestore());
 
 import express from 'express';
-const jwt = { sign: (require('../../../../tests/sessionFixtures') as any).createSession };
+import { createSession } from '../../../../tests/sessionFixtures';
+import { verifySessionMembership } from '../utils/session-access';
+const jwt = { sign: createSession };
+jest.mock('../utils/session-access', () => ({ verifySessionMembership: jest.fn() }));
 import request from 'supertest';
 import { authenticate } from '@study-partner/shared/auth';
 import { errorHandler } from '@study-partner/shared/middleware';
@@ -39,7 +45,10 @@ app.use(errorHandler);
 
 const alice = { userId: 'user-alice', email: 'alice@test.com', role: 'student', isActive: true };
 
-function authHeader(payload: any = alice, secret = process.env.JWT_SECRET) {
+function authHeader(
+  payload: Parameters<typeof createSession>[0] = alice,
+  secret = process.env.JWT_SECRET
+) {
   return { Cookie: `mindflow.test_session=${jwt.sign(payload, secret)}` };
 }
 
@@ -47,7 +56,10 @@ function expiredToken() {
   return jwt.sign({ ...alice, exp: Math.floor(Date.now() / 1000) - 60 }, process.env.JWT_SECRET);
 }
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+  jest.mocked(verifySessionMembership).mockResolvedValue(true);
+});
 
 describe('SEC-12 chat endpoints require valid authentication', () => {
   it('401 without a token', async () => {
@@ -82,6 +94,25 @@ describe('SEC-12 chat endpoints require valid authentication', () => {
       messageId: 'message-id-9',
       userId: 'user-alice'
     });
+  });
+
+  it('403 for an authenticated nonmember before history or deletion', async () => {
+    jest.mocked(verifySessionMembership).mockResolvedValue(false);
+    const history = await request(app)
+      .get('/api/v1/session-chat/session-1/history')
+      .set(authHeader());
+    const deletion = await request(app)
+      .delete('/api/v1/session-chat/session-1/message-id-9')
+      .set(authHeader());
+    expect(history.status).toBe(403);
+    expect(deletion.status).toBe(403);
+    expect(chatService.getHistory).not.toHaveBeenCalled();
+    expect(chatService.deleteMessage).not.toHaveBeenCalled();
+    expect(verifySessionMembership).toHaveBeenCalledWith(
+      expect.stringContaining('mindflow.test_session='),
+      alice.userId,
+      'session-1'
+    );
   });
 
   it('200 for an authenticated valid-history read', async () => {

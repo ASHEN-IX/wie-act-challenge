@@ -19,7 +19,7 @@ const CHALLENGE_DIFFICULTY_MULTIPLIER: Record<string, number> = {
 interface TrackAnalyticsParams {
   authorization?: string;
   eventType: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 const trackAnalyticsEvent = async ({
@@ -39,7 +39,7 @@ const trackAnalyticsEvent = async ({
     );
 
     return response?.data || null;
-  } catch (error: any) {
+  } catch (error) {
     console.warn('[Analytics] Event tracking failed:', getAxiosErrorDetails(error));
     return null;
   }
@@ -63,14 +63,14 @@ const fetchGamificationProfile = async ({
     });
 
     return response?.data || null;
-  } catch (error: any) {
+  } catch (error) {
     console.warn('[Gamification] Profile lookup failed:', getAxiosErrorDetails(error));
     return null;
   }
 };
 
 interface CalculateChallengeXPParams {
-  difficulty?: string;
+  difficulty?: string | null;
   baseXP: number;
 }
 
@@ -80,7 +80,15 @@ const calculateChallengeXP = ({ difficulty, baseXP }: CalculateChallengeXPParams
   return toSafeInteger(baseXP * difficultyMultiplier, baseXP);
 };
 
-const getSessionCompletionContext = (session: any) => {
+interface CompletionSession {
+  _id: { toString(): string } | string;
+  mode?: string;
+  duration?: number;
+  taskId?: string;
+  challengeDifficulty?: string;
+}
+
+const getSessionCompletionContext = (session: CompletionSession) => {
   const isChallenge = session.mode === 'exam';
   const duration = Number(session.duration || 0);
 
@@ -107,7 +115,7 @@ const getSessionCompletionContext = (session: any) => {
 
 interface AwardSessionCompletionParams {
   userId?: string;
-  session: any;
+  session: CompletionSession;
   authorization?: string;
 }
 
@@ -215,7 +223,7 @@ async function processSessionCompletionRewards({
         headers: buildInternalHeaders(authorization)
       }
     );
-  } catch (xpErr: any) {
+  } catch (xpErr) {
     console.warn('XP/streak award failed:', getAxiosErrorDetails(xpErr));
   }
 

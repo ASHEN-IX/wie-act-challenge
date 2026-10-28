@@ -26,7 +26,7 @@ export interface IEvalResult extends Document {
   step: number;
   status: EvalStatus;
   masteryScore: number | null;
-  scores: Record<string, any>;
+  scores: Record<string, number>;
   nextQuestion: string | null;
   demonstratedBloomLevel: string | null;
   objectiveId: string | null;

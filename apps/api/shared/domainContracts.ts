@@ -1,29 +1,37 @@
-import type { Request, Response, NextFunction } from 'express';
+import type { Request, Response, NextFunction, Router } from 'express';
+import type { DomainRequest } from '../src/framework/contracts';
+
+export type ContractHandler = (req: DomainRequest, res: Response, next: NextFunction) => unknown;
+type HttpMethod = 'get' | 'post' | 'put' | 'patch' | 'delete' | 'head' | 'options';
+type HandlerInput = ContractHandler | ContractHandler[];
 
 export interface ContractOperation {
-  method: string;
+  method: HttpMethod;
   path: string;
-  handlers: Array<(req: Request, res: Response, next: NextFunction) => any>;
+  handlers: ContractHandler[];
   [key: string]: unknown;
 }
 
 export interface ContractMiddlewareEntry {
   path: string;
-  handlers: Array<(req: Request, res: Response, next: NextFunction) => any>;
+  handlers: ContractHandler[];
 }
 
 export interface DomainContractRouter {
-  (req: Request, res: Response, next: NextFunction): any;
+  (req: Request, res: Response, next: NextFunction): unknown;
   operations: ContractOperation[];
   middleware: ContractMiddlewareEntry[];
-  use: (path: string | any, ...handlers: any[]) => DomainContractRouter;
-  get: (path: string, ...handlers: any[]) => DomainContractRouter;
-  post: (path: string, ...handlers: any[]) => DomainContractRouter;
-  put: (path: string, ...handlers: any[]) => DomainContractRouter;
-  patch: (path: string, ...handlers: any[]) => DomainContractRouter;
-  delete: (path: string, ...handlers: any[]) => DomainContractRouter;
-  head: (path: string, ...handlers: any[]) => DomainContractRouter;
-  options: (path: string, ...handlers: any[]) => DomainContractRouter;
+  use: (
+    path: string | ContractHandler | DomainContractRouter,
+    ...handlers: Array<HandlerInput | DomainContractRouter>
+  ) => DomainContractRouter;
+  get: (path: string, ...handlers: HandlerInput[]) => DomainContractRouter;
+  post: (path: string, ...handlers: HandlerInput[]) => DomainContractRouter;
+  put: (path: string, ...handlers: HandlerInput[]) => DomainContractRouter;
+  patch: (path: string, ...handlers: HandlerInput[]) => DomainContractRouter;
+  delete: (path: string, ...handlers: HandlerInput[]) => DomainContractRouter;
+  head: (path: string, ...handlers: HandlerInput[]) => DomainContractRouter;
+  options: (path: string, ...handlers: HandlerInput[]) => DomainContractRouter;
 }
 
 /** Declarative domain operations. Nest owns production HTTP routing.
@@ -32,12 +40,13 @@ export interface DomainContractRouter {
 export function createContracts(): DomainContractRouter {
   const operations: ContractOperation[] = [];
   const middleware: ContractMiddlewareEntry[] = [];
-  let testRouter: any;
+  let testRouter: Router | undefined;
 
   const contracts = function (req: Request, res: Response, next: NextFunction) {
     if (!testRouter) {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      testRouter = require('express').Router();
+      const express: typeof import('express') = require('express');
+      testRouter = express.Router();
       for (const entry of middleware) testRouter.use(entry.path, ...entry.handlers);
       for (const entry of operations) testRouter[entry.method](entry.path, ...entry.handlers);
     }
@@ -46,13 +55,13 @@ export function createContracts(): DomainContractRouter {
 
   contracts.operations = operations;
   contracts.middleware = middleware;
-  contracts.use = (path: string | any, ...handlers: any[]) => {
+  contracts.use = (path, ...handlers) => {
     if (typeof path !== 'string') {
       handlers.unshift(path);
       path = '/';
     }
     for (const handler of handlers.flat()) {
-      if (handler && handler.operations) {
+      if (handler && 'operations' in handler) {
         const join = (child: string) =>
           (path.replace(/\/$/, '') + '/' + child.replace(/^\//, '')).replace(/\/$/, '') || '/';
         for (const operation of handler.operations)
@@ -69,7 +78,7 @@ export function createContracts(): DomainContractRouter {
     return contracts;
   };
   for (const method of ['get', 'post', 'put', 'patch', 'delete', 'head', 'options'] as const) {
-    contracts[method] = (path: string, ...handlers: any[]) => {
+    contracts[method] = (path: string, ...handlers: HandlerInput[]) => {
       operations.push({ method, path, handlers: handlers.flat() });
       return contracts;
     };
@@ -78,7 +87,7 @@ export function createContracts(): DomainContractRouter {
 }
 
 export function executeHandlers(
-  handlers: Array<(req: Request, res: Response, next: NextFunction) => any>,
+  handlers: ContractHandler[],
   req: Request,
   res: Response
 ): Promise<void> {

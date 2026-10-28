@@ -9,11 +9,16 @@ process.env.AI_RETRY_DELAYS_MS = '[1000,4000,16000]';
 
 jest.mock('amqplib', () => {
   const state = {
-    connection: null,
-    confirmChannel: null,
-    publishes: [],
-    channels: [],
-    channelHandlers: {}
+    connection: null as { on: jest.Mock } | null,
+    confirmChannel: null as { publish: jest.Mock } | null,
+    publishes: [] as Array<{
+      exchange: string;
+      routingKey: string;
+      content: Buffer;
+      opts: unknown;
+    }>,
+    channels: [] as Array<Record<string, jest.Mock>>,
+    channelHandlers: {} as Record<string, () => void>
   };
 
   function makeConfirmChannel() {
@@ -21,12 +26,12 @@ jest.mock('amqplib', () => {
       assertExchange: jest.fn().mockResolvedValue({}),
       assertQueue: jest.fn().mockResolvedValue({}),
       bindQueue: jest.fn().mockResolvedValue({}),
-      publish: jest.fn((exchange, routingKey, content, opts) => {
+      publish: jest.fn((exchange: string, routingKey: string, content: Buffer, opts: unknown) => {
         state.publishes.push({ exchange, routingKey, content, opts });
         return true;
       }),
       waitForConfirms: jest.fn().mockResolvedValue(true),
-      on: jest.fn((event, handler) => {
+      on: jest.fn((event: string, handler: () => void) => {
         state.channelHandlers[event] = handler;
       }),
       close: jest.fn().mockResolvedValue({})
@@ -204,7 +209,7 @@ describe('ensureTopologyForType', () => {
     const ch = amqp.__state.channels[amqp.__state.channels.length - 1];
     expect(ch.assertExchange).toHaveBeenCalledTimes(3); // ai.jobs + ai.delay + ai.dlx
 
-    const queues = ch.assertQueue.mock.calls.map((c) => c[0]);
+    const queues = ch.assertQueue.mock.calls.map((c: [string]) => c[0]);
     expect(queues).toContain('ai.work.study.eval.step');
     expect(queues).toContain('ai.dlq.study.eval.step');
     // Per-type delay queues, one per retry step
@@ -212,14 +217,16 @@ describe('ensureTopologyForType', () => {
     expect(queues).toContain('ai.delay.study.eval.step.4000');
     expect(queues).toContain('ai.delay.study.eval.step.16000');
 
-    const workCall = ch.assertQueue.mock.calls.find((c) => c[0] === 'ai.work.study.eval.step');
+    const workCall = ch.assertQueue.mock.calls.find(
+      (c: [string]) => c[0] === 'ai.work.study.eval.step'
+    );
     expect(workCall[1].arguments['x-dead-letter-exchange']).toBe('ai.dlx');
     // Terminal dead-letters must route by the bare type even when the
     // message's current key is a retry key.
     expect(workCall[1].arguments['x-dead-letter-routing-key']).toBe('study.eval.step');
 
     const delayArgs = ch.assertQueue.mock.calls.find(
-      (c) => c[0] === 'ai.delay.study.eval.step.1000'
+      (c: [string]) => c[0] === 'ai.delay.study.eval.step.1000'
     )[1].arguments;
     expect(delayArgs).toEqual({
       'x-message-ttl': 1000,
@@ -355,7 +362,7 @@ test('restores result subscriptions after broker disconnection', async () => {
     await consumeAiProgress(handler);
     const previousCount = amqp.__state.channels.length;
     const closeCallbacks = amqp.__state.connection.on.mock.calls.filter(
-      ([event]) => event === 'close'
+      ([event]: [string, () => void]) => event === 'close'
     );
     closeCallbacks[closeCallbacks.length - 1][1]();
     await jest.advanceTimersByTimeAsync(500);

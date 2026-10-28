@@ -1,67 +1,61 @@
-# Use PyTorch base image (includes PyTorch, CUDA, cuDNN pre-installed)
-FROM pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
+# syntax=docker/dockerfile:1
+FROM python:3.12-slim-bookworm AS runtime-base
 
 WORKDIR /app
 
-ENV PYTHONPATH=/app:/app/agents/evaluator/src
+ENV PYTHONPATH=/app:/app/agents/evaluator/src \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    VIRTUAL_ENV=/opt/venv \
+    PATH=/opt/venv/bin:$PATH
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    curl \
-    poppler-utils \
-    tesseract-ocr \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
-    && rm -rf /var/lib/apt/lists/*
+# Keep downloaded Debian packages and indexes across retries, outside the image.
+# Debian's default docker-clean hook would otherwise delete cached .deb files.
+RUN --mount=type=cache,id=ednova-ai-apt-archives,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=ednova-ai-apt-lists,target=/var/lib/apt/lists,sharing=locked \
+    rm -f /etc/apt/apt.conf.d/docker-clean \
+    && apt-get update && apt-get install -y --no-install-recommends \
+    poppler-utils tesseract-ocr libgl1 libglib2.0-0
 
-# Install Python packages
-RUN pip install --no-cache-dir \
-    fastapi \
-    uvicorn \
-    pymongo \
-    pydantic \
-    python-dotenv \
-    google-genai \
-    litellm \
-    requests \
-    PyMuPDF \
-    pillow \
-    faiss-cpu \
-    scikit-learn \
-    pytesseract \
-    numpy \
-    pandas \
-    matplotlib \
-    seaborn \
-    scipy \
-    pdf2image \
-    PyPDF2 \
-    reportlab \
-    opencv-python \
-    mediapipe \
-    python-multipart \
-    flask \
-    beautifulsoup4 \
-    apify-client \
-    SpeechRecognition \
-    pyttsx3 \
-    pytest \
-    pytest-asyncio \
-    pytest-json-report \
-    httpx \
-    anyio \
-    "transformers>=4.38.0,<4.45.0" \
-    "sentence-transformers>=2.5.0,<2.8.0"
+FROM runtime-base AS build
 
-# Copy application code
+ENV POETRY_NO_INTERACTION=1
+
+# Keep Poetry's dependencies separate from the locked application environment.
+RUN --mount=type=cache,id=ednova-ai-pip,target=/root/.cache/pip,sharing=locked \
+    python -m venv /opt/poetry && /opt/poetry/bin/pip install poetry==2.5.1 \
+    && python -m venv /opt/venv
+COPY pyproject.toml poetry.lock ./
+# Retain verified downloads across interrupted builds without baking wheels into the image.
+# Limit competing transfers and tolerate slow connections to the wheel indexes.
+RUN --mount=type=cache,id=ednova-ai-poetry,target=/root/.cache/pypoetry,sharing=locked \
+    /opt/poetry/bin/poetry check --lock \
+    && POETRY_INSTALLER_MAX_WORKERS=4 \
+       POETRY_REQUESTS_TIMEOUT=120 \
+       POETRY_REQUESTS_MAX_RETRIES=5 \
+       /opt/poetry/bin/poetry install --only main --no-ansi
+
+FROM runtime-base AS runtime
+
+COPY --from=build /opt/venv /opt/venv
 COPY . .
 
-# Expose port
+# New named volumes inherit these owners. Existing mounts are never re-owned;
+# startup fails with an actionable error if their permissions are incompatible.
+RUN groupadd --gid 10001 ednova \
+    && useradd --uid 10001 --gid ednova --create-home ednova \
+    && mkdir -p /app/uploads /app/faiss /home/ednova/.cache \
+    && chown ednova:ednova /app/uploads /app/faiss /home/ednova/.cache \
+    && chmod 750 /app/uploads /app/faiss \
+    && chmod 755 /app/scripts/container-entrypoint.sh
+
+ENV HOME=/home/ednova \
+    HF_HOME=/home/ednova/.cache/huggingface
+USER 10001:10001
+ENTRYPOINT ["/app/scripts/container-entrypoint.sh"]
+
 EXPOSE 8000
-
-# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/health')" || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5).close()" || exit 1
 
-# Run the application with uvicorn
 CMD ["uvicorn", "services.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

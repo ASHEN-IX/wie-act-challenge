@@ -1,14 +1,16 @@
+import type { WebSocket } from 'ws';
+import { errorDetails } from '@study-partner/shared/errors';
 import { processSearchQuery } from '../services/chatService';
 
 export interface ChatHandlerContext {
   userId: string;
   sessionId: string;
-  broadcastToSession: (sessionId: string, payload: any) => Promise<void> | void;
+  broadcastToSession: (sessionId: string, payload: Record<string, unknown>) => Promise<void> | void;
 }
 
 export interface HandleChatQueryArgs {
-  ws: any;
-  payload: any;
+  ws: Pick<WebSocket, 'send'>;
+  payload: { query?: string };
   context: ChatHandlerContext;
 }
 
@@ -42,16 +44,14 @@ export async function handleChatQuery({
 
     broadcastToSession(sessionId, {
       type: 'chat_result',
-      sessionId,
-      userId,
       ...result
     });
-  } catch (err: any) {
+  } catch (err) {
     ws.send(
       JSON.stringify({
         type: 'chat_error',
         error: 'Search request failed',
-        details: err.message
+        details: errorDetails(err).message
       })
     );
   }

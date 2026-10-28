@@ -15,6 +15,7 @@ export class ApiError extends Error {
 export async function api<T>(
   endpoint: string,
   options: RequestInit = {},
+  decode?: (value: unknown) => T,
 ): Promise<T> {
   await requireIdentity();
   if (!endpoint.startsWith("/api/v1/") || endpoint.includes(".."))
@@ -46,13 +47,22 @@ export async function api<T>(
     response.status === 204 ? {} : await response.json().catch(() => ({}));
   if (!response.ok) {
     const message =
-      data &&
-      typeof data === "object" &&
-      "error" in data &&
-      typeof data.error === "string"
-        ? data.error.slice(0, 240)
-        : "The request could not be completed.";
+      response.status === 429
+        ? "Too many requests. Wait a minute, then retry the same submission."
+        : data &&
+            typeof data === "object" &&
+            "error" in data &&
+            typeof data.error === "string"
+          ? data.error.slice(0, 240)
+          : "The request could not be completed.";
     throw new ApiError(response.status, message);
+  }
+  if (decode) {
+    try {
+      return decode(data);
+    } catch {
+      throw new ApiError(502, "The service returned an unsupported response.");
+    }
   }
   return data as T;
 }

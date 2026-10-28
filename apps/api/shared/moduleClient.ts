@@ -1,13 +1,38 @@
-/** In-process calls to validated public module contracts. No sockets or service URLs. */
-import { Readable } from 'stream';
+/** In-process calls to validated public module contracts. No network listener or service hops. */
+import { Socket } from 'node:net';
+import express, { Response } from 'express';
+import type { DomainRequest, DomainDefinition, DomainOperation } from '../src/framework/contracts';
+import type { AxiosRequestConfig } from 'axios';
+import { requestContext } from './requestContext';
 import { ServerResponse, IncomingMessage } from 'http';
 
-const modules = new Map<string, any>();
+interface CompiledOperation extends DomainOperation, CompiledPath {}
+interface ContractModule {
+  operations: CompiledOperation[];
+}
+interface LegacyModule {
+  source: unknown;
+  handle(req: DomainRequest, res: Response, next: (error?: unknown) => void): unknown;
+}
+const modules = new Map<string, ContractModule | LegacyModule>();
+export interface ModuleResponse<T = unknown> {
+  status: number;
+  data: T;
+  headers: ReturnType<Response['getHeaders']>;
+}
 
-export function registerModule(name: string, app: any): void {
-  if (modules.has(name) && modules.get(name) !== app)
+export function registerModule(name: string, app: unknown): void {
+  const current = modules.get(name);
+  if (current && (!('source' in current) || current.source !== app))
     throw new Error(`Module already registered: ${name}`);
-  modules.set(name, app);
+  if (!app || (typeof app !== 'object' && typeof app !== 'function'))
+    throw new TypeError('Expected an Express application');
+  const handle: unknown = Reflect.get(app, 'handle');
+  if (typeof handle !== 'function') throw new TypeError('Expected Express application.handle');
+  modules.set(name, {
+    source: app,
+    handle: (req, res, next) => Reflect.apply(handle, app, [req, res, next])
+  });
 }
 
 export interface CompiledPath {
@@ -24,9 +49,9 @@ function compilePath(path: string): CompiledPath {
   return { matcher: new RegExp('^' + expression + '/?$'), names };
 }
 
-export function registerDomainContracts(definitions: any[]): void {
+export function registerDomainContracts(definitions: DomainDefinition[]): void {
   for (const definition of definitions) {
-    const operations = definition.operations.map((operation: any) => ({
+    const operations = definition.operations.map((operation) => ({
       ...operation,
       ...compilePath(operation.path)
     }));
@@ -34,12 +59,12 @@ export function registerDomainContracts(definitions: any[]): void {
   }
 }
 
-export function request(
-  method: string,
+export function request<T = unknown>(
+  method: 'GET' | 'DELETE' | 'POST' | 'PUT' | 'PATCH',
   address: string,
-  body?: any,
-  config: any = {}
-): Promise<any> {
+  body?: unknown,
+  config: AxiosRequestConfig = {}
+): Promise<ModuleResponse<T>> {
   const url = new URL(address);
   if (url.protocol !== 'module:') {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -51,25 +76,24 @@ export function request(
     if (value !== undefined && value !== null) url.searchParams.set(key, String(value));
   }
   return new Promise((resolve, reject) => {
-    const req: any = new Readable({
-      read() {
-        this.push(null);
-      }
-    });
-    req[Symbol.for('mindflow.moduleCall')] = true;
+    // Express request methods are attached by the legacy app or explicitly below.
+    // The underlying transport is an actual, unconnected Node HTTP message.
+    const socket = new Socket();
+    Object.defineProperty(socket, 'remoteAddress', { value: '127.0.0.1' });
+    const req = new IncomingMessage(socket) as DomainRequest & { _body: boolean };
+    req._read = () => req.push(null);
+    Reflect.set(req, Symbol.for('mindflow.moduleCall'), true);
     req.method = method.toUpperCase();
     req.url = url.pathname + url.search;
     req.headers = Object.fromEntries(
       Object.entries(config.headers || {}).map(([k, v]) => [k.toLowerCase(), v])
     );
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const context = require('./requestContext').requestContext.getStore();
+    const context = requestContext.getStore();
     if (!req.headers.cookie && context?.cookie) req.headers.cookie = context.cookie;
     req.body = body || {};
     req._body = true;
-    req.socket = { remoteAddress: '127.0.0.1' };
-    req.connection = req.socket;
-    const res: any = new ServerResponse(req as IncomingMessage);
+    const res: Response = Object.setPrototypeOf(new ServerResponse(req), express.response);
     const chunks: Buffer[] = [];
     let settled = false;
     const timer = setTimeout(
@@ -77,60 +101,72 @@ export function request(
       config.timeout || 30000
     );
     timer.unref();
-    function finish(error?: any, result?: any) {
+    function finish(error?: unknown, result?: ModuleResponse<T>) {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      socket.destroy();
       if (error) reject(error);
-      else resolve(result);
+      else if (result) resolve(result);
     }
-    res.write = (chunk: any) => {
-      if (chunk) chunks.push(Buffer.from(chunk));
+    res.write = (chunk: unknown) => {
+      if (chunk) {
+        if (typeof chunk !== 'string' && !(chunk instanceof Uint8Array))
+          throw new TypeError('Unsupported module response chunk');
+        chunks.push(Buffer.from(chunk));
+      }
       return true;
     };
-    res.end = (chunk: any) => {
-      if (chunk) chunks.push(Buffer.from(chunk));
-      let data: any = Buffer.concat(chunks).toString();
+    res.end = (chunk: unknown) => {
+      if (chunk) {
+        if (typeof chunk !== 'string' && !(chunk instanceof Uint8Array))
+          throw new TypeError('Unsupported module response chunk');
+        chunks.push(Buffer.from(chunk));
+      }
+      let data: unknown = Buffer.concat(chunks).toString();
       try {
-        data = JSON.parse(data);
+        data = JSON.parse(String(data));
       } catch {
         /* A public contract may return text. */
       }
-      const result = { status: res.statusCode, data, headers: res.getHeaders() };
+      const result = { status: res.statusCode, data: data as T, headers: res.getHeaders() };
       res.emit('finish');
       if (res.statusCode >= 400) {
-        const error: any = new Error(data?.error || `Module call failed (${res.statusCode})`);
-        error.response = result;
+        const message =
+          data && typeof data === 'object' && 'error' in data && typeof data.error === 'string'
+            ? data.error
+            : `Module call failed (${res.statusCode})`;
+        const error = Object.assign(new Error(message), { response: result });
         finish(error);
       } else finish(null, result);
       return res;
     };
-    if (app.operations) {
+    if ('operations' in app) {
       const operation = app.operations.find(
-        (entry: any) =>
-          entry.method.toUpperCase() === req.method && entry.matcher.test(url.pathname)
+        (entry) => entry.method.toUpperCase() === req.method && entry.matcher.test(url.pathname)
       );
       if (!operation) return finish(new Error('Module contract not found'));
       const match = operation.matcher.exec(url.pathname);
       req.params = Object.fromEntries(
         operation.names.map((name: string, index: number) => [
           name,
-          decodeURIComponent(match[index + 1])
+          decodeURIComponent(match![index + 1])
         ])
       );
       req.query = Object.fromEntries(url.searchParams);
-      req.path = url.pathname;
+      Object.assign(req, { path: url.pathname });
       req.originalUrl = req.url;
-      req.get = (name: string) => req.headers[name.toLowerCase()];
+      req.get = express.request.get;
       res.status = (code: number) => {
         res.statusCode = code;
         return res;
       };
-      res.json = (data: any) => {
+      res.json = (data: unknown) => {
         res.setHeader('Content-Type', 'application/json');
         return res.end(JSON.stringify(data));
       };
-      res.send = (data: any) => (typeof data === 'object' ? res.json(data) : res.end(String(data)));
+      res.send = (data: unknown) =>
+        typeof data === 'object' ? res.json(data) : res.end(String(data));
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { authenticate } = require('./auth');
       const handlers = [
@@ -142,7 +178,7 @@ export function request(
       require('./domainContracts').executeHandlers(handlers, req, res).catch(finish);
       return;
     }
-    app.handle(req, res, (error: any) => {
+    app.handle(req, res, (error: unknown) => {
       if (error) return finish(error);
       res.statusCode = 404;
       res.end(JSON.stringify({ error: 'Module contract not found' }));
@@ -154,11 +190,16 @@ const moduleClient = {
   registerModule,
   registerDomainContracts,
   request,
-  get: (url: string, config?: any) => request('GET', url, null, config),
-  delete: (url: string, config?: any) => request('DELETE', url, null, config),
-  post: (url: string, body?: any, config?: any) => request('POST', url, body, config),
-  put: (url: string, body?: any, config?: any) => request('PUT', url, body, config),
-  patch: (url: string, body?: any, config?: any) => request('PATCH', url, body, config)
+  get: <T = unknown>(url: string, config?: AxiosRequestConfig) =>
+    request<T>('GET', url, null, config),
+  delete: <T = unknown>(url: string, config?: AxiosRequestConfig) =>
+    request<T>('DELETE', url, null, config),
+  post: <T = unknown>(url: string, body?: unknown, config?: AxiosRequestConfig) =>
+    request<T>('POST', url, body, config),
+  put: <T = unknown>(url: string, body?: unknown, config?: AxiosRequestConfig) =>
+    request<T>('PUT', url, body, config),
+  patch: <T = unknown>(url: string, body?: unknown, config?: AxiosRequestConfig) =>
+    request<T>('PATCH', url, body, config)
 };
 
 export default moduleClient;

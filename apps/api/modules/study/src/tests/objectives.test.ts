@@ -6,7 +6,10 @@
 process.env.JWT_SECRET = 'test-secret-key';
 process.env.MONGODB_URI = 'mongodb://localhost:27017/test_study_partner';
 process.env.NODE_ENV = 'test';
-process.exit = jest.fn() as any;
+const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => {
+  throw new Error(`Unexpected process.exit(${code})`);
+});
+afterAll(() => exitSpy.mockRestore());
 
 // ── Mock LearningObjective model ──────────────────────────────────────────────
 const mockBulkWrite = jest.fn().mockResolvedValue({ modifiedCount: 0 });
@@ -31,7 +34,17 @@ import {
 } from '../services/objectives';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-function makeTopics(objs: any[]) {
+function makeTopics(
+  objs: Array<{
+    objectiveId?: string;
+    topicId?: string;
+    text: string;
+    knowledgeType?: string;
+    bloomLevel?: string;
+    verb?: string;
+    classification?: unknown;
+  }>
+) {
   return [
     {
       id: 'topic_1',
@@ -74,7 +87,7 @@ describe('sha256()', () => {
 describe('extractObjectives()', () => {
   test('returns empty array for empty topics', () => {
     expect(extractObjectives('doc-1', [])).toEqual([]);
-    expect(extractObjectives('doc-1', null as any)).toEqual([]);
+    expect(Reflect.apply(extractObjectives, undefined, ['doc-1', null])).toEqual([]);
   });
 
   test('flattens objectives from nested topics/subtopics', () => {

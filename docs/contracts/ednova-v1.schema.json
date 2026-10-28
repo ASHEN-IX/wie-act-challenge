@@ -1,0 +1,4246 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EdNova ED-26 v1.0.0 review candidate",
+  "description": "Structural export; relational validators and current runtime authorization are mandatory. Not officially frozen.",
+  "anyOf": [
+    {
+      "$ref": "#/$defs/PublishedContext"
+    },
+    {
+      "$ref": "#/$defs/AccessDecision"
+    },
+    {
+      "$ref": "#/$defs/SourceResolution"
+    },
+    {
+      "$ref": "#/$defs/GroundingContext"
+    },
+    {
+      "$ref": "#/$defs/EditorContext"
+    },
+    {
+      "$ref": "#/$defs/ActivityDefinition"
+    },
+    {
+      "$ref": "#/$defs/ServerEvaluationDefinition"
+    },
+    {
+      "$ref": "#/$defs/AttemptSubmission"
+    },
+    {
+      "$ref": "#/$defs/PrivateAttempt"
+    },
+    {
+      "$ref": "#/$defs/AssessmentResult"
+    },
+    {
+      "$ref": "#/$defs/AcceptedEvidence"
+    },
+    {
+      "$ref": "#/$defs/EvidenceDecision"
+    },
+    {
+      "$ref": "#/$defs/PublicCompletion"
+    },
+    {
+      "$ref": "#/$defs/RewardReference"
+    },
+    {
+      "$ref": "#/$defs/RoomActivityState"
+    },
+    {
+      "$ref": "#/$defs/SelectActivityCommand"
+    },
+    {
+      "$ref": "#/$defs/FacilitatorContext"
+    },
+    {
+      "$ref": "#/$defs/FacilitatorProposal"
+    },
+    {
+      "$ref": "#/$defs/ProposalDecision"
+    },
+    {
+      "$ref": "#/$defs/PrivateHelpRequest"
+    },
+    {
+      "$ref": "#/$defs/PrivateHelp"
+    }
+  ],
+  "$defs": {
+    "PublishedContext": {
+      "$defs": {
+        "Objective": {
+          "additionalProperties": false,
+          "properties": {
+            "objectiveId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Objectiveid",
+              "type": "string"
+            },
+            "statement": {
+              "maxLength": 2000,
+              "minLength": 1,
+              "title": "Statement",
+              "type": "string"
+            },
+            "bloomLevel": {
+              "enum": [
+                "remember",
+                "understand",
+                "apply",
+                "analyze",
+                "evaluate",
+                "create"
+              ],
+              "title": "Bloomlevel",
+              "type": "string"
+            }
+          },
+          "required": [
+            "objectiveId",
+            "statement",
+            "bloomLevel"
+          ],
+          "title": "Objective",
+          "type": "object"
+        },
+        "SourceRef": {
+          "additionalProperties": false,
+          "properties": {
+            "documentId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Documentid",
+              "type": "string"
+            },
+            "pageNumber": {
+              "anyOf": [
+                {
+                  "ge": 1,
+                  "le": 100000,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pagenumber"
+            },
+            "contentHash": {
+              "maxLength": 71,
+              "minLength": 1,
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "title": "Contenthash",
+              "type": "string"
+            },
+            "provenance": {
+              "enum": [
+                "extracted",
+                "manual",
+                "ai_generated"
+              ],
+              "title": "Provenance",
+              "type": "string"
+            },
+            "locationKnown": {
+              "title": "Locationknown",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "documentId",
+            "pageNumber",
+            "contentHash",
+            "provenance",
+            "locationKnown"
+          ],
+          "title": "SourceRef",
+          "type": "object"
+        },
+        "Topic": {
+          "additionalProperties": false,
+          "properties": {
+            "topicId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Topicid",
+              "type": "string"
+            },
+            "title": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Title",
+              "type": "string"
+            },
+            "objectives": {
+              "items": {
+                "$ref": "#/$defs/PublishedContext/$defs/Objective"
+              },
+              "maxItems": 50,
+              "minItems": 1,
+              "title": "Objectives",
+              "type": "array"
+            }
+          },
+          "required": [
+            "topicId",
+            "title",
+            "objectives"
+          ],
+          "title": "Topic",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "courseId": {
+          "maxLength": 24,
+          "minLength": 1,
+          "pattern": "^[a-f0-9]{24}$",
+          "title": "Courseid",
+          "type": "string"
+        },
+        "revisionId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Revisionid",
+          "type": "string"
+        },
+        "contentHash": {
+          "maxLength": 71,
+          "minLength": 1,
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "title": "Contenthash",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": "1.0.0",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "visibility": {
+          "const": "authorized_learner",
+          "title": "Visibility",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "isPublished": {
+          "const": true,
+          "title": "Ispublished",
+          "type": "boolean"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/PublishedContext/$defs/SourceRef"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "title": "Sources",
+          "type": "array"
+        },
+        "publishedAt": {
+          "maxLength": 24,
+          "minLength": 24,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Publishedat",
+          "type": "string"
+        },
+        "authorizedDocumentIds": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+            "type": "string"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "title": "Authorizeddocumentids",
+          "type": "array"
+        },
+        "topics": {
+          "items": {
+            "$ref": "#/$defs/PublishedContext/$defs/Topic"
+          },
+          "maxItems": 50,
+          "minItems": 1,
+          "title": "Topics",
+          "type": "array"
+        }
+      },
+      "required": [
+        "courseId",
+        "revisionId",
+        "contentHash",
+        "schemaVersion",
+        "visibility",
+        "title",
+        "isPublished",
+        "sources",
+        "publishedAt",
+        "authorizedDocumentIds",
+        "topics"
+      ],
+      "title": "PublishedContext",
+      "type": "object"
+    },
+    "AccessDecision": {
+      "$defs": {
+        "Allowed": {
+          "additionalProperties": false,
+          "properties": {
+            "schemaVersion": {
+              "const": "1.0.0",
+              "title": "Schemaversion",
+              "type": "string"
+            },
+            "decision": {
+              "const": "allowed",
+              "title": "Decision",
+              "type": "string"
+            },
+            "userId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Userid",
+              "type": "string"
+            },
+            "pin": {
+              "$ref": "#/$defs/AccessDecision/$defs/Pin"
+            },
+            "grant": {
+              "enum": [
+                "personal_owner",
+                "active_enrollment",
+                "assigned_instructor"
+              ],
+              "title": "Grant",
+              "type": "string"
+            },
+            "checkedAt": {
+              "maxLength": 24,
+              "minLength": 24,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+              "title": "Checkedat",
+              "type": "string"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "decision",
+            "userId",
+            "pin",
+            "grant",
+            "checkedAt"
+          ],
+          "title": "Allowed",
+          "type": "object"
+        },
+        "Denied": {
+          "additionalProperties": false,
+          "properties": {
+            "schemaVersion": {
+              "const": "1.0.0",
+              "title": "Schemaversion",
+              "type": "string"
+            },
+            "decision": {
+              "const": "denied",
+              "title": "Decision",
+              "type": "string"
+            },
+            "code": {
+              "enum": [
+                "UNAUTHORIZED",
+                "UNPUBLISHED",
+                "UNAVAILABLE",
+                "REVOKED",
+                "STALE_REVISION",
+                "UNSUPPORTED_VERSION"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "retryable": {
+              "title": "Retryable",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "decision",
+            "code",
+            "retryable"
+          ],
+          "title": "Denied",
+          "type": "object"
+        },
+        "Pin": {
+          "additionalProperties": false,
+          "properties": {
+            "courseId": {
+              "maxLength": 24,
+              "minLength": 1,
+              "pattern": "^[a-f0-9]{24}$",
+              "title": "Courseid",
+              "type": "string"
+            },
+            "revisionId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Revisionid",
+              "type": "string"
+            },
+            "contentHash": {
+              "maxLength": 71,
+              "minLength": 1,
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "title": "Contenthash",
+              "type": "string"
+            }
+          },
+          "required": [
+            "courseId",
+            "revisionId",
+            "contentHash"
+          ],
+          "title": "Pin",
+          "type": "object"
+        }
+      },
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AccessDecision/$defs/Allowed"
+        },
+        {
+          "$ref": "#/$defs/AccessDecision/$defs/Denied"
+        }
+      ]
+    },
+    "SourceResolution": {
+      "$defs": {
+        "Allowed": {
+          "additionalProperties": false,
+          "properties": {
+            "schemaVersion": {
+              "const": "1.0.0",
+              "title": "Schemaversion",
+              "type": "string"
+            },
+            "decision": {
+              "const": "allowed",
+              "title": "Decision",
+              "type": "string"
+            },
+            "userId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Userid",
+              "type": "string"
+            },
+            "pin": {
+              "$ref": "#/$defs/SourceResolution/$defs/Pin"
+            },
+            "grant": {
+              "enum": [
+                "personal_owner",
+                "active_enrollment",
+                "assigned_instructor"
+              ],
+              "title": "Grant",
+              "type": "string"
+            },
+            "checkedAt": {
+              "maxLength": 24,
+              "minLength": 24,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+              "title": "Checkedat",
+              "type": "string"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "decision",
+            "userId",
+            "pin",
+            "grant",
+            "checkedAt"
+          ],
+          "title": "Allowed",
+          "type": "object"
+        },
+        "Denied": {
+          "additionalProperties": false,
+          "properties": {
+            "schemaVersion": {
+              "const": "1.0.0",
+              "title": "Schemaversion",
+              "type": "string"
+            },
+            "decision": {
+              "const": "denied",
+              "title": "Decision",
+              "type": "string"
+            },
+            "code": {
+              "enum": [
+                "UNAUTHORIZED",
+                "UNPUBLISHED",
+                "UNAVAILABLE",
+                "REVOKED",
+                "STALE_REVISION",
+                "UNSUPPORTED_VERSION"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "retryable": {
+              "title": "Retryable",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "decision",
+            "code",
+            "retryable"
+          ],
+          "title": "Denied",
+          "type": "object"
+        },
+        "Pin": {
+          "additionalProperties": false,
+          "properties": {
+            "courseId": {
+              "maxLength": 24,
+              "minLength": 1,
+              "pattern": "^[a-f0-9]{24}$",
+              "title": "Courseid",
+              "type": "string"
+            },
+            "revisionId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Revisionid",
+              "type": "string"
+            },
+            "contentHash": {
+              "maxLength": 71,
+              "minLength": 1,
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "title": "Contenthash",
+              "type": "string"
+            }
+          },
+          "required": [
+            "courseId",
+            "revisionId",
+            "contentHash"
+          ],
+          "title": "Pin",
+          "type": "object"
+        },
+        "SourceRef": {
+          "additionalProperties": false,
+          "properties": {
+            "documentId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Documentid",
+              "type": "string"
+            },
+            "pageNumber": {
+              "anyOf": [
+                {
+                  "ge": 1,
+                  "le": 100000,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pagenumber"
+            },
+            "contentHash": {
+              "maxLength": 71,
+              "minLength": 1,
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "title": "Contenthash",
+              "type": "string"
+            },
+            "provenance": {
+              "enum": [
+                "extracted",
+                "manual",
+                "ai_generated"
+              ],
+              "title": "Provenance",
+              "type": "string"
+            },
+            "locationKnown": {
+              "title": "Locationknown",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "documentId",
+            "pageNumber",
+            "contentHash",
+            "provenance",
+            "locationKnown"
+          ],
+          "title": "SourceRef",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "visibility": {
+          "const": "server_only",
+          "title": "Visibility",
+          "type": "string"
+        },
+        "pin": {
+          "$ref": "#/$defs/SourceResolution/$defs/Pin"
+        },
+        "access": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceResolution/$defs/Allowed"
+            },
+            {
+              "$ref": "#/$defs/SourceResolution/$defs/Denied"
+            }
+          ],
+          "title": "Access"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/SourceResolution/$defs/SourceRef"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "title": "Sources",
+          "type": "array"
+        },
+        "vectorIndexRef": {
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^faiss/[a-f0-9]{24}/[a-zA-Z0-9][a-zA-Z0-9_-]*\\.faiss$",
+          "title": "Vectorindexref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "visibility",
+        "pin",
+        "access",
+        "sources",
+        "vectorIndexRef"
+      ],
+      "title": "SourceResolution",
+      "type": "object"
+    },
+    "GroundingContext": {
+      "$defs": {
+        "Excerpt": {
+          "additionalProperties": false,
+          "properties": {
+            "documentId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Documentid",
+              "type": "string"
+            },
+            "text": {
+              "maxLength": 8000,
+              "minLength": 1,
+              "title": "Text",
+              "type": "string"
+            }
+          },
+          "required": [
+            "documentId",
+            "text"
+          ],
+          "title": "Excerpt",
+          "type": "object"
+        },
+        "Pin": {
+          "additionalProperties": false,
+          "properties": {
+            "courseId": {
+              "maxLength": 24,
+              "minLength": 1,
+              "pattern": "^[a-f0-9]{24}$",
+              "title": "Courseid",
+              "type": "string"
+            },
+            "revisionId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Revisionid",
+              "type": "string"
+            },
+            "contentHash": {
+              "maxLength": 71,
+              "minLength": 1,
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "title": "Contenthash",
+              "type": "string"
+            }
+          },
+          "required": [
+            "courseId",
+            "revisionId",
+            "contentHash"
+          ],
+          "title": "Pin",
+          "type": "object"
+        },
+        "SourceRef": {
+          "additionalProperties": false,
+          "properties": {
+            "documentId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Documentid",
+              "type": "string"
+            },
+            "pageNumber": {
+              "anyOf": [
+                {
+                  "ge": 1,
+                  "le": 100000,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pagenumber"
+            },
+            "contentHash": {
+              "maxLength": 71,
+              "minLength": 1,
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "title": "Contenthash",
+              "type": "string"
+            },
+            "provenance": {
+              "enum": [
+                "extracted",
+                "manual",
+                "ai_generated"
+              ],
+              "title": "Provenance",
+              "type": "string"
+            },
+            "locationKnown": {
+              "title": "Locationknown",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "documentId",
+            "pageNumber",
+            "contentHash",
+            "provenance",
+            "locationKnown"
+          ],
+          "title": "SourceRef",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "visibility": {
+          "const": "service_only",
+          "title": "Visibility",
+          "type": "string"
+        },
+        "pin": {
+          "$ref": "#/$defs/GroundingContext/$defs/Pin"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/GroundingContext/$defs/SourceRef"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "title": "Sources",
+          "type": "array"
+        },
+        "excerpts": {
+          "items": {
+            "$ref": "#/$defs/GroundingContext/$defs/Excerpt"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "title": "Excerpts",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "visibility",
+        "pin",
+        "sources",
+        "excerpts"
+      ],
+      "title": "GroundingContext",
+      "type": "object"
+    },
+    "EditorContext": {
+      "$defs": {
+        "SourceRef": {
+          "additionalProperties": false,
+          "properties": {
+            "documentId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Documentid",
+              "type": "string"
+            },
+            "pageNumber": {
+              "anyOf": [
+                {
+                  "ge": 1,
+                  "le": 100000,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pagenumber"
+            },
+            "contentHash": {
+              "maxLength": 71,
+              "minLength": 1,
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "title": "Contenthash",
+              "type": "string"
+            },
+            "provenance": {
+              "enum": [
+                "extracted",
+                "manual",
+                "ai_generated"
+              ],
+              "title": "Provenance",
+              "type": "string"
+            },
+            "locationKnown": {
+              "title": "Locationknown",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "documentId",
+            "pageNumber",
+            "contentHash",
+            "provenance",
+            "locationKnown"
+          ],
+          "title": "SourceRef",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "courseId": {
+          "maxLength": 24,
+          "minLength": 1,
+          "pattern": "^[a-f0-9]{24}$",
+          "title": "Courseid",
+          "type": "string"
+        },
+        "revisionId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Revisionid",
+          "type": "string"
+        },
+        "contentHash": {
+          "maxLength": 71,
+          "minLength": 1,
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "title": "Contenthash",
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": "1.0.0",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "visibility": {
+          "const": "editor_only",
+          "title": "Visibility",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "draft",
+            "published",
+            "deprecated"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "reviewStatus": {
+          "enum": [
+            "unreviewed",
+            "reviewed"
+          ],
+          "title": "Reviewstatus",
+          "type": "string"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/EditorContext/$defs/SourceRef"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "title": "Sources",
+          "type": "array"
+        }
+      },
+      "required": [
+        "courseId",
+        "revisionId",
+        "contentHash",
+        "schemaVersion",
+        "visibility",
+        "status",
+        "reviewStatus",
+        "sources"
+      ],
+      "title": "EditorContext",
+      "type": "object"
+    },
+    "ActivityDefinition": {
+      "$defs": {
+        "Constraints": {
+          "additionalProperties": false,
+          "properties": {
+            "maxAttempts": {
+              "ge": 1,
+              "le": 20,
+              "title": "Maxattempts",
+              "type": "integer"
+            },
+            "allowCalculator": {
+              "title": "Allowcalculator",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "maxAttempts",
+            "allowCalculator"
+          ],
+          "title": "Constraints",
+          "type": "object"
+        },
+        "Option": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Id",
+              "type": "string"
+            },
+            "label": {
+              "maxLength": 1000,
+              "minLength": 1,
+              "title": "Label",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "label"
+          ],
+          "title": "Option",
+          "type": "object"
+        },
+        "Problem": {
+          "additionalProperties": false,
+          "properties": {
+            "courseId": {
+              "maxLength": 24,
+              "minLength": 1,
+              "pattern": "^[a-f0-9]{24}$",
+              "title": "Courseid",
+              "type": "string"
+            },
+            "revisionId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Revisionid",
+              "type": "string"
+            },
+            "contentHash": {
+              "maxLength": 71,
+              "minLength": 1,
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "title": "Contenthash",
+              "type": "string"
+            },
+            "schemaVersion": {
+              "const": "1.0.0",
+              "title": "Schemaversion",
+              "type": "string"
+            },
+            "activityId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Activityid",
+              "type": "string"
+            },
+            "activityRevision": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Activityrevision",
+              "type": "string"
+            },
+            "componentVersion": {
+              "const": "1.0.0",
+              "title": "Componentversion",
+              "type": "string"
+            },
+            "objectiveId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Objectiveid",
+              "type": "string"
+            },
+            "title": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Title",
+              "type": "string"
+            },
+            "instructions": {
+              "maxLength": 4000,
+              "minLength": 1,
+              "title": "Instructions",
+              "type": "string"
+            },
+            "timeLimitSeconds": {
+              "anyOf": [
+                {
+                  "ge": 1,
+                  "le": 86400,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Timelimitseconds"
+            },
+            "visibility": {
+              "const": "public",
+              "title": "Visibility",
+              "type": "string"
+            },
+            "language": {
+              "maxLength": 35,
+              "minLength": 1,
+              "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$",
+              "title": "Language",
+              "type": "string"
+            },
+            "sourceRefs": {
+              "items": {
+                "$ref": "#/$defs/ActivityDefinition/$defs/SourceRef"
+              },
+              "maxItems": 32,
+              "minItems": 1,
+              "title": "Sourcerefs",
+              "type": "array"
+            },
+            "constraints": {
+              "$ref": "#/$defs/ActivityDefinition/$defs/Constraints"
+            },
+            "activityType": {
+              "const": "GuidedProblem",
+              "title": "Activitytype",
+              "type": "string"
+            },
+            "presentationData": {
+              "$ref": "#/$defs/ActivityDefinition/$defs/ProblemData"
+            }
+          },
+          "required": [
+            "courseId",
+            "revisionId",
+            "contentHash",
+            "schemaVersion",
+            "activityId",
+            "activityRevision",
+            "componentVersion",
+            "objectiveId",
+            "title",
+            "instructions",
+            "timeLimitSeconds",
+            "visibility",
+            "language",
+            "sourceRefs",
+            "constraints",
+            "activityType",
+            "presentationData"
+          ],
+          "title": "Problem",
+          "type": "object"
+        },
+        "ProblemData": {
+          "additionalProperties": false,
+          "properties": {
+            "problem": {
+              "maxLength": 8000,
+              "minLength": 1,
+              "title": "Problem",
+              "type": "string"
+            },
+            "steps": {
+              "items": {
+                "$ref": "#/$defs/ActivityDefinition/$defs/Step"
+              },
+              "maxItems": 20,
+              "minItems": 1,
+              "title": "Steps",
+              "type": "array"
+            }
+          },
+          "required": [
+            "problem",
+            "steps"
+          ],
+          "title": "ProblemData",
+          "type": "object"
+        },
+        "Quiz": {
+          "additionalProperties": false,
+          "properties": {
+            "courseId": {
+              "maxLength": 24,
+              "minLength": 1,
+              "pattern": "^[a-f0-9]{24}$",
+              "title": "Courseid",
+              "type": "string"
+            },
+            "revisionId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Revisionid",
+              "type": "string"
+            },
+            "contentHash": {
+              "maxLength": 71,
+              "minLength": 1,
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "title": "Contenthash",
+              "type": "string"
+            },
+            "schemaVersion": {
+              "const": "1.0.0",
+              "title": "Schemaversion",
+              "type": "string"
+            },
+            "activityId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Activityid",
+              "type": "string"
+            },
+            "activityRevision": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Activityrevision",
+              "type": "string"
+            },
+            "componentVersion": {
+              "const": "1.0.0",
+              "title": "Componentversion",
+              "type": "string"
+            },
+            "objectiveId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Objectiveid",
+              "type": "string"
+            },
+            "title": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Title",
+              "type": "string"
+            },
+            "instructions": {
+              "maxLength": 4000,
+              "minLength": 1,
+              "title": "Instructions",
+              "type": "string"
+            },
+            "timeLimitSeconds": {
+              "anyOf": [
+                {
+                  "ge": 1,
+                  "le": 86400,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Timelimitseconds"
+            },
+            "visibility": {
+              "const": "public",
+              "title": "Visibility",
+              "type": "string"
+            },
+            "language": {
+              "maxLength": 35,
+              "minLength": 1,
+              "pattern": "^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$",
+              "title": "Language",
+              "type": "string"
+            },
+            "sourceRefs": {
+              "items": {
+                "$ref": "#/$defs/ActivityDefinition/$defs/SourceRef"
+              },
+              "maxItems": 32,
+              "minItems": 1,
+              "title": "Sourcerefs",
+              "type": "array"
+            },
+            "constraints": {
+              "$ref": "#/$defs/ActivityDefinition/$defs/Constraints"
+            },
+            "activityType": {
+              "const": "InteractiveQuiz",
+              "title": "Activitytype",
+              "type": "string"
+            },
+            "presentationData": {
+              "$ref": "#/$defs/ActivityDefinition/$defs/QuizData"
+            }
+          },
+          "required": [
+            "courseId",
+            "revisionId",
+            "contentHash",
+            "schemaVersion",
+            "activityId",
+            "activityRevision",
+            "componentVersion",
+            "objectiveId",
+            "title",
+            "instructions",
+            "timeLimitSeconds",
+            "visibility",
+            "language",
+            "sourceRefs",
+            "constraints",
+            "activityType",
+            "presentationData"
+          ],
+          "title": "Quiz",
+          "type": "object"
+        },
+        "QuizData": {
+          "additionalProperties": false,
+          "properties": {
+            "question": {
+              "maxLength": 4000,
+              "minLength": 1,
+              "title": "Question",
+              "type": "string"
+            },
+            "options": {
+              "items": {
+                "$ref": "#/$defs/ActivityDefinition/$defs/Option"
+              },
+              "maxItems": 20,
+              "minItems": 2,
+              "title": "Options",
+              "type": "array"
+            },
+            "isMultiSelect": {
+              "title": "Ismultiselect",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "question",
+            "options",
+            "isMultiSelect"
+          ],
+          "title": "QuizData",
+          "type": "object"
+        },
+        "SourceRef": {
+          "additionalProperties": false,
+          "properties": {
+            "documentId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Documentid",
+              "type": "string"
+            },
+            "pageNumber": {
+              "anyOf": [
+                {
+                  "ge": 1,
+                  "le": 100000,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pagenumber"
+            },
+            "contentHash": {
+              "maxLength": 71,
+              "minLength": 1,
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "title": "Contenthash",
+              "type": "string"
+            },
+            "provenance": {
+              "enum": [
+                "extracted",
+                "manual",
+                "ai_generated"
+              ],
+              "title": "Provenance",
+              "type": "string"
+            },
+            "locationKnown": {
+              "title": "Locationknown",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "documentId",
+            "pageNumber",
+            "contentHash",
+            "provenance",
+            "locationKnown"
+          ],
+          "title": "SourceRef",
+          "type": "object"
+        },
+        "Step": {
+          "additionalProperties": false,
+          "properties": {
+            "stepId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Stepid",
+              "type": "string"
+            },
+            "prompt": {
+              "maxLength": 4000,
+              "minLength": 1,
+              "title": "Prompt",
+              "type": "string"
+            }
+          },
+          "required": [
+            "stepId",
+            "prompt"
+          ],
+          "title": "Step",
+          "type": "object"
+        }
+      },
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ActivityDefinition/$defs/Quiz"
+        },
+        {
+          "$ref": "#/$defs/ActivityDefinition/$defs/Problem"
+        }
+      ]
+    },
+    "ServerEvaluationDefinition": {
+      "$defs": {
+        "ActivityRef": {
+          "additionalProperties": false,
+          "properties": {
+            "courseId": {
+              "maxLength": 24,
+              "minLength": 1,
+              "pattern": "^[a-f0-9]{24}$",
+              "title": "Courseid",
+              "type": "string"
+            },
+            "revisionId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Revisionid",
+              "type": "string"
+            },
+            "contentHash": {
+              "maxLength": 71,
+              "minLength": 1,
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "title": "Contenthash",
+              "type": "string"
+            },
+            "activityId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Activityid",
+              "type": "string"
+            },
+            "activityRevision": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Activityrevision",
+              "type": "string"
+            },
+            "activityType": {
+              "enum": [
+                "InteractiveQuiz",
+                "GuidedProblem"
+              ],
+              "title": "Activitytype",
+              "type": "string"
+            }
+          },
+          "required": [
+            "courseId",
+            "revisionId",
+            "contentHash",
+            "activityId",
+            "activityRevision",
+            "activityType"
+          ],
+          "title": "ActivityRef",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "visibility": {
+          "const": "server_only",
+          "title": "Visibility",
+          "type": "string"
+        },
+        "activity": {
+          "$ref": "#/$defs/ServerEvaluationDefinition/$defs/ActivityRef"
+        },
+        "evaluationRef": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Evaluationref",
+          "type": "string"
+        },
+        "evaluatorType": {
+          "enum": [
+            "deterministic_rubric",
+            "llm_evaluation"
+          ],
+          "title": "Evaluatortype",
+          "type": "string"
+        },
+        "rubricVersion": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Rubricversion",
+          "type": "string"
+        },
+        "rubric": {
+          "maxLength": 16000,
+          "minLength": 1,
+          "title": "Rubric",
+          "type": "string"
+        },
+        "answerKey": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 20,
+          "minItems": 1,
+          "title": "Answerkey",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "visibility",
+        "activity",
+        "evaluationRef",
+        "evaluatorType",
+        "rubricVersion",
+        "rubric",
+        "answerKey"
+      ],
+      "title": "ServerEvaluationDefinition",
+      "type": "object"
+    },
+    "AttemptSubmission": {
+      "$defs": {
+        "ActivityRef": {
+          "additionalProperties": false,
+          "properties": {
+            "courseId": {
+              "maxLength": 24,
+              "minLength": 1,
+              "pattern": "^[a-f0-9]{24}$",
+              "title": "Courseid",
+              "type": "string"
+            },
+            "revisionId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Revisionid",
+              "type": "string"
+            },
+            "contentHash": {
+              "maxLength": 71,
+              "minLength": 1,
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "title": "Contenthash",
+              "type": "string"
+            },
+            "activityId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Activityid",
+              "type": "string"
+            },
+            "activityRevision": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Activityrevision",
+              "type": "string"
+            },
+            "activityType": {
+              "enum": [
+                "InteractiveQuiz",
+                "GuidedProblem"
+              ],
+              "title": "Activitytype",
+              "type": "string"
+            }
+          },
+          "required": [
+            "courseId",
+            "revisionId",
+            "contentHash",
+            "activityId",
+            "activityRevision",
+            "activityType"
+          ],
+          "title": "ActivityRef",
+          "type": "object"
+        },
+        "ProblemAnswers": {
+          "additionalProperties": false,
+          "properties": {
+            "steps": {
+              "items": {
+                "$ref": "#/$defs/AttemptSubmission/$defs/StepAnswer"
+              },
+              "maxItems": 20,
+              "minItems": 1,
+              "title": "Steps",
+              "type": "array"
+            }
+          },
+          "required": [
+            "steps"
+          ],
+          "title": "ProblemAnswers",
+          "type": "object"
+        },
+        "QuizAnswers": {
+          "additionalProperties": false,
+          "properties": {
+            "selectedOptionIds": {
+              "items": {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+                "type": "string"
+              },
+              "maxItems": 20,
+              "minItems": 1,
+              "title": "Selectedoptionids",
+              "type": "array"
+            }
+          },
+          "required": [
+            "selectedOptionIds"
+          ],
+          "title": "QuizAnswers",
+          "type": "object"
+        },
+        "StepAnswer": {
+          "additionalProperties": false,
+          "properties": {
+            "stepId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Stepid",
+              "type": "string"
+            },
+            "answer": {
+              "maxLength": 8000,
+              "minLength": 1,
+              "title": "Answer",
+              "type": "string"
+            }
+          },
+          "required": [
+            "stepId",
+            "answer"
+          ],
+          "title": "StepAnswer",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "attemptId": {
+          "maxLength": 36,
+          "minLength": 1,
+          "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$",
+          "title": "Attemptid",
+          "type": "string"
+        },
+        "activity": {
+          "$ref": "#/$defs/AttemptSubmission/$defs/ActivityRef"
+        },
+        "roomId": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Roomid"
+        },
+        "timeSpentSeconds": {
+          "ge": 0,
+          "le": 86400,
+          "title": "Timespentseconds",
+          "type": "integer"
+        },
+        "answers": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AttemptSubmission/$defs/QuizAnswers"
+            },
+            {
+              "$ref": "#/$defs/AttemptSubmission/$defs/ProblemAnswers"
+            }
+          ],
+          "title": "Answers"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "attemptId",
+        "activity",
+        "roomId",
+        "timeSpentSeconds",
+        "answers"
+      ],
+      "title": "AttemptSubmission",
+      "type": "object"
+    },
+    "PrivateAttempt": {
+      "$defs": {
+        "ActivityRef": {
+          "additionalProperties": false,
+          "properties": {
+            "courseId": {
+              "maxLength": 24,
+              "minLength": 1,
+              "pattern": "^[a-f0-9]{24}$",
+              "title": "Courseid",
+              "type": "string"
+            },
+            "revisionId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Revisionid",
+              "type": "string"
+            },
+            "contentHash": {
+              "maxLength": 71,
+              "minLength": 1,
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "title": "Contenthash",
+              "type": "string"
+            },
+            "activityId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Activityid",
+              "type": "string"
+            },
+            "activityRevision": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Activityrevision",
+              "type": "string"
+            },
+            "activityType": {
+              "enum": [
+                "InteractiveQuiz",
+                "GuidedProblem"
+              ],
+              "title": "Activitytype",
+              "type": "string"
+            }
+          },
+          "required": [
+            "courseId",
+            "revisionId",
+            "contentHash",
+            "activityId",
+            "activityRevision",
+            "activityType"
+          ],
+          "title": "ActivityRef",
+          "type": "object"
+        },
+        "AttemptSubmission": {
+          "additionalProperties": false,
+          "properties": {
+            "schemaVersion": {
+              "const": "1.0.0",
+              "title": "Schemaversion",
+              "type": "string"
+            },
+            "attemptId": {
+              "maxLength": 36,
+              "minLength": 1,
+              "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$",
+              "title": "Attemptid",
+              "type": "string"
+            },
+            "activity": {
+              "$ref": "#/$defs/PrivateAttempt/$defs/ActivityRef"
+            },
+            "roomId": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Roomid"
+            },
+            "timeSpentSeconds": {
+              "ge": 0,
+              "le": 86400,
+              "title": "Timespentseconds",
+              "type": "integer"
+            },
+            "answers": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PrivateAttempt/$defs/QuizAnswers"
+                },
+                {
+                  "$ref": "#/$defs/PrivateAttempt/$defs/ProblemAnswers"
+                }
+              ],
+              "title": "Answers"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "attemptId",
+            "activity",
+            "roomId",
+            "timeSpentSeconds",
+            "answers"
+          ],
+          "title": "AttemptSubmission",
+          "type": "object"
+        },
+        "ProblemAnswers": {
+          "additionalProperties": false,
+          "properties": {
+            "steps": {
+              "items": {
+                "$ref": "#/$defs/PrivateAttempt/$defs/StepAnswer"
+              },
+              "maxItems": 20,
+              "minItems": 1,
+              "title": "Steps",
+              "type": "array"
+            }
+          },
+          "required": [
+            "steps"
+          ],
+          "title": "ProblemAnswers",
+          "type": "object"
+        },
+        "QuizAnswers": {
+          "additionalProperties": false,
+          "properties": {
+            "selectedOptionIds": {
+              "items": {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+                "type": "string"
+              },
+              "maxItems": 20,
+              "minItems": 1,
+              "title": "Selectedoptionids",
+              "type": "array"
+            }
+          },
+          "required": [
+            "selectedOptionIds"
+          ],
+          "title": "QuizAnswers",
+          "type": "object"
+        },
+        "StepAnswer": {
+          "additionalProperties": false,
+          "properties": {
+            "stepId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Stepid",
+              "type": "string"
+            },
+            "answer": {
+              "maxLength": 8000,
+              "minLength": 1,
+              "title": "Answer",
+              "type": "string"
+            }
+          },
+          "required": [
+            "stepId",
+            "answer"
+          ],
+          "title": "StepAnswer",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "visibility": {
+          "const": "recipient_only",
+          "title": "Visibility",
+          "type": "string"
+        },
+        "userId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Userid",
+          "type": "string"
+        },
+        "submission": {
+          "$ref": "#/$defs/PrivateAttempt/$defs/AttemptSubmission"
+        },
+        "status": {
+          "enum": [
+            "in_progress",
+            "submitted",
+            "graded"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "submittedAt": {
+          "maxLength": 24,
+          "minLength": 24,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Submittedat",
+          "type": "string"
+        },
+        "payloadHash": {
+          "maxLength": 71,
+          "minLength": 1,
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "title": "Payloadhash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "visibility",
+        "userId",
+        "submission",
+        "status",
+        "submittedAt",
+        "payloadHash"
+      ],
+      "title": "PrivateAttempt",
+      "type": "object"
+    },
+    "AssessmentResult": {
+      "$defs": {
+        "ActivityRef": {
+          "additionalProperties": false,
+          "properties": {
+            "courseId": {
+              "maxLength": 24,
+              "minLength": 1,
+              "pattern": "^[a-f0-9]{24}$",
+              "title": "Courseid",
+              "type": "string"
+            },
+            "revisionId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Revisionid",
+              "type": "string"
+            },
+            "contentHash": {
+              "maxLength": 71,
+              "minLength": 1,
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "title": "Contenthash",
+              "type": "string"
+            },
+            "activityId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Activityid",
+              "type": "string"
+            },
+            "activityRevision": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Activityrevision",
+              "type": "string"
+            },
+            "activityType": {
+              "enum": [
+                "InteractiveQuiz",
+                "GuidedProblem"
+              ],
+              "title": "Activitytype",
+              "type": "string"
+            }
+          },
+          "required": [
+            "courseId",
+            "revisionId",
+            "contentHash",
+            "activityId",
+            "activityRevision",
+            "activityType"
+          ],
+          "title": "ActivityRef",
+          "type": "object"
+        },
+        "Graded": {
+          "additionalProperties": false,
+          "properties": {
+            "schemaVersion": {
+              "const": "1.0.0",
+              "title": "Schemaversion",
+              "type": "string"
+            },
+            "visibility": {
+              "const": "recipient_only",
+              "title": "Visibility",
+              "type": "string"
+            },
+            "userId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Userid",
+              "type": "string"
+            },
+            "attemptId": {
+              "maxLength": 36,
+              "minLength": 1,
+              "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$",
+              "title": "Attemptid",
+              "type": "string"
+            },
+            "activity": {
+              "$ref": "#/$defs/AssessmentResult/$defs/ActivityRef"
+            },
+            "status": {
+              "const": "graded",
+              "title": "Status",
+              "type": "string"
+            },
+            "score": {
+              "maximum": 1,
+              "minimum": 0,
+              "title": "Score",
+              "type": "number"
+            },
+            "isCorrect": {
+              "title": "Iscorrect",
+              "type": "boolean"
+            },
+            "feedback": {
+              "maxLength": 8000,
+              "minLength": 1,
+              "title": "Feedback",
+              "type": "string"
+            },
+            "socraticHint": {
+              "anyOf": [
+                {
+                  "maxLength": 8000,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Socratichint"
+            },
+            "recommendedNextStep": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/AssessmentResult/$defs/RecommendedNextStep"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "bloomLevelDemonstrated": {
+              "enum": [
+                "remember",
+                "understand",
+                "apply",
+                "analyze",
+                "evaluate",
+                "create"
+              ],
+              "title": "Bloomleveldemonstrated",
+              "type": "string"
+            },
+            "evidenceId": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Evidenceid"
+            },
+            "evaluatedAt": {
+              "maxLength": 24,
+              "minLength": 24,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+              "title": "Evaluatedat",
+              "type": "string"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "visibility",
+            "userId",
+            "attemptId",
+            "activity",
+            "status",
+            "score",
+            "isCorrect",
+            "feedback",
+            "socraticHint",
+            "recommendedNextStep",
+            "bloomLevelDemonstrated",
+            "evidenceId",
+            "evaluatedAt"
+          ],
+          "title": "Graded",
+          "type": "object"
+        },
+        "RecommendedNextStep": {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "advance",
+              "title": "Type",
+              "type": "string"
+            },
+            "nextObjectiveId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Nextobjectiveid",
+              "type": "string"
+            },
+            "title": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Title",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "nextObjectiveId",
+            "title"
+          ],
+          "title": "RecommendedNextStep",
+          "type": "object"
+        },
+        "Unresolved": {
+          "additionalProperties": false,
+          "properties": {
+            "schemaVersion": {
+              "const": "1.0.0",
+              "title": "Schemaversion",
+              "type": "string"
+            },
+            "visibility": {
+              "const": "recipient_only",
+              "title": "Visibility",
+              "type": "string"
+            },
+            "userId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Userid",
+              "type": "string"
+            },
+            "attemptId": {
+              "maxLength": 36,
+              "minLength": 1,
+              "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$",
+              "title": "Attemptid",
+              "type": "string"
+            },
+            "activity": {
+              "$ref": "#/$defs/AssessmentResult/$defs/ActivityRef"
+            },
+            "status": {
+              "enum": [
+                "pending",
+                "rejected",
+                "failed",
+                "unavailable"
+              ],
+              "title": "Status",
+              "type": "string"
+            },
+            "code": {
+              "enum": [
+                "PENDING",
+                "INVALID_SUBMISSION",
+                "STALE_REVISION",
+                "REVOKED",
+                "UNSUPPORTED_VERSION",
+                "UNAVAILABLE",
+                "EVALUATION_FAILED",
+                "UNCERTAIN"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "retryable": {
+              "title": "Retryable",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "visibility",
+            "userId",
+            "attemptId",
+            "activity",
+            "status",
+            "code",
+            "retryable"
+          ],
+          "title": "Unresolved",
+          "type": "object"
+        }
+      },
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AssessmentResult/$defs/Graded"
+        },
+        {
+          "$ref": "#/$defs/AssessmentResult/$defs/Unresolved"
+        }
+      ]
+    },
+    "AcceptedEvidence": {
+      "$defs": {
+        "ActivityRef": {
+          "additionalProperties": false,
+          "properties": {
+            "courseId": {
+              "maxLength": 24,
+              "minLength": 1,
+              "pattern": "^[a-f0-9]{24}$",
+              "title": "Courseid",
+              "type": "string"
+            },
+            "revisionId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Revisionid",
+              "type": "string"
+            },
+            "contentHash": {
+              "maxLength": 71,
+              "minLength": 1,
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "title": "Contenthash",
+              "type": "string"
+            },
+            "activityId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Activityid",
+              "type": "string"
+            },
+            "activityRevision": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Activityrevision",
+              "type": "string"
+            },
+            "activityType": {
+              "enum": [
+                "InteractiveQuiz",
+                "GuidedProblem"
+              ],
+              "title": "Activitytype",
+              "type": "string"
+            }
+          },
+          "required": [
+            "courseId",
+            "revisionId",
+            "contentHash",
+            "activityId",
+            "activityRevision",
+            "activityType"
+          ],
+          "title": "ActivityRef",
+          "type": "object"
+        },
+        "Evaluator": {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "enum": [
+                "deterministic_rubric",
+                "llm_evaluation"
+              ],
+              "title": "Type",
+              "type": "string"
+            },
+            "model": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model"
+            },
+            "validationVersion": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Validationversion",
+              "type": "string"
+            },
+            "executionMode": {
+              "enum": [
+                "REAL_APPROVED",
+                "MOCK_TEST",
+                "DETERMINISTIC_FALLBACK"
+              ],
+              "title": "Executionmode",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "model",
+            "validationVersion",
+            "executionMode"
+          ],
+          "title": "Evaluator",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "evidenceVersion": {
+          "const": "1.0.0",
+          "title": "Evidenceversion",
+          "type": "string"
+        },
+        "evidenceId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Evidenceid",
+          "type": "string"
+        },
+        "visibility": {
+          "const": "server_only",
+          "title": "Visibility",
+          "type": "string"
+        },
+        "userId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Userid",
+          "type": "string"
+        },
+        "attemptId": {
+          "maxLength": 36,
+          "minLength": 1,
+          "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$",
+          "title": "Attemptid",
+          "type": "string"
+        },
+        "activity": {
+          "$ref": "#/$defs/AcceptedEvidence/$defs/ActivityRef"
+        },
+        "objectiveId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Objectiveid",
+          "type": "string"
+        },
+        "status": {
+          "const": "accepted",
+          "title": "Status",
+          "type": "string"
+        },
+        "bloomLevel": {
+          "enum": [
+            "remember",
+            "understand",
+            "apply",
+            "analyze",
+            "evaluate",
+            "create"
+          ],
+          "title": "Bloomlevel",
+          "type": "string"
+        },
+        "score": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Score",
+          "type": "number"
+        },
+        "masteryAchieved": {
+          "title": "Masteryachieved",
+          "type": "boolean"
+        },
+        "evaluator": {
+          "$ref": "#/$defs/AcceptedEvidence/$defs/Evaluator"
+        },
+        "timestamp": {
+          "maxLength": 24,
+          "minLength": 24,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "title": "Timestamp",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "evidenceVersion",
+        "evidenceId",
+        "visibility",
+        "userId",
+        "attemptId",
+        "activity",
+        "objectiveId",
+        "status",
+        "bloomLevel",
+        "score",
+        "masteryAchieved",
+        "evaluator",
+        "timestamp"
+      ],
+      "title": "AcceptedEvidence",
+      "type": "object"
+    },
+    "EvidenceDecision": {
+      "$defs": {
+        "AcceptedEvidence": {
+          "additionalProperties": false,
+          "properties": {
+            "schemaVersion": {
+              "const": "1.0.0",
+              "title": "Schemaversion",
+              "type": "string"
+            },
+            "evidenceVersion": {
+              "const": "1.0.0",
+              "title": "Evidenceversion",
+              "type": "string"
+            },
+            "evidenceId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Evidenceid",
+              "type": "string"
+            },
+            "visibility": {
+              "const": "server_only",
+              "title": "Visibility",
+              "type": "string"
+            },
+            "userId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Userid",
+              "type": "string"
+            },
+            "attemptId": {
+              "maxLength": 36,
+              "minLength": 1,
+              "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$",
+              "title": "Attemptid",
+              "type": "string"
+            },
+            "activity": {
+              "$ref": "#/$defs/EvidenceDecision/$defs/ActivityRef"
+            },
+            "objectiveId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Objectiveid",
+              "type": "string"
+            },
+            "status": {
+              "const": "accepted",
+              "title": "Status",
+              "type": "string"
+            },
+            "bloomLevel": {
+              "enum": [
+                "remember",
+                "understand",
+                "apply",
+                "analyze",
+                "evaluate",
+                "create"
+              ],
+              "title": "Bloomlevel",
+              "type": "string"
+            },
+            "score": {
+              "maximum": 1,
+              "minimum": 0,
+              "title": "Score",
+              "type": "number"
+            },
+            "masteryAchieved": {
+              "title": "Masteryachieved",
+              "type": "boolean"
+            },
+            "evaluator": {
+              "$ref": "#/$defs/EvidenceDecision/$defs/Evaluator"
+            },
+            "timestamp": {
+              "maxLength": 24,
+              "minLength": 24,
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+              "title": "Timestamp",
+              "type": "string"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "evidenceVersion",
+            "evidenceId",
+            "visibility",
+            "userId",
+            "attemptId",
+            "activity",
+            "objectiveId",
+            "status",
+            "bloomLevel",
+            "score",
+            "masteryAchieved",
+            "evaluator",
+            "timestamp"
+          ],
+          "title": "AcceptedEvidence",
+          "type": "object"
+        },
+        "ActivityRef": {
+          "additionalProperties": false,
+          "properties": {
+            "courseId": {
+              "maxLength": 24,
+              "minLength": 1,
+              "pattern": "^[a-f0-9]{24}$",
+              "title": "Courseid",
+              "type": "string"
+            },
+            "revisionId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Revisionid",
+              "type": "string"
+            },
+            "contentHash": {
+              "maxLength": 71,
+              "minLength": 1,
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "title": "Contenthash",
+              "type": "string"
+            },
+            "activityId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Activityid",
+              "type": "string"
+            },
+            "activityRevision": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Activityrevision",
+              "type": "string"
+            },
+            "activityType": {
+              "enum": [
+                "InteractiveQuiz",
+                "GuidedProblem"
+              ],
+              "title": "Activitytype",
+              "type": "string"
+            }
+          },
+          "required": [
+            "courseId",
+            "revisionId",
+            "contentHash",
+            "activityId",
+            "activityRevision",
+            "activityType"
+          ],
+          "title": "ActivityRef",
+          "type": "object"
+        },
+        "Evaluator": {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "enum": [
+                "deterministic_rubric",
+                "llm_evaluation"
+              ],
+              "title": "Type",
+              "type": "string"
+            },
+            "model": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model"
+            },
+            "validationVersion": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Validationversion",
+              "type": "string"
+            },
+            "executionMode": {
+              "enum": [
+                "REAL_APPROVED",
+                "MOCK_TEST",
+                "DETERMINISTIC_FALLBACK"
+              ],
+              "title": "Executionmode",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "model",
+            "validationVersion",
+            "executionMode"
+          ],
+          "title": "Evaluator",
+          "type": "object"
+        },
+        "EvidenceAccepted": {
+          "additionalProperties": false,
+          "properties": {
+            "schemaVersion": {
+              "const": "1.0.0",
+              "title": "Schemaversion",
+              "type": "string"
+            },
+            "status": {
+              "const": "accepted",
+              "title": "Status",
+              "type": "string"
+            },
+            "evidence": {
+              "$ref": "#/$defs/EvidenceDecision/$defs/AcceptedEvidence"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "status",
+            "evidence"
+          ],
+          "title": "EvidenceAccepted",
+          "type": "object"
+        },
+        "EvidenceRejected": {
+          "additionalProperties": false,
+          "properties": {
+            "schemaVersion": {
+              "const": "1.0.0",
+              "title": "Schemaversion",
+              "type": "string"
+            },
+            "status": {
+              "enum": [
+                "rejected",
+                "unavailable"
+              ],
+              "title": "Status",
+              "type": "string"
+            },
+            "attemptId": {
+              "maxLength": 36,
+              "minLength": 1,
+              "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$",
+              "title": "Attemptid",
+              "type": "string"
+            },
+            "code": {
+              "enum": [
+                "UNVALIDATED",
+                "UNCERTAIN",
+                "REVOKED",
+                "STALE_REVISION",
+                "UNAVAILABLE"
+              ],
+              "title": "Code",
+              "type": "string"
+            },
+            "retryable": {
+              "title": "Retryable",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "status",
+            "attemptId",
+            "code",
+            "retryable"
+          ],
+          "title": "EvidenceRejected",
+          "type": "object"
+        }
+      },
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EvidenceDecision/$defs/EvidenceAccepted"
+        },
+        {
+          "$ref": "#/$defs/EvidenceDecision/$defs/EvidenceRejected"
+        }
+      ]
+    },
+    "PublicCompletion": {
+      "$defs": {
+        "ActivityRef": {
+          "additionalProperties": false,
+          "properties": {
+            "courseId": {
+              "maxLength": 24,
+              "minLength": 1,
+              "pattern": "^[a-f0-9]{24}$",
+              "title": "Courseid",
+              "type": "string"
+            },
+            "revisionId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Revisionid",
+              "type": "string"
+            },
+            "contentHash": {
+              "maxLength": 71,
+              "minLength": 1,
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "title": "Contenthash",
+              "type": "string"
+            },
+            "activityId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Activityid",
+              "type": "string"
+            },
+            "activityRevision": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Activityrevision",
+              "type": "string"
+            },
+            "activityType": {
+              "enum": [
+                "InteractiveQuiz",
+                "GuidedProblem"
+              ],
+              "title": "Activitytype",
+              "type": "string"
+            }
+          },
+          "required": [
+            "courseId",
+            "revisionId",
+            "contentHash",
+            "activityId",
+            "activityRevision",
+            "activityType"
+          ],
+          "title": "ActivityRef",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "visibility": {
+          "const": "public",
+          "title": "Visibility",
+          "type": "string"
+        },
+        "completionId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Completionid",
+          "type": "string"
+        },
+        "roomId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Roomid",
+          "type": "string"
+        },
+        "activity": {
+          "$ref": "#/$defs/PublicCompletion/$defs/ActivityRef"
+        },
+        "publicSubmissionsCount": {
+          "ge": 0,
+          "le": 10,
+          "title": "Publicsubmissionscount",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "visibility",
+        "completionId",
+        "roomId",
+        "activity",
+        "publicSubmissionsCount"
+      ],
+      "title": "PublicCompletion",
+      "type": "object"
+    },
+    "RewardReference": {
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "visibility": {
+          "const": "server_only",
+          "title": "Visibility",
+          "type": "string"
+        },
+        "userId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Userid",
+          "type": "string"
+        },
+        "evidenceId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Evidenceid",
+          "type": "string"
+        },
+        "completionId": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Completionid"
+        },
+        "rewardCandidateId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Rewardcandidateid",
+          "type": "string"
+        },
+        "policyVersion": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Policyversion",
+          "type": "string"
+        },
+        "eventKey": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Eventkey",
+          "type": "string"
+        },
+        "finalAwardId": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Finalawardid"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "visibility",
+        "userId",
+        "evidenceId",
+        "completionId",
+        "rewardCandidateId",
+        "policyVersion",
+        "eventKey",
+        "finalAwardId"
+      ],
+      "title": "RewardReference",
+      "type": "object"
+    },
+    "RoomActivityState": {
+      "$defs": {
+        "ActivityRef": {
+          "additionalProperties": false,
+          "properties": {
+            "courseId": {
+              "maxLength": 24,
+              "minLength": 1,
+              "pattern": "^[a-f0-9]{24}$",
+              "title": "Courseid",
+              "type": "string"
+            },
+            "revisionId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Revisionid",
+              "type": "string"
+            },
+            "contentHash": {
+              "maxLength": 71,
+              "minLength": 1,
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "title": "Contenthash",
+              "type": "string"
+            },
+            "activityId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Activityid",
+              "type": "string"
+            },
+            "activityRevision": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Activityrevision",
+              "type": "string"
+            },
+            "activityType": {
+              "enum": [
+                "InteractiveQuiz",
+                "GuidedProblem"
+              ],
+              "title": "Activitytype",
+              "type": "string"
+            }
+          },
+          "required": [
+            "courseId",
+            "revisionId",
+            "contentHash",
+            "activityId",
+            "activityRevision",
+            "activityType"
+          ],
+          "title": "ActivityRef",
+          "type": "object"
+        },
+        "Member": {
+          "additionalProperties": false,
+          "properties": {
+            "userId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Userid",
+              "type": "string"
+            },
+            "name": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Name",
+              "type": "string"
+            },
+            "role": {
+              "enum": [
+                "host",
+                "participant"
+              ],
+              "title": "Role",
+              "type": "string"
+            },
+            "isOnline": {
+              "title": "Isonline",
+              "type": "boolean"
+            },
+            "isSpeaking": {
+              "title": "Isspeaking",
+              "type": "boolean"
+            },
+            "hasSubmitted": {
+              "title": "Hassubmitted",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "userId",
+            "name",
+            "role",
+            "isOnline",
+            "isSpeaking",
+            "hasSubmitted"
+          ],
+          "title": "Member",
+          "type": "object"
+        },
+        "Pin": {
+          "additionalProperties": false,
+          "properties": {
+            "courseId": {
+              "maxLength": 24,
+              "minLength": 1,
+              "pattern": "^[a-f0-9]{24}$",
+              "title": "Courseid",
+              "type": "string"
+            },
+            "revisionId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Revisionid",
+              "type": "string"
+            },
+            "contentHash": {
+              "maxLength": 71,
+              "minLength": 1,
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "title": "Contenthash",
+              "type": "string"
+            }
+          },
+          "required": [
+            "courseId",
+            "revisionId",
+            "contentHash"
+          ],
+          "title": "Pin",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "type": {
+          "const": "ROOM_ACTIVITY_STATE",
+          "title": "Type",
+          "type": "string"
+        },
+        "roomId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Roomid",
+          "type": "string"
+        },
+        "seq": {
+          "ge": 1,
+          "le": 9007199254740991,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "presenterUserId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Presenteruserid",
+          "type": "string"
+        },
+        "currentPhase": {
+          "enum": [
+            "idle",
+            "peer_discussion",
+            "individual_attempt",
+            "debrief"
+          ],
+          "title": "Currentphase",
+          "type": "string"
+        },
+        "pin": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RoomActivityState/$defs/Pin"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "activity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RoomActivityState/$defs/ActivityRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "publicSubmissionsCount": {
+          "ge": 0,
+          "le": 10,
+          "title": "Publicsubmissionscount",
+          "type": "integer"
+        },
+        "participants": {
+          "items": {
+            "$ref": "#/$defs/RoomActivityState/$defs/Member"
+          },
+          "maxItems": 10,
+          "minItems": 1,
+          "title": "Participants",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "type",
+        "roomId",
+        "seq",
+        "presenterUserId",
+        "currentPhase",
+        "pin",
+        "activity",
+        "publicSubmissionsCount",
+        "participants"
+      ],
+      "title": "RoomActivityState",
+      "type": "object"
+    },
+    "SelectActivityCommand": {
+      "$defs": {
+        "ActivityRef": {
+          "additionalProperties": false,
+          "properties": {
+            "courseId": {
+              "maxLength": 24,
+              "minLength": 1,
+              "pattern": "^[a-f0-9]{24}$",
+              "title": "Courseid",
+              "type": "string"
+            },
+            "revisionId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Revisionid",
+              "type": "string"
+            },
+            "contentHash": {
+              "maxLength": 71,
+              "minLength": 1,
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "title": "Contenthash",
+              "type": "string"
+            },
+            "activityId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Activityid",
+              "type": "string"
+            },
+            "activityRevision": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Activityrevision",
+              "type": "string"
+            },
+            "activityType": {
+              "enum": [
+                "InteractiveQuiz",
+                "GuidedProblem"
+              ],
+              "title": "Activitytype",
+              "type": "string"
+            }
+          },
+          "required": [
+            "courseId",
+            "revisionId",
+            "contentHash",
+            "activityId",
+            "activityRevision",
+            "activityType"
+          ],
+          "title": "ActivityRef",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "commandId": {
+          "maxLength": 36,
+          "minLength": 1,
+          "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$",
+          "title": "Commandid",
+          "type": "string"
+        },
+        "expectedSeq": {
+          "ge": 1,
+          "le": 9007199254740991,
+          "title": "Expectedseq",
+          "type": "integer"
+        },
+        "roomId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Roomid",
+          "type": "string"
+        },
+        "action": {
+          "const": "DISPLAY_ACTIVITY",
+          "title": "Action",
+          "type": "string"
+        },
+        "activity": {
+          "$ref": "#/$defs/SelectActivityCommand/$defs/ActivityRef"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "commandId",
+        "expectedSeq",
+        "roomId",
+        "action",
+        "activity"
+      ],
+      "title": "SelectActivityCommand",
+      "type": "object"
+    },
+    "FacilitatorContext": {
+      "$defs": {
+        "ActivityRef": {
+          "additionalProperties": false,
+          "properties": {
+            "courseId": {
+              "maxLength": 24,
+              "minLength": 1,
+              "pattern": "^[a-f0-9]{24}$",
+              "title": "Courseid",
+              "type": "string"
+            },
+            "revisionId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Revisionid",
+              "type": "string"
+            },
+            "contentHash": {
+              "maxLength": 71,
+              "minLength": 1,
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "title": "Contenthash",
+              "type": "string"
+            },
+            "activityId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Activityid",
+              "type": "string"
+            },
+            "activityRevision": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Activityrevision",
+              "type": "string"
+            },
+            "activityType": {
+              "enum": [
+                "InteractiveQuiz",
+                "GuidedProblem"
+              ],
+              "title": "Activitytype",
+              "type": "string"
+            }
+          },
+          "required": [
+            "courseId",
+            "revisionId",
+            "contentHash",
+            "activityId",
+            "activityRevision",
+            "activityType"
+          ],
+          "title": "ActivityRef",
+          "type": "object"
+        },
+        "Dialogue": {
+          "additionalProperties": false,
+          "properties": {
+            "speaker": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Speaker",
+              "type": "string"
+            },
+            "text": {
+              "maxLength": 2000,
+              "minLength": 1,
+              "title": "Text",
+              "type": "string"
+            }
+          },
+          "required": [
+            "speaker",
+            "text"
+          ],
+          "title": "Dialogue",
+          "type": "object"
+        },
+        "Pin": {
+          "additionalProperties": false,
+          "properties": {
+            "courseId": {
+              "maxLength": 24,
+              "minLength": 1,
+              "pattern": "^[a-f0-9]{24}$",
+              "title": "Courseid",
+              "type": "string"
+            },
+            "revisionId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Revisionid",
+              "type": "string"
+            },
+            "contentHash": {
+              "maxLength": 71,
+              "minLength": 1,
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "title": "Contenthash",
+              "type": "string"
+            }
+          },
+          "required": [
+            "courseId",
+            "revisionId",
+            "contentHash"
+          ],
+          "title": "Pin",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "visibility": {
+          "const": "service_only",
+          "title": "Visibility",
+          "type": "string"
+        },
+        "roomId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Roomid",
+          "type": "string"
+        },
+        "seq": {
+          "ge": 1,
+          "le": 9007199254740991,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "pin": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FacilitatorContext/$defs/Pin"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "activity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FacilitatorContext/$defs/ActivityRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "currentPhase": {
+          "enum": [
+            "idle",
+            "peer_discussion",
+            "individual_attempt",
+            "debrief"
+          ],
+          "title": "Currentphase",
+          "type": "string"
+        },
+        "publicSubmissionsCount": {
+          "ge": 0,
+          "le": 10,
+          "title": "Publicsubmissionscount",
+          "type": "integer"
+        },
+        "recentDialogue": {
+          "items": {
+            "$ref": "#/$defs/FacilitatorContext/$defs/Dialogue"
+          },
+          "maxItems": 20,
+          "title": "Recentdialogue",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "visibility",
+        "roomId",
+        "seq",
+        "pin",
+        "activity",
+        "currentPhase",
+        "publicSubmissionsCount",
+        "recentDialogue"
+      ],
+      "title": "FacilitatorContext",
+      "type": "object"
+    },
+    "FacilitatorProposal": {
+      "$defs": {
+        "ActivityRef": {
+          "additionalProperties": false,
+          "properties": {
+            "courseId": {
+              "maxLength": 24,
+              "minLength": 1,
+              "pattern": "^[a-f0-9]{24}$",
+              "title": "Courseid",
+              "type": "string"
+            },
+            "revisionId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Revisionid",
+              "type": "string"
+            },
+            "contentHash": {
+              "maxLength": 71,
+              "minLength": 1,
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "title": "Contenthash",
+              "type": "string"
+            },
+            "activityId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Activityid",
+              "type": "string"
+            },
+            "activityRevision": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Activityrevision",
+              "type": "string"
+            },
+            "activityType": {
+              "enum": [
+                "InteractiveQuiz",
+                "GuidedProblem"
+              ],
+              "title": "Activitytype",
+              "type": "string"
+            }
+          },
+          "required": [
+            "courseId",
+            "revisionId",
+            "contentHash",
+            "activityId",
+            "activityRevision",
+            "activityType"
+          ],
+          "title": "ActivityRef",
+          "type": "object"
+        },
+        "Pin": {
+          "additionalProperties": false,
+          "properties": {
+            "courseId": {
+              "maxLength": 24,
+              "minLength": 1,
+              "pattern": "^[a-f0-9]{24}$",
+              "title": "Courseid",
+              "type": "string"
+            },
+            "revisionId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Revisionid",
+              "type": "string"
+            },
+            "contentHash": {
+              "maxLength": 71,
+              "minLength": 1,
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "title": "Contenthash",
+              "type": "string"
+            }
+          },
+          "required": [
+            "courseId",
+            "revisionId",
+            "contentHash"
+          ],
+          "title": "Pin",
+          "type": "object"
+        },
+        "UIProposal": {
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "const": "DISPLAY_ACTIVITY",
+              "title": "Action",
+              "type": "string"
+            },
+            "activity": {
+              "$ref": "#/$defs/FacilitatorProposal/$defs/ActivityRef"
+            }
+          },
+          "required": [
+            "action",
+            "activity"
+          ],
+          "title": "UIProposal",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "status": {
+          "const": "proposed",
+          "title": "Status",
+          "type": "string"
+        },
+        "interventionId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Interventionid",
+          "type": "string"
+        },
+        "roomId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Roomid",
+          "type": "string"
+        },
+        "expectedSeq": {
+          "ge": 1,
+          "le": 9007199254740991,
+          "title": "Expectedseq",
+          "type": "integer"
+        },
+        "pin": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FacilitatorProposal/$defs/Pin"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "strategy": {
+          "enum": [
+            "PEER_CHALLENGE",
+            "SOCRATIC_NUDGE",
+            "CONCEPT_PROMPT",
+            "INCLUSIVE_INVITATION",
+            "CONSENSUS_CHECK",
+            "DISAGREEMENT_RESOLUTION"
+          ],
+          "title": "Strategy",
+          "type": "string"
+        },
+        "messageText": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Messagetext",
+          "type": "string"
+        },
+        "proposedUICommand": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FacilitatorProposal/$defs/UIProposal"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cooldownSeconds": {
+          "ge": 0,
+          "le": 300,
+          "title": "Cooldownseconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "status",
+        "interventionId",
+        "roomId",
+        "expectedSeq",
+        "pin",
+        "strategy",
+        "messageText",
+        "proposedUICommand",
+        "cooldownSeconds"
+      ],
+      "title": "FacilitatorProposal",
+      "type": "object"
+    },
+    "ProposalDecision": {
+      "$defs": {
+        "AcceptedProposal": {
+          "additionalProperties": false,
+          "properties": {
+            "schemaVersion": {
+              "const": "1.0.0",
+              "title": "Schemaversion",
+              "type": "string"
+            },
+            "interventionId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Interventionid",
+              "type": "string"
+            },
+            "roomId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Roomid",
+              "type": "string"
+            },
+            "status": {
+              "const": "accepted",
+              "title": "Status",
+              "type": "string"
+            },
+            "commandId": {
+              "maxLength": 36,
+              "minLength": 1,
+              "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$",
+              "title": "Commandid",
+              "type": "string"
+            },
+            "seq": {
+              "ge": 1,
+              "le": 9007199254740991,
+              "title": "Seq",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "interventionId",
+            "roomId",
+            "status",
+            "commandId",
+            "seq"
+          ],
+          "title": "AcceptedProposal",
+          "type": "object"
+        },
+        "RejectedProposal": {
+          "additionalProperties": false,
+          "properties": {
+            "schemaVersion": {
+              "const": "1.0.0",
+              "title": "Schemaversion",
+              "type": "string"
+            },
+            "interventionId": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Interventionid"
+            },
+            "roomId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Roomid",
+              "type": "string"
+            },
+            "status": {
+              "const": "rejected",
+              "title": "Status",
+              "type": "string"
+            },
+            "code": {
+              "enum": [
+                "UNAUTHORIZED",
+                "UNPUBLISHED",
+                "REVOKED",
+                "UNSUPPORTED_VERSION"
+              ],
+              "title": "Code",
+              "type": "string"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "interventionId",
+            "roomId",
+            "status",
+            "code"
+          ],
+          "title": "RejectedProposal",
+          "type": "object"
+        },
+        "StaleProposal": {
+          "additionalProperties": false,
+          "properties": {
+            "schemaVersion": {
+              "const": "1.0.0",
+              "title": "Schemaversion",
+              "type": "string"
+            },
+            "interventionId": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Interventionid"
+            },
+            "roomId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Roomid",
+              "type": "string"
+            },
+            "status": {
+              "const": "stale",
+              "title": "Status",
+              "type": "string"
+            },
+            "code": {
+              "const": "STALE_REVISION",
+              "title": "Code",
+              "type": "string"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "interventionId",
+            "roomId",
+            "status",
+            "code"
+          ],
+          "title": "StaleProposal",
+          "type": "object"
+        },
+        "UnavailableProposal": {
+          "additionalProperties": false,
+          "properties": {
+            "schemaVersion": {
+              "const": "1.0.0",
+              "title": "Schemaversion",
+              "type": "string"
+            },
+            "interventionId": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Interventionid"
+            },
+            "roomId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Roomid",
+              "type": "string"
+            },
+            "status": {
+              "const": "unavailable",
+              "title": "Status",
+              "type": "string"
+            },
+            "code": {
+              "const": "UNAVAILABLE",
+              "title": "Code",
+              "type": "string"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "interventionId",
+            "roomId",
+            "status",
+            "code"
+          ],
+          "title": "UnavailableProposal",
+          "type": "object"
+        },
+        "ValidatedProposal": {
+          "additionalProperties": false,
+          "properties": {
+            "schemaVersion": {
+              "const": "1.0.0",
+              "title": "Schemaversion",
+              "type": "string"
+            },
+            "interventionId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Interventionid",
+              "type": "string"
+            },
+            "roomId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Roomid",
+              "type": "string"
+            },
+            "status": {
+              "const": "validated",
+              "title": "Status",
+              "type": "string"
+            },
+            "expectedSeq": {
+              "ge": 1,
+              "le": 9007199254740991,
+              "title": "Expectedseq",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "interventionId",
+            "roomId",
+            "status",
+            "expectedSeq"
+          ],
+          "title": "ValidatedProposal",
+          "type": "object"
+        }
+      },
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProposalDecision/$defs/ValidatedProposal"
+        },
+        {
+          "$ref": "#/$defs/ProposalDecision/$defs/AcceptedProposal"
+        },
+        {
+          "$ref": "#/$defs/ProposalDecision/$defs/RejectedProposal"
+        },
+        {
+          "$ref": "#/$defs/ProposalDecision/$defs/StaleProposal"
+        },
+        {
+          "$ref": "#/$defs/ProposalDecision/$defs/UnavailableProposal"
+        }
+      ]
+    },
+    "PrivateHelpRequest": {
+      "$defs": {
+        "ActivityRef": {
+          "additionalProperties": false,
+          "properties": {
+            "courseId": {
+              "maxLength": 24,
+              "minLength": 1,
+              "pattern": "^[a-f0-9]{24}$",
+              "title": "Courseid",
+              "type": "string"
+            },
+            "revisionId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Revisionid",
+              "type": "string"
+            },
+            "contentHash": {
+              "maxLength": 71,
+              "minLength": 1,
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "title": "Contenthash",
+              "type": "string"
+            },
+            "activityId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Activityid",
+              "type": "string"
+            },
+            "activityRevision": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Activityrevision",
+              "type": "string"
+            },
+            "activityType": {
+              "enum": [
+                "InteractiveQuiz",
+                "GuidedProblem"
+              ],
+              "title": "Activitytype",
+              "type": "string"
+            }
+          },
+          "required": [
+            "courseId",
+            "revisionId",
+            "contentHash",
+            "activityId",
+            "activityRevision",
+            "activityType"
+          ],
+          "title": "ActivityRef",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "requestId": {
+          "maxLength": 36,
+          "minLength": 1,
+          "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$",
+          "title": "Requestid",
+          "type": "string"
+        },
+        "activity": {
+          "$ref": "#/$defs/PrivateHelpRequest/$defs/ActivityRef"
+        },
+        "roomId": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Roomid"
+        },
+        "userQuestion": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Userquestion",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "requestId",
+        "activity",
+        "roomId",
+        "userQuestion"
+      ],
+      "title": "PrivateHelpRequest",
+      "type": "object"
+    },
+    "PrivateHelp": {
+      "$defs": {
+        "ActivityRef": {
+          "additionalProperties": false,
+          "properties": {
+            "courseId": {
+              "maxLength": 24,
+              "minLength": 1,
+              "pattern": "^[a-f0-9]{24}$",
+              "title": "Courseid",
+              "type": "string"
+            },
+            "revisionId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Revisionid",
+              "type": "string"
+            },
+            "contentHash": {
+              "maxLength": 71,
+              "minLength": 1,
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "title": "Contenthash",
+              "type": "string"
+            },
+            "activityId": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Activityid",
+              "type": "string"
+            },
+            "activityRevision": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+              "title": "Activityrevision",
+              "type": "string"
+            },
+            "activityType": {
+              "enum": [
+                "InteractiveQuiz",
+                "GuidedProblem"
+              ],
+              "title": "Activitytype",
+              "type": "string"
+            }
+          },
+          "required": [
+            "courseId",
+            "revisionId",
+            "contentHash",
+            "activityId",
+            "activityRevision",
+            "activityType"
+          ],
+          "title": "ActivityRef",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "visibility": {
+          "const": "recipient_only",
+          "title": "Visibility",
+          "type": "string"
+        },
+        "userId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+          "title": "Userid",
+          "type": "string"
+        },
+        "requestId": {
+          "maxLength": 36,
+          "minLength": 1,
+          "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$",
+          "title": "Requestid",
+          "type": "string"
+        },
+        "activity": {
+          "$ref": "#/$defs/PrivateHelp/$defs/ActivityRef"
+        },
+        "status": {
+          "enum": [
+            "available",
+            "unavailable"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "tutorResponse": {
+          "anyOf": [
+            {
+              "maxLength": 8000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Tutorresponse"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "visibility",
+        "userId",
+        "requestId",
+        "activity",
+        "status",
+        "tutorResponse"
+      ],
+      "title": "PrivateHelp",
+      "type": "object"
+    }
+  }
+}

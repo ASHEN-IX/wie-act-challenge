@@ -1,3 +1,17 @@
+import express from 'express';
+import type { DomainRequest, DomainIdentity } from '../../../../src/framework/contracts';
+import type { Response } from 'express';
+import type { IncomingHttpHeaders } from 'node:http';
+
+function requestFixture(input: {
+  headers?: IncomingHttpHeaders;
+  user?: Partial<DomainIdentity>;
+}): DomainRequest {
+  const req: DomainRequest = Object.create(express.request);
+  req.headers = input.headers || {};
+  if (input.user) req.user = { userId: 'fixture-user', role: 'student', ...input.user };
+  return req;
+}
 import {
   requireInternal,
   buildInternalHeaders,
@@ -16,48 +30,49 @@ afterAll(() => {
 
 describe('SEC-05 requireInternal middleware (single shared implementation)', () => {
   const json = jest.fn();
-  const res: any = { status: jest.fn().mockReturnThis(), json };
+  const status = jest.fn().mockReturnThis();
+  const res: Response = Object.assign(Object.create(express.response), { status, json });
   const next = jest.fn();
 
   beforeEach(() => {
     jest.clearAllMocks();
-    res.status.mockClear();
+    status.mockClear();
     json.mockClear();
     next.mockClear();
   });
 
   it('allows an authenticated admin JWT', () => {
-    requireInternal({ user: { role: 'admin' } } as any, res, next);
+    requireInternal(requestFixture({ user: { role: 'admin' } }), res, next);
     expect(next).toHaveBeenCalledTimes(1);
     expect(res.status).not.toHaveBeenCalled();
   });
 
   it('allows a user flagged isAdmin', () => {
-    requireInternal({ user: { isAdmin: true } } as any, res, next);
+    requireInternal(requestFixture({ user: { isAdmin: true } }), res, next);
     expect(next).toHaveBeenCalledTimes(1);
   });
 
   it('rejects a non-admin user JWT', () => {
-    requireInternal({ user: { role: 'student' }, headers: {} } as any, res, next);
+    requireInternal(requestFixture({ user: { role: 'student' }, headers: {} }), res, next);
     expect(res.status).toHaveBeenCalledWith(403);
     expect(next).not.toHaveBeenCalled();
   });
 
   it('allows a matching x-internal-secret', () => {
     process.env.INTERNAL_API_SECRET = 's3cret';
-    requireInternal({ headers: { 'x-internal-secret': 's3cret' } } as any, res, next);
+    requireInternal(requestFixture({ headers: { 'x-internal-secret': 's3cret' } }), res, next);
     expect(next).toHaveBeenCalledTimes(1);
   });
 
   it('rejects a wrong x-internal-secret', () => {
     process.env.INTERNAL_API_SECRET = 's3cret';
-    requireInternal({ headers: { 'x-internal-secret': 'nope' } } as any, res, next);
+    requireInternal(requestFixture({ headers: { 'x-internal-secret': 'nope' } }), res, next);
     expect(res.status).toHaveBeenCalledWith(403);
   });
 
   it('fails closed when no secret is configured (non-admin request)', () => {
     delete process.env.INTERNAL_API_SECRET;
-    requireInternal({ headers: { 'x-internal-secret': 'anything' } } as any, res, next);
+    requireInternal(requestFixture({ headers: { 'x-internal-secret': 'anything' } }), res, next);
     expect(res.status).toHaveBeenCalledWith(403);
   });
 });
@@ -81,10 +96,14 @@ describe('SEC-05 buildInternalHeaders + isInternalRequest', () => {
 
   it('isInternalRequest only matches a configured secret', () => {
     process.env.INTERNAL_API_SECRET = 's3cret';
-    expect(isInternalRequest({ headers: { 'x-internal-secret': 's3cret' } } as any)).toBe(true);
-    expect(isInternalRequest({ headers: {} } as any)).toBe(false);
+    expect(isInternalRequest(requestFixture({ headers: { 'x-internal-secret': 's3cret' } }))).toBe(
+      true
+    );
+    expect(isInternalRequest(requestFixture({ headers: {} }))).toBe(false);
     delete process.env.INTERNAL_API_SECRET;
-    expect(isInternalRequest({ headers: { 'x-internal-secret': 's3cret' } } as any)).toBe(false);
+    expect(isInternalRequest(requestFixture({ headers: { 'x-internal-secret': 's3cret' } }))).toBe(
+      false
+    );
   });
 });
 

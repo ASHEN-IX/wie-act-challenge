@@ -1,14 +1,18 @@
-import nodemailer from 'nodemailer';
+import nodemailer, { SendMailOptions } from 'nodemailer';
 
-let transporter: any = null;
+interface MailTransport {
+  sendMail(message: SendMailOptions): Promise<{ messageId: string }>;
+}
 
-function logEmail(...args: any[]): void {
+let transporter: MailTransport | null = null;
+
+function logEmail(...args: unknown[]): void {
   if (process.env.NODE_ENV !== 'test') {
     console.log(...args);
   }
 }
 
-async function getTransporter(): Promise<any> {
+async function getTransporter(): Promise<MailTransport> {
   if (transporter) return transporter;
 
   // Avoid network calls and async logs in test runs.

@@ -1,4 +1,5 @@
 import { load, segment } from "@/lib/api";
+import { randomUUID } from 'node:crypto';
 import { requireIdentity } from "@/server/identity";
 import { PageHeader } from "@/components/shared/page-header";
 import { DataError, EmptyState } from "@/components/shared/states";
@@ -11,7 +12,13 @@ import {
   startRoom,
   endRoom,
 } from "@/features/collaboration/actions";
-import { RealtimeStatus } from "@/features/collaboration/realtime-status";
+import {
+  RoomView,
+  RoomStateInfo,
+  ParticipantInfo,
+  FacilitatorInterventionInfo,
+} from "@/features/collaboration/room-view";
+
 export default async function Room({
   params,
 }: {
@@ -19,6 +26,89 @@ export default async function Room({
 }) {
   const { sessionId } = await params;
   const id = segment(sessionId);
+
+  // 1. Try dedicated StudyRoom endpoint first
+  const [dedicatedRoom, identity] = await Promise.all([
+    load<{ room: RoomStateInfo; participants: ParticipantInfo[] }>(
+      `/api/v1/study/rooms/${id}`,
+    ),
+    requireIdentity(),
+  ]);
+
+  const [history, interventionsRes] = await Promise.all([
+    load<{ items: { _id: string; content: string; messageType: string }[] }>(
+      `/api/v1/session-chat/${id}/history`,
+    ),
+    load<{ interventions: FacilitatorInterventionInfo[] }>(
+      `/api/v1/study/rooms/${id}/facilitator/interventions`,
+    ),
+  ]);
+
+  if (dedicatedRoom.data?.room) {
+    const { room, participants } = dedicatedRoom.data;
+
+    return (
+      <>
+        <PageHeader
+          title={room.title || "Your study room"}
+          description="Work through the material in real-time with your peers and AI facilitation."
+        />
+        <div className="grid gap-9 lg:grid-cols-[minmax(0,1fr)_340px]">
+          {/* Main Collaborative Room Experience */}
+          <section className="flex flex-col gap-6">
+            <RoomView
+              key={room.roomId}
+              roomId={room.roomId}
+              currentUserId={identity.userId}
+              leaveCommandId={randomUUID()}
+              initialRoom={room}
+              initialParticipants={participants}
+              initialInterventions={interventionsRes.data?.interventions || []}
+              wsUrl={
+                process.env.NEXT_PUBLIC_WS_URL ||
+                (process.env.BACKEND_URL
+                  ? process.env.BACKEND_URL.replace(/^http/, "ws")
+                  : undefined)
+              }
+            />
+
+
+          </section>
+
+          {/* Right Sidebar Information */}
+          <aside className="flex flex-col gap-6">
+            <div className="rounded-lg border p-5">
+              <h3 className="mb-2 text-sm font-semibold">Study Session Info</h3>
+              <p className="text-xs text-muted-foreground leading-5">
+                All participant presence, active activities, and submission counts
+                are synchronized authoritatively. Private question attempts remain isolated.
+              </p>
+              {room.inviteCode && (
+                <div className="mt-4 rounded border bg-muted/30 p-3">
+                  <span className="block text-xs text-muted-foreground">
+                    Invite Code:
+                  </span>
+                  <code
+                    data-testid="invite-code"
+                    className="mt-0.5 block font-mono text-base font-bold text-foreground"
+                  >
+                    {room.inviteCode}
+                  </code>
+                </div>
+              )}
+            </div>
+          </aside>
+        </div>
+      </>
+    );
+  }
+
+  // Dedicated rooms never downgrade a denied/revoked namespace to legacy access.
+  if (sessionId.startsWith("room_")) {
+    return <DataError message={dedicatedRoom.error || "Room is unavailable."} />;
+  }
+
+  // 2. Fallback to legacy team session flow if room not found in dedicated collection
   const participants = await load<{
     participants: {
       userId: string;
@@ -27,14 +117,10 @@ export default async function Room({
       leftAt?: string;
     }[];
   }>(`/api/v1/study/sessions/team/${id}/participants`);
+
   if (!participants.data)
     return <DataError message={participants.error || "Room is unavailable."} />;
-  const [history, identity] = await Promise.all([
-    load<{ items: { _id: string; content: string; messageType: string }[] }>(
-      `/api/v1/session-chat/${id}/history`,
-    ),
-    requireIdentity(),
-  ]);
+
   const host = participants.data.participants.some(
     (p) => p.userId === identity.userId && p.role === "host",
   );
@@ -43,12 +129,12 @@ export default async function Room({
         `/api/v1/study/sessions/${id}`,
       )
     : undefined;
+
   return (
     <>
       <PageHeader
         title="Your study room"
         description="Work through the material and make space for every perspective."
-        action={<RealtimeStatus sessionId={sessionId} />}
       />
       <DataError message={history.error} />
       <div className="grid gap-9 lg:grid-cols-[minmax(0,1fr)_260px]">

@@ -7,6 +7,7 @@ dispatch, idempotency, retry scheduling and terminal dead-lettering.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import uuid
 
@@ -102,6 +103,48 @@ async def test_success_publishes_completed_result_and_acks(worker):
     await consume(worker, FakeMessage(envelope()))
     assert len(worker.calls) == 1
     assert worker.results == [("completed", {"ok": True}, None)]
+
+
+async def test_concurrent_attempts_are_isolated_and_shutdown_drains_both(worker):
+    ready = asyncio.Event()
+    release = [asyncio.Event(), asyncio.Event()]
+    seen = []
+
+    async def handle(payload, env):
+        index = payload["index"]
+        seen.append((index, worker.current_attempt))
+        if len(seen) == 2:
+            ready.set()
+        await release[index].wait()
+        seen.append((index, worker.current_attempt))
+        return {"ok": True}
+
+    class Connection:
+        closed = False
+
+        async def close(self):
+            self.closed = True
+
+    worker.handle = handle
+    worker._connection = Connection()
+    messages = [
+        FakeMessage(envelope(payload={"index": index}), headers={"x-retry-count": index})
+        for index in range(2)
+    ]
+    tasks = [asyncio.create_task(worker.on_message(message)) for message in messages]
+    await asyncio.wait_for(ready.wait(), timeout=5)
+    stopping = asyncio.create_task(worker.stop())
+    await asyncio.sleep(0)
+    release[0].set()
+    await tasks[0]
+    assert not stopping.done() and not worker._connection.closed
+    assert not worker._shutdown.is_set()
+    release[1].set()
+    await asyncio.wait_for(asyncio.gather(tasks[1], stopping), timeout=5)
+    assert sorted(seen) == [(0, 0), (0, 0), (1, 1), (1, 1)]
+    assert all(message.acked for message in messages)
+    assert worker._connection.closed and not worker._in_flight
+    assert worker._shutdown.is_set()
 
 
 # -------------------------------------------------------------- idempotency

@@ -1,3 +1,5 @@
+import type { Response, NextFunction } from 'express';
+import type { DomainRequest } from '../../src/framework/contracts';
 const express = require('express');
 const request = require('supertest');
 const axios = require('@study-partner/shared/moduleClient');
@@ -5,18 +7,31 @@ jest.mock('@study-partner/shared/moduleClient');
 const mockFindOne = jest.fn();
 const mockCreate = jest.fn();
 jest.mock('../../modules/study/src/models', () => ({
+  Course: {
+    exists: jest.fn().mockResolvedValue({ _id: '64a000000000000000000001' }),
+    findById: jest.fn().mockReturnValue({
+      select: jest.fn().mockReturnValue({
+        lean: jest.fn().mockResolvedValue({
+          _id: '64a00000000000000000001',
+          userId: 'user-1',
+          scope: 'personal'
+        })
+      })
+    })
+  },
   StudySession: {
-    findOne: (...args) => mockFindOne(...args),
-    create: (...args) => mockCreate(...args)
+    findOne: (...args: unknown[]) => mockFindOne(...args),
+    create: (...args: unknown[]) => mockCreate(...args)
   }
 }));
 const sessionsRouter = require('../../modules/study/src/routes/sessions');
 function buildApp(authUserId = 'user-1') {
   const app = express();
   app.use(express.json());
-  app.use((req, res, next) => {
+  app.use((req: DomainRequest, res: Response, next: NextFunction) => {
     req.user = {
-      userId: authUserId
+      userId: authUserId,
+      role: 'student'
     };
     next();
   });
@@ -26,7 +41,7 @@ function buildApp(authUserId = 'user-1') {
 describe('Challenge Session Routes Integration', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    axios.post.mockImplementation(async (url) => {
+    axios.post.mockImplementation(async (url: string) => {
       if (String(url).includes('/api/v1/users/gamification/award-xp')) {
         return {
           data: {
@@ -49,7 +64,7 @@ describe('Challenge Session Routes Integration', () => {
         data: {}
       };
     });
-    axios.get.mockImplementation(async (url) => {
+    axios.get.mockImplementation(async (url: string) => {
       if (String(url).includes('/api/v1/users/gamification')) {
         return {
           data: {
@@ -71,7 +86,7 @@ describe('Challenge Session Routes Integration', () => {
     const createdSession = {
       _id: 'challenge-session-1',
       taskId: 'challenge-123',
-      courseId: 'course-1',
+      courseId: '64a000000000000000000001',
       topicId: 'topic-1',
       mode: 'exam',
       type: 'solo',
@@ -82,7 +97,7 @@ describe('Challenge Session Routes Integration', () => {
     mockCreate.mockResolvedValue(createdSession);
     const response = await request(buildApp()).post('/api/v1/study/sessions/challenge/start').send({
       challengeId: 'challenge-123',
-      courseId: 'course-1',
+      courseId: '64a000000000000000000001',
       topicId: 'topic-1',
       difficulty: 'expert'
     });
@@ -145,7 +160,7 @@ describe('Challenge Session Routes Integration', () => {
         })
       })
     );
-    const questProgressCall = axios.post.mock.calls.find((call) =>
+    const questProgressCall = axios.post.mock.calls.find((call: [string, { action?: string }]) =>
       String(call[0] || '').includes('/users/quests/progress')
     );
     expect(questProgressCall).toBeTruthy();

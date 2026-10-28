@@ -1,3 +1,21 @@
+import type { ICourse, ISubtopic } from '../models';
+import type {
+  AiProgressEnvelope,
+  AiResultEnvelope
+} from '@study-partner/shared/ai-messaging/envelope';
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object';
+}
+type SanitizedSubtopic = Pick<
+  ISubtopic,
+  'id' | 'title' | 'summary' | 'key_concepts' | 'formulas' | 'examples' | 'definitions'
+> & { learning_objectives?: unknown };
+interface SanitizedTopic {
+  title: string;
+  subtopics: SanitizedSubtopic[];
+  prerequisites: string[];
+}
 /**
  * INGEST-07 — course ingestion status tracker.
  *
@@ -21,49 +39,48 @@ const {
 } = require('@study-partner/shared/ai-messaging');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { logger } = require('@study-partner/shared');
-import { Course } from '../models';
+import { Course, CourseRevision } from '../models';
+import { CourseIngestionOperation } from '../models/CourseIngestionOperation';
 import { INGEST_JOB_TYPE } from './ingestionJob';
 
 // Whitelist of subtopic fields a worker result may write into Course.topics.
-const SUBTOPIC_STRING_ARRAY = ['key_concepts', 'formulas', 'examples'];
+const SUBTOPIC_STRING_ARRAY = ['key_concepts', 'formulas', 'examples'] as const;
 
-function sanitizeCourseFromResult(resultCourse: any): any[] {
-  if (!resultCourse || typeof resultCourse !== 'object') return [];
-  const topics = Array.isArray(resultCourse.topics) ? resultCourse.topics : [];
-  return topics
-    .filter((topic: any) => topic && typeof topic === 'object')
-    .map((topic: any) => ({
-      title: String(topic.title || ''),
-      subtopics: (Array.isArray(topic.subtopics) ? topic.subtopics : [])
-        .filter((sub: any) => sub && typeof sub === 'object')
-        .map((sub: any) => {
-          const clean: Record<string, any> = {
-            id: String(sub.id || ''),
-            title: String(sub.title || ''),
-            summary: typeof sub.summary === 'string' ? sub.summary : ''
-          };
-          for (const key of SUBTOPIC_STRING_ARRAY) {
-            if (Array.isArray(sub[key])) {
-              clean[key] = sub[key].filter((v: any) => typeof v === 'string').map(String);
-            } else if (typeof sub[key] === 'string') {
-              clean[key] = [sub[key]];
-            }
+function sanitizeCourseFromResult(resultCourse: unknown): SanitizedTopic[] {
+  if (!isObject(resultCourse)) return [];
+  const topics = Array.isArray(resultCourse.topics) ? (resultCourse.topics as unknown[]) : [];
+  return topics.filter(isObject).map((topic) => ({
+    title: String(topic.title || ''),
+    subtopics: (Array.isArray(topic.subtopics) ? (topic.subtopics as unknown[]) : [])
+      .filter(isObject)
+      .map((sub) => {
+        const clean: SanitizedSubtopic = {
+          id: String(sub.id || ''),
+          title: String(sub.title || ''),
+          summary: typeof sub.summary === 'string' ? sub.summary : ''
+        };
+        for (const key of SUBTOPIC_STRING_ARRAY) {
+          if (Array.isArray(sub[key])) {
+            clean[key] = (sub[key] as unknown[])
+              .filter((v): v is string => typeof v === 'string')
+              .map(String);
+          } else if (typeof sub[key] === 'string') {
+            clean[key] = [sub[key]];
           }
-          if (Array.isArray(sub.definitions)) {
-            clean.definitions = sub.definitions
-              .filter((d: any) => d && typeof d === 'object')
-              .map((d: any) => ({
-                term: String(d.term || ''),
-                definition: String(d.definition || '')
-              }));
-          }
-          if (sub.learning_objectives !== undefined) {
-            clean.learning_objectives = sub.learning_objectives;
-          }
-          return clean;
-        }),
-      prerequisites: Array.isArray(topic.prerequisites) ? topic.prerequisites.map(String) : []
-    }));
+        }
+        if (Array.isArray(sub.definitions)) {
+          clean.definitions = sub.definitions.filter(isObject).map((d) => ({
+            term: String(d.term || ''),
+            definition: String(d.definition || '')
+          }));
+        }
+        if (sub.learning_objectives !== undefined) {
+          clean.learning_objectives = sub.learning_objectives;
+        }
+        return clean;
+      }),
+    prerequisites: Array.isArray(topic.prerequisites) ? topic.prerequisites.map(String) : []
+  }));
 }
 
 function retryAction(
@@ -80,7 +97,15 @@ function retryAction(
 }
 
 /** Shape returned by GET /api/v1/study/courses/:courseId/ingest-status. */
-function buildIngestStatus(course: any) {
+function buildIngestStatus(
+  course: Pick<ICourse, 'status'> &
+    Partial<
+      Pick<
+        ICourse,
+        'jobId' | 'ingestStage' | 'ingestProgress' | 'ingestDetail' | 'ingestError' | 'updatedAt'
+      >
+    > & { _id: { toString(): string }; processedAt?: Date | null }
+) {
   return {
     courseId: course._id.toString(),
     status: course.status,
@@ -91,11 +116,25 @@ function buildIngestStatus(course: any) {
     error: course.status === 'failed' ? course.ingestError || '' : '',
     processedAt: course.processedAt || null,
     retry: retryAction(course._id.toString(), course.status),
+    cancelled: course.ingestDetail === 'cancelled',
+    controls: course.jobId
+      ? {
+          expectedJobId: course.jobId,
+          reconcile: `/api/v1/study/courses/${course._id}/ingestion/reconcile`,
+          retry: `/api/v1/study/courses/${course._id}/ingestion/retry`,
+          cancel: `/api/v1/study/courses/${course._id}/ingestion/cancel`
+        }
+      : null,
     updatedAt: course.updatedAt || null
   };
 }
 
-async function handleIngestProgress(progress: any): Promise<void> {
+async function handleIngestProgress(
+  progress: Pick<
+    AiProgressEnvelope,
+    'type' | 'correlationId' | 'stage' | 'progress' | 'detail' | 'status'
+  >
+): Promise<void> {
   if (progress.type !== INGEST_JOB_TYPE) return;
   const course = await Course.findOne({ correlationId: progress.correlationId });
   if (!course) {
@@ -105,9 +144,28 @@ async function handleIngestProgress(progress: any): Promise<void> {
     return;
   }
   course.ingestStage = progress.stage;
-  course.ingestProgress = progress.progress;
+  course.ingestProgress = progress.progress!;
   course.ingestDetail = progress.detail || '';
-  await course.save();
+  const current = await Course.updateOne(
+    {
+      _id: course._id,
+      correlationId: progress.correlationId,
+      status: 'processing',
+      ingestProgress: { $lte: progress.progress! }
+    },
+    {
+      $set: {
+        ingestStage: course.ingestStage,
+        ingestProgress: course.ingestProgress,
+        ingestDetail: course.ingestDetail
+      }
+    }
+  );
+  if (!current.modifiedCount) return;
+  await CourseIngestionOperation.updateOne(
+    { correlationId: progress.correlationId, state: { $in: ['prepared', 'queued', 'processing'] } },
+    { $set: { state: 'processing' } }
+  );
   logger.info('ingest_progress_recorded', {
     courseId: course._id.toString(),
     stage: progress.stage,
@@ -115,7 +173,9 @@ async function handleIngestProgress(progress: any): Promise<void> {
   });
 }
 
-async function handleIngestResult(result: any): Promise<void> {
+async function handleIngestResult(
+  result: Pick<AiResultEnvelope, 'type' | 'correlationId' | 'status' | 'payload' | 'error'>
+): Promise<void> {
   if (result.type !== INGEST_JOB_TYPE) return;
   const course = await Course.findOne({ correlationId: result.correlationId });
   if (!course) {
@@ -126,6 +186,53 @@ async function handleIngestResult(result: any): Promise<void> {
     return;
   }
 
+  const operation = await CourseIngestionOperation.findOne({
+    correlationId: result.correlationId
+  }).lean();
+  if (operation && ['cancelled', 'superseded'].includes(operation.state)) return;
+  if (
+    operation &&
+    result.status === 'completed' &&
+    (result.payload?.revisionId !== operation.revisionId ||
+      (result.payload?.courseId !== undefined &&
+        result.payload.courseId !== String(operation.courseId)))
+  ) {
+    logger.warn('ingest_result_operation_pin_mismatch');
+    return;
+  }
+
+  if (operation?.resultApplied) return;
+  if (operation?.result) result = operation.result;
+  if (operation && !operation.result) {
+    await CourseIngestionOperation.updateOne(
+      {
+        _id: operation._id,
+        result: { $exists: false },
+        state: { $nin: ['cancelled', 'superseded'] }
+      },
+      { $set: { result } }
+    );
+    // The first durable outcome wins, including concurrent/conflicting delivery.
+    const recorded = await CourseIngestionOperation.findById(operation._id).lean();
+    if (!recorded || ['cancelled', 'superseded'].includes(recorded.state) || !recorded.result)
+      return;
+    result = recorded.result;
+  }
+  const terminalStatus = result.status === 'completed' ? 'completed' : 'failed';
+  const claimed = await Course.updateOne(
+    {
+      _id: course._id,
+      correlationId: result.correlationId,
+      $or: [
+        { status: 'processing' },
+        { status: 'failed', ingestDetail: 'dispatch_unconfirmed' },
+        ...(operation?.result && !operation.resultApplied ? [{ status: terminalStatus }] : [])
+      ]
+    },
+    { $set: { status: terminalStatus } }
+  );
+  if (!claimed.matchedCount) return;
+
   if (result.status === 'completed') {
     course.status = 'completed';
     course.ingestStage = 'indexing';
@@ -133,7 +240,49 @@ async function handleIngestResult(result: any): Promise<void> {
     course.ingestDetail = 'done';
     course.ingestError = '';
     if (result.payload && result.payload.course) {
-      course.topics = sanitizeCourseFromResult(result.payload.course);
+      // Preserve the existing schema-cast boundary for legacy objective metadata.
+      const sanitizedTopics = sanitizeCourseFromResult(result.payload.course);
+      if (result.payload.revisionId && typeof result.payload.revisionId === 'string') {
+        const rev = await CourseRevision.findOne({
+          courseId: course._id,
+          revisionTag: result.payload.revisionId
+        });
+        if (rev) {
+          if (rev.isInstructorReviewed) {
+            logger.warn('ingest_result_skipped_instructor_reviewed', {
+              courseId: course._id.toString(),
+              revisionTag: rev.revisionTag
+            });
+          } else {
+            const expectedIndex =
+              'faiss/' + course._id.toString() + '/' + rev.revisionTag + '.faiss';
+            const changed = await CourseRevision.updateOne(
+              {
+                _id: rev._id,
+                revisionTag: rev.revisionTag,
+                status: 'draft',
+                activationState: { $ne: 'prepared' },
+                isInstructorReviewed: false,
+                __v: rev.__v
+              },
+              {
+                $set: {
+                  topics: sanitizedTopics,
+                  ...(result.payload.vectorIndexRef === expectedIndex
+                    ? { vectorIndexRef: expectedIndex }
+                    : {})
+                },
+                $inc: { __v: 1 }
+              }
+            );
+            if (changed.modifiedCount) course.set('topics', sanitizedTopics);
+          }
+        } else {
+          course.set('topics', sanitizedTopics);
+        }
+      } else {
+        course.set('topics', sanitizedTopics);
+      }
     }
     course.processedAt = new Date();
     logger.info('ingest_completed', { courseId: course._id.toString() });
@@ -145,7 +294,25 @@ async function handleIngestResult(result: any): Promise<void> {
       error: course.ingestError
     });
   }
-  await course.save();
+  const applied = await Course.updateOne(
+    { _id: course._id, correlationId: result.correlationId, status: terminalStatus },
+    {
+      $set: {
+        status: course.status,
+        ingestStage: course.ingestStage,
+        ingestProgress: course.ingestProgress,
+        ingestDetail: course.ingestDetail,
+        ingestError: course.ingestError,
+        ...(course.processedAt ? { processedAt: course.processedAt } : {}),
+        topics: course.topics
+      }
+    }
+  );
+  if (operation && applied.matchedCount)
+    await CourseIngestionOperation.updateOne(
+      { _id: operation._id, state: { $nin: ['cancelled', 'superseded'] } },
+      { $set: { state: terminalStatus, resultApplied: true } }
+    );
 }
 
 /**

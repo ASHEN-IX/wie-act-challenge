@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useActionState, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { LoaderCircle } from "lucide-react";
@@ -49,6 +50,11 @@ export function ActionForm({
         <Alert role="status">
           <AlertDescription>{state.success}</AlertDescription>
         </Alert>
+      )}
+      {state.destination && (
+        <Link className="underline" href={state.destination}>
+          {state.destinationLabel || "Open course"}
+        </Link>
       )}
       <div>
         <SubmitButton variant={variant}>{submit}</SubmitButton>

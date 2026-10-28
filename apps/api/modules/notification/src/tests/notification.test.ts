@@ -1,3 +1,5 @@
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { Response, NextFunction } from 'express';
 /**
  * Notification Service Tests
  * Tests notification CRUD endpoints
@@ -9,7 +11,10 @@ process.env.MONGODB_URI = 'mongodb://localhost:27017/test_study_partner';
 process.env.NODE_ENV = 'test';
 
 // Prevent process.exit() from killing tests
-process.exit = jest.fn() as any;
+const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => {
+  throw new Error(`Unexpected process.exit(${code})`);
+});
+afterAll(() => exitSpy.mockRestore());
 
 // ── Mock Notification model ──────────────────────
 const mockNotification = {
@@ -44,14 +49,31 @@ jest.mock('../models/Notification', () => ({
 }));
 
 jest.mock('@study-partner/shared', () => ({
-  requireInternal: (jest.requireActual('@study-partner/shared') as any).requireInternal,
-  corsMiddleware: jest.fn(() => (req: any, res: any, next: any) => next()),
-  securityMiddleware: jest.fn(() => (req: any, res: any, next: any) => next()),
-  loggingMiddleware: jest.fn((req: any, res: any, next: any) => next()),
-  errorHandler: jest.fn((err: any, req: any, res: any, _next: any) => {
-    res.status(err.status || 500).json({ error: err.message });
-  }),
-  rateLimiter: jest.fn(() => (req: any, res: any, next: any) => next()),
+  requireInternal:
+    jest.requireActual<typeof import('@study-partner/shared')>('@study-partner/shared')
+      .requireInternal,
+  corsMiddleware: jest.fn(
+    () => (req: DomainRequest & { userTier?: string }, res: Response, next: NextFunction) => next()
+  ),
+  securityMiddleware: jest.fn(
+    () => (req: DomainRequest & { userTier?: string }, res: Response, next: NextFunction) => next()
+  ),
+  loggingMiddleware: jest.fn(
+    (req: DomainRequest & { userTier?: string }, res: Response, next: NextFunction) => next()
+  ),
+  errorHandler: jest.fn(
+    (
+      err: Error & { status?: number },
+      req: DomainRequest & { userTier?: string },
+      res: Response,
+      _next: NextFunction
+    ) => {
+      res.status(err.status || 500).json({ error: err.message });
+    }
+  ),
+  rateLimiter: jest.fn(
+    () => (req: DomainRequest & { userTier?: string }, res: Response, next: NextFunction) => next()
+  ),
   logger: {
     info: jest.fn(),
     error: jest.fn(),
@@ -60,11 +82,15 @@ jest.mock('@study-partner/shared', () => ({
 }));
 
 jest.mock('@study-partner/shared/auth', () => ({
-  requireInternal: (jest.requireActual('@study-partner/shared/auth') as any).requireInternal,
-  authenticate: jest.fn((req: any, res: any, next: any) => {
-    req.user = { userId: 'user-123' };
-    next();
-  })
+  requireInternal: jest.requireActual<typeof import('@study-partner/shared/auth')>(
+    '@study-partner/shared/auth'
+  ).requireInternal,
+  authenticate: jest.fn(
+    (req: DomainRequest & { userTier?: string }, res: Response, next: NextFunction) => {
+      req.user = { userId: 'user-123', role: 'student' };
+      next();
+    }
+  )
 }));
 
 import Notification from '../models/Notification';
@@ -73,9 +99,12 @@ import request from 'supertest';
 
 const app = express();
 app.use(express.json());
-app.use((require('@study-partner/shared/auth') as any).authenticate);
+app.use(
+  (require('@study-partner/shared/auth') as typeof import('@study-partner/shared/auth'))
+    .authenticate
+);
 app.use('/api/v1/notifications', notifRoutes);
-app.use((require('@study-partner/shared') as any).errorHandler);
+app.use((require('@study-partner/shared') as typeof import('@study-partner/shared')).errorHandler);
 
 describe('Notification Service', () => {
   beforeEach(() => jest.clearAllMocks());

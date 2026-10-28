@@ -13,7 +13,7 @@ export interface IPayment extends Document {
   status: 'pending' | 'succeeded' | 'failed' | 'canceled';
   amount?: number;
   currency: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
 }

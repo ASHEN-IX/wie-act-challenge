@@ -1,3 +1,4 @@
+import { publicUploads } from '@study-partner/shared/publicUploads';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import profileRoutes from './routes/profile';
@@ -35,14 +36,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Serve static directory for uploads
 // SEC-11: dotfiles and directory listings denied; content sniffing off.
-app.use(
-  '/uploads',
-  express.static(path.join(__dirname, '../uploads'), {
-    dotfiles: 'deny',
-    index: false,
-    setHeaders: (res) => res.setHeader('X-Content-Type-Options', 'nosniff')
-  })
-);
+app.use('/uploads', publicUploads(path.join(__dirname, '../uploads')));
 
 // Shared middleware
 app.use(securityMiddleware());

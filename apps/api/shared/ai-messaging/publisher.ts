@@ -1,3 +1,4 @@
+import { errorDetails } from '../errors';
 /**
  * AI job publisher + result consumer (F01 / AI-COM-04).
  *
@@ -46,14 +47,14 @@ let confirmChannel: ConfirmChannel | null = null;
 let connecting: Promise<ChannelModel> | null = null;
 let reconnectAttempts = 0;
 let closing = false;
-let reconnectTimer: NodeJS.Timeout | null = null;
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
 interface ConsumerDef {
-  handler: (event: any) => Promise<void>;
+  handler: (event: AiResultEnvelope | AiProgressEnvelope) => Promise<void>;
   options: {
     queue: string;
     routingKey: string;
-    validator: (envelope: any) => ValidationResult;
+    validator: (envelope: unknown) => ValidationResult;
     name: string;
   };
 }
@@ -67,20 +68,18 @@ function backoffDelay(attempt: number): number {
 }
 
 async function connect(): Promise<ChannelModel> {
-  if (connection && (connection as any) !== 'closed') return connection;
+  if (connection) return connection;
   if (connecting) return connecting;
 
   connecting = (async () => {
     try {
-      const conn = await amqp.connect(RABBITMQ_URL, {
-        heartbeat: HEARTBEAT_SECONDS
-      } as any);
+      const conn = await amqp.connect(RABBITMQ_URL, { heartbeat: HEARTBEAT_SECONDS });
       connection = conn;
       reconnectAttempts = 0;
       logger.info('ai_messaging_connected', { url: safeUrl(RABBITMQ_URL) });
 
       conn.on('error', (err: Error) => {
-        logger.error('ai_messaging_connection_error', { error: err.message });
+        logger.error('ai_messaging_connection_error', { error: errorDetails(err).message });
       });
       conn.on('close', () => {
         connection = null;
@@ -142,7 +141,7 @@ export interface PublishAiJobOptions {
 export async function publishAiJob(
   type: AiJobType | string,
   userId: string,
-  payload: Record<string, any>,
+  payload: Record<string, unknown>,
   opts: PublishAiJobOptions = {}
 ): Promise<{ messageId: string; correlationId: string }> {
   const envelope: AiJobEnvelope = {
@@ -158,8 +157,9 @@ export async function publishAiJob(
 
   const validation = validateAiJobEnvelope(envelope);
   if (!validation.valid) {
-    const err: any = new Error(`invalid job envelope: ${validation.errors.join('; ')}`);
-    err.code = 'ENVELOPE_INVALID';
+    const err = Object.assign(new Error(`invalid job envelope: ${validation.errors.join('; ')}`), {
+      code: 'ENVELOPE_INVALID'
+    });
     throw err;
   }
 
@@ -178,7 +178,7 @@ export async function publishAiJob(
       type: envelope.type,
       timestamp: Date.parse(envelope.timestamp)
     });
-    const confirmRes = await (confirmChannel.waitForConfirms() as any);
+    const confirmRes: unknown = await confirmChannel.waitForConfirms();
     if (!ok || confirmRes === false) {
       throw Object.assign(new Error('broker did not confirm job publish'), {
         code: 'EPUBLISHCONFIRM'
@@ -199,11 +199,11 @@ export async function publishAiJob(
       requestId: envelope.requestId
     });
     return { messageId: envelope.messageId, correlationId: envelope.correlationId };
-  } catch (err: any) {
+  } catch (err) {
     logger.error('ai_job_publish_failed', {
       type,
-      code: err.code || 'UNKNOWN',
-      error: err.message
+      code: errorDetails(err).code || 'UNKNOWN',
+      error: errorDetails(err).message
     });
     throw err;
   }
@@ -255,12 +255,12 @@ export async function ensureTopologyForType(type: string): Promise<void> {
 interface ResultsConsumerOptions {
   queue: string;
   routingKey: string;
-  validator: (envelope: any) => ValidationResult;
+  validator: (envelope: unknown) => ValidationResult;
   name: string;
 }
 
 export async function startResultsConsumer(
-  handler: (event: any) => Promise<void>,
+  handler: (event: AiResultEnvelope | AiProgressEnvelope) => Promise<void>,
   { queue, routingKey, validator, name }: ResultsConsumerOptions
 ): Promise<Channel> {
   if (typeof handler !== 'function') {
@@ -283,23 +283,27 @@ export async function startResultsConsumer(
     queue,
     async (msg: ConsumeMessage | null) => {
       if (!msg) return;
-      let parsed: any;
+      let parsed: unknown;
       try {
         parsed = JSON.parse(msg.content.toString());
         const validation = validator(parsed);
         if (!validation.valid) throw new Error(validation.errors.join('; '));
-      } catch (err: any) {
-        logger.error('ai_result_invalid', { error: err.message });
+      } catch (err) {
+        logger.error('ai_result_invalid', { error: errorDetails(err).message });
         ch.nack(msg, false, false);
         return;
       }
       try {
-        await handler(parsed);
+        // Validators enforce the type-specific envelope before delivery.
+        await handler(parsed as AiResultEnvelope | AiProgressEnvelope);
         ch.ack(msg);
-      } catch (err: any) {
+      } catch (err) {
         logger.error('ai_result_handler_failed', {
-          correlationId: parsed.correlationId,
-          error: err.message
+          correlationId:
+            parsed && typeof parsed === 'object' && 'correlationId' in parsed
+              ? parsed.correlationId
+              : undefined,
+          error: errorDetails(err).message
         });
         ch.nack(msg, false, msg.fields.redelivered === false);
       }
@@ -314,7 +318,7 @@ export async function startResultsConsumer(
 export async function consumeAiResults(
   handler: (result: AiResultEnvelope) => Promise<void>
 ): Promise<Channel> {
-  return startResultsConsumer(handler, {
+  return startResultsConsumer((event) => handler(event as AiResultEnvelope), {
     queue: RESULT_QUEUE,
     routingKey: 'result',
     validator: validateAiResultEnvelope,
@@ -325,7 +329,7 @@ export async function consumeAiResults(
 export async function consumeAiProgress(
   handler: (progress: AiProgressEnvelope) => Promise<void>
 ): Promise<Channel> {
-  return startResultsConsumer(handler, {
+  return startResultsConsumer((event) => handler(event as AiProgressEnvelope), {
     queue: PROGRESS_QUEUE,
     routingKey: PROGRESS_ROUTING_KEY,
     validator: validateAiProgressEnvelope,
@@ -336,7 +340,7 @@ export async function consumeAiProgress(
 export async function consumeIngestResults(
   handler: (result: AiResultEnvelope) => Promise<void>
 ): Promise<Channel> {
-  return startResultsConsumer(handler, {
+  return startResultsConsumer((event) => handler(event as AiResultEnvelope), {
     queue: INGEST_RESULT_QUEUE,
     routingKey: 'result',
     validator: validateAiResultEnvelope,

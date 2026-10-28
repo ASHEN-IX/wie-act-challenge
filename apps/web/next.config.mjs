@@ -1,5 +1,6 @@
 import path from "node:path";
 export default {
+  distDir: process.env.EDNOVA_NEXT_DIST_DIR || ".next",
   outputFileTracingRoot: path.resolve(process.cwd(), "../.."),
   output: "standalone",
   devIndicators: false,
@@ -121,6 +122,10 @@ export default {
       {
         source: "/api/v1/:path*",
         destination: `${process.env.BACKEND_URL || "http://localhost:3000"}/api/v1/:path*`,
+      },
+      {
+        source: "/ws/:path*",
+        destination: `${process.env.BACKEND_URL || "http://localhost:3000"}/ws/:path*`,
       },
       {
         source: "/uploads/:path*",

@@ -1,10 +1,13 @@
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { FilterQuery } from 'mongoose';
+import type { IAnalyticsEvent } from '../models/AnalyticsEvent';
 import { boundedInteger, activityRange } from '@study-partner/shared/pagination';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { createContracts } = require('@study-partner/shared/domainContracts');
 import Joi from 'joi';
-import type { Request, Response } from 'express';
+import type { Response } from 'express';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const AnalyticsEvent = require('../models/AnalyticsEvent');
+const AnalyticsEvent: typeof import('../models/AnalyticsEvent').default = require('../models/AnalyticsEvent');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { getCacheClient } = require('@study-partner/shared');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -40,13 +43,13 @@ const trackEventSchema = Joi.object({
 // Track an event
 router.post(
   '/track',
-  asyncHandler(async (req: Request, res: Response) => {
+  asyncHandler(async (req: DomainRequest, res: Response) => {
     const { error } = trackEventSchema.validate(req.body);
     if (error) {
       return res.status(400).json({ error: error.details[0].message });
     }
 
-    const userId = (req as any).user.userId;
+    const userId = req.user!.userId;
     const { eventType, metadata } = req.body;
 
     await AnalyticsEvent.create({
@@ -68,8 +71,8 @@ router.post(
 // Get user activity timeline
 router.get(
   '/timeline',
-  asyncHandler(async (req: Request, res: Response) => {
-    const userId = (req as any).user.userId;
+  asyncHandler(async (req: DomainRequest, res: Response) => {
+    const userId = req.user!.userId;
     const {
       startDate,
       endDate,
@@ -90,7 +93,7 @@ router.get(
       return res.json(JSON.parse(cached));
     }
 
-    const filter: Record<string, any> = { userId };
+    const filter: FilterQuery<IAnalyticsEvent> = { userId };
     filter.timestamp = activityRange(startDate, endDate);
 
     const events = await AnalyticsEvent.find(filter)
@@ -106,8 +109,8 @@ router.get(
 // Get activity summary
 router.get(
   '/summary',
-  asyncHandler(async (req: Request, res: Response) => {
-    const userId = (req as any).user.userId;
+  asyncHandler(async (req: DomainRequest, res: Response) => {
+    const userId = req.user!.userId;
     const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
     const cacheKey = buildCacheKey(userId, 'summary', {
       startDate: startDate || null,
@@ -119,7 +122,7 @@ router.get(
       return res.json(JSON.parse(cached));
     }
 
-    const filter: Record<string, any> = { userId };
+    const filter: FilterQuery<IAnalyticsEvent> = { userId };
     filter.timestamp = activityRange(startDate, endDate);
 
     const grouped = await AnalyticsEvent.aggregate([
@@ -174,12 +177,12 @@ router.get(
 // Get event statistics by type
 router.get(
   '/stats/:eventType',
-  asyncHandler(async (req: Request, res: Response) => {
-    const userId = (req as any).user.userId;
+  asyncHandler(async (req: DomainRequest, res: Response) => {
+    const userId = req.user!.userId;
     const { eventType } = req.params;
     const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
 
-    const filter: Record<string, any> = { userId, eventType };
+    const filter: FilterQuery<IAnalyticsEvent> = { userId, eventType };
     filter.timestamp = activityRange(startDate, endDate);
 
     const groups = await AnalyticsEvent.aggregate([
@@ -207,8 +210,8 @@ router.get(
 // Get insights
 router.get(
   '/insights',
-  asyncHandler(async (req: Request, res: Response) => {
-    const userId = (req as any).user.userId;
+  asyncHandler(async (req: DomainRequest, res: Response) => {
+    const userId = req.user!.userId;
     const { days = 30 } = req.query as { days?: string | number };
     const cacheKey = buildCacheKey(userId, 'insights', { days: Number(days) });
 
@@ -226,10 +229,10 @@ router.get(
     });
 
     // Calculate insights
-    const studySessions = events.filter((e: any) => e.eventType === 'study_session_completed');
-    const completedTasks = events.filter((e: any) => e.eventType === 'task_completed');
+    const studySessions = events.filter((e) => e.eventType === 'study_session_completed');
+    const completedTasks = events.filter((e) => e.eventType === 'task_completed');
 
-    const totalStudyTime = studySessions.reduce((sum: number, e: any) => {
+    const totalStudyTime = studySessions.reduce((sum: number, e: IAnalyticsEvent) => {
       return sum + (e.metadata?.duration || 0);
     }, 0);
 
@@ -329,8 +332,8 @@ router.get(
 // Get daily activity breakdown
 router.get(
   '/daily-activity',
-  asyncHandler(async (req: Request, res: Response) => {
-    const userId = (req as any).user.userId;
+  asyncHandler(async (req: DomainRequest, res: Response) => {
+    const userId = req.user!.userId;
     const { days = 30 } = req.query as { days?: string | number };
     const cacheKey = buildCacheKey(userId, 'daily-activity', { days: Number(days) });
 

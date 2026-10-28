@@ -42,6 +42,11 @@ export async function uploadCourse(
     body.set("title", text(form, "title", 150));
     body.set("subject_id", text(form, "subject_id", 150));
     body.set("description", optionalText(form, "description"));
+    const institutionId = optionalText(form, "institutionId");
+    if (institutionId) {
+      body.set("institutionId", segment(institutionId));
+      body.set("scope", "institutional");
+    }
     const files = form.getAll("files");
     if (
       files.reduce(
@@ -52,16 +57,16 @@ export async function uploadCourse(
     )
       return { error: "Keep the total upload under 25 MB." };
     if (!files.length || files.length > 10)
-      return { error: "Choose between 1 and 10 PDF files." };
+      return { error: "Choose between 1 and 10 source files." };
     for (const file of files) {
       if (
         !(file instanceof File) ||
         !file.size ||
         file.size > 25 * 1024 * 1024 ||
-        !file.name.toLowerCase().endsWith(".pdf") ||
-        file.type !== "application/pdf"
+        !/\.(pdf|txt|md)$/i.test(file.name) ||
+        !["application/pdf", "text/plain", "text/markdown"].includes(file.type)
       )
-        return { error: "Choose PDF files up to 25 MB each." };
+        return { error: "Choose PDF or text sources up to 25 MB each." };
       body.append("files", file);
     }
     const response = await api<{ courseId: string }>("/api/v1/study/courses", {
@@ -74,7 +79,11 @@ export async function uploadCourse(
     unstable_rethrow(error);
     return { error: error instanceof Error ? error.message : "Upload failed." };
   }
-  redirect(`/courses/${segment(id)}`);
+  return {
+    success:
+      "Source upload accepted. Open the course to inspect processing and review the draft.",
+    destination: `/courses/${segment(id)}`,
+  };
 }
 export async function deleteCourse(
   _previous: ActionState,
@@ -96,4 +105,226 @@ export async function deleteCourse(
     };
   }
   redirect("/courses");
+}
+
+export async function acceptCourseInvitationAction(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  await requireIdentity();
+  try {
+    const token = text(form, "token", 200);
+    if (!token.trim())
+      return { error: "Enter a valid course invitation token." };
+
+    await api("/api/v1/study/courses/invitations/accept", {
+      method: "POST",
+      body: JSON.stringify({ token: token.trim() }),
+    });
+    revalidatePath("/courses");
+    return { success: "Course invitation accepted. You are now enrolled!" };
+  } catch (error) {
+    unstable_rethrow(error);
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Unable to accept the course invitation.",
+    };
+  }
+}
+
+export async function issueCourseInvitationAction(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  await requireIdentity();
+  try {
+    const courseId = text(form, "courseId", 50);
+    const role = optionalText(form, "role") || "student";
+    const expiresInHours = Number(form.get("expiresInHours")) || 168;
+
+    const res = await api<{ token: string; expiresAt: string }>(
+      `/api/v1/study/courses/${segment(courseId)}/invitations`,
+      {
+        method: "POST",
+        body: JSON.stringify({ role, expiresInHours }),
+      },
+    );
+    return { success: `Invitation token created: ${res.token}` };
+  } catch (error) {
+    unstable_rethrow(error);
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Unable to issue course invitation.",
+    };
+  }
+}
+
+export async function assignInstructorAction(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  await requireIdentity();
+  try {
+    const courseId = text(form, "courseId", 50);
+    const instructorUserId = text(form, "instructorUserId", 100);
+
+    await api(`/api/v1/study/courses/${segment(courseId)}/instructors`, {
+      method: "POST",
+      body: JSON.stringify({ instructorUserId }),
+    });
+    revalidatePath(`/courses/${segment(courseId)}`);
+    return { success: "Instructor assigned to course." };
+  } catch (error) {
+    unstable_rethrow(error);
+    return {
+      error:
+        error instanceof Error ? error.message : "Unable to assign instructor.",
+    };
+  }
+}
+
+export async function withdrawEnrollmentAction(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  await requireIdentity();
+  try {
+    const courseId = text(form, "courseId", 50);
+    await api(`/api/v1/study/courses/${segment(courseId)}/enrollments`, {
+      method: "DELETE",
+    });
+    revalidatePath("/courses");
+    return { success: "You have withdrawn from this course." };
+  } catch (error) {
+    unstable_rethrow(error);
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Unable to withdraw from course.",
+    };
+  }
+}
+
+export async function updateDraftAction(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  await requireIdentity();
+  try {
+    const courseId = text(form, "courseId", 50);
+    const expectedRevisionTag = text(form, "expectedRevisionTag", 100);
+    const topicsRaw = optionalText(form, "topicsJson");
+    const summary = optionalText(form, "summary");
+    const isInstructorReviewed = form.get("isInstructorReviewed") === "true";
+
+    const topics = topicsRaw ? JSON.parse(topicsRaw) : [];
+
+    await api(`/api/v1/study/courses/${segment(courseId)}/draft`, {
+      method: "PUT",
+      body: JSON.stringify({
+        expectedRevisionTag,
+        topics,
+        summary,
+        isInstructorReviewed,
+      }),
+    });
+
+    revalidatePath(`/courses/${segment(courseId)}/studio`);
+    revalidatePath(`/courses/${segment(courseId)}`);
+    return { success: "Course draft saved successfully." };
+  } catch (error) {
+    unstable_rethrow(error);
+    return {
+      error:
+        error instanceof Error ? error.message : "Unable to save course draft.",
+    };
+  }
+}
+
+export async function publishRevisionAction(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  await requireIdentity();
+  try {
+    const courseId = text(form, "courseId", 50);
+    const expectedRevisionTag = text(form, "expectedRevisionTag", 100);
+
+    await api(`/api/v1/study/courses/${segment(courseId)}/publish`, {
+      method: "POST",
+      body: JSON.stringify({ expectedRevisionTag }),
+    });
+
+    revalidatePath(`/courses/${segment(courseId)}/studio`);
+    revalidatePath(`/courses/${segment(courseId)}`);
+    return { success: "Course revision published successfully." };
+  } catch (error) {
+    unstable_rethrow(error);
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Unable to publish course revision.",
+    };
+  }
+}
+
+export async function generateCandidateActivity(
+  courseId: string,
+  objectiveId: string,
+  activityType: "InteractiveQuiz" | "GuidedProblem",
+  title?: string,
+  instructions?: string,
+  expectedRevisionTag?: string,
+  sourceChunkId?: string,
+  settings?: {
+    language: "en" | "fr" | "ar" | "ary";
+    difficulty: "beginner" | "standard" | "advanced";
+    hintDepth: "none" | "cue" | "context";
+    sourceSectionId?: string;
+  },
+) {
+  await requireIdentity();
+  return api<{
+    candidateActivity: Record<string, unknown>;
+    candidateEvaluation: Record<string, unknown>;
+    draftRevisionTag: string;
+    generatedAt: string;
+  }>(`/api/v1/study/courses/${segment(courseId)}/studio/generate-activity`, {
+    method: "POST",
+    body: JSON.stringify({
+      objectiveId,
+      activityType,
+      title,
+      instructions,
+      expectedRevisionTag,
+      sourceChunkId,
+      ...settings,
+    }),
+  });
+}
+
+export async function registerCandidateActivity(
+  courseId: string,
+  activityId: string,
+  activity: Record<string, unknown>,
+  serverEvaluation: Record<string, unknown>,
+) {
+  await requireIdentity();
+  return api<{
+    activityId: string;
+    revisionId: string;
+  }>(`/api/v1/study/activities/${segment(activityId)}/register`, {
+    method: "POST",
+    body: JSON.stringify({
+      courseId,
+      activity,
+      serverEvaluation,
+    }),
+  });
 }

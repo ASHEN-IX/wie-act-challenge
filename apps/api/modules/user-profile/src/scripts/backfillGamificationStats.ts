@@ -1,7 +1,8 @@
+import { errorDetails } from '@study-partner/shared/errors';
 import mongoose from 'mongoose';
 import path from 'path';
 import dotenv from 'dotenv';
-import Gamification from '../models/Gamification';
+import Gamification, { IGamification } from '../models/Gamification';
 
 dotenv.config({
   path: path.resolve(__dirname, '../../../../.env')
@@ -35,13 +36,13 @@ export const isChallengeCompletionAction = (action = ''): boolean => {
 export const isGroupSessionAction = (action = ''): boolean =>
   /^team_session(_host)?$/i.test(String(action || ''));
 
-export const toSafeInt = (value: any, fallback = 0): number => {
+export const toSafeInt = (value: unknown, fallback = 0): number => {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return Math.max(0, Math.trunc(Number(fallback) || 0));
   return Math.max(0, Math.trunc(numeric));
 };
 
-export function deriveStatsFromHistory(xpHistory: any[] = []) {
+export function deriveStatsFromHistory(xpHistory: Array<{ action?: string }> = []) {
   const challengeCount = xpHistory.reduce((count, entry) => {
     return isChallengeCompletionAction(entry?.action) ? count + 1 : count;
   }, 0);
@@ -65,7 +66,12 @@ export async function backfill({ dryRun = false }: { dryRun?: boolean } = {}) {
   for await (const profile of cursor) {
     scanned += 1;
 
-    const stats = profile.stats || ({} as any);
+    const stats: IGamification['stats'] & {
+      challenges_completed?: unknown;
+      challengeCount?: unknown;
+      group_sessions?: unknown;
+      team_sessions?: unknown;
+    } = profile.stats || {};
     const { challengeCount, groupSessionCount } = deriveStatsFromHistory(profile.xpHistory || []);
 
     const existingChallenges = toSafeInt(
@@ -119,9 +125,9 @@ async function main() {
     console.log(
       `[Backfill] completed. scanned=${result.scanned}, changed=${result.changed}, dryRun=${result.dryRun}, elapsed=${elapsedSeconds}s`
     );
-  } catch (error: any) {
+  } catch (error) {
     // eslint-disable-next-line no-console
-    console.error('[Backfill] failed:', error.message);
+    console.error('[Backfill] failed:', errorDetails(error).message);
     process.exitCode = 1;
   } finally {
     await mongoose.disconnect();

@@ -33,11 +33,16 @@ _MONGO_URI: str = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
 _DB_NAME: str = os.getenv("DB_NAME", "study_partner")
 
 
+class _DatabaseUnavailable(Exception):
+    """Private sanitized connection failure; exceptions are never cached."""
+
+
 @lru_cache(maxsize=1)
-def _get_client() -> Optional[MongoClient]:
-    """Return the process-level MongoClient singleton, or None on failure."""
+def _get_client() -> MongoClient:
+    """Cache a successful client only so startup outages remain recoverable."""
+    client = None
     try:
-        client: MongoClient = MongoClient(
+        client = MongoClient(
             _MONGO_URI,
             serverSelectionTimeoutMS=5_000,
             connectTimeoutMS=5_000,
@@ -45,17 +50,16 @@ def _get_client() -> Optional[MongoClient]:
         )
         # Trigger a lightweight ping to confirm connectivity early
         client.admin.command("ping")
-        logger.info(
-            "database_connected",
-            extra={"uri": _MONGO_URI.split("@")[-1], "db": _DB_NAME},
-        )
+        logger.info("database_connected")
         return client
     except Exception as exc:
+        if client is not None:
+            client.close()
         logger.warning(
             "database_connection_failed",
-            extra={"error": str(exc)},
+            extra={"error_type": type(exc).__name__},
         )
-        return None
+        raise _DatabaseUnavailable("Database connection unavailable") from None
 
 
 def get_db() -> Optional[Database]:
@@ -66,7 +70,10 @@ def get_db() -> Optional[Database]:
     components that optionally use the database can degrade gracefully.
     Callers that *require* a DB should handle None explicitly.
     """
-    client = _get_client()
+    try:
+        client = _get_client()
+    except _DatabaseUnavailable:
+        return None
     if client is None:
         return None
     return client[_DB_NAME]
@@ -80,7 +87,6 @@ def require_db() -> Database:
     db = get_db()
     if db is None:
         raise RuntimeError(
-            f"MongoDB is unavailable (uri={_MONGO_URI!r}, db={_DB_NAME!r}). "
-            "Check MONGODB_URI and DB_NAME env vars."
+            "MongoDB is unavailable. Check MONGODB_URI and DB_NAME privately."
         )
     return db

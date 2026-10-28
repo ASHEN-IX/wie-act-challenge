@@ -12,7 +12,7 @@ export interface IAnalyticsEvent extends Document {
     | 'focus_tracked'
     | 'login'
     | 'profile_updated';
-  metadata?: Record<string, unknown>;
+  metadata?: Record<string, unknown> & { duration?: number };
   timestamp: Date;
   createdAt: Date;
   updatedAt: Date;

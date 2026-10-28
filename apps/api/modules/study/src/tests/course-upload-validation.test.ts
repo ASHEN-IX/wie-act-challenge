@@ -1,3 +1,6 @@
+import type { CourseFixture } from '../../../../tests/courseFixture';
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { Response, NextFunction } from 'express';
 /**
  * INGEST-01 — Course upload file validation (MIME + magic bytes).
  */
@@ -11,21 +14,68 @@ import fs from 'fs';
 const UPLOAD_DIR = 'uploads';
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-process.exit = jest.fn() as any;
+const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => {
+  throw new Error(`Unexpected process.exit(${code})`);
+});
+afterAll(() => exitSpy.mockRestore());
 
+// File-validation route tests mock the durable dispatch boundary. Actual
+// outbox/CAS/recovery behavior is covered by final-ingestion-recovery + P0R2.
+jest.mock('../services/ingestionControl', () => ({
+  IngestionConflictError: class extends Error {},
+  enqueueCourseIngestionOperation: jest.fn(async (params) => {
+    const { publishCourseIngestionJob } = require('../services/ingestionJob');
+    const { Course } = require('../models/index');
+    try {
+      const result = await publishCourseIngestionJob(params);
+      const instance =
+        Course.instances.find((row: { _id: string }) => String(row._id) === params.courseId) ||
+        (await Course.findOne({ _id: params.courseId, userId: params.userId }));
+      if (instance) {
+        instance.jobId = result.jobId;
+        instance.correlationId = result.correlationId;
+        instance.ingestError = '';
+        instance.ingestProgress = 0;
+      }
+      return result;
+    } catch (error) {
+      const instance = Course.instances.find(
+        (row: { _id: string }) => String(row._id) === params.courseId
+      );
+      if (instance) {
+        instance.status = 'failed';
+        instance.warning = 'Dispatch could not be enqueued; reconcile retained operation.';
+      }
+      throw error;
+    }
+  }),
+  cancelIngestionOperation: jest.fn(),
+  retryIngestionOperation: jest.fn(),
+  reconcileIngestionOperation: jest.fn()
+}));
 jest.mock('../models/index', () => {
-  const mockCourse: any = jest.fn().mockImplementation(function (this: any, data: any) {
-    Object.assign(this, data);
-    this._id = 'course-new';
-    this.save = jest.fn().mockResolvedValue(true);
-    mockCourse.instances.push(this);
-  });
-  mockCourse.instances = [];
-  mockCourse.find = jest.fn();
-  mockCourse.findOne = jest.fn();
-  mockCourse.findOneAndDelete = jest.fn();
+  const mockCourse = Object.assign(
+    jest.fn().mockImplementation(function (this: CourseFixture, data: object) {
+      Object.assign(this, data);
+      this._id = 'course-new';
+      this.save = jest.fn().mockResolvedValue(true);
+      mockCourse.instances.push(this);
+    }),
+    {
+      instances: new Array<CourseFixture>(),
+      find: jest.fn(),
+      findOne: jest.fn(),
+      findById: jest.fn().mockImplementation((id: string) => {
+        const value = mockCourse.findOne({ _id: id, userId: 'user-123' });
+        const result = Promise.resolve(value);
+        return Object.assign(result, { select: () => ({ lean: () => result }) });
+      }),
+      findOneAndDelete: jest.fn()
+    }
+  );
   return {
     Course: mockCourse,
+    CourseRevision: { create: jest.fn().mockResolvedValue({}) },
     Subject: { findOne: jest.fn() }
   };
 });
@@ -49,8 +99,8 @@ const { createSession } = require('../../../../tests/sessionFixtures');
 const jwt = { sign: createSession };
 
 const app = express();
-const fakeAuth = (req: any, res: any, next: any) => {
-  req.user = { userId: 'user-123', tier: 'vip' };
+const fakeAuth = (req: DomainRequest, res: Response, next: NextFunction) => {
+  req.user = { userId: 'user-123', tier: 'vip', role: 'student' };
   next();
 };
 
@@ -357,14 +407,14 @@ describe('INGEST-04 POST /api/v1/study/courses (polyglot/trailer/encryption → 
 });
 
 describe('INGEST-05 POST /api/v1/study/courses/:courseId/files (async re-ingest → 202)', () => {
-  let reIngestCourse: any;
+  let reIngestCourse: CourseFixture;
   beforeEach(() => {
     jest.clearAllMocks();
     Course.instances = [];
     Course.prototype = {};
     Subject.findOne.mockResolvedValue({ _id: 'subj-1', userId: 'user-123' });
     reIngestCourse = {
-      _id: 'course-1',
+      _id: '64a000000000000000000001',
       userId: 'user-123',
       title: 'Existing Course',
       subjectId: 'subj-1',
@@ -379,13 +429,13 @@ describe('INGEST-05 POST /api/v1/study/courses/:courseId/files (async re-ingest 
 
   test('stages new files, enqueues a job and returns 202 immediately', async () => {
     const res = await request(app)
-      .post('/api/v1/study/courses/course-1/files')
+      .post('/api/v1/study/courses/64a000000000000000000001/files')
       .set(authHeader())
       .attach('files', VALID_PDF, { filename: 'more.pdf', contentType: 'application/pdf' });
 
     expect(res.status).toBe(202);
     expect(res.body.jobId).toBe('job-re');
-    expect(res.body.courseId).toBe('course-1');
+    expect(res.body.courseId).toBe('64a000000000000000000001');
     expect(res.body.status).toBe('processing');
 
     expect(reIngestCourse.jobId).toBe('job-re');
@@ -397,8 +447,8 @@ describe('INGEST-05 POST /api/v1/study/courses/:courseId/files (async re-ingest 
       'study.ingest.course',
       'user-123',
       expect.objectContaining({
-        courseId: 'course-1',
-        fileRef: 'uploads/courses/course-1',
+        courseId: '64a000000000000000000001',
+        fileRef: 'uploads/courses/64a000000000000000000001',
         files: expect.arrayContaining([
           expect.objectContaining({ originalName: 'more.pdf', size: VALID_PDF.length })
         ])
@@ -411,7 +461,7 @@ describe('INGEST-05 POST /api/v1/study/courses/:courseId/files (async re-ingest 
     publishAiJob.mockRejectedValue(new Error('broker down'));
 
     const res = await request(app)
-      .post('/api/v1/study/courses/course-1/files')
+      .post('/api/v1/study/courses/64a000000000000000000001/files')
       .set(authHeader())
       .attach('files', VALID_PDF, { filename: 'extra.pdf', contentType: 'application/pdf' });
 

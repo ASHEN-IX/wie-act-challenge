@@ -1,3 +1,4 @@
+import type { DomainRequest } from '../../../../src/framework/contracts';
 /**
  * User Profile Service Tests
  * Tests profile CRUD and availability endpoints
@@ -45,8 +46,8 @@ app.use(express.json());
 // Fake auth middleware — all requests have user
 app.use(
   '/api/v1/users/profile',
-  (req: any, res, next) => {
-    req.user = { userId: 'user-123' };
+  (req: DomainRequest, res, next) => {
+    req.user = { userId: 'user-123', role: 'student' };
     next();
   },
   profileRoutes
@@ -93,11 +94,19 @@ describe('User Profile Service', () => {
     });
 
     it('should reject invalid preferences', async () => {
-      const res = await request(app)
-        .put('/api/v1/users/profile')
-        .send({ preferences: { studyTime: 'invalid-time' } });
+      const log = jest.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const res = await request(app)
+          .put('/api/v1/users/profile')
+          .send({ bio: 'PRIVATE_PROFILE_SENTINEL', preferences: { studyTime: 'invalid-time' } });
 
-      expect(res.status).toBe(400);
+        expect(res.status).toBe(400);
+        expect(log).toHaveBeenCalled();
+        expect(JSON.stringify(log.mock.calls)).not.toContain('PRIVATE_PROFILE_SENTINEL');
+        expect(JSON.stringify(log.mock.calls)).not.toContain('invalid-time');
+      } finally {
+        log.mockRestore();
+      }
     });
   });
 });

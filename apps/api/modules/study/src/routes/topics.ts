@@ -1,3 +1,5 @@
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { Response } from 'express';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { createContracts } = require('@study-partner/shared/domainContracts');
 import Joi from 'joi';
@@ -26,8 +28,8 @@ const updateTopicSchema = Joi.object({
 // Get all topics
 router.get(
   '/',
-  asyncHandler(async (req: any, res: any) => {
-    const userId = req.user.userId;
+  asyncHandler(async (req: DomainRequest, res: Response) => {
+    const userId = req.user!.userId;
 
     const topics = await Topic.find({ userId }).sort({ name: 1 });
 
@@ -38,8 +40,8 @@ router.get(
 // Get topic by ID
 router.get(
   '/:topicId',
-  asyncHandler(async (req: any, res: any) => {
-    const userId = req.user.userId;
+  asyncHandler(async (req: DomainRequest, res: Response) => {
+    const userId = req.user!.userId;
     const { topicId } = req.params;
 
     const topic = await Topic.findOne({ _id: topicId, userId });
@@ -55,13 +57,13 @@ router.get(
 // Create topic
 router.post(
   '/',
-  asyncHandler(async (req: any, res: any) => {
+  asyncHandler(async (req: DomainRequest, res: Response) => {
     const { error, value } = createTopicSchema.validate(req.body, { stripUnknown: true });
     if (error) {
       return res.status(400).json({ error: error.details[0].message });
     }
 
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
 
     const topic = await Topic.create({
       userId,
@@ -78,13 +80,13 @@ router.post(
 // Update topic
 router.put(
   '/:topicId',
-  asyncHandler(async (req: any, res: any) => {
+  asyncHandler(async (req: DomainRequest, res: Response) => {
     const { error, value } = updateTopicSchema.validate(req.body, { stripUnknown: true });
     if (error) {
       return res.status(400).json({ error: error.details[0].message });
     }
 
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const { topicId } = req.params;
 
     const topic = await Topic.findOne({ _id: topicId, userId });
@@ -106,8 +108,8 @@ router.put(
 // Delete topic
 router.delete(
   '/:topicId',
-  asyncHandler(async (req: any, res: any) => {
-    const userId = req.user.userId;
+  asyncHandler(async (req: DomainRequest, res: Response) => {
+    const userId = req.user!.userId;
     const { topicId } = req.params;
 
     const result = await Topic.deleteOne({ _id: topicId, userId });

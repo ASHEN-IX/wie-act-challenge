@@ -4,6 +4,7 @@ import path from 'path';
 import dotenv from 'dotenv';
 import type { INestApplication } from '@nestjs/common';
 import type { Server } from 'http';
+import { productionApiInstance } from './framework/single-instance';
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 process.env.MONGODB_URI ||=
@@ -47,6 +48,8 @@ export async function start({
   });
   registerProcessHandlers('study-partner-api');
   await connectDatabase();
+  let stopLostInstance = () => {};
+  const instanceLease = await productionApiInstance(() => stopLostInstance());
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   await require('../shared/betterAuth').getAuth();
 
@@ -55,6 +58,7 @@ export async function start({
   const nest: INestApplication = await createNestApp();
   const server: Server = nest.getHttpServer();
   const cleanups: Array<() => unknown> = [];
+  if (instanceLease) cleanups.push(() => instanceLease.close());
 
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { attachRealtime } = require('@study-partner/notification-service');
@@ -94,6 +98,7 @@ export async function start({
     await initializeConsumers();
   }
 
+  instanceLease?.assertActive();
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
     server.listen(port, () => resolve());
@@ -132,6 +137,10 @@ export async function start({
     process.once(signal, () => stop().then(() => process.exit(0)));
   }
 
+  stopLostInstance = () => {
+    void stop();
+  };
+  instanceLease?.assertActive();
   return { app: nest, server, stop };
 }
 

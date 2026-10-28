@@ -7,9 +7,14 @@ process.env.JWT_SECRET = 'test-secret-key';
 process.env.MONGODB_URI = 'mongodb://localhost:27017/test_study_partner';
 process.env.RABBITMQ_URL = 'amqp://localhost:5672/%2F';
 process.env.NODE_ENV = 'test';
-process.exit = jest.fn() as any;
+const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => {
+  throw new Error(`Unexpected process.exit(${code})`);
+});
+afterAll(() => exitSpy.mockRestore());
 
 import request from 'supertest';
+import express from 'express';
+import evalRoutes from '../routes/eval';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const jwt = { sign: require('../../../../tests/sessionFixtures').createSession };
 
@@ -64,6 +69,28 @@ beforeEach(() => {
 });
 
 describe('POST /api/v1/eval/step', () => {
+  test('rejects an objective conflicting with the policy-resolved source', async () => {
+    const scoped = express();
+    scoped.use(express.json());
+    scoped.use((req, res, next) => {
+      Object.assign(req, { user: { userId: 'user-1' } });
+      res.locals.sourceCourseId = '0123456789abcdef01234567';
+      next();
+    });
+    scoped.use(evalRoutes);
+    resolveObjectiveContext.mockResolvedValue({
+      courseId: 'abcdef0123456789abcdef01',
+      targetBloomLevel: 'understand',
+      knowledgeType: 'factual'
+    });
+    const response = await request(scoped)
+      .post('/step')
+      .send({ ...VALID_STEP, objectiveId: 'objective-1' });
+    expect(response.status).toBe(422);
+    expect(AiJob.createPending).not.toHaveBeenCalled();
+    expect(publishAiJob).not.toHaveBeenCalled();
+  });
+
   test('returns 202 with jobId + poll and publishes a study.eval.step job', async () => {
     (publishAiJob as jest.Mock).mockResolvedValue({ messageId: 'm1', correlationId: 'corr-1' });
 
@@ -132,7 +159,7 @@ describe('POST /api/v1/eval/step', () => {
       .send({ ...VALID_STEP, objectiveId: 'obj-apply' });
 
     expect(res.status).toBe(202);
-    expect(resolveObjectiveContext).toHaveBeenCalledWith('obj-apply');
+    expect(resolveObjectiveContext).toHaveBeenCalledWith('obj-apply', 'user-1');
     expect(publishAiJob).toHaveBeenCalledWith(
       'study.eval.step',
       'user-1',
@@ -201,6 +228,8 @@ describe('GET /api/v1/eval/jobs/:jobId', () => {
       lean: jest.fn().mockResolvedValue({
         jobId: 'job-1',
         type: 'study.eval.step',
+        userId: 'user-1',
+        resourceScope: {},
         status: 'COMPLETED',
         attempts: 1,
         result: { state: 'CONTINUE', mastery_score: 0.8, next_question: 'Why?' },
@@ -230,7 +259,7 @@ describe('GET /api/v1/eval/jobs/:jobId', () => {
     });
   });
 
-  test('admin can read any eval job', async () => {
+  test('admin job lookup remains actor-scoped', async () => {
     AiJob.findOne.mockReturnValue({
       lean: jest.fn().mockResolvedValue({ jobId: 'job-1', status: 'PENDING' })
     });
@@ -239,7 +268,8 @@ describe('GET /api/v1/eval/jobs/:jobId', () => {
 
     expect(AiJob.findOne).toHaveBeenCalledWith({
       jobId: 'job-1',
-      type: 'study.eval.step'
+      type: 'study.eval.step',
+      userId: 'admin-1'
     });
   });
 

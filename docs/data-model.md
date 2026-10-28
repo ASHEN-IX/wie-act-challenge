@@ -31,8 +31,15 @@ EdNova enforces strict storage boundaries to prevent duplication and ensure that
 * **`institutions`**: Represents university or organizational tenants.
   - Fields: `_id` (ObjectId), `name` (string), `domain` (string, e.g. `"polytechnique.tn"`), `slug` (string, unique), `isVerified` (boolean), `createdAt` (Date).
 * **`institution_memberships`**: Links users to institutions with contextual roles.
-  - Fields: `_id` (ObjectId), `institutionId` (ObjectId, ref: `institutions`), `userId` (string, ref: `users`), `role` (enum: `"university_admin"`, `"instructor"`, `"university_student"`), `status` (enum: `"active"`, `"invited"`, `"suspended"`), `createdAt` (Date).
+  - Fields: `_id` (ObjectId), `institutionId` (ObjectId, ref: `institutions`), `userId` (string, ref: `users`), `role` (enum: `"university_admin"`, `"instructor"`, `"university_student"`), `status` (enum: `"active"`, `"invited"`, `"suspended"`), `invitedByUserId` (string, optional), `createdAt` (Date), `updatedAt` (Date).
   - **Index**: Unique compound index `{ institutionId: 1, userId: 1 }`.
+* **`institution_invitations`**: Single-use membership capabilities issued by an institution administrator.
+  - Fields: `_id` (ObjectId), `institutionId` (ObjectId, ref: `institutions`), `role` (enum: `"instructor"`, `"university_student"`), `tokenHash` (string, SHA-256, never returned or selected by default), `status` (enum: `"pending"`, `"accepted"`, `"revoked"`, `"expired"`), `issuedByUserId` (string), `acceptedByUserId` (string, optional), `acceptedAt` (Date, optional), `revokedAt` (Date, optional), `expiresAt` (Date), `createdAt` (Date), `updatedAt` (Date).
+  - **Index**: Unique `{ tokenHash: 1 }`; non-unique `{ institutionId: 1, status: 1, expiresAt: 1 }`. Invitations are independent bearer capabilities, so multiple pending invitations for the same institution and role may coexist. The obsolete unique partial `{ institutionId: 1, role: 1 }` index is dropped by `apps/api/scripts/migrate-institution-indexes.ts` when run with `--apply`; the migration is dry-run by default.
+  - **Acceptance**: The pending invitation is atomically claimed by setting `status: "accepted"`, `acceptedByUserId` and `acceptedAt`, then the membership is written. The claim is intentionally not rolled back if the membership write fails. Retrying with the same actor completes a missing membership; a different actor receives `409`. This recovery does not claim a cross-collection transaction or make invitation status an access grant.
+  - **Recipient binding**: No recipient/email field exists, so issuers cannot detect duplicate pending invitations for the same person. That policy remains unresolved rather than being inferred by the service.
+
+> **M04-A.1 implementation status — 23 October 2026.** `institutions`, `institution_memberships` and `institution_invitations` exist with the fields above. `isVerified` is always `false` at synthetic setup; no verification decision is fabricated. No `course_enrollments` collection, course `scope`, `institutionId` or `ownerUserId` field exists yet. `Course.userId` remains the only course-read grant, and membership or invitation records do not authorize personal or official source access. Course enrollment and institutional course scopes remain blocked on the unresolved ED-26/Contract 03 decisions recorded in the [M03 review package](../reports/EDNOVA-M03-CONTRACT-REVIEW-PACKAGE.md). See the [M04-A.1 reliability verification](../reports/EDNOVA-M04A1-INVITATION-RELIABILITY-VERIFICATION.md).
 
 ### 2.2. Course Studio & Content Management
 * **`courses`**: Top-level course entity supporting both institutional and personal courses.
@@ -59,9 +66,10 @@ EdNova enforces strict storage boundaries to prevent duplication and ensure that
     - `publishedByUserId` (string, ref: `users`)
     - `publishedAt` (Date)
     - `sourceDocumentIds` (array of string document IDs)
-    - `vectorIndexRef` (string, e.g. `"faiss/course_123/rev_1.index"`)
+    - `vectorIndexRef` (string, server-only relative artifact: `"faiss/<courseId>/<revisionTag>.faiss"`; sidecar `"faiss/<courseId>/<revisionTag>.meta.json"`)
     - `structure` (array of Chapter objects: `chapterTitle`, `orderIndex`, `topics`: array of `{ topicId, title, objectiveIds }`)
   - **Index**: Unique compound index `{ courseId: 1, revisionTag: 1 }`.
+  - **External identity**: Contract `revisionId` is this immutable `revisionTag`, scoped by `courseId`. MongoDB `_id` is internal only and must not appear in public or service-facing contract payloads. Owning services resolve `(courseId, revisionTag)`; there is no silent substitution of a newer revision.
 
 * **`documents`**: Metadata for uploaded source materials.
   - Fields:
@@ -106,7 +114,7 @@ EdNova enforces strict storage boundaries to prevent duplication and ensure that
   - Fields:
     - `_id` (ObjectId)
     - `activityId` (string, unique)
-    - `activityType` (enum: `"InteractiveQuiz"`, `"GuidedProblem"`, `"StepByStepVisualizer"`, `"ParameterExplorer"`)
+    - `activityType` (future target enum: `"InteractiveQuiz"`, `"GuidedProblem"`, `"StepByStepVisualizer"`, `"ParameterExplorer"`; the v1.0.0 wire contract currently permits only `InteractiveQuiz` and `GuidedProblem`)
     - `schemaVersion` (string, e.g. `"1.0.0"`)
     - `courseId` (ObjectId, ref: `courses`)
     - `revisionId` (ObjectId, ref: `course_revisions`)
@@ -122,7 +130,7 @@ EdNova enforces strict storage boundaries to prevent duplication and ensure that
 * **`activity_attempts`**: Private student submissions for learning activities.
   - Fields:
     - `_id` (ObjectId)
-    - `attemptId` (string, unique UUID v4)
+    - `attemptId` (string, lowercase UUID v4; not globally unique)
     - `activityId` (string, ref: `learning_activities`)
     - `userId` (string, ref: `users`)
     - `courseId` (ObjectId)
@@ -135,7 +143,7 @@ EdNova enforces strict storage boundaries to prevent duplication and ensure that
     - `isCorrect` (boolean)
     - `feedback` (string)
     - `submittedAt` (Date).
-  - **Index**: Unique `{ attemptId: 1 }`, `{ userId: 1, activityId: 1, submittedAt: -1 }`.
+  - **Index**: Unique `{ userId: 1, attemptId: 1 }` (durable receipt identity), non-unique `{ attemptId: 1 }` lookup, `{ userId: 1, activityId: 1, submittedAt: -1 }`.
 
 ---
 
@@ -156,7 +164,7 @@ EdNova enforces strict storage boundaries to prevent duplication and ensure that
     - `evaluatorType` (enum: `"deterministic_rubric"`, `"llm_evaluation"`)
     - `evaluatorModel` (string, nullable)
     - `createdAt` (Date).
-  - **Index**: Unique `{ attemptId: 1 }`, `{ userId: 1, objectiveId: 1 }`.
+  - **Index**: Unique `{ userId: 1, attemptId: 1 }` to prove attempt ownership, non-unique `{ attemptId: 1 }` if a lookup is needed, `{ userId: 1, objectiveId: 1 }`. A global unique `{ attemptId: 1 }` is not a valid ownership proof.
 
 * **`competencies`**: Cumulative mastery profile for a student across course objectives.
   - Fields:
@@ -180,7 +188,7 @@ EdNova enforces strict storage boundaries to prevent duplication and ensure that
     - `roomId` (string, unique)
     - `inviteCode` (string, 6-character unique alphanumeric, e.g. `"DB1NF2"`)
     - `courseId` (ObjectId, ref: `courses`)
-    - `revisionId` (ObjectId, ref: `course_revisions`)
+    - `revisionId` (ObjectId, internal ref: `course_revisions`; wire pins expose `revisionTag` instead)
     - `hostUserId` (string, ref: `users`)
     - `presenterUserId` (string, ref: `users`)
     - `title` (string)

@@ -80,6 +80,35 @@ class IngestionWorker(BaseAIWorker):
 
     async def handle(self, payload: Dict[str, Any], envelope) -> Dict[str, Any]:
         request = self._build_request(payload)
+        await asyncio.to_thread(self._ensure_current_operation, request, envelope)
+        revision_manifest = None
+        db = getattr(self.vector_store, "_db", None)
+        if db is not None and request.revisionId:
+            from bson import ObjectId
+            from services.vector_store.revision_artifacts import manifest_digest
+
+            revision = db.course_revisions.find_one(
+                {
+                    "courseId": ObjectId(request.courseId),
+                    "revisionTag": request.revisionId,
+                    "status": "draft",
+                }
+            )
+            if (
+                not revision
+                or not revision.get("sourceManifest")
+                or any(not d.get("storageRef") for d in revision["sourceManifest"])
+            ):
+                raise TerminalError("Exact immutable source revision unavailable")
+            revision_manifest = {
+                "schemaVersion": "1.0.0",
+                "courseId": request.courseId,
+                "revisionId": request.revisionId,
+                "contentHash": "sha256:"
+                + revision["contentHash"].removeprefix("sha256:"),
+                "documents": revision["sourceManifest"],
+            }
+            revision_manifest["manifestDigest"] = manifest_digest(revision_manifest)
 
         await self._publish_progress(
             envelope,
@@ -89,10 +118,11 @@ class IngestionWorker(BaseAIWorker):
         )
 
         subtopics, section_count, source_files = await asyncio.to_thread(
-            self._parse_stage, request
+            self._parse_stage, request, revision_manifest
         )
         if not subtopics:
             raise TerminalError("no subtopics could be derived from the uploaded files")
+        await asyncio.to_thread(self._ensure_current_operation, request, envelope)
 
         await self._publish_progress(
             envelope,
@@ -103,11 +133,13 @@ class IngestionWorker(BaseAIWorker):
         enriched, objective_stats, classification_stats = await asyncio.to_thread(
             self._enrich_stage, subtopics
         )
+        await asyncio.to_thread(self._ensure_current_operation, request, envelope)
 
         await self._publish_progress(
             envelope, stage="embedding", progress=0.6, detail="chunking and embedding"
         )
         embedded, dedup_removed = await asyncio.to_thread(self._embed_stage, enriched)
+        await asyncio.to_thread(self._ensure_current_operation, request, envelope)
 
         await self._publish_progress(
             envelope,
@@ -123,7 +155,10 @@ class IngestionWorker(BaseAIWorker):
             objective_stats,
             classification_stats,
             dedup_removed,
+            revision_id=request.revisionId,
+            manifest=revision_manifest,
         )
+        await asyncio.to_thread(self._ensure_current_operation, request, envelope)
 
         await self._publish_progress(
             envelope, stage="indexing", progress=1.0, detail="ingestion complete"
@@ -132,7 +167,44 @@ class IngestionWorker(BaseAIWorker):
 
     # ------------------------------------------------------------- stages
 
-    def _parse_stage(self, request: IngestionRequest) -> Tuple[List[dict], int, List[str]]:
+    def _ensure_current_operation(self, request, envelope):
+        """Cooperative cancellation/fencing between bounded blocking stages.
+
+        Existing legacy envelopes without an operation record retain their
+        behavior. New operations must match the current server-owned pointer.
+        Running blocking work is bounded but is not claimed to be hard-cancelled.
+        """
+        db = getattr(self.vector_store, "_db", None)
+        if db is None:
+            return
+        operations = getattr(db, "course_ingestion_operations", None)
+        if operations is None:
+            return
+        operation = operations.find_one({"_id": envelope.messageId})
+        if not operation:
+            return
+        from bson import ObjectId
+
+        if (
+            operation.get("state") not in ("prepared", "queued", "processing")
+            or str(operation.get("courseId")) != request.courseId
+            or operation.get("revisionId") != request.revisionId
+            or operation.get("userId") != envelope.userId
+        ):
+            raise TerminalError("Ingestion operation cancelled, superseded or resolved")
+        current = db.courses.find_one(
+            {
+                "_id": ObjectId(request.courseId),
+                "jobId": envelope.messageId,
+                "correlationId": envelope.correlationId,
+            }
+        )
+        if not current or current.get("ingestDetail") == "cancelled":
+            raise TerminalError("Ingestion operation is no longer current")
+
+    def _parse_stage(
+        self, request: IngestionRequest, manifest=None
+    ) -> Tuple[List[dict], int, List[str]]:
         """Extract text from every file, split into sections, build subtopics.
 
         Returns (subtopics, section_count, source_files) — pure CPU/IO, runs off
@@ -143,11 +215,21 @@ class IngestionWorker(BaseAIWorker):
 
         source_files: List[str] = []
         all_sections = []
-        for meta in request.files:
-            path = self._resolve_path(meta, request.fileRef)
-            text = self._extract_text(meta, path)
-            source_files.append(str(path))
-            all_sections.extend(detect_sections(text))
+        if manifest:
+            from services.vector_store.revision_artifacts import (
+                extract_documents,
+                original_path,
+            )
+
+            chunks, _ = extract_documents(manifest)
+            all_sections = detect_sections("\n\n".join(chunks))
+            source_files = [str(original_path(d)) for d in manifest["documents"]]
+        else:
+            for meta in request.files:
+                path = self._resolve_path(meta, request.fileRef)
+                text = self._extract_text(meta, path)
+                source_files.append(str(path))
+                all_sections.extend(detect_sections(text))
 
         if not all_sections:
             logger.warning("ingest_no_sections", extra={"courseId": request.courseId})
@@ -164,15 +246,17 @@ class IngestionWorker(BaseAIWorker):
             extract_text_from_pdf_sandboxed,
         )
 
-        is_pdf = (meta.mimetype or "").lower() == "application/pdf" or meta.filename.lower().endswith(
-            ".pdf"
-        )
+        is_pdf = (
+            meta.mimetype or ""
+        ).lower() == "application/pdf" or meta.filename.lower().endswith(".pdf")
         if not is_pdf:
             try:
                 return path.read_text(encoding="utf-8")
             except UnicodeDecodeError as exc:
                 # Data problem: retrying cannot fix an undecodable file.
-                raise TerminalError(f"text file is not valid UTF-8: {meta.filename}") from exc
+                raise TerminalError(
+                    f"text file is not valid UTF-8: {meta.filename}"
+                ) from exc
 
         try:
             text = extract_text_from_pdf_sandboxed(str(path))
@@ -206,7 +290,7 @@ class IngestionWorker(BaseAIWorker):
 
         file_ref = fileRef.lstrip("/")
         if file_ref.startswith("uploads/"):
-            file_ref = file_ref[len("uploads/"):]
+            file_ref = file_ref[len("uploads/") :]
         rel = (meta.path or os.path.join(file_ref, meta.filename)).replace("\\", "/")
         path = (root / rel).resolve()
 
@@ -234,7 +318,9 @@ class IngestionWorker(BaseAIWorker):
             enriched_data = enrich_subtopic_with_llm(st["title"], st["full_content"])
             cleaned = enriched_data.get("cleaned_text") or st["full_content"]
             st["full_content"] = cleaned
-            st["key_concepts"] = enriched_data.get("key_concepts", st.get("key_concepts", []))
+            st["key_concepts"] = enriched_data.get(
+                "key_concepts", st.get("key_concepts", [])
+            )
             st["definitions"] = enriched_data.get("definitions", [])
             st["formulas"] = enriched_data.get("formulas", [])
             st["examples"] = enriched_data.get("examples", [])
@@ -243,7 +329,9 @@ class IngestionWorker(BaseAIWorker):
                 if refined_title:
                     st["title"] = refined_title
             except Exception as title_err:  # title refinement is best-effort
-                logger.warning("ingest_title_refinement_failed", extra={"error": str(title_err)})
+                logger.warning(
+                    "ingest_title_refinement_failed", extra={"error": str(title_err)}
+                )
             enriched.append(st)
 
         objective_stats = extract_objectives_for_document(enriched)
@@ -252,7 +340,9 @@ class IngestionWorker(BaseAIWorker):
 
     def _embed_stage(self, subtopics: List[dict]) -> Tuple[List[dict], int]:
         """Chunk (tokenize), embed, then deduplicate near-identical chunks."""
-        from agents.course_ingestion.enrichment.chunk_embedder import embed_all_subtopics
+        from agents.course_ingestion.enrichment.chunk_embedder import (
+            embed_all_subtopics,
+        )
         from agents.course_ingestion.enrichment.deduplicator import deduplicate_chunks
         from agents.course_ingestion.normalization.tokenizer import tokenize_subtopics
 
@@ -271,9 +361,12 @@ class IngestionWorker(BaseAIWorker):
             st["chunk_embeddings"] = unique_embeddings
         logger.info(
             "ingest_dedup_done",
-            extra={"removedChunks": removed, "remainingChunks": sum(
-                len(st.get("tokenized_chunks", [])) for st in embedded
-            )},
+            extra={
+                "removedChunks": removed,
+                "remainingChunks": sum(
+                    len(st.get("tokenized_chunks", [])) for st in embedded
+                ),
+            },
         )
         return embedded, removed
 
@@ -285,17 +378,42 @@ class IngestionWorker(BaseAIWorker):
         objective_stats: Dict[str, Any],
         classification_stats: Dict[str, Any],
         dedup_removed: int,
+        revision_id: Optional[str] = None,
+        manifest=None,
     ) -> Dict[str, Any]:
         """Normalize into course JSON, flatten chunk records, index the vector
         store. Returns the completed-result payload for the Node backend."""
         from agents.course_ingestion.normalization.normalizer import normalize_course
 
+        rev_tag = revision_id or "rev_1"
         course_json = normalize_course(course_id, subtopics, source_files)
-        chunks, embeddings, metadatas = _flatten_chunk_records(course_id, course_json)
+        chunks, embeddings, metadatas = _flatten_chunk_records(
+            course_id, course_json, revision_id=rev_tag
+        )
 
+        if manifest:
+            from services.vector_store.revision_artifacts import extract_documents
+            from services.vector_store.embedder import get_embedder
+
+            chunks, metadatas = extract_documents(manifest)
+            embeddings = get_embedder().encode(chunks)
         indexed = False
         if chunks and embeddings.size:
-            self.vector_store.add_course(course_id, chunks, embeddings, metadatas)
+            if manifest:
+                self.vector_store.add_course(
+                    course_id,
+                    chunks,
+                    embeddings,
+                    metadatas,
+                    revision_id=rev_tag,
+                    artifact=manifest,
+                )
+            else:
+                # Legacy artifacts remain explicitly unverified; never reclassify
+                # unknown document metadata as a published source index.
+                self.vector_store.add_course(
+                    course_id, chunks, embeddings, metadatas, revision_id=rev_tag
+                )
             indexed = True
 
         stats = {
@@ -311,10 +429,12 @@ class IngestionWorker(BaseAIWorker):
         }
         logger.info(
             "ingest_completed",
-            extra={"courseId": course_id, "stats": stats},
+            extra={"courseId": course_id, "revisionId": rev_tag, "stats": stats},
         )
         return {
             "courseId": course_id,
+            "revisionId": rev_tag,
+            "vectorIndexRef": f"faiss/{course_id}/{rev_tag}.faiss",
             "status": "completed",
             "stats": stats,
             "course": _strip_vectors(course_json.model_dump(mode="json")),
@@ -332,19 +452,21 @@ class IngestionWorker(BaseAIWorker):
 
 
 def _flatten_chunk_records(
-    course_id: str, course_json
+    course_id: str, course_json, revision_id: Optional[str] = None
 ) -> Tuple[List[str], Any, List[Dict[str, Any]]]:
     """Flatten per-subtopic tokenized chunks + embeddings into index-ready arrays.
 
     Returns (chunks, np.ndarray float32 (N, 384) embeddings, metadatas). Each
-    metadata record carries the topic/subtopic it came from so the vector store
-    can scope search results back to course structure.
+    metadata record carries stable chunk_id, revision_id, topic/subtopic,
+    provenance, and page location so retrieval maintains verifiable provenance.
     """
+    import hashlib
     import numpy as np
 
     chunks: List[str] = []
     vectors: List[Any] = []
     metadatas: List[Dict[str, Any]] = []
+    rev_tag = revision_id or "rev_1"
     for topic in course_json.topics:
         for sub in topic.subtopics:
             sub_chunks = sub.tokenized_chunks or []
@@ -352,18 +474,28 @@ def _flatten_chunk_records(
             for idx, chunk in enumerate(sub_chunks):
                 if idx >= len(sub_vecs):
                     continue
+                chunk_hash = hashlib.sha256(chunk.encode("utf-8")).hexdigest()[:16]
                 chunks.append(chunk)
                 vectors.append(sub_vecs[idx])
                 metadatas.append(
                     {
+                        "chunk_id": f"chk_{chunk_hash}",
                         "course_id": course_id,
+                        "revision_id": rev_tag,
                         "topic_id": topic.id,
                         "topic_title": topic.title,
                         "subtopic_id": sub.id,
                         "subtopic_title": sub.title,
+                        "provenance": "extracted",
+                        "page_number": None,
+                        "ambiguity_flag": False,
                     }
                 )
-    embeddings = np.asarray(vectors, dtype="float32") if vectors else np.zeros((0, 0), dtype="float32")
+    embeddings = (
+        np.asarray(vectors, dtype="float32")
+        if vectors
+        else np.zeros((0, 0), dtype="float32")
+    )
     return chunks, embeddings, metadatas
 
 

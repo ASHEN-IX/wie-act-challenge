@@ -1,10 +1,15 @@
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { Response, NextFunction } from 'express';
 // Set environment variables BEFORE any imports
 process.env.JWT_SECRET = 'test-secret-key';
 process.env.MONGODB_URI = 'mongodb://localhost:27017/test_study_partner';
 process.env.NODE_ENV = 'test';
 
 // Prevent process.exit() from killing tests
-process.exit = jest.fn() as any;
+const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => {
+  throw new Error(`Unexpected process.exit(${code})`);
+});
+afterAll(() => exitSpy.mockRestore());
 
 // Mock moduleClient
 jest.mock('@study-partner/shared/moduleClient');
@@ -33,24 +38,41 @@ jest.mock('../models/SeasonResultSnapshot', () => ({
 
 jest.mock('@study-partner/shared/auth', () => ({
   authenticate: jest.fn((req, res, next) => {
-    req.user = { userId: 'test-user-123' };
+    req.user = { userId: 'test-user-123', role: 'student' };
     next();
   })
 }));
 
 jest.mock('@study-partner/shared', () => ({
-  corsMiddleware: jest.fn(() => (req: any, res: any, next: any) => next()),
-  securityMiddleware: jest.fn(() => (req: any, res: any, next: any) => next()),
-  loggingMiddleware: jest.fn((req: any, res: any, next: any) => next()),
-  errorHandler: jest.fn((err: any, req: any, res: any) => {
-    res.status(err.status || 500).json({ error: err.message });
-  }),
-  rateLimiter: jest.fn(() => (req: any, res: any, next: any) => next()),
-  tierGate: jest.fn((_tier, _fallbackTier) => (req: any, res: any, _next: any) => {
-    // Mock tier check
-    req.userTier = 'vip_plus';
-    _next();
-  }),
+  corsMiddleware: jest.fn(
+    () => (req: DomainRequest & { userTier?: string }, res: Response, next: NextFunction) => next()
+  ),
+  securityMiddleware: jest.fn(
+    () => (req: DomainRequest & { userTier?: string }, res: Response, next: NextFunction) => next()
+  ),
+  loggingMiddleware: jest.fn(
+    (req: DomainRequest & { userTier?: string }, res: Response, next: NextFunction) => next()
+  ),
+  errorHandler: jest.fn(
+    (
+      err: Error & { status?: number },
+      req: DomainRequest & { userTier?: string },
+      res: Response
+    ) => {
+      res.status(err.status || 500).json({ error: err.message });
+    }
+  ),
+  rateLimiter: jest.fn(
+    () => (req: DomainRequest & { userTier?: string }, res: Response, next: NextFunction) => next()
+  ),
+  tierGate: jest.fn(
+    (_tier, _fallbackTier) =>
+      (req: DomainRequest & { userTier?: string }, res: Response, _next: NextFunction) => {
+        // Mock tier check
+        req.userTier = 'vip_plus';
+        _next();
+      }
+  ),
   logger: {
     info: jest.fn(),
     error: jest.fn(),

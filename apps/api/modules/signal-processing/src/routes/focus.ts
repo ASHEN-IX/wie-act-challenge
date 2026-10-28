@@ -1,11 +1,15 @@
+import { errorDetails } from '@study-partner/shared/errors';
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { FilterQuery } from 'mongoose';
+import type { IFocusSession } from '../models/FocusSession';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { createContracts } = require('@study-partner/shared/domainContracts');
 import Joi from 'joi';
-import type { Request, Response } from 'express';
+import type { Response } from 'express';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const moduleClient = require('@study-partner/shared/moduleClient');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const FocusSession = require('../models/FocusSession');
+const FocusSession: typeof import('../models/FocusSession').default = require('../models/FocusSession');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { tierGate } = require('@study-partner/shared/tierGate');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -33,13 +37,13 @@ const updateSessionSchema = Joi.object({
 router.post(
   '/start',
   tierGate('vip_plus', 'trial'),
-  asyncHandler(async (req: Request, res: Response) => {
+  asyncHandler(async (req: DomainRequest, res: Response) => {
     const { error } = startSessionSchema.validate(req.body);
     if (error) {
       return res.status(400).json({ error: error.details[0].message });
     }
 
-    const userId = (req as any).user.userId;
+    const userId = req.user!.userId;
     const { studySessionId } = req.body;
 
     const session = await FocusSession.create({
@@ -60,13 +64,13 @@ router.post(
 router.post(
   '/:sessionId/data',
   tierGate('vip_plus', 'trial'),
-  asyncHandler(async (req: Request, res: Response) => {
+  asyncHandler(async (req: DomainRequest, res: Response) => {
     const { error } = updateSessionSchema.validate(req.body);
     if (error) {
       return res.status(400).json({ error: error.details[0].message });
     }
 
-    const userId = (req as any).user.userId;
+    const userId = req.user!.userId;
     const { sessionId } = req.params;
     const { focusLevel, isDistracted, gazeData } = req.body;
 
@@ -100,8 +104,8 @@ router.post(
 router.post(
   '/:sessionId/end',
   tierGate('vip_plus', 'trial'),
-  asyncHandler(async (req: Request, res: Response) => {
-    const userId = (req as any).user.userId;
+  asyncHandler(async (req: DomainRequest, res: Response) => {
+    const userId = req.user!.userId;
     const { sessionId } = req.params;
 
     const session = await FocusSession.findOne({ _id: sessionId, userId });
@@ -122,8 +126,11 @@ router.post(
 
     if (totalPoints > 0) {
       const avgFocusLevel =
-        dataPoints.reduce((sum: number, dp: any) => sum + dp.focusLevel, 0) / totalPoints;
-      const focusedPoints = dataPoints.filter((dp: any) => !dp.isDistracted).length;
+        dataPoints.reduce(
+          (sum: number, dp: IFocusSession['dataPoints'][number]) => sum + dp.focusLevel,
+          0
+        ) / totalPoints;
+      const focusedPoints = dataPoints.filter((dp) => !dp.isDistracted).length;
       const distractedPoints = totalPoints - focusedPoints;
 
       const duration =
@@ -176,8 +183,8 @@ router.post(
             headers: buildInternalHeaders(req.headers.cookie)
           }
         );
-      } catch (xpErr: any) {
-        console.warn('XP award failed for perfect focus session:', xpErr.message);
+      } catch (xpErr) {
+        console.warn('XP award failed for perfect focus session:', errorDetails(xpErr).message);
       }
     }
 
@@ -193,8 +200,8 @@ router.post(
           headers: buildInternalHeaders(req.headers.cookie)
         }
       );
-    } catch (questErr: any) {
-      console.warn('Quest progress failed for focus session:', questErr.message);
+    } catch (questErr) {
+      console.warn('Quest progress failed for focus session:', errorDetails(questErr).message);
     }
 
     res.json({
@@ -209,8 +216,8 @@ router.post(
 router.get(
   '/:sessionId',
   tierGate('vip_plus', 'trial'),
-  asyncHandler(async (req: Request, res: Response) => {
-    const userId = (req as any).user.userId;
+  asyncHandler(async (req: DomainRequest, res: Response) => {
+    const userId = req.user!.userId;
     const { sessionId } = req.params;
 
     const session = await FocusSession.findOne({ _id: sessionId, userId });
@@ -227,8 +234,8 @@ router.get(
 router.get(
   '/',
   tierGate('vip_plus', 'trial'),
-  asyncHandler(async (req: Request, res: Response) => {
-    const userId = (req as any).user.userId;
+  asyncHandler(async (req: DomainRequest, res: Response) => {
+    const userId = req.user!.userId;
     const { limit = 10 } = req.query as { limit?: string | number };
 
     const sessions = await FocusSession.find({ userId })
@@ -243,11 +250,11 @@ router.get(
 router.get(
   '/stats/summary',
   tierGate('vip_plus', 'trial'),
-  asyncHandler(async (req: Request, res: Response) => {
-    const userId = (req as any).user.userId;
+  asyncHandler(async (req: DomainRequest, res: Response) => {
+    const userId = req.user!.userId;
     const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
 
-    const filter: Record<string, any> = { userId, endTime: { $exists: true } };
+    const filter: FilterQuery<IFocusSession> = { userId, endTime: { $exists: true } };
     if (startDate || endDate) {
       filter.startTime = {};
       if (startDate) filter.startTime.$gte = new Date(startDate);
@@ -259,10 +266,11 @@ router.get(
     const totalSessions = sessions.length;
     const avgFocusScore =
       sessions.length > 0
-        ? sessions.reduce((sum: number, s: any) => sum + (s.focusScore || 0), 0) / sessions.length
+        ? sessions.reduce((sum: number, s: IFocusSession) => sum + (s.focusScore || 0), 0) /
+          sessions.length
         : 0;
     const totalFocusTime = sessions.reduce(
-      (sum: number, s: any) => sum + (s.summary?.totalFocusTime || 0),
+      (sum: number, s: IFocusSession) => sum + (s.summary?.totalFocusTime || 0),
       0
     );
 

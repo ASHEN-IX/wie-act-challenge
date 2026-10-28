@@ -20,8 +20,12 @@ export interface IRankEventLedger extends Document {
   beforeRankIndex: number;
   afterRankIndex: number;
   rankName: string | null;
-  metadata: Record<string, any>;
-  reasonBreakdown: Record<string, any>;
+  metadata: Record<string, unknown> & {
+    sessionId?: string;
+    focusSessionId?: string;
+    eventId?: string;
+  };
+  reasonBreakdown: Record<string, unknown>;
   contextSessionId: string | null;
   eventKey: string | null;
   occurredAt: Date;

@@ -110,7 +110,7 @@ def test_ocr_and_llm_failures_classify_retryable():
 
 
 async def test_ocr_failure_schedules_backoff_retry_not_dlq(worker, monkeypatch):
-    def ocr_fail(self, request):
+    def ocr_fail(self, request, manifest):
         raise RuntimeError(OCR_RETRYABLE)  # surfaced by the parsing stage
 
     monkeypatch.setattr(worker, "_parse_stage", ocr_fail.__get__(worker))
@@ -126,7 +126,7 @@ async def test_ocr_failure_schedules_backoff_retry_not_dlq(worker, monkeypatch):
 
 
 async def test_llm_enrichment_failure_schedules_backoff_retry(worker, monkeypatch):
-    def parse_stub(self, request):
+    def parse_stub(self, request, manifest):
         return [
             {"title": "t", "full_content": "content", "key_concepts": []}, 1, ["n.pdf"]
         ]
@@ -148,7 +148,7 @@ async def test_llm_enrichment_failure_schedules_backoff_retry(worker, monkeypatc
 
 
 async def test_retry_exhaustion_dlqs_with_failed_result(worker, monkeypatch):
-    def ocr_fail(self, request):
+    def ocr_fail(self, request, manifest):
         raise RuntimeError("OCR still timing out")
 
     monkeypatch.setattr(worker, "_parse_stage", ocr_fail.__get__(worker))
@@ -185,7 +185,7 @@ async def test_invalid_schema_dlqs_immediately_without_retry(worker):
 async def test_file_validation_dlqs_immediately_without_retry(worker, monkeypatch):
     scheduled = await _capture_republish(worker)
 
-    def utf8_fail(self, request):
+    def utf8_fail(self, request, manifest):
         fname = request.files[0].filename
         raise TerminalError(f"text file is not valid UTF-8: {fname}")
 
@@ -198,6 +198,7 @@ async def test_file_validation_dlqs_immediately_without_retry(worker, monkeypatc
     assert scheduled == {}
     assert msg.nacked and msg.requeue is False
     assert worker.recorded_results[0][0] == "failed"
+    assert "text file is not valid UTF-8" in worker.recorded_results[0][2]
 
 
 # ----------------------------------------- AC 3: replay re-runs with full budget
@@ -206,7 +207,7 @@ async def test_file_validation_dlqs_immediately_without_retry(worker, monkeypatc
 async def test_replayed_dlq_message_gets_fresh_attempt_budget(worker, monkeypatch):
     """A DLQ'd message re-published (fresh messageId per dlq-replay.js) must be
     processed as attempt 0 — not swallowed by the original claim."""
-    def ocr_fail(self, request):
+    def ocr_fail(self, request, manifest):
         raise RuntimeError(OCR_RETRYABLE)
 
     monkeypatch.setattr(worker, "_parse_stage", ocr_fail.__get__(worker))

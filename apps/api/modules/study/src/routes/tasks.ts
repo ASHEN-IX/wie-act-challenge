@@ -1,3 +1,8 @@
+import { canReadPlanContext } from '../services/resourceAccess';
+import type { FilterQuery } from 'mongoose';
+import type { ITask } from '../models';
+import type { DomainRequest } from '../../../../src/framework/contracts';
+import type { Response } from 'express';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { createContracts } = require('@study-partner/shared/domainContracts');
 import Joi from 'joi';
@@ -36,31 +41,35 @@ const updateTaskSchema = Joi.object({
 // Get all tasks
 router.get(
   '/',
-  asyncHandler(async (req: any, res: any) => {
-    const userId = req.user.userId;
+  asyncHandler(async (req: DomainRequest, res: Response) => {
+    const userId = req.user!.userId;
     const { status, priority, topicId } = req.query;
 
-    const filter: Record<string, any> = { userId };
+    const filter: FilterQuery<ITask> = { userId };
     if (status) filter.status = status;
     if (priority) filter.priority = priority;
     if (topicId) filter.topicId = topicId;
 
     const tasks = await Task.find(filter).sort({ createdAt: -1 });
 
-    res.json({ tasks });
+    const authorized = [];
+    for (const task of tasks)
+      if (!task.studyPlanId || (await canReadPlanContext(userId, task.studyPlanId)))
+        authorized.push(task);
+    res.json({ tasks: authorized });
   })
 );
 
 // Get task by ID
 router.get(
   '/:taskId',
-  asyncHandler(async (req: any, res: any) => {
-    const userId = req.user.userId;
+  asyncHandler(async (req: DomainRequest, res: Response) => {
+    const userId = req.user!.userId;
     const { taskId } = req.params;
 
     const task = await Task.findOne({ _id: taskId, userId });
 
-    if (!task) {
+    if (!task || (task.studyPlanId && !(await canReadPlanContext(userId, task.studyPlanId)))) {
       return res.status(404).json({ error: 'Task not found' });
     }
 
@@ -71,13 +80,13 @@ router.get(
 // Create task
 router.post(
   '/',
-  asyncHandler(async (req: any, res: any) => {
+  asyncHandler(async (req: DomainRequest, res: Response) => {
     const { error, value } = createTaskSchema.validate(req.body, { stripUnknown: true });
     if (error) {
       return res.status(400).json({ error: error.details[0].message });
     }
 
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
 
     const task = await Task.create({
       userId,
@@ -94,18 +103,18 @@ router.post(
 // Update task
 router.put(
   '/:taskId',
-  asyncHandler(async (req: any, res: any) => {
+  asyncHandler(async (req: DomainRequest, res: Response) => {
     const { error, value } = updateTaskSchema.validate(req.body, { stripUnknown: true });
     if (error) {
       return res.status(400).json({ error: error.details[0].message });
     }
 
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
     const { taskId } = req.params;
 
     const task = await Task.findOne({ _id: taskId, userId });
 
-    if (!task) {
+    if (!task || (task.studyPlanId && !(await canReadPlanContext(userId, task.studyPlanId)))) {
       return res.status(404).json({ error: 'Task not found' });
     }
 
@@ -148,8 +157,11 @@ router.put(
             headers: buildInternalHeaders(req.headers.cookie)
           }
         );
-      } catch (xpErr: any) {
-        console.warn('XP/Quest award failed for task completion:', xpErr.message);
+      } catch (xpErr) {
+        console.warn(
+          'XP/Quest award failed for task completion:',
+          xpErr instanceof Error ? xpErr.message : String(xpErr)
+        );
       }
     }
 
@@ -163,8 +175,8 @@ router.put(
 // Delete task
 router.delete(
   '/:taskId',
-  asyncHandler(async (req: any, res: any) => {
-    const userId = req.user.userId;
+  asyncHandler(async (req: DomainRequest, res: Response) => {
+    const userId = req.user!.userId;
     const { taskId } = req.params;
 
     const result = await Task.deleteOne({ _id: taskId, userId });
@@ -180,7 +192,7 @@ router.delete(
 // Generate tasks from planner using AI (kept for backward compatibility)
 router.post(
   '/generate-from-planner',
-  asyncHandler(async (req: any, res: any) => {
+  asyncHandler(async (req: DomainRequest, res: Response) => {
     try {
       const { goal } = req.body;
 

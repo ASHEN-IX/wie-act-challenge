@@ -1,3 +1,5 @@
+node_modules
+**/node_modules
 node_modules/
 **/node_modules/
 .pnpm-store/
@@ -26,6 +28,9 @@ __pycache__/
 **/*.pfx
 **/logs/
 **/uploads/
+# Local immutable source originals and revision indexes created by dev setup.
+/var/dev-uploads/
+/var/dev-faiss/
 **/.venv/
 **/.pytest_cache/
 **/.mypy_cache/
@@ -39,3 +44,26 @@ __pycache__/
 # Local agent state and generated knowledge graph
 .serena/
 graphify-out/
+
+# Local verification artifacts; keep the authored reports/*.md in Git.
+**/.next-e2e/
+/reports/evidence/
+*.log
+*.log.[0-9]*
+
+# Tool caches and generated test output outside package-specific directories
+.cache/
+.turbo/
+.nyc_output/
+.ipynb_checkpoints/
+htmlcov/
+.coverage
+.coverage.*
+
+# Editor backups and temporary files
+*.swp
+*.swo
+*~
+*.tmp
+*.temp
+Thumbs.db

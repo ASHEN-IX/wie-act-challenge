@@ -5,7 +5,7 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from deps import convert_objectid_to_str
+from services.api.deps import convert_objectid_to_str
 from utils.logger import get_logger
 
 logger = get_logger(__name__)

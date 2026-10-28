@@ -13,7 +13,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { uploadCourse, createSubject } from "./actions";
 import type { Subject } from "./types";
-export function UploadForm({ subjects }: { subjects: Subject[] }) {
+export function UploadForm({
+  subjects,
+  institutions = [],
+}: {
+  subjects: Subject[];
+  institutions?: Array<{ id: string; name: string }>;
+}) {
   if (!subjects.length)
     return (
       <div className="flex flex-col gap-5">
@@ -37,6 +43,17 @@ export function UploadForm({ subjects }: { subjects: Subject[] }) {
             ))}
           </NativeSelect>
         </Field>
+        <Field>
+          <FieldLabel htmlFor="institutionId">Course scope</FieldLabel>
+          <NativeSelect id="institutionId" name="institutionId">
+            <NativeSelectOption value="">Personal</NativeSelectOption>
+            {institutions.map((i) => (
+              <NativeSelectOption key={i.id} value={i.id}>
+                {i.name}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </Field>
         <LongField
           label="Description (optional)"
           name="description"
@@ -48,13 +65,13 @@ export function UploadForm({ subjects }: { subjects: Subject[] }) {
             id="files"
             name="files"
             type="file"
-            accept="application/pdf,.pdf"
+            accept="application/pdf,text/plain,text/markdown,.pdf,.txt,.md"
             multiple
             required
           />
           <FieldDescription>
-            Up to 10 PDFs, 25 MB each. Processing runs asynchronously; the
-            source stays private.
+            Up to 10 PDF or text sources, 25 MB each. Processing runs
+            asynchronously; the source stays private.
           </FieldDescription>
         </Field>
       </FieldGroup>

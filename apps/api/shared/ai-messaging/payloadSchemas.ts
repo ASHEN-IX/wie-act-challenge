@@ -10,6 +10,10 @@
 
 import { ValidationResult } from './envelope';
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 export const GOAL_MAX_CHARS = 500;
 export const CONCEPTS_MAX_ITEMS = 50;
 export const CONCEPT_MAX_CHARS = 100;
@@ -79,9 +83,9 @@ const COACH_FIELDS = new Set([
 const FOCUS_STATES = ['Focused', 'Drifting', 'Lost'];
 const FATIGUE_STATES = ['Alert', 'Moderate', 'High', 'Critical'];
 
-export function validatePlannerPayload(payload: any): ValidationResult {
+export function validatePlannerPayload(payload: unknown): ValidationResult {
   const errors: string[] = [];
-  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+  if (!isRecord(payload)) {
     return { valid: false, errors: ['payload must be an object'] };
   }
 
@@ -127,7 +131,12 @@ export function validatePlannerPayload(payload: any): ValidationResult {
 
   if (payload.available_minutes !== undefined) {
     const n = payload.available_minutes;
-    if (!Number.isInteger(n) || n < AVAILABLE_MINUTES_MIN || n > AVAILABLE_MINUTES_MAX) {
+    if (
+      typeof n !== 'number' ||
+      !Number.isInteger(n) ||
+      n < AVAILABLE_MINUTES_MIN ||
+      n > AVAILABLE_MINUTES_MAX
+    ) {
       errors.push(
         `available_minutes must be an integer between ${AVAILABLE_MINUTES_MIN} and ${AVAILABLE_MINUTES_MAX}`
       );
@@ -146,9 +155,9 @@ export const SEARCH_MAX_RESULTS_MAX = 10;
 export const SEARCH_MAX_RESULTS_DEFAULT = 5;
 export const SEARCH_SESSION_ID_MAX_CHARS = 64;
 
-export function validateSearchPayload(payload: any): ValidationResult {
+export function validateSearchPayload(payload: unknown): ValidationResult {
   const errors: string[] = [];
-  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+  if (!isRecord(payload)) {
     return { valid: false, errors: ['payload must be an object'] };
   }
 
@@ -165,7 +174,12 @@ export function validateSearchPayload(payload: any): ValidationResult {
   // maxResults: optional integer 1–10, default 5
   if (payload.maxResults !== undefined) {
     const n = payload.maxResults;
-    if (!Number.isInteger(n) || n < SEARCH_MAX_RESULTS_MIN || n > SEARCH_MAX_RESULTS_MAX) {
+    if (
+      typeof n !== 'number' ||
+      !Number.isInteger(n) ||
+      n < SEARCH_MAX_RESULTS_MIN ||
+      n > SEARCH_MAX_RESULTS_MAX
+    ) {
       errors.push(
         `maxResults must be an integer between ${SEARCH_MAX_RESULTS_MIN} and ${SEARCH_MAX_RESULTS_MAX}`
       );
@@ -200,11 +214,11 @@ export function validateSearchPayload(payload: any): ValidationResult {
 /** Basic sanity for types whose strict schemas land with their own stories
  *  (COACH-02, EVAL-02, SEARCH-02, INGEST-05). */
 function validateBasicObjectWithFields(
-  payload: any,
+  payload: unknown,
   requiredFields: string[] = []
 ): ValidationResult {
   const errors: string[] = [];
-  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+  if (!isRecord(payload)) {
     return { valid: false, errors: ['payload must be an object'] };
   }
   for (const field of requiredFields) {
@@ -222,9 +236,10 @@ function validateBasicObjectWithFields(
 
 /** eval (F04 / EVAL-08): optional objectiveId matches the Python mirror —
  *  blank/over-length values are rejected, absent is fine. */
-export function validateEvalPayload(payload: any): ValidationResult {
+export function validateEvalPayload(payload: unknown): ValidationResult {
   const base = validateBasicObjectWithFields(payload, ['sessionId']);
   const errors = [...base.errors];
+  if (!isRecord(payload)) return base;
   if (payload.objectiveId !== undefined && payload.objectiveId !== null) {
     if (typeof payload.objectiveId !== 'string' || !payload.objectiveId.trim()) {
       errors.push('objectiveId must be a non-empty string when provided');
@@ -236,9 +251,9 @@ export function validateEvalPayload(payload: any): ValidationResult {
 }
 
 /** Validate the input contract for `study.knowledge.extract` jobs (BLOOM-03). */
-export function validateKnowledgeExtractPayload(payload: any): ValidationResult {
+export function validateKnowledgeExtractPayload(payload: unknown): ValidationResult {
   const errors: string[] = [];
-  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+  if (!isRecord(payload)) {
     return { valid: false, errors: ['payload must be an object'] };
   }
 
@@ -268,18 +283,22 @@ export function validateKnowledgeExtractPayload(payload: any): ValidationResult 
 }
 
 /** Validate the bounded COACH-13 session_stats block. */
-export function validateSessionStats(stats: any, errors: string[], prefix = 'session_stats'): void {
-  if (typeof stats !== 'object' || stats === null || Array.isArray(stats)) {
+export function validateSessionStats(
+  stats: unknown,
+  errors: string[],
+  prefix = 'session_stats'
+): void {
+  if (!isRecord(stats)) {
     errors.push(`${prefix} must be an object`);
     return;
   }
   for (const key of Object.keys(stats)) {
-    if (!SESSION_STATS_FIELDS.includes(key as any)) {
+    if (!SESSION_STATS_FIELDS.some((field) => field === key)) {
       errors.push(`${prefix}.${key} is unknown`);
       continue;
     }
     const v = stats[key];
-    if (!Number.isInteger(v)) {
+    if (typeof v !== 'number' || !Number.isInteger(v)) {
       errors.push(`${prefix}.${key} must be an integer`);
       continue;
     }
@@ -291,9 +310,9 @@ export function validateSessionStats(stats: any, errors: string[], prefix = 'ses
 }
 
 /** Bounded CoachRequest validation (COACH-02) — Python mirror workers/schemas.py. */
-export function validateCoachPayload(payload: any): ValidationResult {
+export function validateCoachPayload(payload: unknown): ValidationResult {
   const errors: string[] = [];
-  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+  if (!isRecord(payload)) {
     return { valid: false, errors: ['payload must be an object'] };
   }
 
@@ -388,7 +407,7 @@ export function validateCoachPayload(payload: any): ValidationResult {
     ['fatigue_state', FATIGUE_STATES]
   ] as const) {
     const v = payload[k];
-    if (v !== undefined && v !== null && !states.includes(v)) {
+    if (v !== undefined && v !== null && !states.some((state) => state === v)) {
       errors.push(`${k} must be one of: ${states.join(', ')}`);
     }
   }
@@ -400,7 +419,9 @@ export function validateCoachPayload(payload: any): ValidationResult {
   }
   if (
     payload.ignored_count !== undefined &&
-    (!Number.isInteger(payload.ignored_count) || payload.ignored_count < 0)
+    (typeof payload.ignored_count !== 'number' ||
+      !Number.isInteger(payload.ignored_count) ||
+      payload.ignored_count < 0)
   ) {
     errors.push('ignored_count must be an integer >= 0');
   }
@@ -444,13 +465,13 @@ export const INGEST_MIME_MAX_CHARS = 128;
  * never inlined in the envelope. `files` carries per-file metadata + the
  * storage-relative path so the worker can locate each document.
  */
-export function validateIngestPayload(payload: any): ValidationResult {
+export function validateIngestPayload(payload: unknown): ValidationResult {
   const errors: string[] = [];
-  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+  if (!isRecord(payload)) {
     return { valid: false, errors: ['payload must be an object'] };
   }
   for (const key of Object.keys(payload)) {
-    if (!['courseId', 'fileRef', 'files'].includes(key)) {
+    if (!['courseId', 'fileRef', 'files', 'revisionId'].includes(key)) {
       errors.push(`unknown field "${key}"`);
     }
   }
@@ -460,6 +481,15 @@ export function validateIngestPayload(payload: any): ValidationResult {
     payload.courseId.length > COURSE_ID_MAX_CHARS
   ) {
     errors.push(`courseId must be a non-empty string of at most ${COURSE_ID_MAX_CHARS} chars`);
+  }
+  if (
+    payload.revisionId !== undefined &&
+    (typeof payload.revisionId !== 'string' ||
+      !payload.revisionId.trim() ||
+      payload.revisionId.length > 64 ||
+      !/^[A-Za-z0-9_\-.]{1,64}$/.test(payload.revisionId))
+  ) {
+    errors.push('revisionId must be a safe identifier of at most 64 chars');
   }
   if (
     typeof payload.fileRef !== 'string' ||
@@ -479,9 +509,16 @@ export function validateIngestPayload(payload: any): ValidationResult {
           errors.push('each file must be an object');
           break;
         }
-        const nameOk = (v: any) =>
+        if (
+          file.fileHash !== undefined &&
+          (typeof file.fileHash !== 'string' || !/^(sha256:)?[a-f0-9]{64}$/.test(file.fileHash))
+        ) {
+          errors.push('file.fileHash must be a SHA-256 digest');
+          break;
+        }
+        const nameOk = (v: unknown) =>
           typeof v === 'string' && v.trim().length > 0 && v.length <= INGEST_FILENAME_MAX_CHARS;
-        const mimeOk = (v: any) =>
+        const mimeOk = (v: unknown) =>
           typeof v === 'string' && v.trim().length > 0 && v.length <= INGEST_MIME_MAX_CHARS;
         if (!nameOk(file.filename) || !nameOk(file.originalName)) {
           errors.push(
@@ -516,9 +553,9 @@ export function validateIngestPayload(payload: any): ValidationResult {
   return { valid: errors.length === 0, errors };
 }
 
-export function validateScheduleApplyPayload(payload: any): ValidationResult {
+export function validateScheduleApplyPayload(payload: unknown): ValidationResult {
   const errors: string[] = [];
-  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+  if (!isRecord(payload)) {
     return { valid: false, errors: ['payload must be an object'] };
   }
 
@@ -529,12 +566,13 @@ export function validateScheduleApplyPayload(payload: any): ValidationResult {
     }
   }
 
-  if (!SCHEDULE_ACTIONS.includes(payload.action)) {
+  if (!SCHEDULE_ACTIONS.some((action) => action === payload.action)) {
     errors.push(`action must be one of: ${SCHEDULE_ACTIONS.join(', ')}`);
   }
 
   if (payload.duration_minutes !== undefined && payload.duration_minutes !== null) {
     if (
+      typeof payload.duration_minutes !== 'number' ||
       !Number.isInteger(payload.duration_minutes) ||
       payload.duration_minutes < 1 ||
       payload.duration_minutes > SCHEDULE_MAX_DURATION_MINUTES
@@ -585,7 +623,7 @@ export function validateScheduleApplyPayload(payload: any): ValidationResult {
   return { valid: errors.length === 0, errors };
 }
 
-const VALIDATORS: Record<string, (payload: any) => ValidationResult> = {
+const VALIDATORS: Record<string, (payload: unknown) => ValidationResult> = {
   'study.plan.generate': validatePlannerPayload,
   'study.coach.nudge': validateCoachPayload,
   'study.eval.step': validateEvalPayload,
@@ -596,7 +634,7 @@ const VALIDATORS: Record<string, (payload: any) => ValidationResult> = {
 };
 
 /** Validate a job payload for the given type. Unknown types pass through. */
-export function validateJobPayload(type: string, payload: any): ValidationResult {
+export function validateJobPayload(type: string, payload: unknown): ValidationResult {
   const validator = VALIDATORS[type];
   if (!validator) return { valid: true, errors: [] };
   return validator(payload);

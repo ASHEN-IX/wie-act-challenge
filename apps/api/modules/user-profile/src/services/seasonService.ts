@@ -1,3 +1,5 @@
+import type { Types } from 'mongoose';
+import type { ISeasonResultSnapshot } from '../models/SeasonResultSnapshot';
 import RankSeason, { IRankSeason } from '../models/RankSeason';
 import UserRankProfile, { IUserRankProfile } from '../models/UserRankProfile';
 import SeasonResultSnapshot from '../models/SeasonResultSnapshot';
@@ -28,7 +30,7 @@ export function deriveNextSeasonCode(currentCode: string): string {
 
 export async function getOrCreateActiveSeason(): Promise<IRankSeason> {
   const now = new Date();
-  let season = await (RankSeason as any).getActiveSeason(now);
+  let season = await RankSeason.getActiveSeason(now);
   if (season) return season;
 
   const seasonCode = toSeasonCode(now);
@@ -60,7 +62,7 @@ export async function getOrCreateActiveSeason(): Promise<IRankSeason> {
 
 export async function ensureUserRankProfile(
   userId: string,
-  seasonId: any
+  seasonId: Types.ObjectId
 ): Promise<IUserRankProfile> {
   let profile = await UserRankProfile.findOne({ userId });
 
@@ -82,16 +84,23 @@ export async function ensureUserRankProfile(
   return profile;
 }
 
-export function computeResetPreviewForProfile(profile: any, resetPolicy: any = {}) {
-  const lowBracketDrop = Number.isFinite(resetPolicy.lowBracketDrop)
-    ? resetPolicy.lowBracketDrop
-    : 3;
-  const highBracketDrop = Number.isFinite(resetPolicy.highBracketDrop)
-    ? resetPolicy.highBracketDrop
-    : 5;
-  const seasonFloorIndex = Number.isFinite(resetPolicy.seasonFloorIndex)
-    ? resetPolicy.seasonFloorIndex
-    : DEFAULT_SEASON_FLOOR_INDEX;
+export function computeResetPreviewForProfile(
+  profile: Pick<IUserRankProfile, 'rankIndex' | 'knowledgePoints' | 'userId' | 'rankName'>,
+  resetPolicy: Partial<IRankSeason['resetPolicy']> = {}
+) {
+  const lowBracketDrop =
+    typeof resetPolicy.lowBracketDrop === 'number' && Number.isFinite(resetPolicy.lowBracketDrop)
+      ? resetPolicy.lowBracketDrop
+      : 3;
+  const highBracketDrop =
+    typeof resetPolicy.highBracketDrop === 'number' && Number.isFinite(resetPolicy.highBracketDrop)
+      ? resetPolicy.highBracketDrop
+      : 5;
+  const seasonFloorIndex =
+    typeof resetPolicy.seasonFloorIndex === 'number' &&
+    Number.isFinite(resetPolicy.seasonFloorIndex)
+      ? resetPolicy.seasonFloorIndex
+      : DEFAULT_SEASON_FLOOR_INDEX;
 
   const oldRankIndex = profile.rankIndex;
   const demotedBy = isLowBracket(oldRankIndex) ? lowBracketDrop : highBracketDrop;
@@ -111,7 +120,7 @@ export function computeResetPreviewForProfile(profile: any, resetPolicy: any = {
   };
 }
 
-export async function previewSeasonReset(seasonId: any = null) {
+export async function previewSeasonReset(seasonId: Types.ObjectId | string | null = null) {
   const season = seasonId ? await RankSeason.findById(seasonId) : await getOrCreateActiveSeason();
   if (!season) {
     throw new Error('Season not found');
@@ -139,7 +148,7 @@ export async function startSeason({
   theme?: string | null;
   startedBy?: string | null;
 }) {
-  const activeSeason = await (RankSeason as any).getActiveSeason(new Date());
+  const activeSeason = await RankSeason.getActiveSeason(new Date());
   if (activeSeason) {
     throw new Error('An active season already exists. Close it before starting a new one.');
   }
@@ -180,7 +189,7 @@ export async function closeSeasonAndStartNext({
   seasonId = null,
   startedBy = null
 }: {
-  seasonId?: any;
+  seasonId?: Types.ObjectId | string | null;
   startedBy?: string | null;
 } = {}) {
   const season = seasonId ? await RankSeason.findById(seasonId) : await getOrCreateActiveSeason();
@@ -223,7 +232,21 @@ export async function closeSeasonAndStartNext({
     updatedAt: 1
   });
 
-  const snapshots: any[] = [];
+  const snapshots: Array<
+    Pick<
+      ISeasonResultSnapshot,
+      | 'seasonId'
+      | 'userId'
+      | 'position'
+      | 'finalRankIndex'
+      | 'finalRankName'
+      | 'finalKnowledgePoints'
+      | 'seasonPeakRankIndex'
+      | 'seasonPeakKp'
+      | 'eventsCount'
+      | 'resetApplied'
+    >
+  > = [];
   for (let idx = 0; idx < currentProfiles.length; idx += 1) {
     const profile = currentProfiles[idx];
     const finalRankIndex = profile.rankIndex;

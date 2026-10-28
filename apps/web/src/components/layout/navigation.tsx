@@ -17,10 +17,13 @@ import { cn } from "@/lib/utils";
 const links = [
   ["/dashboard", "Overview", LayoutDashboard],
   ["/courses", "Courses", BookOpen],
+  ["/institutions", "Institutions", Users],
   ["/practice", "Practice", PencilLine],
+  ["/visualizer", "Worked example", PencilLine],
   ["/study-together", "Study together", Users],
   ["/tasks", "Tasks", ListTodo],
   ["/progress", "Progress", ChartNoAxesCombined],
+  ["/instructor-insights", "Instructor insights", ChartNoAxesCombined],
   ["/planner", "Study planner", CalendarDays],
   ["/search", "Explore sources", Search],
 ] as const;

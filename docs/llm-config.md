@@ -1,4 +1,4 @@
-> **CURRENT configuration guide; scope limit:** provider aliases are not verified organizer compact/capable mappings. Missing keys may mock. See [AI specification](ai-specification.md), [delivery rules](hackathon-delivery.md) and [actual validation](audit/validation.md). Historical migration completion language below does not certify this checkout.
+> **CURRENT configuration guide; scope limit:** provider aliases are not verified organizer compact/capable mappings. Mocks require explicit LLM_MOCK=1; missing keys otherwise raise UNAVAILABLE. See [AI specification](ai-specification.md), [delivery rules](hackathon-delivery.md) and [actual validation](audit/validation.md). Historical migration completion language below does not certify this checkout.
 
 # LiteLLM Config Guide
 
@@ -24,7 +24,7 @@ answer = ask(
 
 Other exported helpers: `agent_config(agent)` (resolved model/fallbacks),
 `config_path()`/`load_config()`/`reload_config()`, `build_router()`/`reset_router()`,
-and the exceptions `LLMRequestError` and `MissingMockResponderError`.
+and the exceptions `LLMRequestError`, `LLMUnavailableError` and `MissingMockResponderError`.
 
 Recognised agent aliases (`AGENT_GROUPS`): `coach`, `planner`, `search`,
 `reflection`, `course_ingestion`, `evaluator`.
@@ -38,22 +38,9 @@ Recognised agent aliases (`AGENT_GROUPS`): `coach`, `planner`, `search`,
 
 ### Mock semantics
 
-The router is bypassed with `mock_fn(user_prompt)` when:
+The router is bypassed with `mock_fn(user_prompt)` only when `LLM_MOCK=1` is explicitly configured (`MOCK_TEST`). Without a responder, explicit mock mode raises `MissingMockResponderError`.
 
-- `LLM_MOCK=1`, or
-- none of the provider keys needed for an agent (primary **or** its fallback
-  chain) are present in the environment (`DUMMY_KEYS = {"dummy_key_for_testing"}`
-  is treated as absent).
-
-If mocking is requested but `mock_fn` is `None`, `ask` raises
-`MissingMockResponderError` — callers use this as "LLM unavailable" and fall
-back (rule engine, `""`, template question, etc.).
-
-### Error behaviour
-
-A real call that exhausts the router's retries raises `LLMRequestError`;
-non-transient parse/validation problems are handled by each caller, not the
-client.
+With mock mode unset or disabled, absent/dummy provider keys raise `LLMUnavailableError` (`UNAVAILABLE`, a subclass of `LLMRequestError`). Neither the provider nor a mock responder is called. Configured provider failures raise `LLMRequestError`; callers may choose a separately identified deterministic fallback. Provider availability does not certify approved inference. Non-transient parse/validation problems remain the responsibility of each caller.
 
 ## `litellm/config.yaml`
 
@@ -123,5 +110,5 @@ at `/app/config.yaml` without changing it.
   local `groq` client, LM-Studio REST call sites, and the evaluator's
   `QwenClient`/`GeminiClient` SDK wiring (the `GeminiClient` name is kept as a
   thin wrapper with the same public interface).
-- Per-agent no-key degradation is preserved via `mock_fn` or rule-based/
+- Per-agent explicit test mode uses `mock_fn`; unavailable inference may use rule-based/
   template fallbacks.

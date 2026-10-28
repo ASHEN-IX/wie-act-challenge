@@ -30,7 +30,7 @@ export interface INotification extends Document {
   message: string;
   status: NotificationStatus;
   priority: NotificationPriority;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   readAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;

@@ -22,8 +22,10 @@ beforeEach(() => {
   delete process.env.SEC06_TEST_VAR;
   delete process.env.SEC06_WEAK_VAR;
   process.env.NODE_ENV = 'test';
-  exitSpy = jest.spyOn(process, 'exit').mockImplementation((() => {}) as any);
-  loggerErrorSpy = jest.spyOn(logger, 'error').mockImplementation((() => {}) as any);
+  exitSpy = jest.spyOn(process, 'exit').mockImplementation((): never => {
+    throw new Error('fixture-exit');
+  });
+  loggerErrorSpy = jest.spyOn(logger, 'error').mockImplementation(() => logger);
 });
 
 afterEach(() => {
@@ -32,7 +34,7 @@ afterEach(() => {
 });
 
 it('exits(1) with a [FATAL] message when a required var is missing', () => {
-  requireEnv(['SEC06_TEST_VAR']);
+  expect(() => requireEnv(['SEC06_TEST_VAR'])).toThrow('fixture-exit');
   expect(exitSpy).toHaveBeenCalledWith(1);
   expect(loggerErrorSpy).toHaveBeenCalledWith(expect.stringMatching(/\[FATAL\].*SEC06_TEST_VAR/));
 });
@@ -46,7 +48,7 @@ it('does not exit when all required vars are present (non-prod)', () => {
 it('rejects a known insecure default in production', () => {
   process.env.NODE_ENV = 'production';
   process.env.SEC06_WEAK_VAR = 'change-me';
-  requireEnv(['SEC06_WEAK_VAR']);
+  expect(() => requireEnv(['SEC06_WEAK_VAR'])).toThrow('fixture-exit');
   expect(exitSpy).toHaveBeenCalledWith(1);
   expect(loggerErrorSpy).toHaveBeenCalledWith(expect.stringMatching(/\[FATAL\].*insecure default/));
 });

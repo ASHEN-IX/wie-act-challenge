@@ -1,3 +1,4 @@
+import type { DomainRequest } from '../../src/framework/contracts';
 import express from 'express';
 import { authenticate } from '@study-partner/shared/auth';
 import { createSession as generateToken } from '../sessionFixtures';
@@ -6,14 +7,12 @@ import { requireInternal } from '@study-partner/shared';
 
 const app = express();
 app.use(express.json());
-app.post('/rewards', authenticate as any, (req: any, res: any) => {
+app.post('/rewards', authenticate, (req: DomainRequest, res) => {
   if (!Number.isInteger(req.body.xp) || req.body.xp < 0)
     return res.status(400).json({ error: 'Invalid XP' });
-  res.status(201).json({ userId: req.user.userId, xp: req.body.xp, query: req.query.source });
+  res.status(201).json({ userId: req.user!.userId, xp: req.body.xp, query: req.query.source });
 });
-app.post('/broadcast', requireInternal as any, (_req: any, res: any) =>
-  res.json({ delivered: true })
-);
+app.post('/broadcast', requireInternal, (_req, res) => res.json({ delivered: true }));
 client.registerModule('contract-test', app);
 
 describe('In-process contracts preserve route boundaries without listening', () => {

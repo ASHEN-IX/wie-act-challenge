@@ -1,3 +1,45 @@
+import type { Types } from 'mongoose';
+import type { IUserRankProfile } from '../models/UserRankProfile';
+import type { IRankSeason } from '../models/RankSeason';
+
+interface AwardResult {
+  awarded: boolean;
+  reason?: string;
+  deltaKp: number;
+  season?: IRankSeason;
+  profile?: IUserRankProfile;
+  progress?: ReturnType<typeof leaderboardService.buildRankProgress>;
+  baseKP?: number;
+  multipliers?: {
+    difficulty: number;
+    performance: number;
+    consistency: number;
+    comeback: number;
+    antiGrind: number;
+    total: number;
+  };
+  breakdown?: {
+    formula: string;
+    baseKP: number;
+    difficulty: { label: string; multiplier: number };
+    performance: { score: number | null; multiplier: number };
+    consistency: { streak: number; multiplier: number };
+    comeback: { applied: boolean; multiplier: number; remainingSessions: number };
+    antiGrind: { lowDifficultyAction: boolean; applied: boolean; multiplier: number };
+    totalMultiplier: number;
+    rawFinalKp: number;
+    cappedByDailyLimit: boolean;
+    finalKP: number;
+    learningSkillDelta: number;
+    learningSkillRating: number;
+  };
+  beforeKp?: number;
+  afterKp?: number;
+  beforeRankIndex?: number;
+  afterRankIndex?: number;
+  rankUp?: boolean;
+  rankDown?: boolean;
+}
 import RankEventLedger from '../models/RankEventLedger';
 import * as seasonService from './seasonService';
 import * as leaderboardService from './leaderboardService';
@@ -44,7 +86,10 @@ const SESSION_ACTIONS = new Set([
   'team_session_host'
 ]);
 
-function toNumber<T extends number | null = number>(value: any, fallback: T = 0 as T): number | T {
+function toNumber<T extends number | null = number>(
+  value: unknown,
+  fallback: T = 0 as T
+): number | T {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
 }
@@ -69,7 +114,7 @@ function buildEventKey({
 }: {
   userId: string;
   action: string;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }) {
   const stableId =
     metadata.eventId ||
@@ -85,7 +130,7 @@ function buildEventKey({
   return `${userId}:${action}:${stableId}`;
 }
 
-function resolveDifficultyLabel(action: string, metadata: any = {}) {
+function resolveDifficultyLabel(action: string, metadata: Record<string, unknown> = {}) {
   const fromMeta = String(metadata.difficulty || metadata.taskDifficulty || '').toLowerCase();
   if (DIFFICULTY_MULTIPLIERS[fromMeta]) return fromMeta;
 
@@ -97,7 +142,7 @@ function resolveDifficultyLabel(action: string, metadata: any = {}) {
   return 'medium';
 }
 
-function resolvePerformanceMultiplier(metadata: any = {}) {
+function resolvePerformanceMultiplier(metadata: Record<string, unknown> = {}) {
   const score = toNumber(
     metadata.quizScore ?? metadata.score ?? metadata.performanceScore ?? metadata.focusScore,
     NaN
@@ -119,7 +164,7 @@ function isSessionAction(action: string) {
   return SESSION_ACTIONS.has(action);
 }
 
-function updateStreak(profile: any, now: Date) {
+function updateStreak(profile: IUserRankProfile, now: Date) {
   if (!profile.lastActivityAt) {
     profile.currentStreak = 1;
     profile.lastActivityAt = now;
@@ -144,7 +189,7 @@ function updateStreak(profile: any, now: Date) {
   return profile.currentStreak;
 }
 
-function refreshComebackWindow(profile: any, now: Date) {
+function refreshComebackWindow(profile: IUserRankProfile, now: Date) {
   if (!profile.lastActivityAt) return;
 
   const inactivityHours =
@@ -173,7 +218,7 @@ function computeLearningSkillDelta({
   return Math.round(score);
 }
 
-async function getTodayAwardedKp(userId: string, seasonId: any) {
+async function getTodayAwardedKp(userId: string, seasonId: Types.ObjectId) {
   const { start, end } = getUtcDayBounds();
   const result = await RankEventLedger.aggregate([
     {
@@ -195,7 +240,11 @@ async function getTodayAwardedKp(userId: string, seasonId: any) {
   return result[0]?.total || 0;
 }
 
-async function countRecentLowDifficultyActions(userId: string, seasonId: any, now: Date) {
+async function countRecentLowDifficultyActions(
+  userId: string,
+  seasonId: Types.ObjectId,
+  now: Date
+) {
   const since = new Date(now.getTime() - LOW_DIFFICULTY_WINDOW_MINUTES * 60 * 1000);
   return RankEventLedger.countDocuments({
     userId,
@@ -212,8 +261,8 @@ export async function awardKnowledgePoints({
 }: {
   userId: string;
   action: string;
-  metadata?: any;
-}): Promise<any> {
+  metadata?: Record<string, unknown>;
+}): Promise<AwardResult> {
   const baseKP = BASE_KP_MAP[action] || 0;
   if (baseKP <= 0) {
     return {

@@ -1,9 +1,10 @@
+import { errorDetails } from '@study-partner/shared/errors';
 import moduleClient from '@study-partner/shared/moduleClient';
 
 // Temporary logger until shared package is fixed
 const logger = {
   info: (msg: string) => console.log(`[INFO] ${msg}`),
-  error: (msg: string, ...args: any[]) => console.error(`[ERROR] ${msg}`, ...args),
+  error: (msg: string, ...args: unknown[]) => console.error(`[ERROR] ${msg}`, ...args),
   warn: (msg: string) => console.warn(`[WARN] ${msg}`)
 };
 
@@ -22,8 +23,8 @@ export async function checkAIServiceHealth(): Promise<boolean> {
       timeout: 5000
     });
     return response.status === 200;
-  } catch (error: any) {
-    logger.error('AI service health check failed:', error?.message);
+  } catch (error) {
+    logger.error('AI service health check failed:', errorDetails(error).message);
     return false;
   }
 }

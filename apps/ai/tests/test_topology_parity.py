@@ -14,7 +14,7 @@ from messaging import topology as t  # noqa: E402
 FIXTURE = (
     pathlib.Path(__file__)
     .resolve()
-    .parents[2]
+    .parents[3]
     / "docs"
     / "contracts"
     / "topology-fixture.json"

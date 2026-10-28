@@ -5,6 +5,12 @@ module.exports = {
   coverageDirectory: 'coverage',
   collectCoverageFrom: ['src/**/*.{js,ts}', '!src/index.js', '!**/node_modules/**'],
   testMatch: ['**/tests/**/*.test.[jt]s'],
+  // node:test suites run through test:node/test:node:integration, never through Jest.
+  testPathIgnorePatterns: [
+    '\\.node\\.test\\.ts$',
+    '/tests/integration/ed07-study-rooms-e2e-real.test.ts$',
+    '/tests/integration/ed09-facilitator.integration.test.ts$'
+  ],
   transform: {
     '^.+\\.[tj]sx?$': [
       'ts-jest',

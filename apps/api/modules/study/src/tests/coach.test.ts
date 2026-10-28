@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 /**
  * Coach API tests (COACH-10)
  * POST /api/v1/coach/nudge → 202 { jobId }
@@ -11,7 +12,10 @@ process.env.RABBITMQ_URL = 'amqp://localhost:5672/%2F';
 process.env.NODE_ENV = 'test';
 
 // Prevent process.exit() from killing tests
-process.exit = jest.fn() as any;
+const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => {
+  throw new Error(`Unexpected process.exit(${code})`);
+});
+afterAll(() => exitSpy.mockRestore());
 
 import mongoose from 'mongoose';
 
@@ -23,7 +27,7 @@ const mockStudySession = {
 };
 
 // findOne returns a chainable query supporting .sort()
-const mockSessionQuery = (result: any) => ({
+const mockSessionQuery = (result: unknown) => ({
   sort: jest.fn().mockResolvedValue(result)
 });
 
@@ -146,8 +150,8 @@ describe('POST /api/v1/coach/nudge', () => {
   });
 
   it('defaults current_time when not supplied', async () => {
-    const posted: any = {};
-    moduleClient.post.mockImplementation(async (_url: string, body: any, _opts: any) => {
+    const posted: { payload?: { current_time?: string; session_stats?: unknown } } = {};
+    moduleClient.post.mockImplementation(async (_url: string, body: object, _opts: unknown) => {
       Object.assign(posted, body);
       return { data: { jobId: 'job-1', correlationId: 'corr-1' } };
     });
@@ -155,8 +159,9 @@ describe('POST /api/v1/coach/nudge', () => {
     const res = await request(app).post('/api/v1/coach/nudge').set('Cookie', token);
 
     expect(res.status).toBe(202);
+    assert.ok(posted.payload);
     expect(posted.payload.current_time).toBeTruthy();
-    expect(new Date(posted.payload.current_time).toString()).not.toBe('Invalid Date');
+    expect(new Date(String(posted.payload.current_time)).toString()).not.toBe('Invalid Date');
   });
 
   it('derives bounded session_stats from the active session (COACH-13)', async () => {
@@ -174,8 +179,8 @@ describe('POST /api/v1/coach/nudge', () => {
         breakStats: { totalBreaks: 3 }
       })
     );
-    const posted: any = {};
-    moduleClient.post.mockImplementation(async (_url: string, body: any, _opts: any) => {
+    const posted: { payload?: { current_time?: string; session_stats?: unknown } } = {};
+    moduleClient.post.mockImplementation(async (_url: string, body: object, _opts: unknown) => {
       Object.assign(posted, body);
       return { data: { jobId: 'job-1', correlationId: 'corr-1' } };
     });
@@ -183,6 +188,7 @@ describe('POST /api/v1/coach/nudge', () => {
     const res = await request(app).post('/api/v1/coach/nudge').set('Cookie', token);
 
     expect(res.status).toBe(202);
+    assert.ok(posted.payload);
     expect(posted.payload.session_stats).toEqual({
       progress_pct: 50,
       minutes_elapsed: 25,
@@ -194,8 +200,8 @@ describe('POST /api/v1/coach/nudge', () => {
 
   it('defaults session stats to zeros when the session lacks progress data', async () => {
     StudySession.findOne.mockReturnValue(mockSessionQuery(mockStudySession));
-    const posted: any = {};
-    moduleClient.post.mockImplementation(async (_url: string, body: any, _opts: any) => {
+    const posted: { payload?: { current_time?: string; session_stats?: unknown } } = {};
+    moduleClient.post.mockImplementation(async (_url: string, body: object, _opts: unknown) => {
       Object.assign(posted, body);
       return { data: { jobId: 'job-1', correlationId: 'corr-1' } };
     });
@@ -203,6 +209,7 @@ describe('POST /api/v1/coach/nudge', () => {
     const res = await request(app).post('/api/v1/coach/nudge').set('Cookie', token);
 
     expect(res.status).toBe(202);
+    assert.ok(posted.payload);
     expect(posted.payload.session_stats).toEqual({
       progress_pct: 0,
       minutes_elapsed: 0,
@@ -249,8 +256,8 @@ describe('POST /api/v1/coach/nudge', () => {
         }
       })
     );
-    const posted: any = {};
-    moduleClient.post.mockImplementation(async (_url: string, body: any, _opts: any) => {
+    const posted: { payload?: { current_time?: string; session_stats?: unknown } } = {};
+    moduleClient.post.mockImplementation(async (_url: string, body: object, _opts: unknown) => {
       Object.assign(posted, body);
       return { data: { jobId: 'job-1', correlationId: 'corr-1' } };
     });
@@ -261,6 +268,7 @@ describe('POST /api/v1/coach/nudge', () => {
       .send({ session_id: 'session-1' });
 
     expect(res.status).toBe(202);
+    assert.ok(posted.payload);
     expect(posted.payload.session_stats).toEqual({
       progress_pct: 50,
       minutes_elapsed: 10,
@@ -284,6 +292,8 @@ describe('GET /api/v1/coach/jobs/:jobId', () => {
     const collectionFindOne = jest.fn().mockResolvedValue({
       jobId: 'job-1',
       userId: 'user-123',
+      type: 'study.coach.nudge',
+      resourceScope: {},
       status: 'COMPLETED',
       result: { nudge: 'TEST_POMODORO', reason: 'test double' },
       fallbackUsed: false,
@@ -291,27 +301,35 @@ describe('GET /api/v1/coach/jobs/:jobId', () => {
       updatedAt: new Date().toISOString()
     });
     jest
-      .spyOn(mongoose.connection, 'collection')
-      .mockReturnValue({ findOne: collectionFindOne } as any);
+      .spyOn(mongoose.connection.collection('ai_jobs'), 'findOne')
+      .mockImplementation(collectionFindOne);
 
     const res = await request(app).get('/api/v1/coach/jobs/job-1').set('Cookie', token);
 
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('COMPLETED');
     expect(res.body.result.nudge).toBe('TEST_POMODORO');
-    expect(collectionFindOne).toHaveBeenCalledWith({ jobId: 'job-1', userId: 'user-123' });
+    expect(collectionFindOne).toHaveBeenCalledWith({
+      jobId: 'job-1',
+      userId: 'user-123',
+      type: 'study.coach.nudge'
+    });
   });
 
   it('adds userId scoping so another user cannot read the job', async () => {
     const collectionFindOne = jest.fn().mockResolvedValue(null);
     jest
-      .spyOn(mongoose.connection, 'collection')
-      .mockReturnValue({ findOne: collectionFindOne } as any);
+      .spyOn(mongoose.connection.collection('ai_jobs'), 'findOne')
+      .mockImplementation(collectionFindOne);
 
     const res = await request(app).get('/api/v1/coach/jobs/job-1').set('Cookie', token);
 
     expect(res.status).toBe(404);
-    expect(collectionFindOne).toHaveBeenCalledWith({ jobId: 'job-1', userId: 'user-123' });
+    expect(collectionFindOne).toHaveBeenCalledWith({
+      jobId: 'job-1',
+      userId: 'user-123',
+      type: 'study.coach.nudge'
+    });
   });
 });
 
