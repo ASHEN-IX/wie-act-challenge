@@ -68,6 +68,9 @@
     --border: hsl(220 14% 90%);
     --input: hsl(220 14% 87%);
     --ring: hsl(158 40% 23%);
+    --radius: 0.625rem;
+  }
+
   .dark {
     --background: hsl(224 71% 4%);
     --foreground: hsl(210 20% 98%);
