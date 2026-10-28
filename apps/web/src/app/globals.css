@@ -68,8 +68,28 @@
     --border: hsl(220 14% 90%);
     --input: hsl(220 14% 87%);
     --ring: hsl(158 40% 23%);
-    --radius: 0.625rem;
+  .dark {
+    --background: hsl(224 71% 4%);
+    --foreground: hsl(210 20% 98%);
+    --card: hsl(224 71% 6%);
+    --card-foreground: hsl(210 20% 98%);
+    --popover: hsl(224 71% 6%);
+    --popover-foreground: hsl(210 20% 98%);
+    --primary: hsl(158 55% 42%);
+    --primary-foreground: hsl(224 71% 4%);
+    --secondary: hsl(215 28% 14%);
+    --secondary-foreground: hsl(210 20% 98%);
+    --muted: hsl(215 28% 13%);
+    --muted-foreground: hsl(217 11% 65%);
+    --accent: hsl(215 28% 15%);
+    --accent-foreground: hsl(210 20% 98%);
+    --destructive: hsl(0 62% 40%);
+    --destructive-foreground: hsl(210 20% 98%);
+    --border: hsl(215 28% 17%);
+    --input: hsl(215 28% 19%);
+    --ring: hsl(158 55% 42%);
   }
+
   * {
     @apply border-border outline-ring/50;
   }

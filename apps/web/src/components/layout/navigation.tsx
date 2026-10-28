@@ -12,21 +12,24 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  Sparkles,
+  GraduationCap,
+  Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-const links = [
-  ["/dashboard", "Overview", LayoutDashboard],
-  ["/courses", "Courses", BookOpen],
-  ["/institutions", "Institutions", Users],
-  ["/practice", "Practice", PencilLine],
-  ["/visualizer", "Worked example", PencilLine],
-  ["/study-together", "Study together", Users],
-  ["/tasks", "Tasks", ListTodo],
-  ["/progress", "Progress", ChartNoAxesCombined],
-  ["/instructor-insights", "Instructor insights", ChartNoAxesCombined],
-  ["/planner", "Study planner", CalendarDays],
-  ["/search", "Explore sources", Search],
-] as const;
+
+interface NavItem {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badge?: string;
+}
+
+interface NavSection {
+  title?: string;
+  items: NavItem[];
+}
+
 export function Navigation({
   admin = false,
   instructor = true,
@@ -35,44 +38,113 @@ export function Navigation({
   instructor?: boolean;
 }) {
   const pathname = usePathname();
-  // Instructor insights has nothing to show a learner, so it is hidden for them.
-  const visible = links.filter(
-    ([href]) => href !== "/instructor-insights" || admin || instructor,
-  );
+
+  const sections: NavSection[] = [
+    {
+      title: "Learning",
+      items: [
+        { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
+        { href: "/courses", label: "Courses", icon: BookOpen },
+        { href: "/practice", label: "Practice and Tutor", icon: PencilLine },
+        { href: "/visualizer", label: "Worked example", icon: Sparkles },
+      ],
+    },
+    {
+      title: "Collaborate",
+      items: [
+        { href: "/study-together", label: "Study Together", icon: Users, badge: "Live" },
+      ],
+    },
+    {
+      title: "Track and Plan",
+      items: [
+        { href: "/progress", label: "Progress and Rewards", icon: ChartNoAxesCombined },
+        { href: "/tasks", label: "Tasks", icon: ListTodo },
+        { href: "/planner", label: "Study planner", icon: CalendarDays },
+        { href: "/search", label: "Explore sources", icon: Search },
+      ],
+    },
+  ];
+
+  if (instructor || admin) {
+    sections.push({
+      title: "Teaching Studio",
+      items: [
+        { href: "/courses/new", label: "Course Studio", icon: GraduationCap },
+        { href: "/instructor-insights", label: "Instructor insights", icon: ChartNoAxesCombined },
+      ],
+    });
+  }
+
+  if (admin) {
+    sections.push({
+      title: "Institution",
+      items: [
+        { href: "/institutions", label: "Institutions", icon: Building2 },
+        { href: "/admin", label: "Administration", icon: ShieldCheck },
+      ],
+    });
+  }
+
   return (
-    <nav aria-label="Workspace navigation" className="flex flex-col gap-1">
-      {visible.map(([href, label, Icon]) => (
+    <nav aria-label="Workspace navigation" className="flex flex-col gap-5 text-sm">
+      {sections.map((section, sIdx) => (
+        <div key={section.title || sIdx} className="flex flex-col gap-1">
+          {section.title && (
+            <span className="px-3 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+              {section.title}
+            </span>
+          )}
+          {section.items.map(({ href, label, icon: Icon, badge }) => {
+            const isActive =
+              href === "/dashboard"
+                ? pathname === "/dashboard"
+                : pathname.startsWith(href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                aria-current={isActive ? "page" : undefined}
+                className={cn(
+                  "group flex items-center justify-between rounded-lg px-3 py-2 font-medium transition-all duration-150 focus-visible:outline-2 focus-visible:outline-ring",
+                  isActive
+                    ? "bg-accent/80 text-primary font-semibold shadow-xs"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <div className="flex items-center gap-2.5 truncate">
+                  <Icon
+                    className={cn(
+                      "size-[18px] shrink-0 transition-transform group-hover:scale-105",
+                      isActive ? "text-primary" : "text-muted-foreground"
+                    )}
+                  />
+                  <span className="truncate">{label}</span>
+                </div>
+                {badge && (
+                  <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                    {badge}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </div>
+      ))}
+      <div className="border-t pt-3 mt-1">
         <Link
-          key={href}
-          href={href}
-          aria-current={pathname.startsWith(href) ? "page" : undefined}
+          href="/profile"
           className={cn(
-            "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring",
-            pathname.startsWith(href)
-              ? "bg-accent text-primary"
-              : "text-muted-foreground",
+            "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-muted hover:text-foreground",
+            pathname.startsWith("/profile")
+              ? "bg-accent/80 text-primary font-semibold"
+              : "text-muted-foreground"
           )}
         >
-          <Icon className="size-[18px]" />
-          {label}
+          <Settings className="size-[18px] text-muted-foreground" />
+          <span>Settings</span>
         </Link>
-      ))}
-      {admin && (
-        <Link
-          href="/admin"
-          className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm"
-        >
-          <ShieldCheck className="size-[18px]" />
-          Administration
-        </Link>
-      )}
-      <Link
-        href="/profile"
-        className="mt-6 flex items-center gap-3 rounded-md px-3 py-2.5 text-sm text-muted-foreground hover:bg-accent"
-      >
-        <Settings className="size-[18px]" />
-        Settings
-      </Link>
+      </div>
     </nav>
   );
 }
