@@ -1,3 +1,4 @@
 # Ensure shell scripts always have Unix line endings (LF) even on Windows
 *.sh text eol=lf
 *.bash text eol=lf
+
