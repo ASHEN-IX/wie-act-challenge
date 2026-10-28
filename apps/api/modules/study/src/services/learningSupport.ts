@@ -32,6 +32,12 @@ schema.index(
 );
 const Support: Model<SupportState> =
   mongoose.models.LearningSupport || mongoose.model<SupportState>('LearningSupport', schema);
+/** Trim at a word boundary so a hint never ends mid-word. */
+function excerpt(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  return cut.slice(0, Math.max(cut.lastIndexOf(' '), 1)).trimEnd() + '…';
+}
 export async function sourceLearningSupport(
   actor: string,
   courseId: string,
@@ -122,7 +128,7 @@ export async function sourceLearningSupport(
         : hintLevel === 1
           ? 'Identify the term or reasoning step asked for. Compare its meaning with the reviewed source before choosing or writing your response.'
           : 'Possible confusion: a related term or step may not fit the source statement. Re-read this source context and compare the alternatives: ' +
-            passage.text.slice(0, 240)) +
+            excerpt(passage.text, 240)) +
       (styleCue ? `\n\nStyle cue (provisional, private): ${styleCue}` : ''),
     citation: {
       documentId: passage.documentId,

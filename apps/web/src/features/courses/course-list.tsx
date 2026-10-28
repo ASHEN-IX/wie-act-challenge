@@ -1,3 +1,4 @@
+import { plural } from "@/lib/utils";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -53,7 +54,7 @@ export function CourseList({
                 </p>
                 <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                   <FileText className="size-4" />
-                  <span>{course.filesCount || 0} source files</span>
+                  <span>{plural(course.filesCount || 0, "source file")}</span>
                   <span>
                     Uploaded{" "}
                     {new Intl.DateTimeFormat("en", {
@@ -64,7 +65,7 @@ export function CourseList({
                 <div className="mt-4">
                   <Badge variant="secondary">{course.status}</Badge>
                   <span className="ml-3 text-xs text-muted-foreground">
-                    {course.topicsCount || 0} extracted topics
+                    {plural(course.topicsCount || 0, "extracted topic")}
                   </span>
                 </div>
               </div>

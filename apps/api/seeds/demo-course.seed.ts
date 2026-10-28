@@ -38,6 +38,22 @@ const OBJECTIVES = [
   { id: 'obj-2nf-dependency', statement: 'Explain partial dependency on a composite key', bloomLevel: 'understand' },
 ];
 
+// Topic outline on the course record, so course lists show what the course covers.
+const COURSE_TOPICS = [
+  {
+    title: 'Normalization',
+    subtopics: [
+      {
+        id: 'sub-normalization',
+        title: 'Normal forms',
+        summary: 'First, second and third normal form and why each fact is stored once.',
+        key_concepts: ['atomic values', 'composite key', 'transitive dependency'],
+        learning_objectives: OBJECTIVES,
+      },
+    ],
+  },
+];
+
 async function userIdFor(email: string): Promise<string> {
   const identity = await mongoose.connection
     .collection('auth_users')
@@ -55,20 +71,47 @@ async function main() {
   await mongoose.connect(uri);
   try {
     const instructor = await userIdFor('instructor@ednova.test');
-    const learner = await userIdFor('learner@ednova.test');
+    const learners = [await userIdFor('learner@ednova.test'), await userIdFor('peer@ednova.test')];
 
-    const existing = await Course.findOne({ ownerUserId: instructor, title: COURSE_TITLE }).lean();
-    if (existing) {
-      console.log(`Demo course already exists: ${existing._id}`);
-      return;
-    }
-
-    // Personal courses are owner-only, so the learner needs an institutional course:
+    // Personal courses are owner-only, so learners need an institutional course:
     // active membership in the demo institution plus an active enrollment.
     const institution = await mongoose.connection
       .collection('institutions')
       .findOne({ slug: 'ednova-learning-demo' }, { projection: { _id: 1 } });
     if (!institution) throw new Error('Missing demo institution; run seed:learning-demo first');
+
+    const enrollLearners = (courseId: mongoose.Types.ObjectId) =>
+      Promise.all(
+        learners.map((userId) =>
+          CourseEnrollment.updateOne(
+            { courseId, userId },
+            {
+              $set: {
+                institutionId: institution._id,
+                status: 'active',
+                enrolledByUserId: instructor,
+              },
+              $setOnInsert: { enrolledAt: new Date() },
+            },
+            { upsert: true },
+          ),
+        ),
+      );
+
+    const existing = await Course.findOne({ ownerUserId: instructor, title: COURSE_TITLE }).lean();
+    if (existing) {
+      await enrollLearners(existing._id);
+      await Course.updateOne(
+        {
+          _id: existing._id,
+          'topics.0.subtopics.0.learning_objectives.0': { $exists: false },
+        },
+        { $set: { topics: COURSE_TOPICS } },
+      );
+      console.log(`Demo course already exists: ${existing._id}`);
+      console.log('Demo learners are enrolled.');
+      return;
+    }
 
     const bytes = Buffer.from(SOURCE_TEXT, 'utf8');
     const fileHash = contentHash(bytes).replace(/^sha256:/, '');
@@ -82,6 +125,7 @@ async function main() {
       institutionId: institution._id,
       assignedInstructorIds: [instructor],
       status: 'completed',
+      topics: COURSE_TOPICS,
       files: [
         {
           filename: FILENAME,
@@ -135,20 +179,9 @@ async function main() {
     }
     await publishCourseRevision(instructor, courseId, REVISION_TAG);
 
-    await CourseEnrollment.updateOne(
-      { courseId: course._id, userId: learner },
-      {
-        $set: {
-          institutionId: institution._id,
-          status: 'active',
-          enrolledByUserId: instructor,
-        },
-        $setOnInsert: { enrolledAt: new Date() },
-      },
-      { upsert: true },
-    );
+    await enrollLearners(course._id);
     console.log(`Demo course ready: ${courseId}`);
-    console.log(`Learner ${'learner@ednova.test'} is enrolled.`);
+    console.log('Learner and peer demo accounts are enrolled.');
   } finally {
     await mongoose.disconnect();
   }

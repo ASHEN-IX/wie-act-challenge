@@ -16,7 +16,7 @@ let singleton: Promise<AuthInstance> | undefined;
 let client: MongoClient | undefined;
 
 export function trustedOrigins(): string[] {
-  return (process.env.AUTH_TRUSTED_ORIGINS || process.env.APP_URL || 'http://localhost:5173')
+  return (process.env.AUTH_TRUSTED_ORIGINS || process.env.APP_URL || 'http://localhost:3000')
     .split(',')
     .map((value) => new URL(value.trim()).origin);
 }
@@ -78,7 +78,7 @@ export async function createAuth(
   db: Db,
   {
     sendMail,
-    baseURL = process.env.BETTER_AUTH_URL || process.env.APP_URL || 'http://localhost:5173'
+    baseURL = process.env.BETTER_AUTH_URL || process.env.APP_URL || 'http://localhost:3000'
   }: CreateAuthOptions = {}
 ) {
   const secret = process.env.BETTER_AUTH_SECRET;

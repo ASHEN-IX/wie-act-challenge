@@ -38,7 +38,7 @@ The tier of every agent is set in code (`AGENT_TIERS`) and documented in `docs/l
 
 **Response cache.** Calls that carry only course content (not learner data) can opt in to a Redis-backed cache keyed by a hash of the agent, model and prompts. Only validated real responses are stored, for seven days by default.
 
-**Confusion and learning style.** A tentative confusion flag comes from repeated wrong attempts, a second hint, or an explicit request for help in English, French, Moroccan Darija or Arabic. The flag routes the next statement to peer-first help. A short private probe (six questions) gives a provisional learning style, which only changes the wording of private hints. It never changes grades or mastery.
+**Confusion and learning style.** A tentative confusion flag comes from repeated wrong attempts, a second hint, or an explicit request for help in English, French, Moroccan Darija or Arabic. In a learner's private hints the flag shows a gentle nudge to talk it through in a study room. The facilitator rule layer also answers a flagged statement with a peer-first prompt, but peer chat does not call the facilitator by design, so today that rule applies only through the facilitator's observe endpoint. A short private probe (six questions) gives a provisional learning style, which only changes the wording of private hints. It never changes grades or mastery.
 
 ## 4. Retrieval workflow (RAG)
 
@@ -52,7 +52,7 @@ The tier of every agent is set in code (`AGENT_TIERS`) and documented in `docs/l
 - **Queue and retry.** The LiteLLM router retries twice with cooldown and then walks an explicit fallback chain.
 - **Budgets.** Request, token and cost caps are enforced by a durable ledger and can be revoked immediately.
 - **Degraded answers.** When the model is unavailable, the hint and explanation paths return fixed-rule guidance, labelled as such.
-- **Visible status.** The learner sees a plain-language note for each mode, and a staged progress indicator while a tutor request runs (`Reading your sources`, `Preparing an answer`, `Waiting for the AI model`).
+- **Visible status.** The learner sees a plain-language note for each mode, and a staged progress indicator while a tutor request runs (`Getting started`, `Preparing an answer`, `Waiting for the AI model`), also used by the planner, practice feedback and source search.
 - **Infrastructure faults.** A Redis outage falls back to a normal approved call. Ingestion survives a worker crash through its outbox.
 
 The UI does not show a real queue position, because the backend does not expose one. Retrying is the learner pressing the button again.
@@ -63,6 +63,7 @@ The UI does not show a real queue position, because the backend does not expose 
 - Private material (hints, help requests, room private help, learning-style profiles) is returned only to its owner. Tests check that other learners cannot read it. Instructor access to private material is not tested yet.
 - Provider keys live only in gitignored environment files. A scan of tracked and new files found no credentials.
 - The cache and the probe store no raw learner text. The cache keys are hashes, and the probe keeps only scores.
+- The source search page sends the learner's question to a public web search engine (DuckDuckGo), and the page says so. Learners are told not to enter personal information.
 - Voice is out of scope for Phase 1. The LiveKit audio path is not active, and no audio is recorded.
 - The AI does not replace teachers. Instructor review is required before a course is published.
 
@@ -74,14 +75,15 @@ Results below come from runs on 28 October 2026. The number of tests grew during
 |---|---|
 | AI service (`pytest`, full) | 994 passed, 3 skipped |
 | API study module (`jest`) | 182 passed, 16 suites |
+| API jest suites (all) | 753 passed, 58 suites |
 | API learning-style and confusion unit tests | 21 passed |
-| API integration: adaptive learning, support, private learning-style profile | passed against MongoDB |
+| API integration (full, MongoDB) | 342 of 350 passed; the 7 failures are the LiveKit SFU tests (see §9) |
 | API integration: facilitator rooms (ED-09) | 7 passed with the AI service pointed at a closed port; 5 of 7 with the live AI service (see §9) |
 | API authentication suite | 17 passed |
 | Web (`vitest`) | 75 passed |
 | Workspace typecheck | passes (after declaring the missing `axios` dependency) |
 | Real approved calls through the gate | six agents answered with `REAL_APPROVED` responses. The facilitator alias was added afterwards and has not been called live. |
-| Browser (learner, desktop and phone widths) | learning workspace loads; hint and tutor status notes verified |
+| Browser: learner, peer, instructor and admin | each role walked through its pages; two-learner study room, hint style, hints, tutor, practice and planner exercised (see §9 for what is still rough) |
 
 Screenshots are in `docs/submission/screenshots/`.
 
@@ -96,7 +98,9 @@ A clean copy of the tracked files was installed with `pnpm install --frozen-lock
 - **Voice and LiveKit** tests need a local SFU that the repository does not start, so seven integration tests fail on a clean machine.
 - **Live AI wording.** Two facilitator integration tests assert the wording of the fixed-rule policy. With the live AI service, the model's wording differs, so those two fail. The tests stay as they are.
 - **Learning-style cues** are not evaluated. The tutor prompt does not use the learning style yet, because that changes a frozen AI contract.
-- **Confusion detection** covers attempts, hints and explicit help phrases only. It does not use dwell time or chat history outside rooms.
+- **Confusion detection** covers attempts, hints and explicit help phrases only. It does not use dwell time, and peer chat is not analysed.
+- **Mock mode shows placeholder AI output.** With `LLM_MOCK=1` practice feedback is a low placeholder score, and the tutor returns the matching source passage. Real-model behaviour needs a run with approvals.
+- **Rough edges still open.** The voice panel is shown although voice is unavailable here. Room screens use internal wording (for example "Recover shared illustration"). The instructor's enrollment form asks for raw course and user IDs. Instructor insights stays empty until a cohort privacy policy is set. New interface strings are English only.
 - **Owner decisions remain.** ED-26 (contract freeze) has 0 of 19 decisions recorded. The tracker says 36 tasks, but only 35 are defined in the backlog.
 
 ## 10. External services
@@ -106,6 +110,8 @@ A clean copy of the tracked files was installed with `pnpm install --frozen-lock
 | Groq API | Compact and capable LLM inference | Team key; calls gated by approvals |
 | NVIDIA NIM API | Fallback LLM inference | Team key; calls gated by approvals |
 | Google Gemini and OpenRouter | Earlier configuration | No keys provisioned; not used |
+| DuckDuckGo web search | The Explore sources page (learner question text) | Used by the search worker; page shows a privacy note |
+| Apify | Optional search provider in the search worker | Not configured; not used |
 | LiveKit Cloud or local SFU | Voice in study rooms | Not active; blocked (ED-17) |
 | Hugging Face model download | `all-MiniLM-L6-v2` embeddings (downloaded once) | Used by the AI service |
 | Docker Hub images | MongoDB, Redis, RabbitMQ, Mailpit | Development infrastructure |

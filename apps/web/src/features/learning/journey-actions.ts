@@ -136,8 +136,40 @@ export async function requestLearningSupport(
     hintLevel: number;
     executionMode: string;
     policy: string;
+    // Tentative and private: reasons only, never a grade.
+    confusion?: { tentative: boolean; reasons: string[] };
   }>(`/api/v1/study/learning/courses/${segment(courseId)}/support`, {
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export type LearningStyleQuestion = {
+  id: string;
+  prompt: string;
+  options: Array<{ id: string; label: string }>;
+};
+export type LearningStyleProfile = {
+  primary: string;
+  provisional: true;
+  completedAt: string;
+} | null;
+
+export async function loadLearningStyle() {
+  await requireIdentity();
+  const [probe, profile] = await Promise.all([
+    api<{ questions: LearningStyleQuestion[] }>(
+      "/api/v1/study/learning/learning-style/probe",
+    ),
+    api<LearningStyleProfile>("/api/v1/study/learning/learning-style"),
+  ]);
+  return { questions: probe.questions, profile };
+}
+
+export async function saveLearningStyle(answers: Record<string, string>) {
+  await requireIdentity();
+  return api<NonNullable<LearningStyleProfile>>(
+    "/api/v1/study/learning/learning-style",
+    { method: "PUT", body: JSON.stringify(answers) },
+  );
 }

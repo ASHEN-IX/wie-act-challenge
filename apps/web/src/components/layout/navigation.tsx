@@ -27,11 +27,21 @@ const links = [
   ["/planner", "Study planner", CalendarDays],
   ["/search", "Explore sources", Search],
 ] as const;
-export function Navigation({ admin = false }: { admin?: boolean }) {
+export function Navigation({
+  admin = false,
+  instructor = true,
+}: {
+  admin?: boolean;
+  instructor?: boolean;
+}) {
   const pathname = usePathname();
+  // Instructor insights has nothing to show a learner, so it is hidden for them.
+  const visible = links.filter(
+    ([href]) => href !== "/instructor-insights" || admin || instructor,
+  );
   return (
     <nav aria-label="Workspace navigation" className="flex flex-col gap-1">
-      {links.map(([href, label, Icon]) => (
+      {visible.map(([href, label, Icon]) => (
         <Link
           key={href}
           href={href}

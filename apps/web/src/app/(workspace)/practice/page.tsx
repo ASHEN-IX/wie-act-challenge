@@ -21,14 +21,14 @@ export default function Practice() {
               label="Question or problem"
               name="question"
               required
-              maxLength={2000}
+              maxLength={1000}
               rows={3}
             />
             <LongField
               label="Your explanation"
               name="answer"
               required
-              maxLength={4000}
+              maxLength={3500}
               rows={7}
               placeholder="Explain how you arrived at your answer…"
             />

@@ -2,8 +2,18 @@
 import { useActionState, useEffect, useState, type ReactNode } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ActionForm, SubmitButton } from "@/components/shared/action-form";
+import { AiWaitStatus } from "@/features/ai-status/ai-status-view";
 import { readJob } from "./actions";
 import type { FormAction } from "@/lib/action-state";
+const JOB_STATUS_LABELS: Record<string, string> = {
+  completed: "Done",
+  succeeded: "Done",
+  failed: "This could not be completed.",
+  cancelled: "Cancelled.",
+  unavailable: "Unavailable right now.",
+};
+const jobIsWaiting = (status: string) =>
+  !(status.toLowerCase() in JOB_STATUS_LABELS);
 function ResultContent({ value }: { value: unknown }) {
   if (typeof value === "string")
     return <p className="whitespace-pre-wrap text-sm leading-7">{value}</p>;
@@ -46,6 +56,60 @@ function ResultContent({ value }: { value: unknown }) {
     </dl>
   );
 }
+const FEEDBACK_DIMENSIONS: Array<[string, string]> = [
+  ["concept_coverage", "Covers the concept"],
+  ["logical_coherence", "Reasoning hangs together"],
+  ["causal_reasoning", "Explains why"],
+  ["error_awareness", "Notices mistakes"],
+  ["specificity", "Specific detail"],
+];
+const asNumber = (value: unknown) => (typeof value === "number" ? value : null);
+const asList = (value: unknown) =>
+  Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
+
+/** Practice feedback for a learner: a short message and a few labelled scores, not the raw job. */
+function PracticeResult({ value }: { value: unknown }) {
+  if (!value || typeof value !== "object") return <ResultContent value={value} />;
+  const r = value as Record<string, unknown>;
+  const dims =
+    r.evaluation_output && typeof r.evaluation_output === "object"
+      ? (r.evaluation_output as Record<string, unknown>)
+      : {};
+  const score = asNumber(r.mastery_score);
+  const message = typeof r.message === "string" ? r.message : "";
+  const feedback = typeof r.feedback === "string" ? r.feedback : "";
+  const weak = asList(r.weak_concepts);
+  const misconceptions = asList(r.misconceptions);
+  return (
+    <div className="flex flex-col gap-3 text-sm">
+      {message && <p>{message}</p>}
+      {feedback && <p className="text-muted-foreground">{feedback}</p>}
+      {score !== null && (
+        <p>
+          Score for this explanation: <strong>{score.toFixed(2)}</strong> out of 1
+        </p>
+      )}
+      <ul className="flex flex-col gap-1">
+        {FEEDBACK_DIMENSIONS.map(([key, label]) => {
+          const n = asNumber(dims[key]);
+          return n === null ? null : (
+            <li key={key}>
+              {label}: {n.toFixed(2)}
+            </li>
+          );
+        })}
+      </ul>
+      {weak.length > 0 && <p>Concepts to revisit: {weak.join(", ")}</p>}
+      {misconceptions.length > 0 && (
+        <p>Possible misunderstandings: {misconceptions.join(", ")}</p>
+      )}
+      <p className="text-muted-foreground">
+        This is feedback on your explanation, not a grade. Check it against your
+        course sources.
+      </p>
+    </div>
+  );
+}
 export function JobForm({
   action,
   kind,
@@ -79,7 +143,7 @@ export function JobForm({
         setJob({
           ...result,
           error: result.error
-            ? "The job failed. You can retry your request."
+            ? "This could not be completed. Check your input and try again."
             : undefined,
         });
         if (["completed", "succeeded", "failed", "cancelled"].includes(status))
@@ -129,12 +193,21 @@ export function JobForm({
           <h2 className="font-semibold">
             {kind === "eval" ? "Your feedback" : "Results"}
           </h2>
-          <p className="text-sm text-muted-foreground">
-            Status: {job.status}
-            {job.fallbackUsed ? " · Fallback used" : ""}
-          </p>
+          {jobIsWaiting(job.status) ? (
+            <AiWaitStatus />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              {JOB_STATUS_LABELS[job.status.toLowerCase()]}
+              {job.fallbackUsed ? " · Built-in guidance was used" : ""}
+            </p>
+          )}
           {job.error && <p className="text-sm text-destructive">{job.error}</p>}
-          {job.result != null && <ResultContent value={job.result} />}
+          {job.result != null &&
+            (kind === "eval" ? (
+              <PracticeResult value={job.result} />
+            ) : (
+              <ResultContent value={job.result} />
+            ))}
           {finalize &&
             state.correlationId &&
             job.status.toLowerCase() === "completed" && (

@@ -45,7 +45,7 @@ export function describeAiMode(mode: string | null | undefined): AiModeNote {
 }
 
 export const AI_WAIT_STAGES = [
-  "Reading your sources",
+  "Getting started",
   "Preparing an answer",
   "Waiting for the AI model",
   "Still working. Longer answers can take a little while.",

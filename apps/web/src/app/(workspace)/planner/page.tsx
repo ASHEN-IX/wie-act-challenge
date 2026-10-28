@@ -12,6 +12,11 @@ import { DataError } from "@/components/shared/states";
 export const metadata = { title: "Study planner" };
 export default async function Planner() {
   const courses = await getCourses();
+  // The plan service only reads courses the user owns, so institutional
+  // courses assigned to them are not offered here.
+  const eligible = (courses.data?.courses ?? []).filter(
+    (c) => c.status === "completed" && c.scope !== "institutional",
+  );
   return (
     <>
       <PageHeader
@@ -43,19 +48,23 @@ export default async function Planner() {
               required
             />
             <Field>
-              <FieldLabel htmlFor="courseId">Course (optional)</FieldLabel>
-              <NativeSelect id="courseId" name="courseId">
-                <NativeSelectOption value="">
-                  No course selected
+              <FieldLabel htmlFor="courseId">Course</FieldLabel>
+              <NativeSelect id="courseId" name="courseId" required defaultValue="">
+                <NativeSelectOption value="" disabled>
+                  Choose one of your courses
                 </NativeSelectOption>
-                {courses.data?.courses
-                  .filter((c) => c.status === "completed")
-                  .map((course) => (
+                {eligible.map((course) => (
                     <NativeSelectOption key={course.id} value={course.id}>
                       {course.title}
                     </NativeSelectOption>
                   ))}
               </NativeSelect>
+              {eligible.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Plans are built from courses you uploaded yourself. Upload a
+                  course first to plan your study time.
+                </p>
+              )}
             </Field>
           </FieldGroup>
         </JobForm>

@@ -44,6 +44,9 @@ import {
   removeLiveKitParticipant
 } from '../services/livekitControl';
 import { assessConfusion, type ConfusionAssessment } from '../services/confusionSignals';
+// Static imports: native dynamic import() cannot resolve .ts sources under tsx/cjs at runtime.
+import { activeLearningRoom } from '../services/roomLearning';
+import { getAttemptResult } from '../services/activityAttempt';
 import type { DomainMiddleware } from '../../../../src/framework/contracts';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const aiClient = require('@study-partner/shared/aiClient');
@@ -1335,7 +1338,6 @@ router.post(
         proposal = evaluateLocalPeerFirstPolicy(obsInput);
       }
 
-      const { activeLearningRoom } = await import('../services/roomLearning.js');
       const currentRoom = await activeLearningRoom(userId, room.roomId);
       if (currentRoom.seq !== room.seq)
         return res.status(409).json({ error: 'Room changed during facilitation' });
@@ -1513,7 +1515,6 @@ router.post(
         });
       }
 
-      const { activeLearningRoom } = await import('../services/roomLearning.js');
       const currentRoom = await activeLearningRoom(userId, room.roomId);
       if (currentRoom.seq !== room.seq)
         return res.status(409).json({ error: 'Room changed during facilitation' });
@@ -1695,7 +1696,6 @@ router.get('/:roomId/debrief', requireActiveRoom, async (req: RoomRequest, res: 
         .lean();
 
       if (studentAttempt && studentAttempt.assessmentResult) {
-        const { getAttemptResult } = await import('../services/activityAttempt.js');
         const verified = await getAttemptResult(
           userId,
           studentAttempt.attemptId,

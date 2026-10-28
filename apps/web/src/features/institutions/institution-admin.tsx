@@ -44,6 +44,12 @@ export function InstitutionAdmin({
       setBusy(false);
     }
   }
+  // Learners hold no authority to invite or enroll, so they are not shown those forms.
+  const activeRoles = contexts
+    .filter((c) => c.membership.status === "active")
+    .map((c) => c.membership.role as string);
+  const canInvite = platformAdmin || activeRoles.includes("university_admin");
+  const canAssign = canInvite || activeRoles.includes("instructor");
   return (
     <div className="max-w-3xl space-y-6">
       <h1 className="text-2xl font-bold">Institutions and course access</h1>
@@ -96,6 +102,7 @@ export function InstitutionAdmin({
           <p>{created}</p>
         </section>
       )}
+      {canInvite && (
       <section className="space-y-3 rounded border p-4">
         <h2 className="font-semibold">Invite institution member</h2>
         <p>
@@ -146,6 +153,8 @@ export function InstitutionAdmin({
           </p>
         )}
       </section>
+      )}
+      {canAssign && (
       <section className="space-y-3 rounded border p-4">
         <h2 className="font-semibold">Assign instructor or enroll learner</h2>
         <p>
@@ -194,6 +203,14 @@ export function InstitutionAdmin({
           Apply course assignment
         </Button>
       </section>
+      )}
+      {!canAssign && (
+        <p className="text-sm text-muted-foreground">
+          Your institution roles are listed above. Institution administrators
+          and instructors manage invitations and course enrollment. If you were
+          sent an invitation, accept it in Settings.
+        </p>
+      )}
     </div>
   );
 }
