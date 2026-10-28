@@ -29,6 +29,7 @@
     "dev:setup": "node scripts/setup.mjs",
     "dev:doctor": "node scripts/doctor.mjs",
     "dev:ai": "node scripts/run-ai.mjs",
-    "dev:worker": "node scripts/run-ai.mjs worker"
+    "dev:worker": "node scripts/run-ai.mjs worker",
+    "seed": "pnpm --filter api exec tsx seeds/complete-demo.seed.ts"
   }
 }
