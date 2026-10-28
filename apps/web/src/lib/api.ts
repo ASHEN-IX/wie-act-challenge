@@ -25,14 +25,14 @@ export async function api<T>(
   outgoing.set("cookie", incoming.get("cookie") || "");
   outgoing.set(
     "origin",
-    process.env.BETTER_AUTH_URL || "http://localhost:5173",
+    process.env.BETTER_AUTH_URL || "http://localhost:3000",
   );
   if (options.body && !(options.body instanceof FormData))
     outgoing.set("content-type", "application/json");
   let response: Response;
   try {
     response = await fetch(
-      new URL(endpoint, process.env.BACKEND_URL || "http://localhost:3000"),
+      new URL(endpoint, process.env.BACKEND_URL || "http://localhost:3001"),
       {
         ...options,
         headers: outgoing,

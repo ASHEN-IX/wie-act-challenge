@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { AiModeNote } from "@/features/ai-status/ai-status-view";
 import {
   loadPrivateHelp,
   sendPrivateHelp,
@@ -103,7 +104,11 @@ export function PrivateHelpPanel({ roomId }: { roomId: string }) {
       {history.map((item) => (
         <article key={item.requestId} className="border-t pt-2">
           <p>{item.question}</p>
-          <p>{item.response?.executionMode || item.status}</p>
+          {item.response?.executionMode ? (
+            <AiModeNote mode={item.response.executionMode} />
+          ) : (
+            <p>{item.status}</p>
+          )}
           <p className="whitespace-pre-wrap">
             {item.response?.answer ||
               (item.status === "pending"

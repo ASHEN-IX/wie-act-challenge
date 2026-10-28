@@ -1,3 +1,4 @@
+import { plural } from "@/lib/utils";
 import Link from "next/link";
 import { ArrowUpRight, BookOpen, PencilLine, Users } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
@@ -29,7 +30,7 @@ export default async function Dashboard() {
           {
             href: "/courses",
             title: "Your courses",
-            description: `${courses.data?.courses.length ?? 0} courses in your library`,
+            description: `${plural(courses.data?.courses.length ?? 0, "course")} in your library`,
             icon: BookOpen,
           },
           {

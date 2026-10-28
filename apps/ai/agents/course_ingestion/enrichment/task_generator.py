@@ -99,6 +99,7 @@ def call_llm_task_generation(prompt: str) -> str:
                 "course_ingestion",
                 "You are an educational task designer creating practical, actionable study tasks.",
                 prompt,
+                cache=True,  # course content only (no learner data)
             )
         except (LLMRequestError, MissingMockResponderError) as e:
             print(f"Error calling LLM ({MODEL_NAME}): {e}")

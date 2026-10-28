@@ -21,6 +21,10 @@ export default function Search() {
               minLength={2}
               maxLength={500}
             />
+            <p className="text-sm text-muted-foreground">
+              Your question is sent to a public web search engine to find
+              links. Do not include names or other personal information.
+            </p>
           </FieldGroup>
         </JobForm>
       </div>

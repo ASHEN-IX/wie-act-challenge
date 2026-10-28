@@ -239,7 +239,7 @@ export async function authenticateWsRequest(
     const { resolveIdentity } =
       require('@study-partner/shared/sessionIdentity') as typeof import('@study-partner/shared/sessionIdentity');
     const trustedOrigins = () =>
-      (process.env.AUTH_TRUSTED_ORIGINS || 'http://localhost:5173').split(',');
+      (process.env.AUTH_TRUSTED_ORIGINS || 'http://localhost:3000').split(',');
     if (req.headers.origin && !trustedOrigins().includes(req.headers.origin))
       return 'Unauthorized origin';
     const auth = await resolveIdentity(req.headers);

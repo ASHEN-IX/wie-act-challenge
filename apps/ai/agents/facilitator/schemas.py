@@ -18,6 +18,7 @@ class FacilitatorTrigger(str, Enum):
     EXPLICIT_ASK = "explicit_ask"
     REQUEST_HINT = "request_hint"
     MISCONCEPTION_DETECTED = "misconception_detected"
+    CONFUSION_SIGNAL = "confusion_signal"
     PHASE_TRANSITION = "phase_transition"
     CONSENSUS_CHECK = "consensus_check"
 

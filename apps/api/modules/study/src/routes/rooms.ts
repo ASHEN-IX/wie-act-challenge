@@ -43,6 +43,10 @@ import {
   revokeLiveKitPublishPermissions,
   removeLiveKitParticipant
 } from '../services/livekitControl';
+import { assessConfusion, type ConfusionAssessment } from '../services/confusionSignals';
+// Static imports: native dynamic import() cannot resolve .ts sources under tsx/cjs at runtime.
+import { activeLearningRoom } from '../services/roomLearning';
+import { getAttemptResult } from '../services/activityAttempt';
 import type { DomainMiddleware } from '../../../../src/framework/contracts';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const aiClient = require('@study-partner/shared/aiClient');
@@ -193,6 +197,7 @@ function evaluateLocalPeerFirstPolicy(obs: {
   transcriptText: string;
   actionType: string;
   hintLevel?: number;
+  confusion?: ConfusionAssessment;
   currentPhase: string;
   participants: Array<Pick<IStudyRoomParticipant, 'userId' | 'name' | 'leftAt'>>;
   speakerName?: string;
@@ -260,6 +265,20 @@ function evaluateLocalPeerFirstPolicy(obs: {
       targetSpeakerName: peerName,
       reasoning: 'Confusing 1NF (atomic values) with entity integrity (primary key uniqueness).',
       messageText: `Notice ${obs.speakerName || 'the'}'s explanation about 1NF and primary keys. ${peerName}, does having a unique primary key guarantee atomicity in each column, or can repeating groups still exist?`
+    };
+  }
+
+  // Rule 2b: Learner signalled they are stuck; peers reason first, before any explanation
+  if (obs.actionType === 'statement' && obs.confusion?.tentative) {
+    const peerName = targetPeer ? targetPeer.name : 'the team';
+    return {
+      shouldIntervene: true,
+      strategy: 'PEER_CHALLENGE',
+      trigger: 'confusion_signal',
+      targetUserId: targetPeer?.userId,
+      targetSpeakerName: peerName,
+      reasoning: `Tentative confusion signal (${obs.confusion.reasons.join(', ')}): peer-first reasoning before explanation.`,
+      messageText: `${obs.speakerName || 'A teammate'} may be stuck on this step. ${peerName}, how would you approach it from first principles?`
     };
   }
 
@@ -1253,7 +1272,9 @@ router.post(
         recentDialogue = []
       } = req.body;
 
-      // Check cooldown for automatic observations (routine dialogue throttled; misconceptions bypass)
+      const confusion = assessConfusion({ transcriptText, hintLevel });
+
+      // Check cooldown for automatic observations (routine dialogue throttled; misconceptions and confusion bypass)
       if (actionType === 'statement' && !req.body.force) {
         const lastIntervention = await FacilitatorIntervention.findOne({
           roomId: room.roomId
@@ -1266,7 +1287,11 @@ router.post(
           const hasKnownMisconception =
             (lower.includes('1nf') || lower.includes('normal form')) &&
             (lower.includes('primary key') || lower.includes('unique'));
-          if (!hasKnownMisconception && elapsed < (lastIntervention.cooldownSeconds || 15)) {
+          if (
+            !hasKnownMisconception &&
+            !confusion.tentative &&
+            elapsed < (lastIntervention.cooldownSeconds || 15)
+          ) {
             return res
               .status(200)
               .json({ success: true, intervened: false, reason: 'cooldown_active' });
@@ -1282,7 +1307,8 @@ router.post(
         actionType,
         currentPhase: room.currentPhase,
         activeActivityId: room.activeActivityId || null,
-        learningContext: { courseId: room.courseId, title: room.title },
+        learningContext: { courseId: room.courseId, title: room.title, confusion },
+        confusion,
         participants: activeParticipants.map((p) => ({
           userId: p.userId,
           name: p.name || 'Student',
@@ -1312,7 +1338,6 @@ router.post(
         proposal = evaluateLocalPeerFirstPolicy(obsInput);
       }
 
-      const { activeLearningRoom } = await import('../services/roomLearning.js');
       const currentRoom = await activeLearningRoom(userId, room.roomId);
       if (currentRoom.seq !== room.seq)
         return res.status(409).json({ error: 'Room changed during facilitation' });
@@ -1332,6 +1357,7 @@ router.post(
           'explicit_ask',
           'request_hint',
           'misconception_detected',
+          'confusion_signal',
           'phase_transition',
           'consensus_check'
         ),
@@ -1339,6 +1365,7 @@ router.post(
         messageText: Joi.string().max(8000),
         reasoning: Joi.string().max(2000),
         interventionId: Joi.string().max(128),
+        roomId: Joi.string().max(128),
         targetSpeakerId: Joi.string().max(128),
         targetUserId: Joi.string().max(128),
         targetSpeakerName: Joi.string().max(200),
@@ -1488,7 +1515,6 @@ router.post(
         });
       }
 
-      const { activeLearningRoom } = await import('../services/roomLearning.js');
       const currentRoom = await activeLearningRoom(userId, room.roomId);
       if (currentRoom.seq !== room.seq)
         return res.status(409).json({ error: 'Room changed during facilitation' });
@@ -1508,6 +1534,7 @@ router.post(
           'explicit_ask',
           'request_hint',
           'misconception_detected',
+          'confusion_signal',
           'phase_transition',
           'consensus_check'
         ),
@@ -1515,6 +1542,7 @@ router.post(
         messageText: Joi.string().max(8000),
         reasoning: Joi.string().max(2000),
         interventionId: Joi.string().max(128),
+        roomId: Joi.string().max(128),
         targetSpeakerId: Joi.string().max(128),
         targetUserId: Joi.string().max(128),
         targetSpeakerName: Joi.string().max(200),
@@ -1668,7 +1696,6 @@ router.get('/:roomId/debrief', requireActiveRoom, async (req: RoomRequest, res: 
         .lean();
 
       if (studentAttempt && studentAttempt.assessmentResult) {
-        const { getAttemptResult } = await import('../services/activityAttempt.js');
         const verified = await getAttemptResult(
           userId,
           studentAttempt.attemptId,

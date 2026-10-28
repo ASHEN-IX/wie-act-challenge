@@ -61,7 +61,7 @@ const spec: OpenAPISpec = {
   }
 };
 
-const authOrigin = process.env.BETTER_AUTH_URL || 'http://localhost:5173';
+const authOrigin = process.env.BETTER_AUTH_URL || 'http://localhost:3000';
 for (const [method, path, summary] of [
   ['post', 'sign-up/email', 'Register with Better Auth'],
   ['post', 'sign-in/email', 'Sign in with email/password'],

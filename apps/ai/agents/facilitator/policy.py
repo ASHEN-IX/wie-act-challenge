@@ -89,6 +89,23 @@ def evaluate_rules(obs: FacilitatorObservationInput) -> Optional[FacilitatorInte
                 shouldIntervene=True,
             )
 
+    # 2b. Learner signalled they are stuck (tentative): peers reason first, no explanation
+    confusion = (obs.learningContext or {}).get("confusion") or {}
+    if obs.actionType == "statement" and confusion.get("tentative"):
+        reasons = ", ".join(str(r) for r in confusion.get("reasons", []))
+        return FacilitatorInterventionProposal(
+            interventionId=f"int_{uuid.uuid4().hex[:12]}",
+            roomId=obs.roomId,
+            strategy=FacilitatorStrategy.PEER_CHALLENGE,
+            trigger=FacilitatorTrigger.CONFUSION_SIGNAL,
+            targetSpeakerId=peer_id,
+            targetSpeakerName=peer_name,
+            reasoning=f"Tentative confusion signal ({reasons}): peer-first reasoning before explanation.",
+            messageText=f"{obs.speakerName or 'A teammate'} may be stuck on this step. {peer_name}, how would you approach it from first principles?",
+            cooldownSeconds=15,
+            shouldIntervene=True,
+        )
+
     # 3. Handle explicit hint requests
     if obs.actionType == "request_hint":
         hint_text = (

@@ -37,7 +37,8 @@ def call_llm(prompt: str, system_prompt: str = None) -> str:
         if not system_prompt or system_prompt == MODEL_NAME:
             system_prompt = DEFAULT_SYSTEM_PROMPT
         try:
-            return ask("course_ingestion", system_prompt, prompt)
+            # Course content only (no learner data), so repeated ingests may reuse output.
+            return ask("course_ingestion", system_prompt, prompt, cache=True)
         except (LLMRequestError, MissingMockResponderError) as e:
             print(f"Error calling LLM ({MODEL_NAME}): {e}")
             return ""

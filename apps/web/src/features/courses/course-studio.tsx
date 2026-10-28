@@ -882,8 +882,8 @@ export function CourseStudio({
                 Activity Proposal Studio
               </CardTitle>
               <CardDescription>
-                Select an objective to generate source-backed student activities
-                (Contract 04). AI cannot auto-publish or alter draft.
+                Select an objective to generate source-backed student activities.
+                AI cannot publish or change your draft on its own.
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">

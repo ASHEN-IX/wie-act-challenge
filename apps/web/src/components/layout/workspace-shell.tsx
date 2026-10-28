@@ -8,10 +8,12 @@ import { logout } from "@/features/auth/actions";
 export function WorkspaceShell({
   email,
   admin,
+  instructor = true,
   children,
 }: {
   email: string;
   admin: boolean;
+  instructor?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -24,7 +26,7 @@ export function WorkspaceShell({
           <BookOpen className="size-7 text-primary" />
           EdNova
         </Link>
-        <Navigation admin={admin} />
+        <Navigation admin={admin} instructor={instructor} />
         <div className="mt-auto flex flex-col gap-4 border-t pt-5">
           <div className="flex items-center gap-3">
             <Avatar>
@@ -54,7 +56,7 @@ export function WorkspaceShell({
             </span>
           </summary>
           <div className="absolute left-0 top-10 z-30 w-64 rounded-lg border bg-background p-4 shadow-lg">
-            <Navigation admin={admin} />
+            <Navigation admin={admin} instructor={instructor} />
             <form action={logout} className="mt-4">
               <Button variant="outline" type="submit">
                 Sign out

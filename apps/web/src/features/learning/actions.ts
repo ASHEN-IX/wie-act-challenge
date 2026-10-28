@@ -12,15 +12,17 @@ export async function submitPractice(
 ): Promise<ActionState> {
   await requireIdentity();
   try {
+    // The evaluation worker rejects unknown fields, so the question travels
+    // inside the answer text. Together they stay under its 5,000 character limit.
+    const question = text(form, "question", 1000);
+    const answer = text(form, "answer", 3500);
     const result = await api<{ jobId: string }>("/api/v1/eval/step", {
       method: "POST",
       body: JSON.stringify({
         sessionId: optionalText(form, "sessionId", 64) || crypto.randomUUID(),
         step: integer(form, "step", 1, 100),
         contextId: "individual-practice",
-        taskDescription: text(form, "question", 2000),
-        studentAnswer: text(form, "answer", 4000),
-        maxAttempts: 3,
+        studentAnswer: `Question: ${question}\n\nAnswer: ${answer}`,
       }),
     });
     return {

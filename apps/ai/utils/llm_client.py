@@ -12,6 +12,7 @@ never silently substitute test output. A failing configured call raises
 :class:`LLMRequestError` so callers can choose an identified fallback.
 """
 
+import hashlib
 import os
 import json
 import time
@@ -45,6 +46,7 @@ AGENT_GROUPS = (
     "reflection",
     "course_ingestion",
     "evaluator",
+    "facilitator",
 )
 
 
@@ -71,6 +73,8 @@ AGENT_TIERS: Dict[str, ModelTier] = {
     "evaluator": ModelTier.CAPABLE,
     "search": ModelTier.CAPABLE,
     "reflection": ModelTier.CAPABLE,
+    # Peer-first interventions weigh several learners' dialogue at once (synthesis).
+    "facilitator": ModelTier.CAPABLE,
 }
 
 
@@ -380,6 +384,9 @@ class LLMResult:
     fallback_used: bool = False
     usage: Optional[Dict[str, int]] = None
     latency_ms: Optional[float] = None
+    # True when the text was served from the response cache. The original call was
+    # a REAL_APPROVED call; no provider request was made for this result.
+    cache_hit: bool = False
 
 
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[1] / "litellm" / "config.yaml"
@@ -573,6 +580,72 @@ def reset_router() -> None:
     _router = None
 
 
+# ----------------------------------------------------------- response cache #
+# Opt-in per call (``cache=True``) and only for content that carries no learner
+# data, so a repeated course-only request does not reach the provider again.
+# Only validated REAL_APPROVED responses are stored; mock and fallback results
+# never are. Cache failures degrade to a normal approved call.
+
+LLM_CACHE_PREFIX = "llm:cache:"
+DEFAULT_LLM_CACHE_TTL_SECONDS = 7 * 24 * 3600
+_cache_redis = None
+
+
+def _cache_ttl_seconds() -> int:
+    try:
+        return max(1, int(os.getenv("LLM_CACHE_TTL_SECONDS", DEFAULT_LLM_CACHE_TTL_SECONDS)))
+    except ValueError:
+        return DEFAULT_LLM_CACHE_TTL_SECONDS
+
+
+def _cache_client():
+    global _cache_redis
+    url = os.getenv("REDIS_URL")
+    if not url:
+        return None
+    if _cache_redis is None:
+        import redis
+
+        _cache_redis = redis.Redis.from_url(
+            url, socket_connect_timeout=1, socket_timeout=1, decode_responses=True
+        )
+    return _cache_redis
+
+
+def _cache_key(
+    agent: str,
+    model: str,
+    system_prompt: str,
+    user_prompt: str,
+    temperature: Optional[float],
+    max_tokens: Optional[int],
+) -> str:
+    material = json.dumps(
+        [agent, model, system_prompt, user_prompt, temperature, max_tokens],
+        ensure_ascii=False,
+    )
+    return LLM_CACHE_PREFIX + hashlib.sha256(material.encode("utf-8")).hexdigest()
+
+
+def _cache_get(key: str) -> Optional[dict]:
+    try:
+        client = _cache_client()
+        raw = client.get(key) if client else None
+        return json.loads(raw) if raw else None
+    except Exception as exc:
+        logger.warning("llm_cache_read_failed", extra={"error": sanitize_text(str(exc))})
+        return None
+
+
+def _cache_set(key: str, payload: dict) -> None:
+    try:
+        client = _cache_client()
+        if client:
+            client.set(key, json.dumps(payload, ensure_ascii=False), ex=_cache_ttl_seconds())
+    except Exception as exc:
+        logger.warning("llm_cache_write_failed", extra={"error": sanitize_text(str(exc))})
+
+
 @overload
 def ask(
     agent: str,
@@ -584,6 +657,7 @@ def ask(
     mock_fn: Optional[MockResponder] = None,
     fallback_fn: Optional[DeterministicFallback] = None,
     trace_id: str = "",
+    cache: bool = False,
     return_metadata: Literal[False] = False,
 ) -> str: ...
 
@@ -599,6 +673,7 @@ def ask(
     mock_fn: Optional[MockResponder] = None,
     fallback_fn: Optional[DeterministicFallback] = None,
     trace_id: str = "",
+    cache: bool = False,
     return_metadata: Literal[True],
 ) -> LLMResult: ...
 
@@ -613,6 +688,7 @@ def ask(
     mock_fn: Optional[MockResponder] = None,
     fallback_fn: Optional[DeterministicFallback] = None,
     trace_id: str = "",
+    cache: bool = False,
     return_metadata: bool = False,
 ) -> Union[str, LLMResult]:
     """Complete a chat for ``agent`` and return the assistant text or LLMResult.
@@ -705,6 +781,31 @@ def ask(
             f"UNAVAILABLE: credentials, approval or durable budget unavailable for {agent!r}"
         )
 
+    cache_key = (
+        _cache_key(agent, cfg.model, system_prompt, user_prompt, temperature, max_tokens)
+        if cache
+        else None
+    )
+    if cache_key:
+        cached = _cache_get(cache_key)
+        if cached:
+            logger.info(
+                "llm_cache_hit",
+                extra={"agent": agent, "trace_id": trace_id, "tier": tier, "model": cached["model"]},
+            )
+            res = LLMResult(
+                text=cached["text"],
+                execution_mode=ExecutionMode.REAL_APPROVED.value,
+                model=cached["model"],
+                tier=tier,
+                agent=agent,
+                trace_id=trace_id,
+                fallback_used=False,
+                cache_hit=True,
+            )
+            return res if return_metadata else res.text
+        logger.info("llm_cache_miss", extra={"agent": agent, "trace_id": trace_id, "tier": tier})
+
     messages = [
         {"role": "system", "content": build_system_block(system_prompt)},
         {"role": "user", "content": user_prompt},
@@ -725,7 +826,11 @@ def ask(
         current = _approval(agent)
         if current != approval or not _budget_still_active(approval):
             raise LLMUnavailableError("Approval revoked during inference")
-        if getattr(response, "model", None) != approval["model"]:
+        # Providers echo either the full LiteLLM route (nvidia_nim/meta/...) or the
+        # bare model id (Groq: openai/gpt-oss-20b for groq/openai/gpt-oss-20b).
+        # Only the approved model's own route or its bare id is accepted.
+        approved_bare = approval["model"].split("/", 1)[1]
+        if getattr(response, "model", None) not in (approval["model"], approved_bare):
             raise LLMRequestError("Provider/model identity did not match approval")
         _execution_records[agent] = {
             "approvalId": approval["approvalId"],
@@ -768,6 +873,8 @@ def ask(
                 "model": resolved_model,
             },
         )
+        if cache_key:
+            _cache_set(cache_key, {"text": text, "model": resolved_model})
         res = LLMResult(
             text=text,
             execution_mode=ExecutionMode.REAL_APPROVED.value,
