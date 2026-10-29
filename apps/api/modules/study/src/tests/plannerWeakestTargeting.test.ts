@@ -4,17 +4,21 @@ import assert from 'node:assert/strict';
  */
 
 jest.mock('../models/index', () => ({
-  Course: { findOne: jest.fn() },
+  Course: { find: jest.fn() },
+  CourseEnrollment: { find: jest.fn() },
+  CourseRevision: { find: jest.fn() },
+  Subject: { find: jest.fn() },
   CompetencyProfile: { find: jest.fn() }
 }));
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { Course, CompetencyProfile } = require('../models/index');
+const { Course, CourseEnrollment, CourseRevision, CompetencyProfile } = require('../models/index');
 import { getWeakCompetenciesForCourse } from '../services/competencyQueries';
 
 const courseDoc = {
   _id: 'course-1',
   userId: 'user-123',
+  subjectId: 'subj-1',
   topics: [
     {
       title: 'Core Algorithms',
@@ -27,21 +31,36 @@ const courseDoc = {
   ]
 };
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+  // The learner reaches the hierarchy through enrolled courses, not ownership.
+  CourseEnrollment.find.mockReturnValue({ distinct: jest.fn().mockResolvedValue(['course-1']) });
+  CourseRevision.find.mockReturnValue({
+    select: jest.fn().mockReturnThis(),
+    lean: jest.fn().mockResolvedValue([])
+  });
+});
 
 function courseQueryResult(doc: typeof courseDoc) {
-  return { lean: jest.fn().mockResolvedValue(doc) };
+  return {
+    select: jest.fn().mockReturnThis(),
+    lean: jest.fn().mockResolvedValue([doc])
+  };
 }
 
 describe('getWeakCompetenciesForCourse', () => {
-  test('returns [] when the course is not found', async () => {
-    Course.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) });
+  test('returns [] when the course is not reachable', async () => {
+    CourseEnrollment.find.mockReturnValue({ distinct: jest.fn().mockResolvedValue([]) });
+    Course.find.mockReturnValue({
+      select: jest.fn().mockReturnThis(),
+      lean: jest.fn().mockResolvedValue([])
+    });
     const out = await getWeakCompetenciesForCourse('user-123', 'course-x');
     expect(out).toEqual([]);
   });
 
   test('computes scores, progression-gated unlocked levels and current level', async () => {
-    Course.findOne.mockReturnValue(courseQueryResult(courseDoc));
+    Course.find.mockReturnValue(courseQueryResult(courseDoc));
     CompetencyProfile.find.mockReturnValue({
       lean: jest.fn().mockResolvedValue([
         // Sorting: remember strong, understand strong, apply weak
@@ -52,7 +71,7 @@ describe('getWeakCompetenciesForCourse', () => {
     });
 
     const out = await getWeakCompetenciesForCourse('user-123', 'course-1');
-    expect(Course.findOne).toHaveBeenCalledWith({ _id: 'course-1', userId: 'user-123' });
+    expect(CourseEnrollment.find).toHaveBeenCalledWith({ userId: 'user-123', status: 'active' });
     const sorting = out.find((w) => w.topic_id === 'sorting');
     assert.ok(sorting);
     expect(sorting.topic_title).toBe('Sorting Algorithms');
@@ -64,7 +83,7 @@ describe('getWeakCompetenciesForCourse', () => {
   });
 
   test('normalizes British ANALYSE and uppercase levels to lowercase keys', async () => {
-    Course.findOne.mockReturnValue(courseQueryResult(courseDoc));
+    Course.find.mockReturnValue(courseQueryResult(courseDoc));
     CompetencyProfile.find.mockReturnValue({
       lean: jest.fn().mockResolvedValue([
         { topicId: 'sorting', bloomLevel: 'REMEMBER', score: 0.9 },
@@ -82,7 +101,7 @@ describe('getWeakCompetenciesForCourse', () => {
   });
 
   test('ranks weakest-first and respects limit', async () => {
-    Course.findOne.mockReturnValue(courseQueryResult(courseDoc));
+    Course.find.mockReturnValue(courseQueryResult(courseDoc));
     CompetencyProfile.find.mockReturnValue({
       lean: jest.fn().mockResolvedValue([
         { topicId: 'arrays', bloomLevel: 'REMEMBER', score: 0.5 },
@@ -101,7 +120,7 @@ describe('getWeakCompetenciesForCourse', () => {
   });
 
   test('a topic with no competency rows is not-started and ranks weakest', async () => {
-    Course.findOne.mockReturnValue(courseQueryResult(courseDoc));
+    Course.find.mockReturnValue(courseQueryResult(courseDoc));
     CompetencyProfile.find.mockReturnValue({
       lean: jest.fn().mockResolvedValue([
         { topicId: 'sorting', bloomLevel: 'REMEMBER', score: 0.9 },

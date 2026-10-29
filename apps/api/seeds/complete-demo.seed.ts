@@ -1,8 +1,16 @@
 import { config } from 'dotenv';
+import fs from 'node:fs/promises';
 import path from 'node:path';
 import { MongoClient } from 'mongodb';
 import mongoose, { Types } from 'mongoose';
 import { createAuth } from '../shared/betterAuth';
+import {
+  contentHash,
+  manifestDigest,
+  sourceRoots,
+  type SourceDocument
+} from '../modules/study/src/services/revisionSources';
+import { activityDigest } from '../modules/study/src/services/activityIdentity';
 import { Institution, InstitutionMembership } from '../modules/study/src/models/Institution';
 import {
   bootstrapInstitution,
@@ -11,7 +19,13 @@ import {
 } from '../modules/study/src/services/institutions';
 import { RANK_LADDER } from '../modules/user-profile/src/models/rankingConfig';
 import RankBadge from '../modules/user-profile/src/models/RankBadge';
-import { Course, Task, StudySession } from '../modules/study/src/models';
+import {
+  Course,
+  Task,
+  StudySession,
+  Subject,
+  LearningObjective
+} from '../modules/study/src/models';
 import { CourseRevision } from '../modules/study/src/models/CourseRevision';
 import { ActivityRecord } from '../modules/study/src/models/ActivityRecord';
 import { CourseEnrollment } from '../modules/study/src/models/CourseEnrollment';
@@ -27,6 +41,104 @@ const accounts = [
 
 const SINGLE_BADGE_TIERS = new Set(['grandmaster', 'legend']);
 const DIVISION_TO_BADGE_KEY: Record<string, string> = { III: 'first', II: 'second', I: 'third' };
+
+/** Synthetic source text backing the demo course. Kept in-repo so the seeded
+ * revision can carry a real content hash and a verifiable provenance artifact. */
+const DEMO_SOURCE_TEXT = [
+  'EdNova demo source: Relational Database Design & Normalization',
+  '',
+  'First Normal Form (1NF) requires every attribute value to be atomic: a column',
+  'must not hold repeating groups or comma-separated lists. A relation such as',
+  'Student(StudentID, FullName, CourseCodes[Array]) violates 1NF because CourseCodes',
+  'stores several values in one attribute.',
+  '',
+  'Second Normal Form (2NF) removes partial dependencies on part of a composite',
+  'primary key. A relation is in 2NF when it is in 1NF and every non-key attribute',
+  'depends on the whole key.',
+  ''
+].join('\n');
+
+/**
+ * Writes the original source blob plus a deterministic FAISS artifact for a
+ * revision, then pins the manifest on the revision. Mirrors what the ingestion
+ * worker produces so published-content gates pass without special-casing seeds.
+ */
+async function materializeSourceArtifact(
+  courseId: string,
+  revisionTag: string,
+  storedContentHash: string
+): Promise<SourceDocument> {
+  const roots = sourceRoots();
+  const hash = contentHash(DEMO_SOURCE_TEXT);
+  const document: SourceDocument = {
+    documentId: 'doc_' + hash.slice(7, 23),
+    filename: 'relational-normalization.txt',
+    contentHash: hash,
+    storageRef: 'originals/' + hash.slice(7),
+    mediaType: 'text/plain',
+    provenance: 'extracted'
+  };
+  await fs.mkdir(path.join(roots.uploads, 'originals'), { recursive: true });
+  // Blobs are written read-only so they behave like immutable originals; clear a
+  // stale copy from an earlier run before rewriting it.
+  const blobPath = path.join(roots.uploads, document.storageRef);
+  await fs.rm(blobPath, { force: true });
+  await fs.writeFile(blobPath, DEMO_SOURCE_TEXT, { mode: 0o444 });
+  const pinHash = 'sha256:' + storedContentHash.replace(/^sha256:/, '');
+  const digest = manifestDigest(courseId, revisionTag, pinHash, [document]);
+
+  // Deterministic 384-dim vector placeholder: the demo never performs semantic
+  // search against this index, it only has to be a valid, self-consistent FAISS
+  // file whose sha256 is recorded in the metadata.
+  const index = Buffer.from('FAISS_DEMO_INDEX_V1\x00' + courseId + '\x00' + revisionTag, 'utf8');
+  const base = path.join(roots.indexes, courseId, revisionTag);
+  await fs.mkdir(path.dirname(base), { recursive: true });
+  // Artifacts are read-only like production originals, so a re-run over an
+  // existing database must clear the previous copies before rewriting them.
+  await fs.rm(base + '.faiss', { force: true });
+  await fs.rm(base + '.meta.json', { force: true });
+  await fs.writeFile(base + '.faiss', index, { mode: 0o444 });
+  await fs.writeFile(
+    base + '.meta.json',
+    JSON.stringify({
+      schemaVersion: '1.0.0',
+      courseId,
+      revisionId: revisionTag,
+      contentHash: pinHash,
+      documents: [document],
+      manifestDigest: digest,
+      indexHash: contentHash(index),
+      chunks: [DEMO_SOURCE_TEXT],
+      metas: [
+        {
+          course_id: courseId,
+          revision_id: revisionTag,
+          document_id: document.documentId,
+          content_hash: hash,
+          text_hash: hash,
+          chunk_id: 'chk_' + hash.slice(7),
+          page_number: null,
+          section_id: 'section_1',
+          provenance: 'extracted'
+        }
+      ]
+    })
+  );
+  await CourseRevision.collection.updateOne(
+    {
+      courseId: new Types.ObjectId(courseId),
+      revisionTag
+    },
+    {
+      $set: {
+        sourceManifest: [document],
+        sourceManifestDigest: digest,
+        vectorIndexRef: 'faiss/' + courseId + '/' + revisionTag + '.faiss'
+      }
+    }
+  );
+  return document;
+}
 
 function toBadgeKey(rank: any): string {
   const tier = String(rank?.tier || '').toLowerCase();
@@ -61,10 +173,9 @@ async function main() {
         identity = await db.collection('auth_users').findOne({ email: account.email });
         if (!identity) throw new Error(`Missing auth identity: ${account.email}`);
         const now = new Date();
-        await db.collection('auth_users').updateOne(
-          { _id: identity._id },
-          { $set: { emailVerified: true, updatedAt: now } }
-        );
+        await db
+          .collection('auth_users')
+          .updateOne({ _id: identity._id }, { $set: { emailVerified: true, updatedAt: now } });
         await db.collection('users').updateOne(
           { _id: identity._id },
           {
@@ -172,30 +283,47 @@ async function main() {
     const courseId = course._id;
     let revision = await CourseRevision.findOne({ courseId, status: 'published' });
     if (!revision) {
+      // Content hash is derived from the same source bytes that get indexed, so the
+      // seeded revision satisfies the same integrity checks production does.
+      const revisionTag = 'rev_20261018_v1';
+      const sourceText = DEMO_SOURCE_TEXT;
+      const revisionHash = contentHash(sourceText);
       revision = await CourseRevision.create({
         courseId,
-        revisionTag: 'rev_20261018_v1',
-        contentHash: 'hash_cs301_demo_relational',
+        revisionTag,
+        contentHash: revisionHash.replace(/^sha256:/, ''),
         status: 'published',
+        // Publication gates require committed activation plus no revocation;
+        // see getPublishedCourseContext in coursePublication.ts.
+        activationState: 'committed',
         publishedByUserId: instructorId,
         publishedAt: new Date(),
         summary: 'Official published revision for CS301 Normalization.',
         isInstructorReviewed: true,
+        // Objectives live under subtopics[].learning_objectives: that is the shape
+        // ingestion produces and the one the published context projects.
         topics: [
           {
             id: 'top_1nf',
             title: 'First Normal Form (1NF) & Atomicity',
             description: 'Elimination of repeating groups and ensuring attribute atomicity.',
-            objectives: [
+            subtopics: [
               {
-                id: 'obj_1nf_def',
-                text: 'Identify table definitions that violate 1NF atomic domain constraints',
-                bloomLevel: 'analyze'
-              },
-              {
-                id: 'obj_1nf_decompose',
-                text: 'Decompose non-atomic attributes into 1NF compliant relations',
-                bloomLevel: 'apply'
+                id: 'sub_1nf_def',
+                title: 'Atomic domains',
+                learning_objectives: [
+                  {
+                    id: 'obj_1nf_def',
+                    statement:
+                      'Identify table definitions that violate 1NF atomic domain constraints',
+                    bloomLevel: 'analyze'
+                  },
+                  {
+                    id: 'obj_1nf_decompose',
+                    statement: 'Decompose non-atomic attributes into 1NF compliant relations',
+                    bloomLevel: 'apply'
+                  }
+                ]
               }
             ]
           },
@@ -203,78 +331,181 @@ async function main() {
             id: 'top_2nf',
             title: 'Second Normal Form (2NF) & Full Functional Dependency',
             description: 'Removal of partial dependencies on candidate keys.',
-            objectives: [
+            subtopics: [
               {
-                id: 'obj_2nf_identify',
-                text: 'Detect partial functional dependencies on composite primary keys',
-                bloomLevel: 'analyze'
+                id: 'sub_2nf_identify',
+                title: 'Partial dependencies',
+                learning_objectives: [
+                  {
+                    id: 'obj_2nf_identify',
+                    statement: 'Detect partial functional dependencies on composite primary keys',
+                    bloomLevel: 'analyze'
+                  }
+                ]
               }
             ]
           }
         ]
       });
-      course.activeRevisionId = revision._id.toString();
+      course.activeRevisionId = revision.revisionTag;
       await course.save();
       console.log('  ✓ Created Published Course Revision (v1)');
     }
 
-    // Seed Interactive Learning Activities (Contract 04)
+    // Materialize genuine source provenance (blob + FAISS artifact + manifest) so
+    // the seeded revision passes verifyRevisionArtifact exactly like a published one.
+    const sourceDocument = await materializeSourceArtifact(
+      courseId.toString(),
+      revision.revisionTag,
+      revision.contentHash
+    );
+    const resolvedRevision = await CourseRevision.findOne({ _id: revision._id });
+    if (!resolvedRevision) throw new Error('Seeded revision disappeared');
+
+    // The published revision is the curriculum source of truth, but several read
+    // paths (competency projection, planner targeting) resolve subject names and
+    // objective topics through these records. Seed them from the same hierarchy.
+    // Course.subjectId historically held a free-form slug, which no Subject could
+    // ever match, so subject names resolved to null. Point it at a real Subject.
+    let subject = mongoose.isValidObjectId(course.subjectId)
+      ? await Subject.findOne({ _id: course.subjectId })
+      : null;
+    if (!subject) {
+      subject = await Subject.create({
+        userId: instructorId,
+        name: 'Computer Science',
+        description: 'Relational data modelling and database design'
+      });
+      console.log('  ✓ Created Subject: Computer Science');
+    }
+    for (const topic of resolvedRevision.topics || []) {
+      for (const sub of topic.subtopics || []) {
+        for (const objective of sub.learning_objectives || []) {
+          await LearningObjective.updateOne(
+            {
+              documentId: sourceDocument.documentId,
+              topicId: topic.id,
+              textHash: contentHash(objective.statement)
+            },
+            {
+              $setOnInsert: {
+                userId: instructorId,
+                documentId: sourceDocument.documentId,
+                objectiveId: objective.id,
+                topicId: topic.id,
+                knowledgeType: 'procedural',
+                bloomLevel: objective.bloomLevel,
+                verb: objective.bloomLevel,
+                text: objective.statement,
+                textHash: contentHash(objective.statement),
+                version: 1,
+                isActive: true
+              }
+            },
+            { upsert: true, runValidators: true }
+          );
+        }
+      }
+    }
+    // Keep the legacy editable projection aligned with the revision so studio and
+    // planner surfaces that still read Course.topics resolve the same hierarchy.
+    course.topics = resolvedRevision.topics as never;
+    course.subjectId = String(subject._id);
+    await course.save();
+    console.log('  ✓ Seeded Subject & LearningObjectives');
+
+    // Seed Interactive Learning Activities (Contract 04). The definition must carry
+    // the same pin as the published revision, and the revision must list it as an
+    // approved activity, exactly as publishCourseRevision records it.
     const quizActivityId = 'act_1nf_quiz_01';
-    let quizActivity = await ActivityRecord.findOne({ activityId: quizActivityId });
+    const revisionTag = resolvedRevision.revisionTag;
+    const pinnedHash = 'sha256:' + resolvedRevision.contentHash.replace(/^sha256:/, '');
+    const publicDefinition = {
+      schemaVersion: '1.0.0',
+      activityId: quizActivityId,
+      activityRevision: 'ar_1',
+      componentVersion: '1.0.0',
+      activityType: 'InteractiveQuiz',
+      courseId: courseId.toString(),
+      revisionId: revisionTag,
+      contentHash: pinnedHash,
+      objectiveId: 'obj_1nf_def',
+      title: '1NF Decomposition Challenge',
+      instructions:
+        'Select all attribute sets that violate First Normal Form in the table schema below.',
+      timeLimitSeconds: 180,
+      visibility: 'public',
+      language: 'en',
+      sourceRefs: [
+        {
+          documentId: sourceDocument.documentId,
+          contentHash: sourceDocument.contentHash,
+          pageNumber: null,
+          locationKnown: false,
+          provenance: 'extracted' as const
+        }
+      ],
+      constraints: { maxAttempts: 3, allowCalculator: false },
+      presentationData: {
+        question: 'Which of the following table column definitions violate 1NF?',
+        options: [
+          { id: 'opt_a', label: 'Student(StudentID, FullName, CourseCodes[Array])' },
+          { id: 'opt_b', label: 'Enrollment(StudentID, CourseCode, Semester)' },
+          { id: 'opt_c', label: 'Order(OrderID, CustomerName, ItemsCommaSeparated)' }
+        ],
+        isMultiSelect: true
+      }
+    } as const;
+    const serverEvaluation = {
+      schemaVersion: '1.0.0',
+      visibility: 'server_only',
+      activity: {
+        courseId: courseId.toString(),
+        revisionId: revisionTag,
+        contentHash: pinnedHash,
+        activityId: quizActivityId,
+        activityRevision: 'ar_1',
+        activityType: 'InteractiveQuiz'
+      },
+      evaluationRef: 'ref_1nf_eval',
+      evaluatorType: 'deterministic_rubric',
+      rubricVersion: 'exact-options-v1',
+      rubric: 'Options A and C contain multi-valued attributes which violates atomicity.',
+      answerKey: ['opt_a', 'opt_c']
+    };
+    let quizActivity = await ActivityRecord.findOne({
+      activityId: quizActivityId,
+      courseId: courseId.toString()
+    });
     if (!quizActivity) {
       quizActivity = await ActivityRecord.create({
         courseId: courseId.toString(),
-        revisionId: revision._id.toString(),
-        contentHash: 'hash_1nf_quiz_01',
+        revisionId: revisionTag,
+        contentHash: pinnedHash,
         activityId: quizActivityId,
-        activityRevision: '1.0.0',
+        activityRevision: 'ar_1',
         activityType: 'InteractiveQuiz',
         objectiveId: 'obj_1nf_def',
-        publicDefinition: {
-          activityId: quizActivityId,
-          activityType: 'InteractiveQuiz',
-          schemaVersion: '1.0.0',
-          courseId: courseId.toString(),
-          revisionId: revision._id.toString(),
-          objectiveId: 'obj_1nf_def',
-          title: '1NF Decomposition Challenge',
-          instructions:
-            'Select all attribute sets that violate First Normal Form in the table schema below.',
-          timeLimitSeconds: 180,
-          presentationData: {
-            question: 'Which of the following table column definitions violate 1NF?',
-            options: [
-              { id: 'opt_a', label: 'Student(StudentID, FullName, CourseCodes[Array])' },
-              { id: 'opt_b', label: 'Enrollment(StudentID, CourseCode, Semester)' },
-              { id: 'opt_c', label: 'Order(OrderID, CustomerName, ItemsCommaSeparated)' }
-            ],
-            isMultiSelect: true
-          },
-          constraints: {
-            maxAttempts: 3,
-            allowCalculator: false
-          }
-        },
-        serverEvaluation: {
-          schemaVersion: '1.0.0',
-          visibility: 'server_only',
-          activity: {
-            courseId: courseId.toString(),
-            revisionId: revision._id.toString(),
-            contentHash: 'hash_1nf_quiz_01',
-            activityId: quizActivityId,
-            activityRevision: '1.0.0',
-            activityType: 'InteractiveQuiz'
-          },
-          evaluationRef: 'ref_1nf_eval',
-          evaluatorType: 'deterministic_rubric',
-          rubricVersion: '1.0.0',
-          rubric: 'Options A and C contain multi-valued attributes which violates atomicity.',
-          answerKey: ['opt_a', 'opt_c']
-        }
+        publicDefinition,
+        serverEvaluation
       });
       console.log('  ✓ Created Interactive Activity: 1NF Quiz Challenge');
     }
+    await CourseRevision.collection.updateOne(
+      { _id: resolvedRevision._id },
+      {
+        $set: {
+          approvedActivities: [
+            {
+              activityId: quizActivityId,
+              activityRevision: 'ar_1',
+              definitionHash: activityDigest(publicDefinition),
+              evaluationHash: activityDigest(serverEvaluation)
+            }
+          ]
+        }
+      }
+    );
 
     // 5. Enroll Learner and Seed Tasks & Progress
     console.log('\n[5/5] Enrolling Learner & Creating Study Tasks...');
@@ -282,6 +513,9 @@ async function main() {
     if (!enrollment) {
       enrollment = await CourseEnrollment.create({
         courseId,
+        // Institutional course access requires the enrollment to carry the same
+        // institution as the course; see courseGrant in resourceAccess.ts.
+        institutionId: course.institutionId,
         userId: learnerId,
         enrolledAt: new Date(),
         status: 'active'

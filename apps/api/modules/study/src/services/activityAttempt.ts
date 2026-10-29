@@ -18,6 +18,7 @@ import {
   validateActivityRoom
 } from './activityResolution';
 import { evaluateActivity } from './activityEvaluation';
+import { recordAcceptedEvidence } from './competency';
 import { awardAcceptedLearningEvidence } from '../../../user-profile/src/services/learningRewards';
 
 export class AttemptConflictError extends Error {
@@ -221,6 +222,28 @@ function activityPin(a: ActivityDefinition) {
   };
 }
 
+/**
+ * Resolve the competency unit that owns an objective. Objectives live under
+ * subtopics[].learning_objectives in the revision hierarchy, which is the shape
+ * ingestion and the draft editor both produce; the subtopic is the grain the
+ * progress projection reports at.
+ */
+function objectiveTopicId(revision: { topics?: unknown }, objectiveId: string): string | null {
+  const topics = (revision.topics as Array<Record<string, unknown>>) || [];
+  for (const topic of topics) {
+    const direct = (topic.objectives as Array<Record<string, unknown>> | undefined) || [];
+    if (direct.some((o) => (o.id || o.objectiveId) === objectiveId))
+      return typeof topic.id === 'string' ? topic.id : null;
+    const subtopics = (topic.subtopics as Array<Record<string, unknown>> | undefined) || [];
+    for (const sub of subtopics) {
+      const objectives = (sub.learning_objectives as Array<Record<string, unknown>>) || [];
+      if (objectives.some((o) => (o.id || o.objectiveId) === objectiveId))
+        return typeof sub.id === 'string' ? sub.id : null;
+    }
+  }
+  return null;
+}
+
 export async function getPublicActivity(
   actor: string,
   activityId: string,
@@ -395,7 +418,11 @@ export async function submitAttempt(actor: string, input: unknown, expectedActiv
       'Attempt preparation incomplete; retry same payload'
     );
   // Current grant/context checked before accepting evidence AND before delivery.
-  await resolveActivityRevision(actor, definition.courseId, definition.revisionId);
+  const revisionContext = await resolveActivityRevision(
+    actor,
+    definition.courseId,
+    definition.revisionId
+  );
   if (receipt.processingState === 'prepared') {
     if (receipt.preparedEvidence) {
       const evidence = parseContract('AcceptedEvidence', receipt.preparedEvidence);
@@ -422,6 +449,30 @@ export async function submitAttempt(actor: string, input: unknown, expectedActiv
       const stored = await LearningEvidence.findOne(key).lean();
       if (!stored || stored.evidenceId !== evidence.evidenceId)
         throw new AttemptConflictError('Existing evidence conflicts with receipt');
+      if (evidence.masteryAchieved) {
+        // Accepted reviewed evidence is also competency evidence. The revision is
+        // already loaded and authorized here, so resolve the objective's topic
+        // without a second grant check, and never let a profile write fail the
+        // submission that legitimately earned it.
+        const objective = validateActivityRevision(definition, revisionContext);
+        const topicId = objectiveTopicId(revisionContext, definition.objectiveId);
+        if (topicId) {
+          try {
+            await recordAcceptedEvidence({
+              userId: actor,
+              objectiveId: definition.objectiveId,
+              bloomLevel: objective.bloomLevel,
+              score: evidence.score,
+              masteryAchieved: evidence.masteryAchieved,
+              evaluatedAt: new Date(evidence.timestamp),
+              correlationId: evidence.evidenceId,
+              topicId
+            });
+          } catch {
+            /* Competency projection is derived state; accepted evidence stands. */
+          }
+        }
+      }
     }
     await StudentAttempt.updateOne(
       { ...key, processingState: 'prepared', payloadHash },

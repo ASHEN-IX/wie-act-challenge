@@ -74,6 +74,44 @@ interface UpsertProfileParams {
   evidenceItem: IEvidenceEntry;
 }
 
+export interface AcceptedEvidenceInput {
+  userId: string;
+  objectiveId: string;
+  bloomLevel: string;
+  score: number;
+  masteryAchieved: boolean;
+  evaluatedAt: Date;
+  correlationId: string;
+  /** Curriculum context for the objective, resolved by the caller. */
+  topicId: string;
+  knowledgeType?: string;
+}
+
+/**
+ * Record accepted reviewed evidence as competency evidence.
+ *
+ * Reviewed activity attempts are the product's verified-practice path: they carry a
+ * deterministic rubric verdict and an immutable activity pin. Without this bridge the
+ * only writer of competency profiles is the AI-job poller, so a learner who completes
+ * a reviewed check sees accepted evidence but an empty competency map. Replayed
+ * submissions are idempotent because evidence correlation ids are unique per attempt.
+ */
+async function recordAcceptedEvidence(input: AcceptedEvidenceInput) {
+  return upsertProfile({
+    userId: input.userId,
+    topicId: input.topicId,
+    knowledgeType: input.knowledgeType || 'procedural',
+    bloomLevel: String(input.bloomLevel).toLowerCase(),
+    evidenceItem: {
+      objectiveId: input.objectiveId,
+      demonstratedBloomLevel: String(input.bloomLevel).toLowerCase(),
+      masteryScore: input.score,
+      evaluatedAt: input.evaluatedAt,
+      correlationId: input.correlationId
+    }
+  });
+}
+
 /**
  * Update or insert a CompetencyProfile row for one competency key.
  * Evidence is appended (capped at MAX_EVIDENCE), EWMA replayed.
@@ -169,7 +207,8 @@ export {
   computeConfidence,
   replayEvidence,
   upsertProfile,
-  rollupByTopics
+  rollupByTopics,
+  recordAcceptedEvidence
 };
 
 module.exports = {
@@ -180,5 +219,6 @@ module.exports = {
   computeConfidence,
   replayEvidence,
   upsertProfile,
-  rollupByTopics
+  rollupByTopics,
+  recordAcceptedEvidence
 };

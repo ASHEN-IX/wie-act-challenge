@@ -7,6 +7,9 @@ import type { Response, NextFunction } from 'express';
 import express from 'express';
 import request from 'supertest';
 
+// Subject ids are ObjectIds in real data; the reader only queries well-formed ids.
+const SUBJECT_ID = '507f1f77bcf86cd799439011';
+
 jest.mock('../services/competencyQueries', () => ({
   getUserCompetencyMap: jest.fn(),
   getTopicDetail: jest.fn()
@@ -34,14 +37,14 @@ const sampleLevel = {
 };
 
 const sampleSubject = {
-  subjectId: 'subj-1',
+  subjectId: SUBJECT_ID,
   subjectName: 'Algorithms',
   topics: [
     {
       topicId: 't1',
       topicName: 'Sorting',
       parentTopic: 'Core Algorithms',
-      subjectId: 'subj-1',
+      subjectId: SUBJECT_ID,
       courseId: 'course-1',
       levels: [sampleLevel]
     }
@@ -66,11 +69,11 @@ describe('GET /api/v1/competencies', () => {
   test('forwards subjectId filter and knowledgeType breakdown', async () => {
     (getUserCompetencyMap as jest.Mock).mockResolvedValue([]);
     const res = await request(app).get(
-      '/api/v1/competencies?subjectId=subj-1&knowledgeType=breakdown'
+      `/api/v1/competencies?subjectId=${SUBJECT_ID}&knowledgeType=breakdown`
     );
     expect(res.status).toBe(200);
     expect(getUserCompetencyMap).toHaveBeenCalledWith('user-123', {
-      subjectId: 'subj-1',
+      subjectId: SUBJECT_ID,
       knowledgeTypeBreakdown: true
     });
   });
@@ -128,11 +131,19 @@ const {
 } = realQueries;
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { Subject, Course, CompetencyProfile } = require('../models/index');
+const {
+  Subject,
+  Course,
+  CourseEnrollment,
+  CourseRevision,
+  CompetencyProfile
+} = require('../models/index');
 
 jest.mock('../models/index', () => ({
   Subject: { find: jest.fn() },
   Course: { find: jest.fn() },
+  CourseEnrollment: { find: jest.fn() },
+  CourseRevision: { find: jest.fn() },
   CompetencyProfile: { find: jest.fn() }
 }));
 
@@ -152,7 +163,17 @@ describe('groupKnowledgeTypes', () => {
 });
 
 describe('getUserCompetencyMap (real implementation, mocked models)', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Learners reach courses they are enrolled in; ownership is only one grant path.
+    CourseEnrollment.find.mockReturnValue({
+      distinct: jest.fn().mockResolvedValue(['course-1'])
+    });
+    CourseRevision.find.mockReturnValue({
+      select: jest.fn().mockReturnThis(),
+      lean: jest.fn().mockResolvedValue([])
+    });
+  });
 
   test('groups profiles by subject → topic → bloom level', async () => {
     Course.find.mockReturnValue({
@@ -160,7 +181,7 @@ describe('getUserCompetencyMap (real implementation, mocked models)', () => {
       lean: jest.fn().mockResolvedValue([
         {
           _id: 'course-1',
-          subjectId: 'subj-1',
+          subjectId: SUBJECT_ID,
           title: 'CS',
           topics: [
             {
@@ -195,7 +216,7 @@ describe('getUserCompetencyMap (real implementation, mocked models)', () => {
 
     Subject.find.mockReturnValue({
       select: jest.fn().mockReturnThis(),
-      lean: jest.fn().mockResolvedValue([{ _id: 'subj-1', name: 'Algorithms' }])
+      lean: jest.fn().mockResolvedValue([{ _id: SUBJECT_ID, name: 'Algorithms' }])
     });
 
     const map = await realGetUserCompetencyMap('u1');
@@ -213,7 +234,7 @@ describe('getUserCompetencyMap (real implementation, mocked models)', () => {
       lean: jest.fn().mockResolvedValue([
         {
           _id: 'c1',
-          subjectId: 'subj-1',
+          subjectId: SUBJECT_ID,
           title: 'A',
           topics: [{ title: 'T', subtopics: [{ id: 't1', title: 'S' }] }]
         },
@@ -247,12 +268,12 @@ describe('getUserCompetencyMap (real implementation, mocked models)', () => {
     });
     Subject.find.mockReturnValue({
       select: jest.fn().mockReturnThis(),
-      lean: jest.fn().mockResolvedValue([{ _id: 'subj-1', name: 'A' }])
+      lean: jest.fn().mockResolvedValue([{ _id: SUBJECT_ID, name: 'A' }])
     });
 
-    const map = await realGetUserCompetencyMap('u1', { subjectId: 'subj-1' });
+    const map = await realGetUserCompetencyMap('u1', { subjectId: SUBJECT_ID });
     expect(map).toHaveLength(1);
-    expect(map[0].subjectId).toBe('subj-1');
+    expect(map[0].subjectId).toBe(SUBJECT_ID);
     expect(map[0].topics[0].topicId).toBe('t1');
   });
 
@@ -262,7 +283,7 @@ describe('getUserCompetencyMap (real implementation, mocked models)', () => {
       lean: jest.fn().mockResolvedValue([
         {
           _id: 'c1',
-          subjectId: 'subj-1',
+          subjectId: SUBJECT_ID,
           title: 'A',
           topics: [{ title: 'T', subtopics: [{ id: 't1', title: 'S' }] }]
         }
@@ -290,7 +311,7 @@ describe('getUserCompetencyMap (real implementation, mocked models)', () => {
     });
     Subject.find.mockReturnValue({
       select: jest.fn().mockReturnThis(),
-      lean: jest.fn().mockResolvedValue([{ _id: 'subj-1', name: 'A' }])
+      lean: jest.fn().mockResolvedValue([{ _id: SUBJECT_ID, name: 'A' }])
     });
 
     const map = await realGetUserCompetencyMap('u1');
@@ -304,7 +325,7 @@ describe('getUserCompetencyMap (real implementation, mocked models)', () => {
       lean: jest.fn().mockResolvedValue([
         {
           _id: 'c1',
-          subjectId: 'subj-1',
+          subjectId: SUBJECT_ID,
           title: 'A',
           topics: [{ title: 'T', subtopics: [{ id: 't1', title: 'S' }] }]
         }
@@ -332,7 +353,7 @@ describe('getUserCompetencyMap (real implementation, mocked models)', () => {
     });
     Subject.find.mockReturnValue({
       select: jest.fn().mockReturnThis(),
-      lean: jest.fn().mockResolvedValue([{ _id: 'subj-1', name: 'A' }])
+      lean: jest.fn().mockResolvedValue([{ _id: SUBJECT_ID, name: 'A' }])
     });
 
     const map = await realGetUserCompetencyMap('u1', { knowledgeTypeBreakdown: true });
@@ -345,7 +366,16 @@ describe('getUserCompetencyMap (real implementation, mocked models)', () => {
 });
 
 describe('getTopicDetail (real implementation, mocked models)', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    CourseEnrollment.find.mockReturnValue({
+      distinct: jest.fn().mockResolvedValue(['course-1'])
+    });
+    CourseRevision.find.mockReturnValue({
+      select: jest.fn().mockReturnThis(),
+      lean: jest.fn().mockResolvedValue([])
+    });
+  });
 
   test('returns per-level competencies with evidence excerpts and needsReview', async () => {
     Course.find.mockReturnValue({
@@ -353,7 +383,7 @@ describe('getTopicDetail (real implementation, mocked models)', () => {
       lean: jest.fn().mockResolvedValue([
         {
           _id: 'c1',
-          subjectId: 'subj-1',
+          subjectId: SUBJECT_ID,
           title: 'A',
           topics: [{ title: 'T', subtopics: [{ id: 't1', title: 'Sorting' }] }]
         }
