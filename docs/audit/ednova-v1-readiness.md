@@ -25,7 +25,7 @@ Source: `docs/reference/EdNova_Challenge_Specification_book.pdf` (3 pages, read 
 | R2 | Support **group** learning | Study rooms, LiveKit rooms, peer proposals, room checks | **Implemented** — units pass; live media not exercised here |
 | R3 | Simple explanations | Tutor + hint/explain endpoints with source citations | **Implemented** — degrades visibly without provider |
 | R4 | Guiding questions, hints **before** answers | `hintLevel` escalation, `learningSupport` modes | **Implemented** |
-| R5 | **Confusion detection** | Only 3 hardcoded regexes in `agents/facilitator/policy.py`; deterministic path emits "possible confusion" caveat | **Partially implemented** — weakest requirement |
+| R5 | **Confusion detection** | `confusionSignals.ts` (repeated errors, hint escalation, multilingual help requests) wired into both the solo hint path and room transcripts; facilitator `CONFUSION_SIGNAL` routes to peer-first help | **Implemented** [observed] — see the correction below |
 | R6 | Adapt explanation **form and level** | Hint depth / quotation difficulty selectors; `AGENT_TIERS` not on the response path | **Partially implemented** |
 | R7 | Diagnostics from questions/exercises/prior responses | Provisional diagnostic endpoint, attempt history | **Implemented** |
 | R8 | Accessible multilingual (Arabic/Darija/French/English) | Learner workspace only; `en`/`fr`/`ar`/`ary` with RTL | **Partially implemented** — one screen |
@@ -36,6 +36,30 @@ Source: `docs/reference/EdNova_Challenge_Specification_book.pdf` (3 pages, read 
 | R13 | RAG allowed and documented | FAISS `IndexFlatIP` 384-d + revision provenance | **Implemented** |
 | R14 | Voice, dashboards, quizzes, analytics, gamification, revision notes | All present as extensions | **Implemented** where claimed |
 | R15 | Working end-to-end app on a real inference service | Requires provider credentials + Python service | **Not verifiable here** — no keys, no `litellm` installed |
+
+### Correction after merging origin/main
+
+This review was written against `bb1be3d` while local `main` was eight commits behind `origin/main`.
+After merging `origin/main` (`4ef52d4`), two of its findings were no longer true and are corrected
+here rather than silently left in place:
+
+- **R5 (confusion detection) is implemented, not partial.** Upstream added
+  `apps/api/modules/study/src/services/confusionSignals.ts`: tentative signals from repeated wrong
+  attempts, hint escalation, and help requests matched in English, French, Darija (Latin) and Arabic.
+  It is wired into the solo hint path (`learningSupport.ts`) *and* room transcripts (`rooms.ts`), and
+  the facilitator maps a tentative signal to peer-first help. Behavioural evidence of being stuck —
+  not a guess at a learning style — which is the defensible reading of the requirement.
+- **R11/R12 presentation was already addressed upstream.** `features/ai-status` presents the execution
+  mode to learners via `AiModeNote`. What upstream did *not* fix is the backend: `GET /api/v1/ai/status`
+  still returned a hardcoded `'available'` for all six agents. The two halves are now reconciled — the
+  probe from this branch makes the upstream presentation truthful.
+
+The duplicate `describeExecutionMode`/`ExecutionBadge` that this branch introduced was dropped in
+favour of the upstream, already-tested component. Upstream's test asserts the same guarantees
+(including that an unknown mode is never presented as a real answer).
+
+Everything below that concerns the evidence→competency loop stands: upstream had not touched those
+files, and the defect was reproduced against the merged tree's ancestry.
 
 ### The finding that mattered most
 
@@ -75,11 +99,11 @@ so adaptive targeting could not see a learner's real weaknesses either.
 |---|---|---|
 | API typecheck | `tsc -p tsconfig.check.json` / `-p tsconfig.json` | exit 0 |
 | Web typecheck | `tsc --noEmit` | exit 0 |
-| API module + shared tests | `jest modules shared` | **653/653 pass** (46 suites) |
+| API module + shared tests (post-merge) | `jest modules shared` | **674/674 pass** (48 suites) |
 | Integration tests (MongoDB colocated) | `jest tests/integration` | **26/26 pass** (3 suites) |
 | Redis-outage regression | `jest tests/architecture/rate-limit-resilience.test.ts` | **2/2 pass** |
 | Study module | `jest modules/study` | **165/165 pass** (15 suites) |
-| Web tests | `vitest run` | **66/66 pass** (12 files) |
+| Web tests (post-merge) | `vitest run` | **75/75 pass** (13 files) |
 | Web production build | `next build --webpack` | exit 0 |
 | Browser journeys | Playwright, production build | learner / instructor / admin / denial all correct |
 
@@ -95,7 +119,7 @@ process namespace; that is an environment constraint, not a defect. With it colo
 | **P1** | `GET /api/v1/ai/status` returned hardcoded `'available'` for all six agents | Code was six literal strings | Bounded 2 s provider probe; reports real state |
 | **P1** | Re-running the demo seed failed with `EACCES` on read-only artifacts | Reproduced twice | Clear stale artifacts before rewriting |
 | **P1** | Typecheck failed: modules imported `axios` without declaring it | Isolated pnpm linker | Re-export transport types from `moduleClient` |
-| **P2** | Learners saw raw enum `DETERMINISTIC_FALLBACK` as the status of an answer | Screenshot | `describeExecutionMode` → "Rule-based answer" with an honest description |
+| **P2** | Learners saw raw enum `DETERMINISTIC_FALLBACK` as the status of an answer | Screenshot | `AiModeNote` (upstream) → "Built-in guidance"; the duplicate local component was dropped on merge |
 | **P2** | Tests mocked models that no longer matched the code | 11 failures | Updated fixtures; every behavioural assertion preserved |
 
 ### Regression cover added
@@ -103,13 +127,13 @@ process namespace; that is an environment constraint, not a defect. With it colo
 - `tests/architecture/rate-limit-resilience.test.ts` — fails 2/2 without the Redis fix, passes 2/2 with it.
 - `modules/study/src/tests/competencyEvidenceLoop.test.ts` — the two read-path tests were confirmed
   to **fail against the original code** before being accepted as guards.
-- `apps/web/src/features/learning/execution-mode.test.ts` — asserts rule-based text is never labelled model output.
+- `apps/web/src/features/ai-status/ai-status.test.ts` (upstream) — asserts rule-based text is never
+  labelled model output and an unknown mode is never presented as a real answer.
 
 ### Known gaps (not fixed — recorded honestly)
 
 | Area | State | Why not fixed |
 |---|---|---|
-| Confusion detection | 3 regexes; deterministic path only caveats | Needs a design decision, not a patch |
 | Adaptive explanation level | Selectors exist; `AGENT_TIERS` not on the response path | Requires the Python service to run |
 | Multilingual | Learner workspace only | Cross-cutting; scope is a product call |
 | Live AI inference | `UNAVAILABLE` in this environment | No provider keys; `litellm` not installed |
@@ -130,7 +154,8 @@ tentative"*. That epistemic restraint is a genuine differentiator and should sur
 **Weak, in priority order.**
 
 1. **Contradictory feedback** (fixed). "Evidence: recorded" beside an empty evidence panel.
-2. **Raw machine enums as user-facing text** (fixed). `DETERMINISTIC_FALLBACK` now reads "Rule-based answer".
+2. **Raw machine enums as user-facing text** (fixed). `DETERMINISTIC_FALLBACK` now reads
+   "Built-in guidance" via upstream's `AiModeNote`.
 3. **Progress is a flat list.** One badge per Bloom level, no trend, no next action. The data to do
    better now exists (evidence counts, confidence, recency).
 4. **The learning workspace is dense.** ~10 stacked sections on one scroll. A staged flow would read better.
@@ -158,10 +183,14 @@ plainly when text came from rules rather than a model. For a judging panel asses
 capacity behavior with visible status", that is the requirement met in the product rather than in the
 slide deck.
 
-**What I did not build.** Confusion detection and adaptive explanation are the two features that would
-most change the learning experience, and both need a decision about what "confusion" means before code.
-Shipping a confidence-typed heuristic would have *added* an unearned claim to a product whose whole
-value is not making unearned claims.
+**What I did not build.** Adaptive explanation level, which needs the model service to run. I also
+declined to build confusion detection on the reasoning that it needed a decision about what "confusion"
+means before code — shipping a confidence-typed heuristic would have added an unearned claim to a
+product whose whole value is not making unearned claims. Upstream then implemented it from behavioural
+signals (repeated errors, hint escalation, explicit multilingual help requests) rather than a guessed
+affective state, which is the version of that decision I would have argued for. That work landed in
+`origin/main` independently and is now merged; the honest summary is that I scoped it out and someone
+else solved it well.
 
 ---
 
@@ -209,9 +238,7 @@ Python service — real operational weight for a small institution.
 1. **Make Progress actionable.** Now that profiles populate: surface confidence, evidence count and
    the next recommended objective on `/progress`. *(Data exists; UI-only change.)*
 2. **Persist language choice** and apply it to the workspace shell, not one screen.
-3. **Confusion detection with a real policy.** Define the signal, then implement — do not ship a
-   confidence-typed guess.
-4. **Verify Tier documentation against the response path** so the compact/capable claim is provable.
+3. **Verify Tier documentation against the response path** so the compact/capable claim is provable.
 
 ### P2 — differentiation
 
@@ -233,18 +260,20 @@ Python service — real operational weight for a small institution.
 1. Learner signs in → course → select reviewed activity → quiz → correct answer → **Correct, 100%,
    evidence recorded** → +20 XP, badge.
 2. **Progress** shows `Computer Science → Atomic domains → ANALYSE 62%` — the loop closing.
-3. Hints panel shows **"Rule-based answer"** with the honest explanation — *this is the limited-capacity
-   story, demonstrated rather than described*.
+3. Hints panel shows the AI mode note (**"Built-in guidance"** upstream wording) with the honest
+   explanation — *this is the limited-capacity story, demonstrated rather than described*.
 4. Instructor Course Studio: draft → review → publish, source preparation, Activity Proposal Studio.
 5. Admin: institutions and course access. Learner hitting `/admin` is redirected; `/studio` returns `FORBIDDEN`.
 
-**Demo risk.** The strongest technical claims (model tiers, RAG quality, confusion detection) depend on
-the Python service, which cannot run in this environment. Either the demo machine has provider keys, or
-the pitch must present these as designed-and-constrained rather than observed. Do not let a judge ask
-"show me the model answer" and discover it cannot run.
+**Demo risk.** The strongest technical claims (model tiers, RAG quality, the facilitator's confusion
+routing) depend on the Python service, which cannot run in this environment. Either the demo machine has
+provider keys, or the pitch must present these as designed-and-constrained rather than observed. Do not
+let a judge ask "show me the model answer" and discover it cannot run. The deterministic confusion
+signals in `learningSupport.ts` *do* run without the model service, so that part can be demonstrated
+safely; the facilitator's peer-first routing cannot.
 
-**Weakest scoring area.** "Confusion detection and next steps" is R5 and is the least implemented
-requirement relative to how prominently the spec states it.
+**Weakest scoring area.** After the correction above, R6 (adapt explanation form and level) is now the
+weakest requirement relative to how prominently the spec states it.
 
 ---
 
@@ -264,9 +293,7 @@ requirement relative to how prominently the spec states it.
 | `apps/api/modules/study/src/tests/{competencies,plannerWeakestTargeting}.test.ts` | Fixtures for new dependencies |
 | `apps/api/tests/architecture/rate-limit-resilience.test.ts` | New |
 | `apps/api/modules/study/src/tests/competencyEvidenceLoop.test.ts` | New |
-| `apps/web/src/features/learning/execution-mode.ts` | New |
-| `apps/web/src/features/learning/execution-badge.tsx` | New |
-| `apps/web/src/features/learning/execution-mode.test.ts` | New |
-| `apps/web/src/features/learning/learning-workspace.tsx` | Render the badge |
+| `apps/web/src/features/learning/learning-workspace.tsx` | Adopt upstream `AiModeNote` (duplicate dropped) |
 
-Nothing is committed. Lint on changed files: 0 new errors (2 remaining are pre-existing on `HEAD`).
+Committed as five commits plus a merge of `origin/main`, not pushed. Lint on changed files: 0 new
+errors (2 remaining are pre-existing on `bb1be3d`).
