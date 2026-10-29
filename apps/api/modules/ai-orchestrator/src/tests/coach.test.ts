@@ -311,11 +311,15 @@ describe('POST /api/v1/ai/coach', () => {
 });
 
 describe('GET /api/v1/ai/status', () => {
-  it('should return AI service status', async () => {
+  it('reports the provider state instead of assuming every agent is up', async () => {
+    // The status surface must never claim inference is available when the provider
+    // is unreachable: the product relies on it to show honest fallback status.
     const response = await request(app).get('/api/v1/ai/status').expect(200);
 
     expect(response.body).toHaveProperty('agents');
-    expect(response.body.agents).toHaveProperty('coach');
-    expect(response.body.agents.coach).toBe('available');
+    expect(response.body.agents.coach).toEqual(
+      expect.objectContaining({ status: 'unavailable', tier: null, model: null })
+    );
+    expect(response.body.executionMode).toBe('UNAVAILABLE');
   });
 });

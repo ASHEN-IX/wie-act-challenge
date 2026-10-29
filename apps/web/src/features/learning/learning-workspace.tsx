@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ActivityRenderer } from "./activity-renderer";
+import { ExecutionBadge } from "./execution-badge";
 import {
   learningProgress,
   selectLearning,
@@ -371,7 +372,7 @@ export function LearningWorkspace({
           </Button>
           {support && (
             <div role="status">
-              <p>{support.executionMode}</p>
+              <ExecutionBadge mode={support.executionMode} label={t.sourceSupport} />
               <p className="whitespace-pre-wrap">{support.text}</p>
               <p>{support.policy}</p>
             </div>
@@ -413,7 +414,7 @@ export function LearningWorkspace({
         </Button>
         {answer && (
           <div data-testid="tutor-answer">
-            <p>{answer.executionMode || "Inference unavailable"}</p>
+            <ExecutionBadge mode={answer.executionMode} label={t.explain} />
             <p className="whitespace-pre-wrap">
               {answer.answer || "No verified answer available."}
             </p>

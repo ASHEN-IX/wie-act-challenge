@@ -572,15 +572,47 @@ router.post(
 router.get('/status', async (req: DomainRequest, res: Response) => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const aiCli = require('@study-partner/shared/aiClient');
+  // Report the provider's real state. A hardcoded "available" told the product,
+  // operators and the demo that inference was up while every agent was actually
+  // answering from deterministic fallbacks. The probe is bounded and never fails
+  // the request: an unreachable provider is itself the answer.
+  const agentNames = [
+    'courseIngestion',
+    'planner',
+    'scheduler',
+    'coach',
+    'signals',
+    'reviews'
+  ] as const;
+  const agentKeys = [
+    'course_ingestion',
+    'planner',
+    'schedule',
+    'coach',
+    'signals',
+    'reviews'
+  ] as const;
+  let report: {
+    execution_mode?: string;
+    agents?: Record<string, { tier?: string; model?: string; available?: boolean }>;
+  } | null = null;
+  try {
+    report = await aiCli.getProviderStatus({ timeout: 2000 });
+  } catch {
+    report = null;
+  }
+  const agents: Record<string, { status: string; tier: string | null; model: string | null }> = {};
+  for (const [index, name] of agentNames.entries()) {
+    const entry = report?.agents?.[agentKeys[index]];
+    agents[name] = {
+      status: entry ? (entry.available ? 'available' : 'unavailable') : 'unavailable',
+      tier: entry?.tier || null,
+      model: entry?.model || null
+    };
+  }
   res.json({
-    agents: {
-      courseIngestion: 'available',
-      planner: 'available',
-      scheduler: 'available',
-      coach: 'available',
-      signals: 'available',
-      reviews: 'available'
-    },
+    executionMode: report?.execution_mode || 'UNAVAILABLE',
+    agents,
     aiServiceUrl: (aiCli.getBaseUrl ? aiCli.getBaseUrl() : null) || 'http://localhost:8000'
   });
 });
