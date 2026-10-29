@@ -5,8 +5,7 @@ import type { Response, NextFunction } from 'express';
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { ContractHandler } from '@study-partner/shared/domainContracts';
 import type { Schema } from 'joi';
-import type { AxiosRequestConfig } from 'axios';
-import type { ModuleResponse } from '@study-partner/shared/moduleClient';
+import type { ModuleResponse, AxiosRequestConfig } from '@study-partner/shared/moduleClient';
 import { errorDetails } from '@study-partner/shared/errors';
 
 export const requireOwnedUser = (req: DomainRequest, res: Response, next: NextFunction) => {

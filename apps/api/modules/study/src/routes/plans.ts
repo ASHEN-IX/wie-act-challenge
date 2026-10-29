@@ -3,7 +3,7 @@ import type { JobResourceScope } from '../../../ai-orchestrator/src/models/AiJob
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response } from 'express';
 import type { FilterQuery } from 'mongoose';
-import type { AxiosResponse } from 'axios';
+import type { AxiosResponse } from '@study-partner/shared/moduleClient';
 import type { ICourse, IStudyPlan, IStudyPlanTask } from '../models';
 import { errorDetails } from '@study-partner/shared/errors';
 interface SchedulerSession {

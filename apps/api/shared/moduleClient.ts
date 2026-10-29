@@ -6,6 +6,12 @@ import type { AxiosRequestConfig } from 'axios';
 import { requestContext } from './requestContext';
 import { ServerResponse, IncomingMessage } from 'http';
 
+/**
+ * Re-exported so domain modules can describe this transport's request/response
+ * types without declaring a direct `axios` dependency of their own.
+ */
+export type { AxiosRequestConfig, AxiosResponse } from 'axios';
+
 interface CompiledOperation extends DomainOperation, CompiledPath {}
 interface ContractModule {
   operations: CompiledOperation[];
