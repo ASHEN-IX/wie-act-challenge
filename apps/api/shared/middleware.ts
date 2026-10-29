@@ -1,6 +1,7 @@
 import cors from 'cors';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { MemoryStore } from 'express-rate-limit';
+import type { Store as RateStore } from 'express-rate-limit';
 import type { Request, Response, NextFunction } from 'express';
 import type { DomainRequest } from '../src/framework/contracts';
 import type Redis from 'ioredis';
@@ -112,7 +113,66 @@ export function errorHandler(
  */
 let redisRateClient: Redis | null = null;
 let limiterIndex = 0;
-function _getRedisStore(): RateRedisStore | null {
+
+/**
+ * Keeps the Redis-backed limiter authoritative while Redis answers, but falls
+ * back to per-process counting when it is unreachable. Without this a configured
+ * but unavailable Redis turns every request — readiness probes included — into
+ * a 500. Counters are separate while degraded, so the fallback stays a subset of
+ * the configured limit and never widens it.
+ */
+class RedisFallbackStore implements RateStore {
+  private primary: RateRedisStore;
+  private fallback = new MemoryStore();
+  private degraded = false;
+
+  constructor(primary: RateRedisStore) {
+    this.primary = primary;
+  }
+
+  private async attempt<T>(operation: () => Promise<T> | T, alternate: () => Promise<T> | T) {
+    if (this.degraded) return alternate();
+    try {
+      const value = await operation();
+      if (this.degraded) {
+        this.degraded = false;
+        logger.info('Rate limit store recovered');
+      }
+      return value;
+    } catch (error) {
+      if (!this.degraded) {
+        this.degraded = true;
+        logger.warn(
+          `Rate limit store unavailable, using local counters: ${(error as Error).message}`
+        );
+      }
+      return alternate();
+    }
+  }
+
+  async increment(key: string) {
+    return this.attempt(
+      () => this.primary.increment(key),
+      () => this.fallback.increment(key)
+    );
+  }
+
+  async decrement(key: string) {
+    return this.attempt(
+      () => this.primary.decrement(key),
+      () => this.fallback.decrement(key)
+    );
+  }
+
+  async resetKey(key: string) {
+    return this.attempt(
+      () => this.primary.resetKey(key),
+      () => this.fallback.resetKey(key)
+    );
+  }
+}
+
+function _getRedisStore(): RateStore | null {
   if (!process.env.REDIS_URL) return null;
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const Redis: typeof import('ioredis').default = require('ioredis');
@@ -132,10 +192,11 @@ function _getRedisStore(): RateRedisStore | null {
     prefix: `rl:module:${limiterIndex++}:`
   });
   // Store scripts load before the first request. Observe failures so optional Redis
-  // initialization cannot become an unhandled rejection; requests still fail closed.
+  // initialization cannot become an unhandled rejection; RedisFallbackStore then
+  // serves those requests from local counters until Redis answers again.
   store.incrementScriptSha.catch((error: Error) => logger.warn(error.message));
   store.getScriptSha.catch((error: Error) => logger.warn(error.message));
-  return store;
+  return new RedisFallbackStore(store);
 }
 
 export async function closeRateLimits(): Promise<void> {
