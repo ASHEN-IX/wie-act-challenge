@@ -12,6 +12,7 @@ export type FacilitatorTrigger =
   | 'explicit_ask'
   | 'request_hint'
   | 'misconception_detected'
+  | 'confusion_signal'
   | 'phase_transition'
   | 'consensus_check';
 
@@ -67,6 +68,7 @@ const facilitatorInterventionSchema = new Schema<IFacilitatorIntervention>(
         'explicit_ask',
         'request_hint',
         'misconception_detected',
+        'confusion_signal',
         'phase_transition',
         'consensus_check'
       ],

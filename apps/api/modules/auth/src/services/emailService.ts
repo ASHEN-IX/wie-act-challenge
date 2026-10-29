@@ -52,7 +52,7 @@ async function getTransporter(): Promise<MailTransport> {
 }
 
 const FROM_ADDRESS = process.env.EMAIL_FROM || 'StudyPartner <noreply@studypartner.app>';
-const APP_URL = process.env.APP_URL || 'http://localhost:5173';
+const APP_URL = process.env.APP_URL || 'http://localhost:3000';
 
 export interface SendSubscriptionExpiryNoticeOptions {
   tier: string;

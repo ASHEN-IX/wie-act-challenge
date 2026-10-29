@@ -17,6 +17,11 @@ import {
 } from '../services/roomLearning';
 import { broadcastRoomState } from './rooms';
 import { sourceLearningSupport } from '../services/learningSupport';
+import {
+  getLearningStyle,
+  learningStyleProbeQuestions,
+  saveLearningStyle
+} from '../services/learningStyle';
 const router = createContracts();
 router.use((req: DomainRequest, res: Response, next: NextFunction) =>
   req.user?.userId ? next() : res.status(401).json({ error: 'Unauthorized' })
@@ -58,6 +63,13 @@ router.get(
   '/courses/:courseId/diagnostic',
   operation((r) => diagnosticChecks(r.user!.userId, String(r.params.courseId), revision(r)))
 );
+// Private, provisional learning-style probe. Only the learner can read or save their profile.
+router.get(
+  '/learning-style/probe',
+  operation(async () => ({ questions: learningStyleProbeQuestions() }))
+);
+router.get('/learning-style', operation((r) => getLearningStyle(r.user!.userId)));
+router.put('/learning-style', operation((r) => saveLearningStyle(r.user!.userId, r.body)));
 router.get(
   '/studio/:courseId',
   operation((r) => studioContext(r.user!.userId, String(r.params.courseId), revision(r)))

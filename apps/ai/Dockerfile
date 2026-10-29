@@ -47,6 +47,7 @@ RUN groupadd --gid 10001 ednova \
     && mkdir -p /app/uploads /app/faiss /home/ednova/.cache \
     && chown ednova:ednova /app/uploads /app/faiss /home/ednova/.cache \
     && chmod 750 /app/uploads /app/faiss \
+    && sed -i 's/\r$//' /app/scripts/container-entrypoint.sh \
     && chmod 755 /app/scripts/container-entrypoint.sh
 
 ENV HOME=/home/ednova \

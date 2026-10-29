@@ -4,6 +4,9 @@ import { resolveStoredActivity, ActivityBoundaryError } from './activityResoluti
 import { verifyRevisionArtifact } from './revisionSources';
 import { canReadCourse } from './resourceAccess';
 import { PublicationForbiddenError } from './coursePublication';
+import { assessConfusion } from './confusionSignals';
+import { StudentAttempt } from '../models/StudentAttempt';
+import { learningStyleCue } from './learningStyle';
 interface SupportState {
   userId: string;
   courseId: string;
@@ -29,6 +32,12 @@ schema.index(
 );
 const Support: Model<SupportState> =
   mongoose.models.LearningSupport || mongoose.model<SupportState>('LearningSupport', schema);
+/** Trim at a word boundary so a hint never ends mid-word. */
+function excerpt(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  return cut.slice(0, Math.max(cut.lastIndexOf(' '), 1)).trimEnd() + '…';
+}
 export async function sourceLearningSupport(
   actor: string,
   courseId: string,
@@ -96,20 +105,31 @@ export async function sourceLearningSupport(
   }
   if (!(await canReadCourse(actor, courseId))) throw new PublicationForbiddenError();
   const hintLevel = Number(state?.hintLevel || 1);
+  const wrongAttempts = await StudentAttempt.countDocuments({
+    userId: actor,
+    courseId,
+    activityId: definition.activityId,
+    'assessmentResult.isCorrect': false
+  });
+  // Private, provisional phrasing cue from the learner's own probe (hints only).
+  const styleCue = input.mode === 'hint' ? await learningStyleCue(actor) : null;
   return {
     visibility: 'recipient_only',
     userId: actor,
     mode: input.mode,
     hintLevel,
+    // Reasons only: no grades, rubrics or evidence. Tentative by design.
+    confusion: assessConfusion({ wrongAttempts, hintLevel }),
     executionMode: 'DETERMINISTIC_FALLBACK',
-    text:
+    text: (
       input.mode === 'explain'
         ? 'Source explanation: compare each part of your answer with this reviewed passage. This is source scaffolding, not a new verified correction.\n' +
           passage.text
         : hintLevel === 1
           ? 'Identify the term or reasoning step asked for. Compare its meaning with the reviewed source before choosing or writing your response.'
           : 'Possible confusion: a related term or step may not fit the source statement. Re-read this source context and compare the alternatives: ' +
-            passage.text.slice(0, 240),
+            excerpt(passage.text, 240)) +
+      (styleCue ? `\n\nStyle cue (provisional, private): ${styleCue}` : ''),
     citation: {
       documentId: passage.documentId,
       pageNumber: passage.pageNumber,

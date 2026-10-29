@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { RoomVisualizer } from "@/features/visualization/room-visualizer";
 import { Button } from "@/components/ui/button";
 import { ActivityRenderer } from "@/features/learning/activity-renderer";
+import { AiModeNote } from "@/features/ai-status/ai-status-view";
 import { learningCatalog } from "@/features/learning/journey-actions";
 import {
   ownPrivateCheck,
@@ -182,7 +183,7 @@ export function RoomLearningPanel({
           </Button>
           {proposal && (
             <div className="rounded border p-3">
-              <p>{proposal.executionMode}</p>
+              <AiModeNote mode={proposal.executionMode} />
               <p>{proposal.message}</p>
               <Button
                 disabled={busy}

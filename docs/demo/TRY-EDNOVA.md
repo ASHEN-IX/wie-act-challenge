@@ -1,21 +1,25 @@
 # Try EdNova locally
 
-Open http://localhost:5173/login. The web and API development servers were started for this session (`/tmp/ednova-demo-dev.log`). Restart them with `pnpm dev` when needed. Existing local infrastructure remains running.
+Open http://localhost:3000/login. The web app runs on port 3000 and the API on port 3001 (`pnpm dev`). Local infrastructure comes from `pnpm dev:infra:up`; Redis is on port 6390 when another project holds 6381.
 
 All four demo passwords: `EdNovaDemo!2026`. These are local demonstration accounts with verified email; no OTP is needed for their initial login.
 
 | Account | Email | User ID |
 |---|---|---|
-| Platform / institution administrator | admin@ednova.test | 6adcd6f44441bbb9f9dacf19 |
-| Instructor | instructor@ednova.test | 6adcd6f44441bbb9f9dacf1c |
-| Learner | learner@ednova.test | 6adcd6f44441bbb9f9dacf1f |
-| Second learner | peer@ednova.test | 6adcd6f44441bbb9f9dacf22 |
+| Platform / institution administrator | admin@ednova.test | 6ae1f2869274974f3bef70f9 |
+| Instructor | instructor@ednova.test | 6ae1f2879274974f3bef70fc |
+| Learner | learner@ednova.test | 6ae1f2879274974f3bef70ff |
+| Second learner | peer@ednova.test | 6ae1f2879274974f3bef7102 |
 
 On 27 October the local configuration was aligned, Docker infrastructure and the host web/API/Python/ingestion services were started, the learner browser login and API session were verified, and the cached embedding model loaded in offline mode. The local tutor still uses mock/deterministic execution; this is not approved provider inference.
 
-This workspace keeps the seeded Mongo database on port 27017 in the existing `study-partner-api-mongodb-1` container. To restart this particular setup, start that container and `study-partner-api-mailpit-1`, then start RabbitMQ and Redis with `docker compose -f deploy/compose.development.yml up -d rabbitmq redis`. Run `pnpm dev`, `pnpm dev:ai`, and `pnpm dev:worker ingestion` in separate terminals. `apps/ai/.env` selects the existing Python environment. The full `pnpm dev:infra:up` stack also starts a separate Mongo on 27018; it does not contain these demo accounts unless seeded separately.
+The demo accounts live in the `ednova_dev` database on MongoDB port 27018 (`pnpm dev:infra:up`). Seed them with `pnpm --filter api seed:learning-demo`. Run `pnpm dev` and `pnpm dev:ai` in separate terminals, and `pnpm dev:worker ingestion` for course uploads. `apps/ai/.env` selects the Python environment through `EDNOVA_AI_PYTHON`.
 
-Their active memberships belong to **EdNova Learning Demo**, institution ID `6adcd6f4e373c21e626650c6`. Instructor is an institution membership, not a platform administrator role. Course assignment/enrollment remains a separate explicit operation after creating a course. No course, activity, answer or mastery result was fabricated by this seed.
+Their active memberships belong to **EdNova Learning Demo**, institution ID `6ae1f28715e0d23d377dda36`. Instructor is an institution membership, not a platform administrator role. Course assignment/enrollment remains a separate explicit operation after creating a course. No course, activity, answer or mastery result was fabricated by this seed.
+
+## Demo course for the learning workspace
+
+Run `pnpm --filter api seed:demo-course` after the learning-demo seed. It creates **Demo: Database normalization basics** in the EdNova Learning Demo institution, indexes a synthetic normalization text through the real source pipeline, publishes two reviewed quizzes, and enrolls `learner@ednova.test`. It is idempotent. The script prints the course ID; open `/courses/<courseId>/learn` as the learner. The tutor and hints show the status note for the active AI mode. With `LLM_MOCK=1` the tutor says it is a test answer, and the hint says it is built-in guidance.
 
 ## Stories to try now
 

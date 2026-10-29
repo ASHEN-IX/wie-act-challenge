@@ -1,3 +1,4 @@
+import { plural } from "@/lib/utils";
 import Link from "next/link";
 import { randomUUID } from 'node:crypto';
 import { load } from "@/lib/api";
@@ -119,7 +120,7 @@ export default async function Rooms() {
                     </code>
                   </span>
                   <span>•</span>
-                  <span>{room.participantsCount} participants</span>
+                  <span>{plural(room.participantsCount, "participant")}</span>
                   <Badge variant="outline" className="text-xs capitalize">
                     {room.currentPhase.replaceAll("_", " ")}
                   </Badge>

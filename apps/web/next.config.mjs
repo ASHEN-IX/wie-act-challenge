@@ -121,15 +121,15 @@ export default {
     return [
       {
         source: "/api/v1/:path*",
-        destination: `${process.env.BACKEND_URL || "http://localhost:3000"}/api/v1/:path*`,
+        destination: `${process.env.BACKEND_URL || "http://localhost:3001"}/api/v1/:path*`,
       },
       {
         source: "/ws/:path*",
-        destination: `${process.env.BACKEND_URL || "http://localhost:3000"}/ws/:path*`,
+        destination: `${process.env.BACKEND_URL || "http://localhost:3001"}/ws/:path*`,
       },
       {
         source: "/uploads/:path*",
-        destination: `${process.env.BACKEND_URL || "http://localhost:3000"}/uploads/:path*`,
+        destination: `${process.env.BACKEND_URL || "http://localhost:3001"}/uploads/:path*`,
       },
     ];
   },

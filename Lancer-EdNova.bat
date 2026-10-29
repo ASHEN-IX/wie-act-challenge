@@ -19,13 +19,14 @@ call pnpm seed
 
 echo.
 echo [3/4] Ouverture automatique de votre navigateur...
-start http://localhost:5173
+start http://localhost:3000
 
 echo.
 echo [4/4] Demarrage du serveur Web et API...
 echo ========================================================
-echo  Le site est pret et accessible a l'adresse :
-echo  👉 http://localhost:5173
+echo  Le site est pret et accessible aux adresses :
+echo  👉 Web UI : http://localhost:3000
+echo  👉 API    : http://localhost:3001
 echo.
 echo  Comptes de demonstration initialises :
 echo  - Etudiant   : learner@ednova.test    (Mdp: EdNovaDemo!2026)

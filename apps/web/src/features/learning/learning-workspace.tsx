@@ -1,8 +1,13 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import {
+  AiModeNote,
+  AiWaitStatus,
+} from "@/features/ai-status/ai-status-view";
 import { ActivityRenderer } from "./activity-renderer";
-import { ExecutionBadge } from "./execution-badge";
+import { LearningStylePanel } from "./learning-style-panel";
 import {
   learningProgress,
   selectLearning,
@@ -24,6 +29,9 @@ export function LearningWorkspace({
   const objectives = context.topics.flatMap((t) =>
     t.objectives.map((o) => ({ ...o, topicId: t.topicId })),
   );
+  // Show the objective's wording, never its internal id.
+  const objectiveTitle = (id: string) =>
+    objectives.find((o) => o.objectiveId === id)?.statement ?? id;
   const [objectiveId, setObjective] = useState(
     objectives[0]?.objectiveId || "",
   );
@@ -337,6 +345,7 @@ export function LearningWorkspace({
           className="rounded-xl border p-5 space-y-3"
         >
           <h2 className="font-semibold">{t.sourceSupport}</h2>
+          <LearningStylePanel />
           <Button
             disabled={busy}
             onClick={() =>
@@ -371,10 +380,20 @@ export function LearningWorkspace({
             {t.requestExplanation}
           </Button>
           {support && (
-            <div role="status">
-              <ExecutionBadge mode={support.executionMode} label={t.sourceSupport} />
+            <div role="status" className="space-y-2">
+              <AiModeNote mode={support.executionMode} />
               <p className="whitespace-pre-wrap">{support.text}</p>
               <p>{support.policy}</p>
+              {support.confusion?.tentative && (
+                <p className="text-sm">
+                  This step looks tricky. You can ask for the full source
+                  explanation, or talk it through with a peer in a{" "}
+                  <Link href="/study-together" className="underline">
+                    study room
+                  </Link>
+                  .
+                </p>
+              )}
             </div>
           )}
         </section>
@@ -412,9 +431,10 @@ export function LearningWorkspace({
         >
           {busy ? "Loading…" : "Ask from sources"}
         </Button>
+        {busy && <AiWaitStatus />}
         {answer && (
           <div data-testid="tutor-answer">
-            <ExecutionBadge mode={answer.executionMode} label={t.explain} />
+            <AiModeNote mode={answer.executionMode} />
             <p className="whitespace-pre-wrap">
               {answer.answer || "No verified answer available."}
             </p>
@@ -439,11 +459,12 @@ export function LearningWorkspace({
         <p>{progress?.policy}</p>
         <p>
           Objectives with accepted mastery evidence:{" "}
-          {progress?.masteredObjectiveIds.join(", ") || "None"}
+          {progress?.masteredObjectiveIds.map(objectiveTitle).join(", ") ||
+            "None"}
         </p>
         {progress?.recommendation && (
           <p>
-            Next objective: {progress.recommendation.objectiveId}.{" "}
+            Next objective: {objectiveTitle(progress.recommendation.objectiveId)}.{" "}
             {progress.recommendation.reason}
           </p>
         )}

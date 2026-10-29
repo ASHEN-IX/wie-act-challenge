@@ -838,6 +838,27 @@ export class StudyController {
       res
     );
   }
+  @Get('/api/v1/study/learning/learning-style/probe')
+  get_api_v1_study_learning_learningstyle_probe_aeeccf0a(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('GET /api/v1/study/learning/learning-style/probe', req, res);
+  }
+  @Get('/api/v1/study/learning/learning-style')
+  get_api_v1_study_learning_learningstyle_42115772(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('GET /api/v1/study/learning/learning-style', req, res);
+  }
+  @Put('/api/v1/study/learning/learning-style')
+  put_api_v1_study_learning_learningstyle_98cf3391(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('PUT /api/v1/study/learning/learning-style', req, res);
+  }
   @Get('/api/v1/study/learning/studio/:courseId')
   get_api_v1_study_learning_studio_373d7661(
     @Req() req: DomainRequest,

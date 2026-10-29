@@ -14,7 +14,7 @@ pnpm dev:doctor
 pnpm dev
 ```
 
-Open [localhost:5173](http://localhost:5173). Setup creates missing local environment files with shared random service/auth secrets and preserves existing files. Resolve any `doctor` failures before continuing. Infrastructure ports: Mongo **27018**, RabbitMQ **5673** (management **15673**), Redis **6381**, SMTP **1026**, Mailpit UI **8026**. Stop an existing test stack before starting the dev stack; their Mongo/Mailpit ports overlap.
+Open [localhost:3000](http://localhost:3000). Setup creates missing local environment files with shared random service/auth secrets and preserves existing files. Resolve any `doctor` failures before continuing. Infrastructure ports: Mongo **27018**, RabbitMQ **5673** (management **15673**), Redis **6381**, SMTP **1026**, Mailpit UI **8026**. Stop an existing test stack before starting the dev stack; their Mongo/Mailpit ports overlap.
 
 `pnpm dev` starts the API and web only. See [development](docs/development.md) for Python HTTP/workers, provider configuration, uploads and testing. Local setup explicitly uses mock inference; real approved model access remains required for feature acceptance.
 
@@ -49,4 +49,4 @@ This is a **pnpm workspace** with applications organized cleanly under `apps/` (
 | `pnpm test` / `pnpm test:integration` / `pnpm test:e2e` | Node unit/auth, integration and browser tests |
 | `pnpm generate:contracts` | Regenerate Nest adapters after domain-route changes |
 
-[Frontend structure and migration scope](docs/frontend-web.md) · [Documentation](docs/README.md) · [Current architecture](docs/architecture.md) · [Target architecture](docs/target-architecture.md) · [Preparation results and remaining blockers](docs/audit/cleanup.md)
+[Frontend structure and migration scope](docs/frontend-web.md) · [Documentation](docs/README.md) · [Current architecture](docs/architecture.md) · [Target architecture](docs/target-architecture.md) · [Preparation results and remaining blockers](docs/audit/cleanup.md) · [Challenge submission report](docs/submission/TECHNICAL-REPORT.pdf)

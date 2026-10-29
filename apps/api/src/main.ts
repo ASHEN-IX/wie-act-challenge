@@ -40,7 +40,7 @@ export interface StartedApplication {
 }
 
 export async function start({
-  port = Number(process.env.PORT || 3000),
+  port = Number(process.env.PORT || 3001),
   workers = true
 }: StartOptions = {}): Promise<StartedApplication> {
   requireEnv(['MONGODB_URI', 'BETTER_AUTH_SECRET', 'INTERNAL_API_SECRET', 'RABBITMQ_URL'], {

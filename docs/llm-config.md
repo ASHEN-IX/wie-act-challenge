@@ -58,16 +58,37 @@ deployments plus `router_settings`.
 
 | Alias | Primary model | Temp / max_tokens | Fallback chain |
 |-------|---------------|-------------------|----------------|
-| `coach` | `gemini/gemini-2.0-flash` | 0.5 / 512 | `[groq-main]` |
-| `planner` | `nvidia_nim/deepseek-ai/deepseek-r1` | 0.3 / 2048 | `[nvidia-main, groq-main]` |
-| `search` | `openrouter/meta-llama/llama-3.3-70b-instruct` | 0.2 / 1536 | `[groq-main]` |
-| `reflection` | `nvidia_nim/meta/llama-3.3-70b-instruct` | 0.7 / 2048 | `[groq-main]` |
-| `course_ingestion` | `groq/llama-3.1-8b-instant` | 0.1 / 1024 | `[nvidia-main]` |
-| `evaluator` | `gemini/gemini-2.0-flash` | 0.3 / 1536 | `[groq-main, openrouter-main]` |
+| `coach` | `groq/openai/gpt-oss-20b` | 0.5 / 1024 | `[groq-main]` |
+| `planner` | `groq/openai/gpt-oss-120b` | 0.3 / 2048 | `[nvidia-main, groq-main]` |
+| `search` | `groq/openai/gpt-oss-120b` | 0.2 / 1536 | `[groq-main]` |
+| `reflection` | `groq/openai/gpt-oss-120b` | 0.7 / 2048 | `[groq-main]` |
+| `course_ingestion` | `groq/openai/gpt-oss-20b` | 0.1 / 1024 | `[nvidia-main]` |
+| `evaluator` | `groq/openai/gpt-oss-120b` | 0.3 / 1536 | `[groq-main, nvidia-main]` |
+| `facilitator` | `groq/openai/gpt-oss-120b` | 0.5 / 1536 | `[nvidia-main]` |
 
-Fallback deployments: `groq-main` = `groq/llama-3.3-70b-versatile`,
-`nvidia-main` = `nvidia_nim/meta/llama-3.3-70b-instruct`,
-`openrouter-main` = `openrouter/meta-llama/llama-3.3-70b-instruct`.
+### Compact and capable tiers
+
+Each agent is tagged in `utils/llm_client.py` (`AGENT_TIERS`) so the split is explicit:
+
+- **Compact** (`gpt-oss-20b`): short, frequent steps with a well-defined output: `coach` (hints, grounded tutor answers) and `course_ingestion` (cleaning and extraction).
+- **Capable** (`gpt-oss-120b`): steps that synthesize or judge: `facilitator` (peer-first interventions across several learners), `planner`, `search`, `reflection`, `evaluator` (grading).
+
+The facilitator prompt contains learner dialogue, so it is never cached. Course-only steps (`course_ingestion`) opt into the response cache (see below).
+
+### Response cache
+
+`ask(..., cache=True)` reuses a previous approved response for an identical agent, model, system prompt, user prompt and sampling settings. The cache key is a SHA-256 hash, so prompt text is not stored in the key. Values live in Redis (`REDIS_URL`) for `LLM_CACHE_TTL_SECONDS` (default 7 days).
+
+- Opt-in only. Callers must pass `cache=True` only for content with no learner data.
+- Only validated real responses are stored. Mock and fallback results are never cached.
+- A cache hit still goes through the approval gate, and it counts against the approval's request budget. This is deliberately conservative.
+- A Redis outage falls back to a normal approved call.
+
+Fallback deployments: `groq-main` = `groq/openai/gpt-oss-120b`,
+`nvidia-main` = `nvidia_nim/meta/llama-3.2-11b-vision-instruct`,
+`openrouter-main` = `openrouter/meta-llama/llama-3.3-70b-instruct` (defined, not used by any alias while no OpenRouter key is provisioned).
+
+These models were chosen from the models available to the provided Groq and NVIDIA keys on 28 October 2026. Gemini and OpenRouter aliases were replaced because no keys were provisioned for them. `gpt-oss` models are reasoning models, so `max_tokens` includes reasoning tokens.
 
 ### Router settings
 

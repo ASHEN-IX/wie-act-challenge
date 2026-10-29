@@ -16,17 +16,17 @@ model_list:
 # COACH — short, frequent nudges: speed + judgement.
 - model_name: coach
   litellm_params:
-    model: gemini/gemini-2.0-flash
-    api_key: os.environ/GEMINI_API_KEY
+    model: groq/openai/gpt-oss-20b
+    api_key: os.environ/GROQ_API_KEY
     temperature: 0.5
-    max_tokens: 512
+    max_tokens: 1024
     drop_params: true
 
 # PLANNER — goal decomposition into plans: strong open-weights reasoning.
 - model_name: planner
   litellm_params:
-    model: nvidia_nim/deepseek-ai/deepseek-r1
-    api_key: os.environ/NVIDIA_API_KEY
+    model: groq/openai/gpt-oss-120b
+    api_key: os.environ/GROQ_API_KEY
     temperature: 0.3
     max_tokens: 2048
     drop_params: true
@@ -34,8 +34,8 @@ model_list:
 # SEARCH — web-result synthesis: long-context + fast.
 - model_name: search
   litellm_params:
-    model: openrouter/meta-llama/llama-3.3-70b-instruct
-    api_key: os.environ/OPENROUTER_API_KEY
+    model: groq/openai/gpt-oss-120b
+    api_key: os.environ/GROQ_API_KEY
     temperature: 0.2
     max_tokens: 1536
     drop_params: true
@@ -43,8 +43,8 @@ model_list:
 # REFLECTION — empathetic, long-form journaling.
 - model_name: reflection
   litellm_params:
-    model: nvidia_nim/meta/llama-3.3-70b-instruct
-    api_key: os.environ/NVIDIA_API_KEY
+    model: groq/openai/gpt-oss-120b
+    api_key: os.environ/GROQ_API_KEY
     temperature: 0.7
     max_tokens: 2048
     drop_params: true
@@ -52,7 +52,7 @@ model_list:
 # COURSE_INGESTION — deterministic title/entity extraction: small + cheap.
 - model_name: course_ingestion
   litellm_params:
-    model: groq/llama-3.1-8b-instant
+    model: groq/openai/gpt-oss-20b
     api_key: os.environ/GROQ_API_KEY
     temperature: 0.1
     max_tokens: 1024
@@ -61,9 +61,18 @@ model_list:
 # EVALUATOR — question generation + grading: structured outputs.
 - model_name: evaluator
   litellm_params:
-    model: gemini/gemini-2.0-flash
-    api_key: os.environ/GEMINI_API_KEY
+    model: groq/openai/gpt-oss-120b
+    api_key: os.environ/GROQ_API_KEY
     temperature: 0.3
+    max_tokens: 1536
+    drop_params: true
+
+# FACILITATOR — peer-first interventions across several learners: capable tier.
+- model_name: facilitator
+  litellm_params:
+    model: groq/openai/gpt-oss-120b
+    api_key: os.environ/GROQ_API_KEY
+    temperature: 0.5
     max_tokens: 1536
     drop_params: true
 
@@ -71,13 +80,13 @@ model_list:
 
 - model_name: groq-main
   litellm_params:
-    model: groq/llama-3.3-70b-versatile
+    model: groq/openai/gpt-oss-120b
     api_key: os.environ/GROQ_API_KEY
     drop_params: true
 
 - model_name: nvidia-main
   litellm_params:
-    model: nvidia_nim/meta/llama-3.3-70b-instruct
+    model: nvidia_nim/meta/llama-3.2-11b-vision-instruct
     api_key: os.environ/NVIDIA_API_KEY
     drop_params: true
 
@@ -98,4 +107,5 @@ router_settings:
     - search: [groq-main]
     - reflection: [groq-main]
     - course_ingestion: [nvidia-main]
-    - evaluator: [groq-main, openrouter-main]
+    - evaluator: [groq-main, nvidia-main]
+    - facilitator: [nvidia-main]

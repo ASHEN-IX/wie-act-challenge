@@ -12,8 +12,8 @@ services:
     - path: ./apps/ai/.env
       required: false
     environment:
-      MONGODB_URI: mongodb://mongodb:27017/study_partner_ai
-      DB_NAME: ${AI_DB_NAME:-study_partner_ai}
+      MONGODB_URI: mongodb://mongodb:27017/${AI_DB_NAME:-ednova_dev}
+      DB_NAME: ${AI_DB_NAME:-ednova_dev}
       RABBITMQ_URL: amqp://${RABBITMQ_USER:-mindflow}:${RABBITMQ_PASS:?RABBITMQ_PASS
         must be set}@rabbitmq:5672/${RABBITMQ_VHOST:-mindflow}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
@@ -32,8 +32,8 @@ services:
     volumes:
     # Both the ingestion worker and the authenticated source-preparation HTTP
     # endpoint create revision artifacts on this shared volume.
-    - revision_faiss:/app/faiss
-    - study_uploads:/app/uploads
+    - ./var/dev-faiss:/app/faiss
+    - ./var/dev-uploads:/app/uploads
     depends_on:
       mongodb:
         condition: service_healthy
