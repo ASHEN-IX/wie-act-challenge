@@ -859,6 +859,20 @@ export class StudyController {
   ): Promise<void> {
     return this.service.execute('PUT /api/v1/study/learning/learning-style', req, res);
   }
+  @Get('/api/v1/study/learning/language')
+  get_api_v1_study_learning_language_c85e2586(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('GET /api/v1/study/learning/language', req, res);
+  }
+  @Put('/api/v1/study/learning/language')
+  put_api_v1_study_learning_language_a6478acf(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('PUT /api/v1/study/learning/language', req, res);
+  }
   @Get('/api/v1/study/learning/studio/:courseId')
   get_api_v1_study_learning_studio_373d7661(
     @Req() req: DomainRequest,

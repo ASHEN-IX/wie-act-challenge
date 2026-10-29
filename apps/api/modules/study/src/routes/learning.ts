@@ -22,6 +22,22 @@ import {
   learningStyleProbeQuestions,
   saveLearningStyle
 } from '../services/learningStyle';
+import UserProfile from '../../../user-profile/src/models/UserProfile';
+
+// Interface languages the learning workspace can actually render. Keep this list
+// in step with the translations in the web workspace; a persisted value outside
+// it would only produce a half-translated page.
+const WORKSPACE_LANGUAGES = ['en', 'fr', 'ar', 'ary'] as const;
+type WorkspaceLanguage = (typeof WORKSPACE_LANGUAGES)[number];
+
+async function getWorkspaceLanguage(userId: string): Promise<WorkspaceLanguage> {
+  const profile = await UserProfile.findOne({ userId }).select('preferences.language').lean();
+  const stored = profile?.preferences?.language;
+  return WORKSPACE_LANGUAGES.includes(stored as WorkspaceLanguage)
+    ? (stored as WorkspaceLanguage)
+    : 'en';
+}
+
 const router = createContracts();
 router.use((req: DomainRequest, res: Response, next: NextFunction) =>
   req.user?.userId ? next() : res.status(401).json({ error: 'Unauthorized' })
@@ -70,6 +86,27 @@ router.get(
 );
 router.get('/learning-style', operation((r) => getLearningStyle(r.user!.userId)));
 router.put('/learning-style', operation((r) => saveLearningStyle(r.user!.userId, r.body)));
+// The learner's interface language, so the choice survives a reload and follows
+// them to any surface that renders these languages.
+router.get(
+  '/language',
+  operation(async (r) => ({ language: await getWorkspaceLanguage(r.user!.userId) }))
+);
+router.put(
+  '/language',
+  operation(async (r) => {
+    const language = (r.body || {}).language;
+    if (!WORKSPACE_LANGUAGES.includes(language)) {
+      throw Object.assign(new Error('Unsupported interface language'), { status: 400 });
+    }
+    const profile = await UserProfile.findOneAndUpdate(
+      { userId: r.user!.userId },
+      { $set: { 'preferences.language': language } },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+    return { language };
+  })
+);
 router.get(
   '/studio/:courseId',
   operation((r) => studioContext(r.user!.userId, String(r.params.courseId), revision(r)))

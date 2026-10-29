@@ -15,15 +15,19 @@ import {
   sendLearningAttempt,
   askLearningTutor,
   requestLearningSupport,
+  saveWorkspaceLanguage,
+  type WorkspaceLanguage,
 } from "./journey-actions";
 import type { learningCatalog } from "./journey-actions";
 import type { ActivityDefinition } from "@/lib/activity-contracts";
 export function LearningWorkspace({
   catalog,
   userId,
+  initialLanguage,
 }: {
   catalog: Awaited<ReturnType<typeof learningCatalog>>;
   userId: string;
+  initialLanguage?: WorkspaceLanguage;
 }) {
   const { context, activities } = catalog;
   const objectives = context.topics.flatMap((t) =>
@@ -53,7 +57,15 @@ export function LearningWorkspace({
   const [support, setSupport] = useState<Awaited<
     ReturnType<typeof requestLearningSupport>
   > | null>(null);
-  const [workspaceLang, setWorkspaceLang] = useState<"en" | "fr" | "ar" | "ary">("en");
+  // The language is persisted on the learner's profile, so it survives a reload
+  // and follows them to any surface that renders these languages.
+  const [workspaceLang, setWorkspaceLang] = useState<WorkspaceLanguage>(
+    initialLanguage ?? "en",
+  );
+  // Only this component's own strings are translated. Applying RTL to the whole
+  // workspace would flip English sentences that have no translation and strand
+  // their punctuation on the wrong side, which is worse than left-to-right. RTL is
+  // therefore scoped to the translated region below.
   const isRtl = workspaceLang === "ar" || workspaceLang === "ary";
   const [checks, setChecks] = useState<ActivityDefinition[]>([]);
   const attempt = useRef<{
@@ -143,6 +155,17 @@ export function LearningWorkspace({
       current = false;
     };
   }, [context.courseId, context.revisionId]);
+  function changeLanguage(next: WorkspaceLanguage) {
+    const previous = workspaceLang;
+    // Switch immediately so the choice feels instant, then persist. A failed save
+    // reverts rather than leaving the screen in a state that will not survive a
+    // reload, and says so instead of failing silently.
+    setWorkspaceLang(next);
+    saveWorkspaceLanguage(next).catch(() => {
+      setWorkspaceLang(previous);
+      setError("Could not save your language choice. Try again.");
+    });
+  }
   async function run(action: () => Promise<void>) {
     setBusy(true);
     setError("");
@@ -164,7 +187,6 @@ export function LearningWorkspace({
   }
   return (
     <div
-      dir={isRtl ? "rtl" : "ltr"}
       lang={workspaceLang}
       className="mx-auto max-w-4xl space-y-6 pb-16"
     >
@@ -186,9 +208,7 @@ export function LearningWorkspace({
             id="learning-lang-select"
             aria-label="Interface language"
             value={workspaceLang}
-            onChange={(e) =>
-              setWorkspaceLang(e.target.value as "en" | "fr" | "ar" | "ary")
-            }
+            onChange={(e) => changeLanguage(e.target.value as WorkspaceLanguage)}
             className="rounded border p-1 text-sm bg-background"
           >
             <option value="en">English (en)</option>
@@ -198,13 +218,22 @@ export function LearningWorkspace({
           </select>
         </div>
       </div>
+      {workspaceLang !== "en" && (
+        <p className="text-xs text-muted-foreground">
+          Translated on this screen only; the rest of the workspace stays in
+          English.
+        </p>
+      )}
       <p className="text-xs text-muted-foreground">{t.disclaimer}</p>
       {error && (
         <p role="alert" className="text-destructive">
           {error}
         </p>
       )}
-      <section className="rounded-xl border p-5 space-y-3">
+      <section
+        className="rounded-xl border p-5 space-y-3"
+        dir={isRtl ? "rtl" : "ltr"}
+      >
         <h2 className="font-semibold">{t.goal}</h2>
         <label className="block">
           {t.objective}{" "}

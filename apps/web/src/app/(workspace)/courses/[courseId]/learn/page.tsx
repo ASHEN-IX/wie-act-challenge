@@ -1,5 +1,8 @@
 import { requireIdentity } from "@/server/identity";
-import { learningCatalog } from "@/features/learning/journey-actions";
+import {
+  learningCatalog,
+  loadWorkspaceLanguage,
+} from "@/features/learning/journey-actions";
 import { LearningWorkspace } from "@/features/learning/learning-workspace";
 import { DataError } from "@/components/shared/states";
 export default async function LearnPage({
@@ -13,8 +16,19 @@ export default async function LearnPage({
   const { courseId } = await params;
   const { revisionId } = await searchParams;
   try {
-    const catalog = await learningCatalog(courseId, revisionId);
-    return <LearningWorkspace catalog={catalog} userId={identity.userId} />;
+    const [catalog, language] = await Promise.all([
+      learningCatalog(courseId, revisionId),
+      // A failed preference read must not block the lesson; English is the
+      // documented fallback.
+      loadWorkspaceLanguage().catch(() => "en" as const),
+    ]);
+    return (
+      <LearningWorkspace
+        catalog={catalog}
+        userId={identity.userId}
+        initialLanguage={language}
+      />
+    );
   } catch (error) {
     return (
       <DataError

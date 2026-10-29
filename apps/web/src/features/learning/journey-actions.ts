@@ -173,3 +173,22 @@ export async function saveLearningStyle(answers: Record<string, string>) {
     { method: "PUT", body: JSON.stringify(answers) },
   );
 }
+
+export type WorkspaceLanguage = "en" | "fr" | "ar" | "ary";
+
+/** The learner's persisted interface language. Falls back to English. */
+export async function loadWorkspaceLanguage(): Promise<WorkspaceLanguage> {
+  await requireIdentity();
+  const data = await api<{ language: WorkspaceLanguage }>(
+    "/api/v1/study/learning/language",
+  );
+  return data.language;
+}
+
+export async function saveWorkspaceLanguage(language: WorkspaceLanguage) {
+  await requireIdentity();
+  return api<{ language: WorkspaceLanguage }>(
+    "/api/v1/study/learning/language",
+    { method: "PUT", body: JSON.stringify({ language }) },
+  );
+}
