@@ -566,12 +566,48 @@ def build_router():
     }
     for unused in router_settings:
         logger.warning("llm_router_unknown_setting", extra={"key": unused})
+
+    # Router-level fallbacks are deliberately not enabled. `ask()` accepts only the
+    # model named in the operator's approval (`approval["model"]`) and raises
+    # "Provider/model identity did not match approval" for anything else. A fallback
+    # deployment reporting a different model would therefore be discarded after
+    # being paid for, and a same-family fallback would silently answer as the
+    # approved model. Recovery is the caller's typed deterministic fallback instead,
+    # which is reported as DETERMINISTIC_FALLBACK rather than passed off as
+    # inference. The YAML still resolves these chains via `agent_config()` for
+    # routing, documentation and so a fallback-aware approval model can adopt them.
+    configured_fallbacks = _configured_fallback_agents()
+    if configured_fallbacks:
+        logger.info(
+            "llm_router_fallbacks_not_routed",
+            extra={
+                "agents": configured_fallbacks,
+                "reason": "approval_binds_exact_model",
+            },
+        )
+
     _router = litellm.Router(
         model_list=cfg.get("model_list", []),
         fallbacks=[],
+        # Retries stay with the caller: each attempt needs its own approval budget
+        # reservation, which the Router cannot make.
         **{**retry_kwargs, "num_retries": 0},
     )
     return _router
+
+
+def _configured_fallback_agents() -> List[str]:
+    """Agents whose YAML declares a fallback chain.
+
+    Reported at router construction so an operator can see that a chain in the
+    config is documentation rather than active routing.
+    """
+    chains = load_config().get("router_settings", {}).get("fallbacks", []) or []
+    agents: List[str] = []
+    for mapping in chains:
+        if isinstance(mapping, dict):
+            agents.extend(mapping.keys())
+    return agents
 
 
 def reset_router() -> None:

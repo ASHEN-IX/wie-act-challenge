@@ -306,8 +306,32 @@ def test_router_builds_from_yaml():
     router = build_router()
     models = {d["model_name"] for d in router.model_list}
     assert set(AGENT_GROUPS) <= models
-    assert router.fallbacks is None or isinstance(router.fallbacks, list)
     reset_router()
+
+
+def test_router_fallbacks_are_disabled_because_approval_binds_an_exact_model():
+    """Pins a deliberate decision, not an accident.
+
+    The YAML declares fallback chains and `agent_config()` resolves them, but the
+    Router gets `fallbacks=[]`. `ask()` rejects any response whose model is not the
+    approved one, so a routed fallback would be paid for and then discarded. This
+    test fails if someone re-enables routing without also widening the approval
+    model, which is the change that would actually make fallbacks safe.
+    """
+    # Reset first: a router cached by an earlier test would make this assertion
+    # read someone else's instance and pass regardless of the current config.
+    reset_router()
+    router = build_router()
+    assert router.fallbacks in (None, []), router.fallbacks
+    reset_router()
+
+
+def test_configured_fallback_chains_are_visible_to_operators():
+    """The declared chains must resolve even though they are not routed."""
+    assert agent_config("coach").fallback_models == ("groq/openai/gpt-oss-120b",)
+    assert "nvidia_nim/meta/llama-3.2-11b-vision-instruct" in (
+        agent_config("facilitator").fallback_models
+    )
 
 
 def test_reset_router_rebuilds():

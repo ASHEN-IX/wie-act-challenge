@@ -103,9 +103,32 @@ router_settings:
     ...
 ```
 
-`build_router()` lifts `num_retries`/`allowed_fails`/`retry_after`/
-`cooldown_time` to the `litellm.Router` constructor and passes `fallbacks` as
-LiteLLM expects. `litellm.drop_params = True` is set globally.
+`build_router()` lifts `allowed_fails`/`retry_after`/`cooldown_time` to the
+`litellm.Router` constructor. `litellm.drop_params = True` is set globally.
+
+**Fallback chains are resolved but not routed, and that is deliberate.** The
+`fallbacks:` block above is read by `agent_config()`, so the chains appear in
+status output and in the per-agent wiring, but `build_router()` passes
+`fallbacks=[]` to the Router. `ask()` accepts only the model named in the
+operator's approval (`LLM_APPROVALS_JSON[agent].model`):
+
+```python
+if getattr(response, "model", None) not in (approval["model"], approved_bare):
+    raise LLMRequestError("Provider/model identity did not match approval")
+```
+
+A routed fallback would therefore be paid for and then discarded, because it
+reports a different model. Enabling `fallbacks=` without changing the approval to
+name each fallback (or dropping the identity check) is strictly worse than the
+current behaviour. Recovery today is the caller's typed deterministic fallback,
+which is reported as `DETERMINISTIC_FALLBACK` rather than presented as inference.
+
+`num_retries` is forced to `0` for the same reason: each attempt needs its own
+approval-budget reservation, which the Router cannot make. Retries belong to the
+caller.
+
+Both behaviours are pinned by `tests/test_llm_client.py` so a future change has to
+make the corresponding approval change rather than silently re-enabling routing.
 
 ### Provider prefixes
 

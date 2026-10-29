@@ -29,7 +29,7 @@ Source: `docs/reference/EdNova_Challenge_Specification_book.pdf` (3 pages, read 
 | R6 | Adapt explanation **form and level** | Hint depth / quotation difficulty selectors; `AGENT_TIERS` not on the response path | **Partially implemented** |
 | R7 | Diagnostics from questions/exercises/prior responses | Provisional diagnostic endpoint, attempt history | **Implemented** |
 | R8 | Accessible multilingual (Arabic/Darija/French/English) | Learner workspace only; `en`/`fr`/`ar`/`ary` with RTL | **Partially implemented** — one screen |
-| R9 | Deliberate compact **and** capable model combination, documented | `AGENT_TIERS` maps agents to tiers; `litellm/config.yaml` defines aliases | **Implemented** [observed] — see §6 caveat |
+| R9 | Deliberate compact **and** capable model combination, documented | `AGENT_TIERS` resolves each agent to a distinct model: compact `gpt-oss-20b` vs capable `gpt-oss-120b`, confirmed by executing the resolver | **Implemented** [verified] — resolution verified; live inference unverified |
 | R10 | No fine-tuning / custom training | No training path in the request flow | **Implemented** |
 | R11 | Non-streamed responses need progress/staged feedback | Job queue + AI status endpoint | **Implemented**, now honest (was hardcoded "available") |
 | R12 | Limited shared capacity → queue/retry/fallback **with visible status** | RabbitMQ ladder `[1000,4000,16000]`, DLQ, `ExecutionMode` | **Fixed** — status was a static lie; now probed |
@@ -233,12 +233,36 @@ Python service — real operational weight for a small institution.
 | `/ai/status` must report reality | Done + test |
 | Seed must be re-runnable | Done |
 
+### Tier claim verified — and the fallback chains it exposed
+
+The compact/capable split holds on the response path. Executing the resolver against the real config
+(`agent_config()` + `AGENT_TIERS`) gives every agent a distinct model: `coach` and `course_ingestion`
+resolve to `gpt-oss-20b` (compact), while `facilitator`, `planner`, `search`, `reflection` and
+`evaluator` resolve to `gpt-oss-120b` (capable). Both categories are genuinely in use — that is the
+spec's "deliberately combine" requirement, not a single model with tier labels attached. [verified]
+
+Verifying it surfaced a defect worth recording. `litellm/config.yaml` declares a fallback chain per
+agent and `build_router()` extracts it into a local variable — which is then never used, because the
+Router is constructed with a hardcoded `fallbacks=[]` and `num_retries: 0`. So the chains were pure
+documentation.
+
+That turned out to be the *correct* behaviour, for a reason the code did not state. `ask()` accepts only
+the model named in the operator's approval and raises `"Provider/model identity did not match approval"`
+for anything else. Enabling `fallbacks=` without also widening the approval would have made every
+fallback dead on arrival: paid for, then discarded. Recovery already exists at the caller as a typed
+deterministic fallback, reported as `DETERMINISTIC_FALLBACK` rather than passed off as inference.
+
+So the fix is not to enable routing — it is to make the decision explicit, log it at construction, and
+pin it with a test that fails if someone re-enables routing without the matching approval change. The
+upstream test had asserted `router.fallbacks is None or isinstance(router.fallbacks, list)`, which
+cannot fail and therefore guarded nothing; it is replaced.
+
 ### P1 — high impact, safe
 
 1. **Make Progress actionable.** Now that profiles populate: surface confidence, evidence count and
    the next recommended objective on `/progress`. *(Data exists; UI-only change.)*
 2. **Persist language choice** and apply it to the workspace shell, not one screen.
-3. **Verify Tier documentation against the response path** so the compact/capable claim is provable.
+3. ~~Verify Tier documentation against the response path.~~ **Done** — see note below.
 
 ### P2 — differentiation
 
