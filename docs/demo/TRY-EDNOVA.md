@@ -38,6 +38,11 @@ These passed the isolated P0-R3 integration/browser verification, but the curren
 1. **Instructor authoring:** Courses → Upload; first create a subject, select EdNova Learning Demo, upload a source, Open course → Studio, refresh ingestion, review/add objectives and Save Draft. Prepare the exact source revision, select a real passage, generate quiz/GuidedProblem, review public preview and private evaluation, explicitly register, then publish.
 2. **Course access:** use the administrator's Institutions page with the course ID to assign instructor access where required and enroll learner/peer. Copy the course ID from its URL. Membership and course grants are separate.
 3. **Solo learning:** Open published learning, select objective/type, answer both incorrectly and correctly, inspect private feedback/history and accepted-evidence progress, ask the grounded tutor and open its authenticated citations.
+
+   Verified 29 October against the production build: a correct reviewed attempt now also appears on
+   **Progress** (`Computer Science → Atomic domains → ANALYSE · 62%`). Until this review it did not —
+   accepted evidence was recorded but no competency profile was written, so the page stayed empty.
+   See [challenge readiness](../audit/ednova-v1-readiness.md) for the five defects and their fixes.
 4. **Shared activity:** create a room with that published course context, join as peer, select a reviewed activity as presenter, submit independent private checks, request/accept the deterministic peer-first proposal, and transition to debrief. A peer cannot read another learner's result.
 5. **Revocation/recovery:** retry an uncertain attempt without changing its payload; reload owned results. Remove a course/institution grant and check that future protected reads are denied.
 
