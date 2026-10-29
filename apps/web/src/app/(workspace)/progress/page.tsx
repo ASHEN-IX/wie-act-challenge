@@ -1,7 +1,9 @@
+import Link from "next/link";
 import { load } from "@/lib/api";
 import { PageHeader } from "@/components/shared/page-header";
 import { DataError, EmptyState } from "@/components/shared/states";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { RewardSummary } from "@/features/rewards/reward-summary";
 import type { LearningRewards } from "@/features/rewards/types";
 interface Competency {
@@ -10,13 +12,29 @@ interface Competency {
   topics: {
     topicId: string;
     topicName: string;
+    parentTopic?: string;
+    courseId?: string;
     levels: {
       bloomLevel: string;
       score: number;
       confidence: number;
       count: number;
+      needsReview?: boolean;
     }[];
   }[];
+}
+// Bloom levels are reported in their canonical order; label them for a learner
+// rather than showing the taxonomy constant.
+const LEVEL_LABELS: Record<string, string> = {
+  REMEMBER: "Recall",
+  UNDERSTAND: "Understand",
+  APPLY: "Apply",
+  ANALYSE: "Analyse",
+  EVALUATE: "Evaluate",
+  CREATE: "Create",
+};
+function levelLabel(level: string) {
+  return LEVEL_LABELS[level] ?? level;
 }
 export const metadata = { title: "Progress" };
 export default async function Progress() {
@@ -43,15 +61,28 @@ export default async function Progress() {
                 key={topic.topicId}
                 className="mb-4 rounded-lg border p-5"
               >
-                <h3 className="mb-4 font-medium">{topic.topicName}</h3>
-                <div className="flex flex-wrap gap-3">
+                <h3 className="font-medium">{topic.topicName}</h3>
+                {topic.parentTopic && (
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {topic.parentTopic}
+                  </p>
+                )}
+                <div className="mt-4 flex flex-wrap gap-3">
                   {topic.levels.map((level) => (
                     <Badge variant="secondary" key={level.bloomLevel}>
-                      {level.bloomLevel}: {Math.round(level.score * 100)}% ·{" "}
-                      {level.count} observations
+                      {levelLabel(level.bloomLevel)}:{" "}
+                      {Math.round(level.score * 100)}% · {level.count}{" "}
+                      {level.count === 1 ? "observation" : "observations"}
+                      {level.needsReview && " · low confidence"}
                     </Badge>
                   ))}
                 </div>
+                {topic.levels.some((level) => level.needsReview) && (
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    Low-confidence levels rest on few observations. More reviewed
+                    practice on this topic is the way to settle them.
+                  </p>
+                )}
               </article>
             ))}
           </section>
@@ -59,8 +90,12 @@ export default async function Progress() {
       ) : (
         <EmptyState
           title="Evidence takes practice"
-          description="Complete evaluated practice to start building a picture of your understanding."
-        />
+          description="Complete a reviewed activity in one of your courses and it will appear here as evidence."
+        >
+          <Button asChild size="sm">
+            <Link href="/courses">Go to your courses</Link>
+          </Button>
+        </EmptyState>
       )}
     </>
   );

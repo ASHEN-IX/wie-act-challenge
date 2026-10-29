@@ -153,8 +153,10 @@ describe('the learner sees competency evidence for an enrolled course', () => {
     expect(map[0].subjectName).toBe('Computer Science');
     expect(map[0].topics[0].topicName).toBe('Atomic domains');
     expect(map[0].topics[0].parentTopic).toBe('First Normal Form (1NF) & Atomicity');
+    // A single observation is reported as low confidence so the learner is not
+    // shown a settled-looking percentage built from one data point.
     expect(map[0].topics[0].levels).toEqual([
-      { bloomLevel: 'ANALYSE', score: 0.74, confidence: 0.64, count: 1 }
+      { bloomLevel: 'ANALYSE', score: 0.74, confidence: 0.64, count: 1, needsReview: false }
     ]);
   });
 
@@ -184,5 +186,46 @@ describe('the learner sees competency evidence for an enrolled course', () => {
 
     expect(map[0].topics[0].levels).toHaveLength(1);
     expect(map[0].topics[0].levels[0]).toMatchObject({ bloomLevel: 'ANALYSE', count: 2 });
+  });
+
+  test('flags a level resting on a single observation as needing review', async () => {
+    CompetencyProfile.find.mockReturnValue({
+      lean: jest.fn().mockResolvedValue([
+        {
+          topicId: 'sub_1nf_def',
+          knowledgeType: 'procedural',
+          bloomLevel: 'analyze',
+          score: 0.9,
+          // Exactly what computeConfidence yields for one observation: 1 - 0.6^1.
+          // The threshold sits above this on purpose, so the most misleading case
+          // (a high percentage from one data point) is the one that gets flagged.
+          confidence: 0.4,
+          evidence: [{ objectiveId: 'obj_1nf_def' }]
+        }
+      ])
+    });
+
+    const map = await getUserCompetencyMap('learner-1');
+
+    expect(map[0].topics[0].levels[0]).toMatchObject({ score: 0.9, needsReview: true });
+  });
+
+  test('does not flag a level backed by more than one observation', async () => {
+    CompetencyProfile.find.mockReturnValue({
+      lean: jest.fn().mockResolvedValue([
+        {
+          topicId: 'sub_1nf_def',
+          knowledgeType: 'procedural',
+          bloomLevel: 'analyze',
+          score: 0.7,
+          confidence: 0.64,
+          evidence: [{ objectiveId: 'obj_1nf_def' }, { objectiveId: 'obj_1nf_def' }]
+        }
+      ])
+    });
+
+    const map = await getUserCompetencyMap('learner-1');
+
+    expect(map[0].topics[0].levels[0].needsReview).toBe(false);
   });
 });

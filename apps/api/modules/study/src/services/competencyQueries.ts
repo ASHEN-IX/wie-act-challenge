@@ -23,6 +23,8 @@ interface CompetencyLevel {
   score: number;
   confidence: number;
   count: number;
+  /** True when confidence is too low to treat the score as settled. */
+  needsReview?: boolean;
   knowledgeTypes?: KnowledgeTypeGroup[];
 }
 interface CompetencyTopic {
@@ -46,7 +48,10 @@ const { BLOOM_LEVELS, UNLOCK_THRESHOLD } = require('@study-partner/shared/bloom/
 
 const BLOOM_ORDER = ['REMEMBER', 'UNDERSTAND', 'APPLY', 'ANALYSE', 'EVALUATE', 'CREATE'];
 
-const NEEDS_REVIEW_MIN_CONFIDENCE = 0.4;
+// Confidence is 1 - (1 - ALPHA)^n, so a single observation yields exactly 0.4 and
+// two yield 0.64. The bar sits above one observation on purpose: a percentage from
+// a single data point is the case most likely to be misread as settled mastery.
+const NEEDS_REVIEW_MIN_CONFIDENCE = 0.5;
 
 const BLOOM_LEVEL_TO_KEY: Record<string, string> = {
   REMEMBER: 'remember',
@@ -286,6 +291,10 @@ async function getUserCompetencyMap(
               ) / 1000,
             count: levelRows.length
           };
+          // A score built from one observation is not settled evidence. Say so at
+          // the same place the score is reported, so a learner is never shown a
+          // confident-looking percentage that rests on a single data point.
+          level.needsReview = level.confidence < NEEDS_REVIEW_MIN_CONFIDENCE;
           if (knowledgeTypeBreakdown) level.knowledgeTypes = groupKnowledgeTypes(levelRows);
           return level;
         }
