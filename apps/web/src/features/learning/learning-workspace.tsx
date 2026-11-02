@@ -9,6 +9,10 @@ import {
 import { ActivityRenderer } from "./activity-renderer";
 import { LearningStylePanel } from "./learning-style-panel";
 import {
+  isTransientLearningError,
+  learningErrorMessage,
+} from "./learning-errors";
+import {
   learningProgress,
   selectLearning,
   learningDiagnostic,
@@ -39,11 +43,11 @@ export function LearningWorkspace({
   const [objectiveId, setObjective] = useState(
     objectives[0]?.objectiveId || "",
   );
-  const [activityType, setType] = useState("InteractiveQuiz"),
+  const [activityType, setType] = useState(""),
     [intent, setIntent] = useState("practice");
   const [activity, setActivity] = useState<ActivityDefinition | null>(null),
     [message, setMessage] = useState(
-      "Choose an objective and a reviewed activity.",
+      "Press Start practice to begin with the best next activity.",
     );
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -68,6 +72,18 @@ export function LearningWorkspace({
   // therefore scoped to the translated region below.
   const isRtl = workspaceLang === "ar" || workspaceLang === "ary";
   const [checks, setChecks] = useState<ActivityDefinition[]>([]);
+  // The tutor reports its own failures next to its own box; the rest of the path
+  // reports in the "next step" card. Neither may discard the learner's work.
+  const [tutorError, setTutorError] = useState("");
+  const [asking, setAsking] = useState(false);
+  const [noActivity, setNoActivity] = useState(false);
+  const [rationale, setRationale] = useState("");
+  const [lastResult, setLastResult] = useState<{
+    isCorrect: boolean;
+  } | null>(null);
+  const objectiveTouched = useRef(false);
+  const recommendationApplied = useRef(false);
+  const tutorRef = useRef<HTMLElement | null>(null);
   const attempt = useRef<{
     id: string;
     answers: Record<string, unknown>;
@@ -88,6 +104,21 @@ export function LearningWorkspace({
       sourceSupport: "Hints and explanation",
       requestHint: "Request source hint",
       requestExplanation: "Request full source explanation",
+      nextStep: "Your next step",
+      startPractice: "Start practice",
+      checkMine: "Check my understanding",
+      askTutor: "Ask the tutor",
+      moreOptions: "More options",
+      anyType: "Any (recommended)",
+      progressLine: "{done} of {total} objectives mastered",
+      whatsNext: "What's next",
+      correctLead: "Well done. That answer was accepted.",
+      incorrectLead: "Not quite yet. Try a hint, or ask the tutor to talk it through.",
+      nextObjective: "Practice the next objective",
+      exploreVisually: "Explore this visually",
+      studyPeers: "Study with peers",
+      noActivity: "There is no reviewed practice activity for this objective yet. Ask the tutor, or explore it visually.",
+      whyActivity: "Why this activity?",
       disclaimer: "Formulas, code blocks, and source quotes remain in their canonical notation.",
     },
     fr: {
@@ -103,6 +134,21 @@ export function LearningWorkspace({
       sourceSupport: "Indices et explication",
       requestHint: "Demander un indice de source",
       requestExplanation: "Demander une explication complète",
+      nextStep: "Votre prochaine étape",
+      startPractice: "Commencer à pratiquer",
+      checkMine: "Vérifier ma compréhension",
+      askTutor: "Demander au tuteur",
+      moreOptions: "Plus d'options",
+      anyType: "Au choix (recommandé)",
+      progressLine: "{done} objectifs maîtrisés sur {total}",
+      whatsNext: "Et ensuite",
+      correctLead: "Bravo. Cette réponse a été acceptée.",
+      incorrectLead: "Pas tout à fait. Essayez un indice ou demandez au tuteur.",
+      nextObjective: "Pratiquer l'objectif suivant",
+      exploreVisually: "Explorer visuellement",
+      studyPeers: "Étudier avec des pairs",
+      noActivity: "Aucune activité révisée n'existe encore pour cet objectif. Demandez au tuteur ou explorez-le visuellement.",
+      whyActivity: "Pourquoi cette activité ?",
       disclaimer: "Les formules, blocs de code et citations sources conservent leur notation canonique.",
     },
     ar: {
@@ -118,6 +164,21 @@ export function LearningWorkspace({
       sourceSupport: "التلميحات والشروحات",
       requestHint: "طلب تلميح من المصدر",
       requestExplanation: "طلب شرح كامل من المصدر",
+      nextStep: "خطوتك التالية",
+      startPractice: "ابدأ التمرين",
+      checkMine: "تحقق من فهمي",
+      askTutor: "اسأل المدرّس",
+      moreOptions: "خيارات إضافية",
+      anyType: "أي نوع (موصى به)",
+      progressLine: "{done} من {total} أهداف تم إتقانها",
+      whatsNext: "ماذا بعد",
+      correctLead: "أحسنت. تم قبول إجابتك.",
+      incorrectLead: "ليس بعد. جرّب تلميحًا أو اسأل المدرّس.",
+      nextObjective: "تمرّن على الهدف التالي",
+      exploreVisually: "استكشف بصريًا",
+      studyPeers: "ادرس مع الزملاء",
+      noActivity: "لا يوجد نشاط معتمد لهذا الهدف بعد. اسأل المدرّس أو استكشفه بصريًا.",
+      whyActivity: "لماذا هذا النشاط؟",
       disclaimer: "الصيغ الرياضية والأكواد البرمجية والاقتباسات تحتفظ بترميزها الأصلي المعتمد.",
     },
     ary: {
@@ -133,6 +194,21 @@ export function LearningWorkspace({
       sourceSupport: "مساعدة وشرح",
       requestHint: "طلب مساعدة من المقرر",
       requestExplanation: "طلب شرح مفصل من المقرر",
+      nextStep: "الخطوة الجاية ديالك",
+      startPractice: "بدا التدريب",
+      checkMine: "تأكد من الفهم ديالي",
+      askTutor: "سول المدرّس",
+      moreOptions: "خيارات أخرى",
+      anyType: "أي نوع (مستحسن)",
+      progressLine: "{done} من {total} ديال الأهداف تقادّات",
+      whatsNext: "من بعد",
+      correctLead: "برافو. الجواب ديالك تقبل.",
+      incorrectLead: "مازال شوية. جرب مساعدة ولا سول المدرّس.",
+      nextObjective: "تدرب على الهدف الجاي",
+      exploreVisually: "جرب بالصورة",
+      studyPeers: "قرا مع الصحاب",
+      noActivity: "مازال ما كاين حتى تمرين معتمد لهاد الهدف. سول المدرّس ولا جرب بالصورة.",
+      whyActivity: "علاش هاد التمرين؟",
       disclaimer: "المعادلات والأكواد البرمجية تاتبقى بالشكل الأصلي ديالها.",
     },
   }[workspaceLang];
@@ -155,6 +231,14 @@ export function LearningWorkspace({
       current = false;
     };
   }, [context.courseId, context.revisionId]);
+  useEffect(() => {
+    // Start on the recommended objective, once. Later progress updates must not
+    // move the learner off the objective whose result they are looking at.
+    if (!progress || recommendationApplied.current) return;
+    recommendationApplied.current = true;
+    if (!objectiveTouched.current && progress.recommendation)
+      setObjective(progress.recommendation.objectiveId);
+  }, [progress]);
   function changeLanguage(next: WorkspaceLanguage) {
     const previous = workspaceLang;
     // Switch immediately so the choice feels instant, then persist. A failed save
@@ -166,19 +250,46 @@ export function LearningWorkspace({
       setError("Could not save your language choice. Try again.");
     });
   }
-  async function run(action: () => Promise<void>) {
+  async function run(
+    action: () => Promise<void>,
+    scope: "path" | "tutor" = "path",
+  ) {
     setBusy(true);
-    setError("");
+    if (scope === "tutor") setTutorError("");
+    else setError("");
     try {
       await action();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Learning unavailable");
-      setActivity(null);
-      setAnswer(null);
-      setProgress(null);
+      const message = learningErrorMessage(e);
+      if (scope === "tutor") setTutorError(message);
+      else setError(message);
+      // Access or revision errors mean what is on screen may no longer be valid,
+      // so clear it. A transient outage says nothing about that and must not
+      // throw away the learner's open activity or progress.
+      if (!isTransientLearningError(e)) {
+        setActivity(null);
+        setAnswer(null);
+        setProgress(null);
+      }
     } finally {
       setBusy(false);
     }
+  }
+  async function startActivity(nextIntent: string, forObjective = objectiveId) {
+    await run(async () => {
+      const r = await selectLearning(context.courseId, {
+        revisionId: context.revisionId,
+        objectiveId: forObjective,
+        ...(activityType ? { activityType } : {}),
+        intent: nextIntent,
+      });
+      setNoActivity(r.kind === "unavailable");
+      setMessage(r.kind === "unavailable" ? t.noActivity : r.reason);
+      setRationale(r.kind === "unavailable" ? "" : (r.limitation ?? ""));
+      setActivity(null);
+      setLastResult(null);
+      if (r.activity) choose(r.activity);
+    });
   }
   function choose(a: ActivityDefinition) {
     attempt.current = null;
@@ -225,27 +336,40 @@ export function LearningWorkspace({
         </p>
       )}
       <p className="text-xs text-muted-foreground">{t.disclaimer}</p>
-      {error && (
-        <p role="alert" className="text-destructive">
-          {error}
-        </p>
-      )}
       <section
-        className="rounded-xl border p-5 space-y-3"
+        aria-label={t.nextStep}
+        className="rounded-xl border p-5 space-y-4"
         dir={isRtl ? "rtl" : "ltr"}
       >
-        <h2 className="font-semibold">{t.goal}</h2>
-        <label className="block">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {t.nextStep}
+          </p>
+          <h2 className="mt-1 text-lg font-semibold">
+            {objectiveTitle(objectiveId)}
+          </h2>
+          {progress && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              {t.progressLine
+                .replace("{done}", String(progress.masteredObjectiveIds.length))
+                .replace("{total}", String(objectives.length))}
+            </p>
+          )}
+        </div>
+        <label className="block text-sm">
           {t.objective}{" "}
           <select
             aria-label="Learning objective"
             value={objectiveId}
             onChange={(e) => {
+              objectiveTouched.current = true;
               setObjective(e.target.value);
               setActivity(null);
               setAnswer(null);
+              setLastResult(null);
+              setNoActivity(false);
             }}
-            className="block w-full border p-2"
+            className="mt-1 block w-full rounded-md border bg-background p-2"
           >
             {objectives.map((o) => (
               <option key={o.objectiveId} value={o.objectiveId}>
@@ -254,99 +378,147 @@ export function LearningWorkspace({
             ))}
           </select>
         </label>
-        <label>
-          {t.intent}{" "}
-          <select
-            aria-label="Learning intent"
-            value={intent}
-            onChange={(e) => setIntent(e.target.value)}
-            className="m-2 border p-2"
-          >
-            <option value="practice">{t.practice}</option>
-            <option value="check">{t.check}</option>
-            <option value="explain">{t.explain}</option>
-          </select>
-        </label>
-        <label>
-          {t.type}{" "}
-          <select
-            aria-label="Activity type"
-            value={activityType}
-            onChange={(e) => setType(e.target.value)}
-            className="m-2 border p-2"
-          >
-            <option>InteractiveQuiz</option>
-            <option>GuidedProblem</option>
-          </select>
-        </label>
-        <Button
-          disabled={busy || !objectiveId}
-          onClick={() =>
-            run(async () => {
-              const r = await selectLearning(context.courseId, {
-                revisionId: context.revisionId,
-                objectiveId,
-                activityType,
-                intent,
-              });
-              setMessage(r.reason + " " + (r.limitation || ""));
-              setActivity(null);
-              if (r.activity) choose(r.activity);
-            })
-          }
-        >
-          {t.select}
-        </Button>
-        <p role="status">{message}</p>
-        <Button
-          variant="outline"
-          disabled={busy}
-          onClick={() =>
-            run(async () => {
-              const r = await learningDiagnostic(
-                context.courseId,
-                context.revisionId,
-              );
-              setChecks(r.checks);
-              setMessage(
-                r.policy +
-                  (r.status === "unavailable"
-                    ? " At least two reviewed checks are required."
-                    : ""),
-              );
-            })
-          }
-        >
-          {t.diagnostic}
-        </Button>
-        {checks.map((a, i) => (
+        <div className="flex flex-wrap gap-2">
           <Button
-            key={a.activityId}
-            variant="outline"
-            onClick={() => choose(a)}
+            disabled={busy || !objectiveId}
+            onClick={() => startActivity("practice")}
           >
-            Check {i + 1}: {a.title}
+            {t.startPractice}
           </Button>
-        ))}
-        <p className="text-sm">
-          {activities.length} reviewed activities. Practice adapts to exact
-          accepted evidence using a reproducible structural-demand policy.
-          Untested learners remain unassessed; no ability level is inferred.
+          <Button
+            variant="outline"
+            disabled={busy || !objectiveId}
+            onClick={() => startActivity("check")}
+          >
+            {t.checkMine}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() =>
+              tutorRef.current?.scrollIntoView({ behavior: "smooth" })
+            }
+          >
+            {t.askTutor}
+          </Button>
+        </div>
+        {error && (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        )}
+        <p role="status" className="text-sm">
+          {message}
         </p>
-      </section>
-      <div className="flex flex-wrap gap-2">
-        {activities
-          .filter((a) => a.objectiveId === objectiveId)
-          .map((a) => (
+        {rationale && (
+          <details className="text-xs text-muted-foreground">
+            <summary className="cursor-pointer">{t.whyActivity}</summary>
+            <p className="mt-1">{rationale}</p>
+          </details>
+        )}
+        {noActivity && (
+          <div className="flex flex-wrap gap-2">
             <Button
-              key={a.activityId}
               variant="outline"
-              onClick={() => choose(a)}
+              onClick={() =>
+                tutorRef.current?.scrollIntoView({ behavior: "smooth" })
+              }
             >
-              Open {a.title}
+              {t.askTutor}
             </Button>
-          ))}
-      </div>
+            <Button variant="outline" asChild>
+              <Link href={`/visual-lab?courseId=${context.courseId}`}>
+                {t.exploreVisually}
+              </Link>
+            </Button>
+          </div>
+        )}
+        <details className="text-sm">
+          <summary className="cursor-pointer font-medium">
+            {t.moreOptions}
+          </summary>
+          <div className="mt-3 space-y-3">
+            <label>
+              {t.intent}{" "}
+              <select
+                aria-label="Learning intent"
+                value={intent}
+                onChange={(e) => setIntent(e.target.value)}
+                className="m-2 border p-2"
+              >
+                <option value="practice">{t.practice}</option>
+                <option value="check">{t.check}</option>
+                <option value="explain">{t.explain}</option>
+              </select>
+            </label>
+            <label>
+              {t.type}{" "}
+              <select
+                aria-label="Activity type"
+                value={activityType}
+                onChange={(e) => setType(e.target.value)}
+                className="m-2 border p-2"
+              >
+                <option value="">{t.anyType}</option>
+                <option>InteractiveQuiz</option>
+                <option>GuidedProblem</option>
+              </select>
+            </label>
+            <Button
+              variant="outline"
+              disabled={busy || !objectiveId}
+              onClick={() => startActivity(intent)}
+            >
+              {t.select}
+            </Button>
+            {activities.length >= 2 && (
+              <Button
+                variant="outline"
+                disabled={busy}
+                onClick={() =>
+                  run(async () => {
+                    const r = await learningDiagnostic(
+                      context.courseId,
+                      context.revisionId,
+                    );
+                    setChecks(r.checks);
+                    setMessage(r.policy);
+                  })
+                }
+              >
+                {t.diagnostic}
+              </Button>
+            )}
+            {checks.map((a, i) => (
+              <Button
+                key={a.activityId}
+                variant="outline"
+                onClick={() => choose(a)}
+              >
+                Check {i + 1}: {a.title}
+              </Button>
+            ))}
+            <div className="flex flex-wrap gap-2">
+              {activities
+                .filter((a) => a.objectiveId === objectiveId)
+                .map((a) => (
+                  <Button
+                    key={a.activityId}
+                    variant="outline"
+                    onClick={() => choose(a)}
+                  >
+                    Open {a.title}
+                  </Button>
+                ))}
+            </div>
+            <p className="text-muted-foreground">
+              {activities.length} reviewed activities. Practice adapts to exact
+              accepted evidence using a reproducible structural-demand policy.
+              Untested learners remain unassessed; no ability level is
+              inferred.
+            </p>
+          </div>
+        </details>
+      </section>
       {activity && (
         <ActivityRenderer
           key={activity.activityId}
@@ -362,11 +534,64 @@ export function LearningWorkspace({
               fixed.answers,
               fixed.seconds,
             );
-            if (result.status === "graded") attempt.current = null;
+            if (result.status === "graded") {
+              attempt.current = null;
+              setLastResult({ isCorrect: result.isCorrect });
+            }
             await refresh();
             return result;
           }}
         />
+      )}
+      {activity && lastResult && (
+        <section
+          aria-label={t.whatsNext}
+          className="rounded-xl border p-5 space-y-3"
+          dir={isRtl ? "rtl" : "ltr"}
+        >
+          <h2 className="font-semibold">{t.whatsNext}</h2>
+          <p role="status" className="text-sm">
+            {lastResult.isCorrect ? t.correctLead : t.incorrectLead}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {lastResult.isCorrect &&
+              progress?.recommendation &&
+              progress.recommendation.objectiveId !== objectiveId && (
+                <Button
+                  disabled={busy}
+                  onClick={() => {
+                    const next = progress.recommendation!.objectiveId;
+                    objectiveTouched.current = true;
+                    setObjective(next);
+                    setAnswer(null);
+                    startActivity("practice", next);
+                  }}
+                >
+                  {t.nextObjective}
+                </Button>
+              )}
+            {!lastResult.isCorrect && (
+              <Button
+                variant="outline"
+                onClick={() =>
+                  tutorRef.current?.scrollIntoView({ behavior: "smooth" })
+                }
+              >
+                {t.askTutor}
+              </Button>
+            )}
+            <Button variant="outline" asChild>
+              <Link href={`/visual-lab?courseId=${context.courseId}`}>
+                {t.exploreVisually}
+              </Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href={`/study-together?courseId=${context.courseId}`}>
+                {t.studyPeers}
+              </Link>
+            </Button>
+          </div>
+        </section>
       )}
       {activity && (
         <section
@@ -427,7 +652,10 @@ export function LearningWorkspace({
           )}
         </section>
       )}
-      <section className="rounded-xl border p-5 space-y-3">
+      <section
+        ref={tutorRef}
+        className="rounded-xl border p-5 space-y-3"
+      >
         <h2 className="font-semibold">Source-grounded tutor</h2>
         <label className="block">
           Your question
@@ -447,20 +675,30 @@ export function LearningWorkspace({
               );
               if (!objective) throw new Error("Choose a published objective");
               setAnswer(null);
-              setAnswer(
-                await askLearningTutor(context.courseId, {
-                  revisionId: context.revisionId,
-                  topicId: objective.topicId,
-                  objectiveId,
-                  question,
-                }),
-              );
-            })
+              setAsking(true);
+              try {
+                setAnswer(
+                  await askLearningTutor(context.courseId, {
+                    revisionId: context.revisionId,
+                    topicId: objective.topicId,
+                    objectiveId,
+                    question,
+                  }),
+                );
+              } finally {
+                setAsking(false);
+              }
+            }, "tutor")
           }
         >
-          {busy ? "Loading…" : "Ask from sources"}
+          {asking ? "Loading…" : "Ask from sources"}
         </Button>
-        {busy && <AiWaitStatus />}
+        {asking && <AiWaitStatus />}
+        {tutorError && (
+          <p role="alert" className="text-sm text-destructive">
+            {tutorError}
+          </p>
+        )}
         {answer && (
           <div data-testid="tutor-answer">
             <AiModeNote mode={answer.executionMode} />

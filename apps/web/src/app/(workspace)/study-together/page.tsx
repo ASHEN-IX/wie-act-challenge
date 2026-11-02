@@ -27,7 +27,12 @@ interface StudyRoomItem {
   participantsCount: number;
 }
 
-export default async function Rooms() {
+export default async function Rooms({
+  searchParams,
+}: {
+  searchParams: Promise<{ courseId?: string }>;
+}) {
+  const { courseId: requestedCourseId } = await searchParams;
   const [courses, sessions, studyRooms] = await Promise.all([
     getCourses(),
     load<{
@@ -63,7 +68,17 @@ export default async function Rooms() {
             <FieldGroup>
               <Field>
                 <FieldLabel htmlFor="courseId">Course (optional)</FieldLabel>
-                <NativeSelect name="courseId" id="courseId">
+                <NativeSelect
+                  name="courseId"
+                  id="courseId"
+                  defaultValue={
+                    courses.data?.courses.some(
+                      (c) => c.id === requestedCourseId && isCourseReady(c),
+                    )
+                      ? requestedCourseId
+                      : ""
+                  }
+                >
                   <NativeSelectOption value="">
                     Start without a course
                   </NativeSelectOption>
