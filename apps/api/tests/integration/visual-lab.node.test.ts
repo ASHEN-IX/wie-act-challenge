@@ -323,7 +323,7 @@ test(
       const engines = response.body.engines as Array<{ engine: string }>;
       assert.deepEqual(
         engines.map((e) => e.engine),
-        ['weighted_graph', 'parameter_model', 'spatial_3d']
+        ['weighted_graph', 'parameter_model', 'spatial_3d', 'function_plot']
       );
     });
 
