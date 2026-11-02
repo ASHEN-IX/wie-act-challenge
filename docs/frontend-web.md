@@ -24,6 +24,10 @@ src/lib/                  Server API gateway, bounded form validation and utilit
 src/server/identity.ts    Request-scoped identity resolution
 ```
 
+## Navigation
+
+Primary navigation is four items: **Home** (`/dashboard`), **My Learning** (`/courses`), **Study Together** and **Progress**. Visual Lab, Practice, the binary-search demo, Tasks, Study plan and Explore sources sit under a collapsed **More tools** group that opens on those routes; Visual Lab is also reached from a published course ("Explore visually"). Teaching Studio and Institution sections remain role-gated by the workspace layout. No routes were removed, so existing bookmarks keep working.
+
 Pages read through the server-only gateway in `src/lib/api.ts`. It forwards the current cookie to the configured Nest backend, disables shared caching, bounds requests and preserves backend authorization. Server Actions authenticate independently, select fixed operations, validate fields, preserve Next redirect/error control flow and revalidate affected pages. No service keys or raw database/domain records are passed to the browser.
 
 Client components are limited to interactive navigation, form submission/pending feedback, asynchronous job polling and room WebSockets. React `useActionState` handles form feedback; no global client auth/data store is required. Use `next/link` and `next/navigation` directly. Independent reads use `Promise.all`.

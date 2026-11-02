@@ -61,7 +61,9 @@ Course labs use the existing published-revision pin, authorization and exact sou
 
 ## Assessment integration status
 
-`/check` returns `recordedAsEvidence: false` (`policy: visual_lab_practice_only`). **Gap:** results are not yet written to learner evidence, competencies or XP. Opening a lab, moving sliders or time spent never counts as mastery. Wiring a server-verified check into the existing evidence API is the next integration step.
+`/check` returns `recordedAsEvidence: false` (`policy: visual_lab_practice_only`). **Gap:** results are not written to learner evidence, competencies or XP. Opening a lab, moving sliders or time spent never counts as mastery.
+
+This is a deliberate boundary, not an oversight, and it is not a one-line wiring job. The existing attempt pipeline (`activityAttempt.registerActivity`) is insert-only, author-only, limited to draft revisions and pinned to verified source pages, so a per-learner, AI-planned lab check cannot be registered into it without weakening those guarantees. Options for a later decision: (a) keep labs practice-only and send the learner to the course's graded activity for the same objective; (b) add a distinct, lower-trust `visual_lab` evidence source with its own anti-farming rules; (c) let instructors author lab checks as registered activities. Until one is approved, the UI must keep labelling the check as practice.
 
 ## Adding an engine or model
 
