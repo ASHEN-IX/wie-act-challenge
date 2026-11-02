@@ -85,6 +85,24 @@ model_list:
     max_tokens: 1536
     drop_params: true
 
+# VISUAL LAB SELECTOR — chooses a supported simulation engine or refuses: small + cheap.
+- model_name: visual_lab_selector
+  litellm_params:
+    model: groq/openai/gpt-oss-20b
+    api_key: os.environ/GROQ_API_KEY
+    temperature: 0.1
+    max_tokens: 512
+    drop_params: true
+
+# VISUAL LAB PLANNER — configures a course-specific experiment: capable reasoning.
+- model_name: visual_lab_planner
+  litellm_params:
+    model: groq/openai/gpt-oss-120b
+    api_key: os.environ/GROQ_API_KEY
+    temperature: 0.2
+    max_tokens: 2048
+    drop_params: true
+
 # ————————————————— shared fallback providers —————————————————————
 
 - model_name: groq-main
@@ -118,3 +136,5 @@ router_settings:
     - course_ingestion: [nvidia-main]
     - evaluator: [groq-main, nvidia-main]
     - facilitator: [nvidia-main]
+    - visual_lab_selector: [groq-main]
+    - visual_lab_planner: [groq-main, nvidia-main]

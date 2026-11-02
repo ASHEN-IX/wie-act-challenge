@@ -15,6 +15,7 @@ import {
   Sparkles,
   GraduationCap,
   Building2,
+  FlaskConical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -45,8 +46,9 @@ export function Navigation({
       items: [
         { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
         { href: "/courses", label: "Courses", icon: BookOpen },
-        { href: "/practice", label: "Practice and Tutor", icon: PencilLine },
-        { href: "/visualizer", label: "Worked example", icon: Sparkles },
+        { href: "/visual-lab", label: "Visual Lab", icon: FlaskConical },
+        { href: "/practice", label: "Practice", icon: PencilLine },
+        { href: "/visualizer", label: "Binary search demo", icon: Sparkles },
       ],
     },
     {
@@ -58,9 +60,9 @@ export function Navigation({
     {
       title: "Track and Plan",
       items: [
-        { href: "/progress", label: "Progress and Rewards", icon: ChartNoAxesCombined },
+        { href: "/progress", label: "Progress", icon: ChartNoAxesCombined },
         { href: "/tasks", label: "Tasks", icon: ListTodo },
-        { href: "/planner", label: "Study planner", icon: CalendarDays },
+        { href: "/planner", label: "Study plan", icon: CalendarDays },
         { href: "/search", label: "Explore sources", icon: Search },
       ],
     },

@@ -51,8 +51,8 @@ export default async function Rooms() {
   return (
     <>
       <PageHeader
-        title="Better questions, together"
-        description="Invite a few peers and work through your material in a shared room."
+        title="Study Together"
+        description="Study with up to six peers in a shared room. Create one or join with a code."
       />
       <DataError message={courses.error || sessions.error} />
       <div className="mb-10 grid max-w-4xl gap-8 md:grid-cols-2">
@@ -78,7 +78,7 @@ export default async function Rooms() {
               </Field>
             </FieldGroup>
             <p className="text-sm text-muted-foreground">
-              Up to six participants. Generates an invite code for your peers.
+              You get an invite code to share.
             </p>
           </ActionForm>
         </section>
@@ -101,7 +101,7 @@ export default async function Rooms() {
         </section>
       </div>
 
-      <h2 className="mb-5 text-xl font-semibold">Active study rooms</h2>
+      <h2 className="mb-5 text-xl font-semibold">Your rooms</h2>
       {dedicatedRooms.length > 0 || legacyRooms.length > 0 ? (
         <div className="flex flex-col gap-3">
           {dedicatedRooms.map((room) => (
@@ -152,8 +152,8 @@ export default async function Rooms() {
         </div>
       ) : (
         <EmptyState
-          title="Room for another perspective"
-          description="Create a room, or join a peer using their invite code."
+          title="No rooms yet"
+          description="Create a room, or enter a peer’s invite code above."
         />
       )}
     </>

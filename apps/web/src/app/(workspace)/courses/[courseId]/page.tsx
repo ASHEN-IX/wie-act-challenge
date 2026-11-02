@@ -33,9 +33,16 @@ export default async function CoursePage({
               <Link href={`/courses/${course.id}/studio`}>Course Studio</Link>
             </Button>
             {stage === "ready" && (
-              <Button asChild>
-                <Link href={`/courses/${course.id}/learn`}>Open course</Link>
-              </Button>
+              <>
+                <Button asChild>
+                  <Link href={`/courses/${course.id}/learn`}>Open course</Link>
+                </Button>
+                <Button variant="outline" asChild>
+                  <Link href={`/visual-lab?courseId=${course.id}`}>
+                    Explore visually
+                  </Link>
+                </Button>
+              </>
             )}
           </div>
         }

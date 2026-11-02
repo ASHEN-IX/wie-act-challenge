@@ -52,6 +52,23 @@ const spec: OpenAPISpec = {
     '/api/v1/ai/coach': { post: { summary: 'Get coach decision' } },
     '/api/v1/coach/nudge': { post: { summary: 'Trigger async coach nudge (202 + jobId)' } },
     '/api/v1/coach/jobs/{jobId}': { get: { summary: 'Get coach nudge job status + result' } },
+    '/api/v1/study/visual-lab/capabilities': {
+      get: { summary: 'List supported Visual Learning Lab engines and limits' }
+    },
+    '/api/v1/study/visual-lab': { get: { summary: 'List the learner’s own visual labs' } },
+    '/api/v1/study/visual-lab/discover': {
+      get: { summary: 'Find visually explorable concepts in a published course' }
+    },
+    '/api/v1/study/visual-lab/plan': {
+      post: { summary: 'Plan, validate and persist a course or topic visual lab' }
+    },
+    '/api/v1/study/visual-lab/{labId}': { get: { summary: 'Read a private visual lab' } },
+    '/api/v1/study/visual-lab/{labId}/guide': {
+      post: { summary: 'Explain authoritative simulation state' }
+    },
+    '/api/v1/study/visual-lab/{labId}/check': {
+      post: { summary: 'Grade the lab understanding check (practice only)' }
+    },
     '/api/v1/ai/evaluator/session': { post: { summary: 'Evaluate completed session' } },
     '/api/v1/analytics/summary': { get: { summary: 'Get analytics summary' } },
     '/api/v1/notifications': {

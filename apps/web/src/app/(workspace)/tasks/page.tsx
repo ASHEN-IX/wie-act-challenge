@@ -16,8 +16,8 @@ export default async function Tasks() {
   return (
     <>
       <PageHeader
-        title="One step at a time"
-        description="A clear list makes it easier to begin."
+        title="Tasks"
+        description="What you plan to work on. Add one on the right."
       />
       <DataError message={result.error} />
       <div className="grid items-start gap-9 xl:grid-cols-[minmax(0,1fr)_320px]">
