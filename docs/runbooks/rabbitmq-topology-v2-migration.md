@@ -48,8 +48,8 @@ In-flight messages must not be dropped:
 3. **Salvage DLQs** with the replay tool *before* deleting anything:
 
    ```bash
-   node study-partner-api/shared/ai-messaging/dlq-replay.js --type study.search.query --dry-run
-   node study-partner-api/shared/ai-messaging/dlq-replay.js --type study.search.query
+   node apps/api/shared/ai-messaging/dlq-replay.js --type study.search.query --dry-run
+   node apps/api/shared/ai-messaging/dlq-replay.js --type study.search.query
    ```
 
 4. Delete queues as above; **deploy the new version**; unfreeze.

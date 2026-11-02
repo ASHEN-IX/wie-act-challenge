@@ -18,7 +18,7 @@ Redis: cache/rate state; optional Python idempotency and evaluation session stat
 
 ## Application and domains
 
-`study-partner-api/src/main.ts` starts Nest through `framework/bootstrap.ts`, owns lifecycle, connects persistence, attaches realtime, starts result consumers and study pollers, and drains them on stop. `src/framework/app.module.ts` loads auth, users, study, AI, signals, analytics and notifications. Generated controllers call `DomainService`, which dispatches operations loaded from `src/domain-definitions.ts`. Existing route files export `createContracts()` operations; this is not a wholesale rewrite into independent Nest business services.
+`apps/api/src/main.ts` starts Nest through `framework/bootstrap.ts`, owns lifecycle, connects persistence, attaches realtime, starts result consumers and study pollers, and drains them on stop. `src/framework/app.module.ts` loads auth, users, study, AI, signals, analytics and notifications. Generated controllers call `DomainService`, which dispatches operations loaded from `src/domain-definitions.ts`. Existing route files export `createContracts()` operations; this is not a wholesale rewrite into independent Nest business services.
 
 `shared/moduleClient.ts` routes `module://` requests in process with request context, identity and handler execution. Non-module URLs use `shared/aiClient.ts`; do not replace module calls with a service fleet. `src/app.ts` retains an Express-compatible application exercised by legacy tests; it is not the production entrypoint and is not proven dead.
 

@@ -1,6 +1,6 @@
 # Python AI service — CURRENT operations
 
-Independent process tree under `study-partner-ai`; pnpm does not install/start it. Poetry declares Python >=3.11,<3.15. Work from that directory in a compatible isolated environment:
+Independent process tree under `apps/ai`; pnpm does not install/start it. Poetry declares Python >=3.11,<3.15. Work from that directory in a compatible isolated environment:
 
 ```bash
 poetry install --with dev
@@ -21,7 +21,7 @@ pnpm dev:worker evaluator
 pnpm dev:worker search
 ```
 
-Run worker commands from the repository root. The helpers load `study-partner-ai/.env` and run Poetry in the AI directory. Each command is a separate long-running process; launch only required workers. Main Node lifecycle starts consumers/pollers, not these Python producers/consumers. AI Compose starts HTTP only. Set INGEST_UPLOADS_DIR/file references to actual API upload staging; match Node `aiCourseId` and Python course/index metadata. Redis enables cross-process idempotency/evaluation session storage; memory defaults do not persist through restarts.
+Run worker commands from the repository root. The helpers load `apps/ai/.env` and run Poetry in the AI directory. Each command is a separate long-running process; launch only required workers. Main Node lifecycle starts consumers/pollers, not these Python producers/consumers. AI Compose starts HTTP only. Set INGEST_UPLOADS_DIR/file references to actual API upload staging; match Node `aiCourseId` and Python course/index metadata. Redis enables cross-process idempotency/evaluation session storage; memory defaults do not persist through restarts.
 
 The [AI specification](ai-specification.md) documents actual ingestion/planner/scheduler/coach/evaluator/search/reflection behavior, current model configuration, and the separate PLANNED EdNova facilitator/category policy. Preserve BaseAIWorker leases, validated payloads, retries/DLQs, deterministic fallback and [message contract](contracts/ai-message-contract.md). Existing external provider fallback is not authorization to bypass organizer limits.
 

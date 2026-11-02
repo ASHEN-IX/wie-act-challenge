@@ -4,7 +4,7 @@
 
 ## CURRENT agents and reusable behavior
 
-| Agent / source under `study-partner-ai` | Actual responsibility | Reuse and limitation |
+| Agent / source under `apps/ai` | Actual responsibility | Reuse and limitation |
 |---|---|---|
 | `agents/course_ingestion/agent.py`, ingestion worker | Validate/sandbox PDF extraction, OCR fallback, section parsing, enrichment, objective extraction/Bloom classification, chunks/embeddings/dedup and persistence | Source processing useful; not an instructor publication/authorization system |
 | `agents/planner/agent.py` | Retrieve course chunks, decompose goals, validate task graph, buffers/reviews and pacing; simple decomposition fallback | Personal study plan, not a live room facilitator |
