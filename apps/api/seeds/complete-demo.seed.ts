@@ -4,6 +4,7 @@ import path from 'node:path';
 import { MongoClient } from 'mongodb';
 import mongoose, { Types } from 'mongoose';
 import { createAuth } from '../shared/betterAuth';
+import aiClient from '../shared/aiClient';
 import {
   contentHash,
   manifestDigest,
@@ -87,43 +88,73 @@ async function materializeSourceArtifact(
   const pinHash = 'sha256:' + storedContentHash.replace(/^sha256:/, '');
   const digest = manifestDigest(courseId, revisionTag, pinHash, [document]);
 
-  // Deterministic 384-dim vector placeholder: the demo never performs semantic
-  // search against this index, it only has to be a valid, self-consistent FAISS
-  // file whose sha256 is recorded in the metadata.
-  const index = Buffer.from('FAISS_DEMO_INDEX_V1\x00' + courseId + '\x00' + revisionTag, 'utf8');
   const base = path.join(roots.indexes, courseId, revisionTag);
   await fs.mkdir(path.dirname(base), { recursive: true });
   // Artifacts are read-only like production originals, so a re-run over an
   // existing database must clear the previous copies before rewriting them.
   await fs.rm(base + '.faiss', { force: true });
   await fs.rm(base + '.meta.json', { force: true });
-  await fs.writeFile(base + '.faiss', index, { mode: 0o444 });
-  await fs.writeFile(
-    base + '.meta.json',
-    JSON.stringify({
-      schemaVersion: '1.0.0',
-      courseId,
-      revisionId: revisionTag,
-      contentHash: pinHash,
-      documents: [document],
-      manifestDigest: digest,
-      indexHash: contentHash(index),
-      chunks: [DEMO_SOURCE_TEXT],
-      metas: [
-        {
-          course_id: courseId,
-          revision_id: revisionTag,
-          document_id: document.documentId,
-          content_hash: hash,
-          text_hash: hash,
-          chunk_id: 'chk_' + hash.slice(7),
-          page_number: null,
-          section_id: 'section_1',
-          provenance: 'extracted'
-        }
-      ]
-    })
-  );
+
+  // Prefer a real index built by the AI service through the same endpoint the
+  // ingestion worker uses, so the grounded tutor can actually retrieve from the
+  // demo course. The AI service must share FAISS_INDEX_DIR and INGEST_UPLOADS_DIR
+  // with this process (pnpm dev:doctor checks that).
+  let realIndex = false;
+  try {
+    await aiClient.post(
+      '/api/ai/sources/index',
+      {
+        schemaVersion: '1.0.0',
+        courseId,
+        revisionId: revisionTag,
+        contentHash: pinHash,
+        documents: [document],
+        manifestDigest: digest
+      },
+      { timeout: 120_000 }
+    );
+    realIndex = true;
+    console.log('  ✓ Built a real source index through the AI service');
+  } catch (error) {
+    console.warn(
+      '  ! AI service could not index the demo source (' +
+        (error instanceof Error ? error.message : String(error)) +
+        '); writing a placeholder index. The grounded tutor will be unavailable on this course.'
+    );
+  }
+
+  if (!realIndex) {
+    // Placeholder so the revision still passes local integrity checks; it cannot
+    // serve semantic search.
+    const index = Buffer.from('FAISS_DEMO_INDEX_V1\x00' + courseId + '\x00' + revisionTag, 'utf8');
+    await fs.writeFile(base + '.faiss', index, { mode: 0o444 });
+    await fs.writeFile(
+      base + '.meta.json',
+      JSON.stringify({
+        schemaVersion: '1.0.0',
+        courseId,
+        revisionId: revisionTag,
+        contentHash: pinHash,
+        documents: [document],
+        manifestDigest: digest,
+        indexHash: contentHash(index),
+        chunks: [DEMO_SOURCE_TEXT],
+        metas: [
+          {
+            course_id: courseId,
+            revision_id: revisionTag,
+            document_id: document.documentId,
+            content_hash: hash,
+            text_hash: hash,
+            chunk_id: 'chk_' + hash.slice(7),
+            page_number: null,
+            section_id: 'section_1',
+            provenance: 'extracted'
+          }
+        ]
+      })
+    );
+  }
   await CourseRevision.collection.updateOne(
     {
       courseId: new Types.ObjectId(courseId),
@@ -419,92 +450,173 @@ async function main() {
     // Seed Interactive Learning Activities (Contract 04). The definition must carry
     // the same pin as the published revision, and the revision must list it as an
     // approved activity, exactly as publishCourseRevision records it.
-    const quizActivityId = 'act_1nf_quiz_01';
     const revisionTag = resolvedRevision.revisionTag;
     const pinnedHash = 'sha256:' + resolvedRevision.contentHash.replace(/^sha256:/, '');
-    const publicDefinition = {
-      schemaVersion: '1.0.0',
-      activityId: quizActivityId,
-      activityRevision: 'ar_1',
-      componentVersion: '1.0.0',
-      activityType: 'InteractiveQuiz',
+    const sourceRefs = [
+      {
+        documentId: sourceDocument.documentId,
+        contentHash: sourceDocument.contentHash,
+        pageNumber: null,
+        locationKnown: false,
+        provenance: 'extracted' as const
+      }
+    ];
+    const pinFor = (activityId: string, activityType: 'InteractiveQuiz' | 'GuidedProblem') => ({
       courseId: courseId.toString(),
       revisionId: revisionTag,
       contentHash: pinnedHash,
-      objectiveId: 'obj_1nf_def',
-      title: '1NF Decomposition Challenge',
-      instructions:
-        'Select all attribute sets that violate First Normal Form in the table schema below.',
-      timeLimitSeconds: 180,
+      activityId,
+      activityRevision: 'ar_1',
+      activityType
+    });
+    const baseDefinition = {
+      schemaVersion: '1.0.0',
+      activityRevision: 'ar_1',
+      componentVersion: '1.0.0',
+      courseId: courseId.toString(),
+      revisionId: revisionTag,
+      contentHash: pinnedHash,
       visibility: 'public',
       language: 'en',
-      sourceRefs: [
-        {
-          documentId: sourceDocument.documentId,
-          contentHash: sourceDocument.contentHash,
-          pageNumber: null,
-          locationKnown: false,
-          provenance: 'extracted' as const
-        }
-      ],
-      constraints: { maxAttempts: 3, allowCalculator: false },
-      presentationData: {
-        question: 'Which of the following table column definitions violate 1NF?',
-        options: [
-          { id: 'opt_a', label: 'Student(StudentID, FullName, CourseCodes[Array])' },
-          { id: 'opt_b', label: 'Enrollment(StudentID, CourseCode, Semester)' },
-          { id: 'opt_c', label: 'Order(OrderID, CustomerName, ItemsCommaSeparated)' }
-        ],
-        isMultiSelect: true
-      }
-    } as const;
-    const serverEvaluation = {
-      schemaVersion: '1.0.0',
-      visibility: 'server_only',
-      activity: {
-        courseId: courseId.toString(),
-        revisionId: revisionTag,
-        contentHash: pinnedHash,
-        activityId: quizActivityId,
-        activityRevision: 'ar_1',
-        activityType: 'InteractiveQuiz'
-      },
-      evaluationRef: 'ref_1nf_eval',
-      evaluatorType: 'deterministic_rubric',
-      rubricVersion: 'exact-options-v1',
-      rubric: 'Options A and C contain multi-valued attributes which violates atomicity.',
-      answerKey: ['opt_a', 'opt_c']
+      sourceRefs
     };
-    let quizActivity = await ActivityRecord.findOne({
-      activityId: quizActivityId,
-      courseId: courseId.toString()
-    });
-    if (!quizActivity) {
-      quizActivity = await ActivityRecord.create({
+    // One reviewed activity per objective so the adaptive path, the diagnostic
+    // (which needs at least two) and the next-objective flow can all be exercised.
+    const seededActivities = [
+      {
+        publicDefinition: {
+          ...baseDefinition,
+          activityId: 'act_1nf_quiz_01',
+          activityType: 'InteractiveQuiz',
+          objectiveId: 'obj_1nf_def',
+          title: '1NF Decomposition Challenge',
+          instructions:
+            'Select all attribute sets that violate First Normal Form in the table schema below.',
+          timeLimitSeconds: 180,
+          constraints: { maxAttempts: 3, allowCalculator: false },
+          presentationData: {
+            question: 'Which of the following table column definitions violate 1NF?',
+            options: [
+              { id: 'opt_a', label: 'Student(StudentID, FullName, CourseCodes[Array])' },
+              { id: 'opt_b', label: 'Enrollment(StudentID, CourseCode, Semester)' },
+              { id: 'opt_c', label: 'Order(OrderID, CustomerName, ItemsCommaSeparated)' }
+            ],
+            isMultiSelect: true
+          }
+        },
+        serverEvaluation: {
+          schemaVersion: '1.0.0',
+          visibility: 'server_only',
+          activity: pinFor('act_1nf_quiz_01', 'InteractiveQuiz'),
+          evaluationRef: 'ref_1nf_eval',
+          evaluatorType: 'deterministic_rubric',
+          rubricVersion: 'exact-options-v1',
+          rubric: 'Options A and C contain multi-valued attributes which violates atomicity.',
+          answerKey: ['opt_a', 'opt_c']
+        }
+      },
+      {
+        publicDefinition: {
+          ...baseDefinition,
+          activityId: 'act_1nf_decompose_01',
+          activityType: 'GuidedProblem',
+          objectiveId: 'obj_1nf_decompose',
+          title: 'Decompose a non-atomic table',
+          instructions:
+            'Work through the steps. Type each answer exactly as written in the schema.',
+          timeLimitSeconds: 240,
+          constraints: { maxAttempts: 3, allowCalculator: false },
+          presentationData: {
+            problem: 'Student(StudentID, FullName, CourseCodes[Array]) must be brought into 1NF.',
+            steps: [
+              {
+                stepId: 'step_attribute',
+                prompt: 'Which attribute holds more than one value in a single row?'
+              },
+              {
+                stepId: 'step_atomic',
+                prompt:
+                  'After decomposition, how many values may one cell of an atomic column hold? (a number)'
+              }
+            ]
+          }
+        },
+        serverEvaluation: {
+          schemaVersion: '1.0.0',
+          visibility: 'server_only',
+          activity: pinFor('act_1nf_decompose_01', 'GuidedProblem'),
+          evaluationRef: 'ref_1nf_decompose_eval',
+          evaluatorType: 'deterministic_rubric',
+          rubricVersion: 'exact-answer-v1',
+          rubric:
+            'CourseCodes is the repeating attribute; atomic columns hold exactly one value per cell.',
+          answerKey: ['CourseCodes', '1']
+        }
+      },
+      {
+        publicDefinition: {
+          ...baseDefinition,
+          activityId: 'act_2nf_quiz_01',
+          activityType: 'InteractiveQuiz',
+          objectiveId: 'obj_2nf_identify',
+          title: 'Spot the partial dependency',
+          instructions:
+            'The key of Enrollment is (StudentID, CourseCode). Choose the attribute that depends on only part of the key.',
+          timeLimitSeconds: 180,
+          constraints: { maxAttempts: 3, allowCalculator: false },
+          presentationData: {
+            question:
+              'In Enrollment(StudentID, CourseCode, StudentName, Grade), which attribute is a partial dependency?',
+            options: [
+              { id: 'opt_a', label: 'Grade' },
+              { id: 'opt_b', label: 'StudentName' },
+              { id: 'opt_c', label: 'CourseCode' }
+            ],
+            isMultiSelect: false
+          }
+        },
+        serverEvaluation: {
+          schemaVersion: '1.0.0',
+          visibility: 'server_only',
+          activity: pinFor('act_2nf_quiz_01', 'InteractiveQuiz'),
+          evaluationRef: 'ref_2nf_eval',
+          evaluatorType: 'deterministic_rubric',
+          rubricVersion: 'exact-options-v1',
+          rubric:
+            'StudentName depends only on StudentID, which is part of the composite key, so it violates 2NF.',
+          answerKey: ['opt_b']
+        }
+      }
+    ];
+    for (const { publicDefinition, serverEvaluation } of seededActivities) {
+      const exists = await ActivityRecord.findOne({
+        activityId: publicDefinition.activityId,
+        courseId: courseId.toString()
+      });
+      if (exists) continue;
+      await ActivityRecord.create({
         courseId: courseId.toString(),
         revisionId: revisionTag,
         contentHash: pinnedHash,
-        activityId: quizActivityId,
+        activityId: publicDefinition.activityId,
         activityRevision: 'ar_1',
-        activityType: 'InteractiveQuiz',
-        objectiveId: 'obj_1nf_def',
+        activityType: publicDefinition.activityType,
+        objectiveId: publicDefinition.objectiveId,
         publicDefinition,
         serverEvaluation
       });
-      console.log('  ✓ Created Interactive Activity: 1NF Quiz Challenge');
+      console.log('  ✓ Created Interactive Activity: ' + publicDefinition.title);
     }
     await CourseRevision.collection.updateOne(
       { _id: resolvedRevision._id },
       {
         $set: {
-          approvedActivities: [
-            {
-              activityId: quizActivityId,
-              activityRevision: 'ar_1',
-              definitionHash: activityDigest(publicDefinition),
-              evaluationHash: activityDigest(serverEvaluation)
-            }
-          ]
+          approvedActivities: seededActivities.map(({ publicDefinition, serverEvaluation }) => ({
+            activityId: publicDefinition.activityId,
+            activityRevision: 'ar_1',
+            definitionHash: activityDigest(publicDefinition),
+            evaluationHash: activityDigest(serverEvaluation)
+          }))
         }
       }
     );
