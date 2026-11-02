@@ -6,7 +6,15 @@ import {
   decodePrivateAssessmentResult,
   type ActivityDefinition,
 } from "@/lib/activity-contracts";
-import type { Contract } from "@study-partner/shared/ednova/contracts";
+import type { Contract } from "@ednova/shared/ednova/contracts";
+import {
+  parseLearningDocument,
+  type LearningDocument,
+} from "@ednova/shared/ednova/learningDocument";
+import {
+  parseReadingDocumentV2,
+  migrateReadingDocumentV1,
+} from "@ednova/shared/ednova/learningDocumentV2";
 export async function learningCatalog(courseId: string, revisionId?: string) {
   await requireIdentity();
   const data = await api<{
@@ -16,6 +24,19 @@ export async function learningCatalog(courseId: string, revisionId?: string) {
     `/api/v1/study/learning/courses/${segment(courseId)}/activities${revisionId !== undefined ? "?revisionId=" + encodeURIComponent(revisionId) : ""}`,
   );
   return { ...data, activities: data.activities.map(decodeActivityDefinition) };
+}
+export async function learningDocument(courseId: string, revisionId?: string) {
+  await requireIdentity();
+  const payload = await api<unknown>(
+    `/api/v1/study/learning/courses/${segment(courseId)}/document${revisionId !== undefined ? "?revisionId=" + encodeURIComponent(revisionId) : ""}`,
+  );
+  if (
+    payload &&
+    typeof payload === "object" &&
+    (payload as { schemaVersion?: unknown }).schemaVersion === "2.0.0"
+  )
+    return parseReadingDocumentV2(payload);
+  return migrateReadingDocumentV1(parseLearningDocument(payload));
 }
 export async function learningProgress(courseId: string, revisionId: string) {
   await requireIdentity();

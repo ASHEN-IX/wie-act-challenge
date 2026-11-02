@@ -1,6 +1,6 @@
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response, NextFunction } from 'express';
-import type { ContractHandler } from '@study-partner/shared/domainContracts';
+import type { ContractHandler } from '@ednova/shared/domainContracts';
 /**
  * SEC-10 — Mass-assignment protection regression tests.
  */
@@ -25,7 +25,7 @@ jest.mock('../utils/gamificationService', () => ({
   trackAnalyticsEvent: jest.fn().mockResolvedValue(undefined)
 }));
 
-jest.mock('@study-partner/shared/moduleClient', () => ({
+jest.mock('@ednova/shared/moduleClient', () => ({
   post: jest.fn().mockResolvedValue({ data: { xpAwarded: 10 } }),
   get: jest.fn().mockResolvedValue({ data: {} })
 }));
@@ -66,12 +66,12 @@ jest.mock('../models', () => {
   };
 });
 
-jest.mock('@study-partner/shared/middleware', () => ({
+jest.mock('@ednova/shared/middleware', () => ({
   asyncHandler: (fn: ContractHandler) => (req: DomainRequest, res: Response, next: NextFunction) =>
     Promise.resolve(fn(req, res, next)).catch(next)
 }));
 
-jest.mock('@study-partner/shared/auth', () => ({
+jest.mock('@ednova/shared/auth', () => ({
   requireAuth: (req: DomainRequest, res: Response, next: NextFunction) => next(),
   requireRole: () => (req: DomainRequest, res: Response, next: NextFunction) => next(),
   buildInternalHeaders: () => ({})
@@ -89,7 +89,7 @@ const app = express();
 app.use(express.json());
 app.use((req: DomainRequest, _res: Response, next: NextFunction) => {
   req.user = { userId: 'user-123', role: 'student' };
-  req.headers.cookie = 'mindflow.test_session=tok';
+  req.headers.cookie = 'ednova.test_session=tok';
   next();
 });
 app.use('/tasks', tasksRouter);

@@ -4,7 +4,7 @@
 
 // Prevent process.exit() from killing tests (same as study.test.js)
 process.env.JWT_SECRET = 'test-secret-key';
-process.env.MONGODB_URI = 'mongodb://localhost:27017/test_study_partner';
+process.env.MONGODB_URI = 'mongodb://localhost:27017/test_ednova';
 process.env.NODE_ENV = 'test';
 const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => {
   throw new Error(`Unexpected process.exit(${code})`);

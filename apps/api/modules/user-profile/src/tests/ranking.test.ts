@@ -2,7 +2,7 @@ import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response, NextFunction } from 'express';
 // Set environment variables BEFORE any imports
 process.env.JWT_SECRET = 'test-secret-key';
-process.env.MONGODB_URI = 'mongodb://localhost:27017/test_study_partner';
+process.env.MONGODB_URI = 'mongodb://localhost:27017/test_ednova';
 process.env.NODE_ENV = 'test';
 
 // Prevent process.exit() from killing tests
@@ -12,7 +12,7 @@ const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => 
 afterAll(() => exitSpy.mockRestore());
 
 // Mock moduleClient
-jest.mock('@study-partner/shared/moduleClient');
+jest.mock('@ednova/shared/moduleClient');
 
 // Mock database models
 jest.mock('../models/UserRankProfile', () => ({
@@ -36,14 +36,14 @@ jest.mock('../models/SeasonResultSnapshot', () => ({
   create: jest.fn()
 }));
 
-jest.mock('@study-partner/shared/auth', () => ({
+jest.mock('@ednova/shared/auth', () => ({
   authenticate: jest.fn((req, res, next) => {
     req.user = { userId: 'test-user-123', role: 'student' };
     next();
   })
 }));
 
-jest.mock('@study-partner/shared', () => ({
+jest.mock('@ednova/shared', () => ({
   corsMiddleware: jest.fn(
     () => (req: DomainRequest & { userTier?: string }, res: Response, next: NextFunction) => next()
   ),

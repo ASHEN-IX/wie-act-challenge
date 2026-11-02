@@ -5,7 +5,7 @@
 import request from 'supertest';
 
 process.env.JWT_SECRET = 'test-secret-key';
-process.env.MONGODB_URI = 'mongodb://localhost:27017/test_study_partner';
+process.env.MONGODB_URI = 'mongodb://localhost:27017/test_ednova';
 process.env.INTERNAL_API_SECRET = 'test-internal-secret';
 process.env.NODE_ENV = 'test';
 
@@ -20,7 +20,7 @@ describe('Main API', () => {
       const res = await request(app).get('/api/v1/health');
       expect(res.status).toBe(503);
       expect(res.body.status).toBe('degraded');
-      expect(res.body.service).toBe('study-partner-api');
+      expect(res.body.service).toBe('ednova-api');
     });
   });
 

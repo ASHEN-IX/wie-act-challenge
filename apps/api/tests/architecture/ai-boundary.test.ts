@@ -1,5 +1,5 @@
 import http from 'http';
-import client from '@study-partner/shared/aiClient';
+import client from '@ednova/shared/aiClient';
 
 let server: http.Server;
 let requests: number;

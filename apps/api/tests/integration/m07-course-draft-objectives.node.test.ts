@@ -17,7 +17,7 @@ import {
 } from '../../modules/study/src/services/courseDraft';
 import { handleIngestResult } from '../../modules/study/src/services/ingestStatus';
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27018/mindflow-test';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27018/ednova-test';
 
 test('M07 / ED-30: Course Studio Versioned Draft APIs & Learning Objectives', async (t) => {
   await mongoose.connect(MONGO_URI);
@@ -346,6 +346,34 @@ test('M07 / ED-30: Course Studio Versioned Draft APIs & Learning Objectives', as
       // Verify published revision content was not mutated!
       const verifyPub = await CourseRevision.findById(publishedRev._id);
       assert.equal(verifyPub!.topics![0].title, 'Published Topic v1');
+    }
+  );
+
+  await t.test(
+    'ED-30.5b: Stale empty draft shells cannot hide current editable material',
+    async () => {
+      const activeBefore = await Course.findById(courseId);
+      const activeTag = activeBefore!.activeRevisionId!;
+      const active = await CourseRevision.findOne({
+        courseId,
+        ...(activeTag.startsWith('rev_') ? { revisionTag: activeTag } : { _id: activeTag })
+      }).lean();
+      assert.ok(active?.topics?.length);
+      const stale = await CourseRevision.create({
+        courseId: new mongoose.Types.ObjectId(courseId),
+        revisionTag: 'rev_stale_empty_shell',
+        contentHash: 'empty',
+        status: 'draft',
+        topics: [],
+        isInstructorReviewed: false
+      });
+
+      const draft = await getCourseDraft(instructorId, courseId);
+      assert.notEqual(draft.revisionTag, stale.revisionTag);
+      assert.equal(draft.topics.length, active.topics.length);
+      assert.notEqual(draft.topics[0].title, '');
+      assert.equal((await CourseRevision.findById(stale._id))!.status, 'draft');
+      assert.equal((await Course.findById(courseId))!.activeRevisionId, activeTag);
     }
   );
 

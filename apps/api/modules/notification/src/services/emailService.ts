@@ -1,4 +1,4 @@
-import moduleClient from '@study-partner/shared/moduleClient';
+import moduleClient from '@ednova/shared/moduleClient';
 import nodemailer from 'nodemailer';
 import type { Request } from 'express';
 import type { INotification } from '../models/Notification';
@@ -108,7 +108,7 @@ export const buildEmailTemplate = ({
     }
   }
   const action = actionUrl
-    ? `<p style="margin-top:24px"><a href="${escapeHtml(actionUrl)}" style="background:#ff4655;color:#fff;padding:10px 14px;border-radius:8px;text-decoration:none;font-weight:700">Open Study Partner</a></p>`
+    ? `<p style="margin-top:24px"><a href="${escapeHtml(actionUrl)}" style="background:#ff4655;color:#fff;padding:10px 14px;border-radius:8px;text-decoration:none;font-weight:700">Open EdNova</a></p>`
     : '';
 
   return {
@@ -119,7 +119,7 @@ export const buildEmailTemplate = ({
           <h2 style="margin:0 0 10px;color:#0f172a;">${emoji} ${escapeHtml(title)}</h2>
           <p style="margin:0;color:#334155;line-height:1.6;">${escapeHtml(message)}</p>
           ${action}
-          <p style="margin-top:24px;color:#64748b;font-size:12px;">This email was sent by Study Partner notifications.</p>
+          <p style="margin-top:24px;color:#64748b;font-size:12px;">This email was sent by EdNova notifications.</p>
         </div>
       </div>
     `
@@ -146,7 +146,7 @@ export const sendNotificationEmail = async ({
     metadata: notification.metadata
   });
 
-  const from = process.env.SMTP_FROM || 'Study Partner <no-reply@study-partner.local>';
+  const from = process.env.SMTP_FROM || 'EdNova <no-reply@ednova.local>';
   await t.sendMail({
     from,
     to,

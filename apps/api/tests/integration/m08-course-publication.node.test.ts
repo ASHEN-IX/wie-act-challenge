@@ -20,7 +20,7 @@ import {
 } from '../../modules/study/src/services/coursePublication';
 import { updateCourseDraft } from '../../modules/study/src/services/courseDraft';
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27018/mindflow-test';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27018/ednova-test';
 
 test('M08 / ED-05: Immutable Reviewed Publication & Revision Resolution Integration', async (t) => {
   await mongoose.connect(MONGO_URI);

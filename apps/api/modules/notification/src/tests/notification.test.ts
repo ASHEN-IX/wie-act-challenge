@@ -7,7 +7,7 @@ import type { Response, NextFunction } from 'express';
 import express from 'express';
 
 process.env.JWT_SECRET = 'test-secret-key';
-process.env.MONGODB_URI = 'mongodb://localhost:27017/test_study_partner';
+process.env.MONGODB_URI = 'mongodb://localhost:27017/test_ednova';
 process.env.NODE_ENV = 'test';
 
 // Prevent process.exit() from killing tests
@@ -48,9 +48,9 @@ jest.mock('../models/Notification', () => ({
   updateMany: jest.fn().mockResolvedValue({ modifiedCount: 1 })
 }));
 
-jest.mock('@study-partner/shared', () => ({
+jest.mock('@ednova/shared', () => ({
   requireInternal:
-    jest.requireActual<typeof import('@study-partner/shared')>('@study-partner/shared')
+    jest.requireActual<typeof import('@ednova/shared')>('@ednova/shared')
       .requireInternal,
   corsMiddleware: jest.fn(
     () => (req: DomainRequest & { userTier?: string }, res: Response, next: NextFunction) => next()
@@ -81,9 +81,9 @@ jest.mock('@study-partner/shared', () => ({
   }
 }));
 
-jest.mock('@study-partner/shared/auth', () => ({
-  requireInternal: jest.requireActual<typeof import('@study-partner/shared/auth')>(
-    '@study-partner/shared/auth'
+jest.mock('@ednova/shared/auth', () => ({
+  requireInternal: jest.requireActual<typeof import('@ednova/shared/auth')>(
+    '@ednova/shared/auth'
   ).requireInternal,
   authenticate: jest.fn(
     (req: DomainRequest & { userTier?: string }, res: Response, next: NextFunction) => {
@@ -100,11 +100,11 @@ import request from 'supertest';
 const app = express();
 app.use(express.json());
 app.use(
-  (require('@study-partner/shared/auth') as typeof import('@study-partner/shared/auth'))
+  (require('@ednova/shared/auth') as typeof import('@ednova/shared/auth'))
     .authenticate
 );
 app.use('/api/v1/notifications', notifRoutes);
-app.use((require('@study-partner/shared') as typeof import('@study-partner/shared')).errorHandler);
+app.use((require('@ednova/shared') as typeof import('@ednova/shared')).errorHandler);
 
 describe('Notification Service', () => {
   beforeEach(() => jest.clearAllMocks());

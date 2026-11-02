@@ -18,7 +18,7 @@ jest.setTimeout(30000);
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'integration-test-secret';
 process.env.JWT_REFRESH_SECRET =
   process.env.JWT_REFRESH_SECRET || 'integration-test-refresh-secret';
-process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/study_partner_test';
+process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/ednova_test';
 process.env.NODE_ENV = 'test';
 
 // Prevent process.exit() from killing tests
@@ -95,7 +95,7 @@ describe('API Gateway - Health & Routing', () => {
     const res = await request(gatewayApp).get('/api/v1/health');
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('healthy');
-    expect(res.body.service).toBe('study-partner-api');
+    expect(res.body.service).toBe('ednova-api');
   });
 
   it('unknown route should return 404', async () => {
@@ -116,7 +116,7 @@ describe('Study Service – CRUD with authentication', () => {
   it('GET /api/v1/study/tasks – should succeed with valid JWT', async () => {
     const res = await request(studyApp)
       .get('/api/v1/study/tasks')
-      .set('Cookie', `mindflow.test_session=${token}`);
+      .set('Cookie', `ednova.test_session=${token}`);
 
     expect(res.status).toBe(200);
   });
@@ -124,7 +124,7 @@ describe('Study Service – CRUD with authentication', () => {
   it('POST /api/v1/study/tasks – should create a task', async () => {
     const res = await request(studyApp)
       .post('/api/v1/study/tasks')
-      .set('Cookie', `mindflow.test_session=${token}`)
+      .set('Cookie', `ednova.test_session=${token}`)
       .send({
         title: 'Integration Test Task',
         description: 'Created by integration test',
@@ -146,7 +146,7 @@ describe('User Profile Service – Profile & Availability', () => {
   it('GET /api/v1/users/profile – should return profile with valid JWT', async () => {
     const res = await request(profileApp)
       .get('/api/v1/users/profile')
-      .set('Cookie', `mindflow.test_session=${token}`);
+      .set('Cookie', `ednova.test_session=${token}`);
 
     // 200 if profile exists, 404 if not yet created — both valid
     expect([200, 404]).toContain(res.status);
@@ -155,7 +155,7 @@ describe('User Profile Service – Profile & Availability', () => {
   it('GET /api/v1/users/availability – should return availability array', async () => {
     const res = await request(profileApp)
       .get('/api/v1/users/availability')
-      .set('Cookie', `mindflow.test_session=${token}`);
+      .set('Cookie', `ednova.test_session=${token}`);
 
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
@@ -168,7 +168,7 @@ describe('Analytics Service – Event tracking', () => {
   it('POST /api/v1/analytics/track – should accept events', async () => {
     const res = await request(analyticsApp)
       .post('/api/v1/analytics/track')
-      .set('Cookie', `mindflow.test_session=${token}`)
+      .set('Cookie', `ednova.test_session=${token}`)
       .send({
         eventType: 'test_event',
         data: { source: 'integration-test' }

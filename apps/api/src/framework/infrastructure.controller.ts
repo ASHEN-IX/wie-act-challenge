@@ -6,7 +6,7 @@ import { SessionGuard } from './auth.guard';
 export class InfrastructureController {
   @Get('health')
   health(@Req() req: DomainRequest, @Res() res: Response): void {
-    require('../../shared').healthCheck('study-partner-api')(req, res);
+    require('../../shared').healthCheck('ednova-api')(req, res);
   }
   @Get('docs/openapi.json')
   specification(): unknown {
@@ -17,7 +17,7 @@ export class InfrastructureController {
     res
       .type('html')
       .send(
-        '<h1>Study Partner API</h1><a href="/api/v1/docs/openapi.json">OpenAPI specification</a>'
+        '<h1>EdNova API</h1><a href="/api/v1/docs/openapi.json">OpenAPI specification</a>'
       );
   }
   @Get('monitoring/metrics')

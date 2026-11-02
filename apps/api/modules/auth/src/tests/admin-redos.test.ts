@@ -9,7 +9,7 @@ import type { Request, Response, NextFunction } from 'express';
  */
 process.env.JWT_SECRET = 'test-secret-key';
 process.env.JWT_REFRESH_SECRET = 'test-refresh-secret';
-process.env.MONGODB_URI = 'mongodb://localhost:27017/test_study_partner';
+process.env.MONGODB_URI = 'mongodb://localhost:27017/test_ednova';
 process.env.NODE_ENV = 'test';
 
 jest.mock('../models/User', () => ({
@@ -32,7 +32,7 @@ jest.mock('../models/Payment', () => ({
   findById: jest.fn(),
   aggregate: jest.fn()
 }));
-jest.mock('@study-partner/shared/auth', () => ({
+jest.mock('@ednova/shared/auth', () => ({
   requireRole: () => (req: Request, res: Response, next: NextFunction) => next()
 }));
 

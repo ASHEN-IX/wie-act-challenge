@@ -516,6 +516,10 @@ async function main() {
       .getByRole("button", { name: "Add learning objective", exact: true })
       .click();
     await instructor.page
+      .getByRole("button", { name: /Instructor reviewed objective/ })
+      .click();
+    await instructor.page.getByRole("button", { name: /Source study/ }).click();
+    await instructor.page
       .getByLabel("Topic heading 1", { exact: true })
       .fill("Instructor corrected arithmetic heading");
     await instructor.page.locator("#reviewed-checkbox").check();
@@ -567,6 +571,9 @@ async function main() {
     for (const type of ["InteractiveQuiz", "GuidedProblem"]) {
       await instructor.page
         .getByRole("button", { name: type, exact: true })
+        .click();
+      await instructor.page
+        .getByText("Settings", { exact: true })
         .click();
       await instructor.page
         .getByLabel("Hint depth", { exact: true })

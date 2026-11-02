@@ -1,15 +1,15 @@
-import { errorDetails } from '@study-partner/shared/errors';
+import { errorDetails } from '@ednova/shared/errors';
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response } from 'express';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createContracts } = require('@study-partner/shared/domainContracts');
+const { createContracts } = require('@ednova/shared/domainContracts');
 import multer from 'multer';
 import path from 'path';
 import { Subject, Course } from '../models';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const moduleClient = require('@study-partner/shared/moduleClient');
+const moduleClient = require('@ednova/shared/moduleClient');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { buildInternalHeaders } = require('@study-partner/shared/auth');
+const { buildInternalHeaders } = require('@ednova/shared/auth');
 
 const router = createContracts();
 

@@ -332,16 +332,16 @@ async function registerTests() {
   });
 
   test('HTTPS sessions use secure HTTP-only SameSite cookies and fresh random sessions', async () => {
-    process.env.AUTH_TRUSTED_ORIGINS = 'http://localhost:5173,https://mindflow.example';
+    process.env.AUTH_TRUSTED_ORIGINS = 'http://localhost:5173,https://ednova.example';
     const secure = await createAuth(db, {
-      baseURL: 'https://mindflow.example',
+      baseURL: 'https://ednova.example',
       sendMail: async () => {}
     });
     const login = () =>
       secure.handler(
-        new Request('https://mindflow.example/api/auth/sign-in/email', {
+        new Request('https://ednova.example/api/auth/sign-in/email', {
           method: 'POST',
-          headers: { origin: 'https://mindflow.example', 'content-type': 'application/json' },
+          headers: { origin: 'https://ednova.example', 'content-type': 'application/json' },
           body: JSON.stringify({ email: 'new@example.test', password: 'ChangedPass!456' })
         })
       );

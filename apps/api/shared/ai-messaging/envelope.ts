@@ -3,7 +3,7 @@
  *
  * Single source of truth for the shape of AI job messages and AI result
  * events travelling over RabbitMQ. Mirrored by the Pydantic models in
- * `study-partner-ai/messaging/envelope.py`; both sides MUST validate on
+ * `ednova-ai/messaging/envelope.py`; both sides MUST validate on
  * publish AND on consume. Contract doc: docs/contracts/ai-message-contract.md
  */
 
@@ -39,7 +39,7 @@ export type ResultStatus = (typeof RESULT_STATUSES)[number];
 /**
  * INGEST-06/07 — staged progress events published on ai.results under the
  * `progress` routing key. Mirrors `AiProgressEnvelope` in
- * study-partner-ai/messaging/envelope.py (status "progress", stage in
+ * ednova-ai/messaging/envelope.py (status "progress", stage in
  * PROGRESS_STAGES, progress ∈ [0,1], detail ≤256, no payload field).
  */
 export const PROGRESS_STATUS = 'progress';

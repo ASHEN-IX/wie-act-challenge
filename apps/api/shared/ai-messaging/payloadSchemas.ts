@@ -1,7 +1,7 @@
 /**
  * Per-type job payload validators (F02 / PLAN-02).
  *
- * Python mirror: `study-partner-ai/workers/schemas.py`. Limits MUST stay
+ * Python mirror: `ednova-ai/workers/schemas.py`. Limits MUST stay
  * identical on both sides — parity is covered by contract tests.
  *
  * Used by the ai-orchestrator jobs route to reject malformed payloads BEFORE
@@ -471,7 +471,7 @@ export function validateIngestPayload(payload: unknown): ValidationResult {
     return { valid: false, errors: ['payload must be an object'] };
   }
   for (const key of Object.keys(payload)) {
-    if (!['courseId', 'fileRef', 'files', 'revisionId'].includes(key)) {
+    if (!['courseId', 'courseTitle', 'fileRef', 'files', 'revisionId'].includes(key)) {
       errors.push(`unknown field "${key}"`);
     }
   }
@@ -497,6 +497,14 @@ export function validateIngestPayload(payload: unknown): ValidationResult {
     payload.fileRef.length > CONTENT_REF_MAX_CHARS
   ) {
     errors.push(`fileRef must be a non-empty string of at most ${CONTENT_REF_MAX_CHARS} chars`);
+  }
+  if (
+    payload.courseTitle !== undefined &&
+    (typeof payload.courseTitle !== 'string' ||
+      !payload.courseTitle.trim() ||
+      payload.courseTitle.length > 150)
+  ) {
+    errors.push('courseTitle must be a non-empty string of at most 150 chars');
   }
   if (payload.files !== undefined) {
     if (!Array.isArray(payload.files)) {

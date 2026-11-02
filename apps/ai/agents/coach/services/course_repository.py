@@ -1,6 +1,6 @@
 """Course catalog reader for the coach (F03 / COACH-14).
 
-Reads the shared course catalog directly from Mongo — the same `study_partner`
+Reads the shared course catalog directly from Mongo — the same `ednova`
 DB that `PlannerRepository` and `CoachHistoryRepository` use — so the coach
 can ground nudges in the student's enrolled courses and subjects instead of
 reasoning from task titles alone:
@@ -31,7 +31,7 @@ from pymongo import MongoClient
 from agents.coach.models.schemas import CourseContext
 
 MONGO_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
-DB_NAME = os.getenv("DB_NAME", "study_partner")
+DB_NAME = os.getenv("DB_NAME", "ednova")
 COURSES_COLLECTION = os.getenv("COURSES_COLLECTION", "courses")
 SUBJECTS_COLLECTION = os.getenv("SUBJECTS_COLLECTION", "subjects")
 STUDY_SESSIONS_COLLECTION = os.getenv("STUDY_SESSIONS_COLLECTION", "studysessions")

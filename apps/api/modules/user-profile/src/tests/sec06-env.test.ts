@@ -7,11 +7,11 @@
  */
 process.env.JWT_SECRET = 'test-secret-key';
 process.env.JWT_REFRESH_SECRET = 'test-refresh-secret';
-process.env.MONGODB_URI = 'mongodb://localhost:27017/test_study_partner';
+process.env.MONGODB_URI = 'mongodb://localhost:27017/test_ednova';
 process.env.INTERNAL_API_SECRET = 'test-internal-secret';
 process.env.NODE_ENV = 'test';
 
-import { requireEnv, logger } from '@study-partner/shared';
+import { requireEnv, logger } from '@ednova/shared';
 
 const SAVED_ENV = { ...process.env };
 let exitSpy: jest.SpyInstance;

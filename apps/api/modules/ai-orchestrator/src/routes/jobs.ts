@@ -10,10 +10,10 @@ import type { FilterQuery } from 'mongoose';
  * GET  /api/v1/ai/jobs          → list own jobs (optional ?status=&limit=)
  */
 
-import { createContracts } from '@study-partner/shared/domainContracts';
-import { logger } from '@study-partner/shared';
-import { publishAiJob, AI_JOB_TYPES } from '@study-partner/shared/ai-messaging';
-import { validateJobPayload } from '@study-partner/shared/ai-messaging/payloadSchemas';
+import { createContracts } from '@ednova/shared/domainContracts';
+import { logger } from '@ednova/shared';
+import { publishAiJob, AI_JOB_TYPES } from '@ednova/shared/ai-messaging';
+import { validateJobPayload } from '@ednova/shared/ai-messaging/payloadSchemas';
 import AiJob from '../models/AiJob';
 import crypto from 'crypto';
 

@@ -22,7 +22,7 @@ const mongoose = require('mongoose');
 
 jest.setTimeout(30000);
 
-process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/study_partner_test';
+process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/ednova_test';
 process.env.NODE_ENV = 'test';
 
 const {

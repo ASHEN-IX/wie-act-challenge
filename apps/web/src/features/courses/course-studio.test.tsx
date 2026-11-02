@@ -69,10 +69,14 @@ describe("CourseStudio Component (ED-31 / M15)", () => {
     );
 
     expect(html).toContain("Algorithms &amp; Data Structures");
-    expect(html).toContain("rev_20261023_01");
+    expect(html).not.toContain("rev_20261023_01");
+    expect(html).toContain("Upload");
+    expect(html).toContain("Review");
     expect(html).toContain("Needs Review");
     expect(html).toContain("Save Draft");
-    expect(html).toContain("Publish Revision");
+    expect(html).toContain("Review &amp; Publish");
+    expect(html).toContain("Draft ready for review.");
+    expect(html).not.toContain("Choose a source to begin.");
   });
 
   it("renders reviewed status badge when isInstructorReviewed is true", () => {
@@ -100,11 +104,8 @@ describe("CourseStudio Component (ED-31 / M15)", () => {
 
     expect(html).toContain("Asymptotic Analysis");
     expect(html).toContain("Worst-Case Complexity");
-    expect(html).toContain("Bloom: apply");
-    expect(html).toContain(
-      "Formulate worst-case recurrence relations for recursive algorithms.",
-    );
-    expect(html).toContain("Generate Proposal");
+    expect(html).toContain("1 objective");
+    expect(html).toContain('aria-expanded="false"');
   });
 
   it("renders activity proposal studio controls with InteractiveQuiz and GuidedProblem options", () => {
@@ -120,6 +121,6 @@ describe("CourseStudio Component (ED-31 / M15)", () => {
     expect(html).toContain("Activity Proposal Studio");
     expect(html).toContain("InteractiveQuiz");
     expect(html).toContain("GuidedProblem");
-    expect(html).toContain("Activity Type:");
+    expect(html).toContain("Activity type");
   });
 });

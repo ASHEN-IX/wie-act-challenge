@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# MongoDB backup script for Study Partner
+# MongoDB backup script for EdNova
 # Usage: ./backup.sh [MONGODB_URI] [BACKUP_DIR]
 #
 # Defaults:
-#   MONGODB_URI  = $MONGODB_URI env var, or mongodb://localhost:27017/study_partner
+#   MONGODB_URI  = $MONGODB_URI env var, or mongodb://localhost:27017/ednova
 #   BACKUP_DIR   = ./backups (relative to script location)
 #
 # Produces a gzipped BSON dump in BACKUP_DIR/<timestamp>/
@@ -12,7 +12,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
-MONGODB_URI="${1:-${MONGODB_URI:-mongodb://localhost:27017/study_partner}}"
+MONGODB_URI="${1:-${MONGODB_URI:-mongodb://localhost:27017/ednova}}"
 BACKUP_DIR="${2:-${SCRIPT_DIR}/../backups}/${TIMESTAMP}"
 
 echo "==> MongoDB backup"
@@ -28,8 +28,8 @@ mongodump \
   --numParallelCollections=4
 
 # Verify at least one collection was dumped
-if [ -d "${BACKUP_DIR}/study_partner" ]; then
-  COLLECTIONS=$(ls -1 "${BACKUP_DIR}/study_partner" | wc -l)
+if [ -d "${BACKUP_DIR}/ednova" ]; then
+  COLLECTIONS=$(ls -1 "${BACKUP_DIR}/ednova" | wc -l)
   echo "==> Backup complete: ${COLLECTIONS} collections dumped"
 else
   # Try the database name extracted from URI

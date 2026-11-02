@@ -1,17 +1,17 @@
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { FilterQuery } from 'mongoose';
 import type { IAnalyticsEvent } from '../models/AnalyticsEvent';
-import { boundedInteger, activityRange } from '@study-partner/shared/pagination';
+import { boundedInteger, activityRange } from '@ednova/shared/pagination';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createContracts } = require('@study-partner/shared/domainContracts');
+const { createContracts } = require('@ednova/shared/domainContracts');
 import Joi from 'joi';
 import type { Response } from 'express';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const AnalyticsEvent: typeof import('../models/AnalyticsEvent').default = require('../models/AnalyticsEvent');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { getCacheClient } = require('@study-partner/shared');
+const { getCacheClient } = require('@ednova/shared');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { asyncHandler } = require('@study-partner/shared/middleware');
+const { asyncHandler } = require('@ednova/shared/middleware');
 
 const router = createContracts();
 const cache = getCacheClient();

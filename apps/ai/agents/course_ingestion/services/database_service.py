@@ -8,7 +8,7 @@ from bson import ObjectId
 # MongoDB setup
 # ----------------------------
 MONGO_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
-DB_NAME = os.getenv("DB_NAME", "study_partner")
+DB_NAME = os.getenv("DB_NAME", "ednova")
 # Use consistent collection names across all services
 COLLECTION_NAME = "courses"  # AI-processed courses
 STUDY_PLAN_COLLECTION = "studyplans"  # Match Mongoose pluralization

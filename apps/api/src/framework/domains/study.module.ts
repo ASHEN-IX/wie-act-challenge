@@ -806,6 +806,13 @@ export class StudyController {
       res
     );
   }
+  @Get('/api/v1/study/learning/courses/:courseId/document')
+  get_api_v1_study_learning_courses_document_19748d64(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('GET /api/v1/study/learning/courses/:courseId/document', req, res);
+  }
   @Get('/api/v1/study/learning/courses/:courseId/progress')
   get_api_v1_study_learning_courses_progress_ca9afcc4(
     @Req() req: DomainRequest,

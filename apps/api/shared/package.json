@@ -1,17 +1,17 @@
 {
-  "name": "@study-partner/shared",
+  "name": "@ednova/shared",
   "version": "1.0.0",
-  "description": "Shared utilities for Study Partner backend services",
+  "description": "Shared utilities for EdNova backend services",
   "main": "index.ts",
   "scripts": {
     "test": "echo \"No tests yet\""
   },
   "keywords": [
-    "study-partner",
+    "ednova",
     "shared",
     "utilities"
   ],
-  "author": "Study Partner Team",
+  "author": "EdNova Team",
   "license": "MIT",
   "dependencies": {
     "@better-auth/mongo-adapter": "^1.7.7",

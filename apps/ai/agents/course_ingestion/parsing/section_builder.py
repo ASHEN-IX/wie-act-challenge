@@ -3,6 +3,7 @@ from agents.course_ingestion.enrichment.llm_enricher import (
     generate_subtopic_title,
     clean_metadata,
 )
+from agents.course_ingestion.parsing.semantic_structure import _source_section_title
 
 # Patterns that indicate a line is metadata rather than a real title
 _METADATA_PATTERNS = [
@@ -74,7 +75,7 @@ def build_subtopics(sections):
             candidate.lower().startswith("subtopic")
             or candidate_words < 2
             or _is_metadata_heavy(raw_source)
-        )
+        ) and not _source_section_title(sec["title"])
 
         if needs_llm_title:
             try:
@@ -125,15 +126,30 @@ def build_subtopics(sections):
             {
                 "id": f"sub_{idx}",
                 "title": title,
+                "chapter": sec.get("chapter", ""),
                 "summary": summary,
-                "full_content": content_text,  # Store full content for tokenization
+                # Preserve source line boundaries for the canonical reading
+                # document. This is still the extracted text, not a repair.
+                "full_content": "\n".join(sec["content"]),
                 "key_concepts": list(set(key_concepts[:10])),  # Deduplicate and limit
                 "definitions": [],
                 "formulas": [],
                 "examples": [],
-                "figures": [],
-                "tables": [],
-                "source_spans": [],
+                # These fields are evidence, not model output. The ingestion
+                # parser copies exact chunk/page/line spans from the verified
+                # source so later readers do not need to guess associations.
+                "figures": [
+                    block
+                    for block in sec.get("blocks", [])
+                    if block.get("type") == "media"
+                ],
+                "tables": [
+                    block
+                    for block in sec.get("blocks", [])
+                    if block.get("type") == "table"
+                ],
+                "source_spans": list(sec.get("source_spans", [])),
+                "structured_blocks": list(sec.get("blocks", [])),
                 "difficulty_estimate": round(difficulty, 2),
                 "tokenized_chunks": [],  # will be filled in tokenization
             }
@@ -143,9 +159,13 @@ def build_subtopics(sections):
     merged_subtopics = []
     for subtopic in subtopics:
         # Check if we should merge with previous
-        if merged_subtopics and should_merge(merged_subtopics[-1], subtopic):
+        if (
+            merged_subtopics
+            and merged_subtopics[-1].get("chapter") == subtopic.get("chapter")
+            and should_merge(merged_subtopics[-1], subtopic)
+        ):
             # Merge content
-            merged_subtopics[-1]["full_content"] += " " + subtopic["full_content"]
+            merged_subtopics[-1]["full_content"] += "\n" + subtopic["full_content"]
             merged_subtopics[-1]["summary"] = (
                 merged_subtopics[-1]["full_content"][:500] + "..."
             )
@@ -153,6 +173,12 @@ def build_subtopics(sections):
             merged_subtopics[-1]["key_concepts"] = list(
                 set(merged_subtopics[-1]["key_concepts"])
             )[:10]
+            merged_subtopics[-1]["source_spans"].extend(
+                subtopic.get("source_spans", [])
+            )
+            merged_subtopics[-1]["structured_blocks"].extend(
+                subtopic.get("structured_blocks", [])
+            )
         else:
             merged_subtopics.append(subtopic)
 
@@ -180,7 +206,7 @@ def should_merge(prev_subtopic, current_subtopic):
     )
 
     # Merge if titles are very similar and previous is short
-    if prev_words < 100 and prev_main in curr_main or curr_main in prev_main:
+    if prev_words < 100 and (prev_main in curr_main or curr_main in prev_main):
         return True
 
     return False

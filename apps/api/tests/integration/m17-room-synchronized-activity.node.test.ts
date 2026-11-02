@@ -27,7 +27,7 @@ import { updateCourseDraft } from '../../modules/study/src/services/courseDraft'
 import { publishCourseRevision } from '../../modules/study/src/services/coursePublication';
 import type { DomainRequest } from '../../src/framework/contracts';
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27018/mindflow-test';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27018/ednova-test';
 
 test('M17 / ED-07 & ED-29: Real Shared Room Synchronized Activity & Private Submission Integration', async (t) => {
   await mongoose.connect(MONGO_URI);

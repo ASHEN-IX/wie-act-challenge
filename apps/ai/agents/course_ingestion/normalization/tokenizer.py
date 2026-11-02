@@ -51,8 +51,7 @@ def tokenize_subtopics(
         else:
             sub["tokenized_chunks"] = []
 
-        # Remove full_content from final output to save space (it's in chunks now)
-        if "full_content" in sub:
-            del sub["full_content"]
+        # full_content is canonical source content. Chunks are a derived index
+        # projection, never a replacement for the lesson body.
 
     return subtopics

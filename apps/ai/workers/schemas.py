@@ -458,6 +458,7 @@ class IngestionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     courseId: str = Field(..., min_length=1, max_length=COURSE_ID_MAX_CHARS)
+    courseTitle: Optional[str] = Field(default=None, min_length=1, max_length=150)
     revisionId: Optional[str] = Field(default=None, max_length=64)
     fileRef: str = Field(..., min_length=1, max_length=CONTENT_REF_MAX_CHARS)
     files: List[IngestFileMeta] = Field(

@@ -2,8 +2,8 @@ import type { Response, NextFunction } from 'express';
 import type { DomainRequest } from '../../src/framework/contracts';
 const express = require('express');
 const request = require('supertest');
-const axios = require('@study-partner/shared/moduleClient');
-jest.mock('@study-partner/shared/moduleClient');
+const axios = require('@ednova/shared/moduleClient');
+jest.mock('@ednova/shared/moduleClient');
 const mockFindOne = jest.fn();
 const mockCreate = jest.fn();
 jest.mock('../../modules/study/src/models', () => ({
@@ -140,7 +140,7 @@ describe('Challenge Session Routes Integration', () => {
     mockFindOne.mockResolvedValueOnce(activeChallengeSession).mockResolvedValueOnce(null);
     const response = await request(buildApp())
       .put('/api/v1/study/sessions/challenge/challenge-session-1/complete')
-      .set('Cookie', 'mindflow.test_session=user-auth-token')
+      .set('Cookie', 'ednova.test_session=user-auth-token')
       .send({
         focusScore: 87
       });

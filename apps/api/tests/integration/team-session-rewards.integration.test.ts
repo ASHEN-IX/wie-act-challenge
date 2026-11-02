@@ -2,8 +2,8 @@ import type { Response, NextFunction } from 'express';
 import type { DomainRequest } from '../../src/framework/contracts';
 const express = require('express');
 const request = require('supertest');
-const axios = require('@study-partner/shared/moduleClient');
-jest.mock('@study-partner/shared/moduleClient');
+const axios = require('@ednova/shared/moduleClient');
+jest.mock('@ednova/shared/moduleClient');
 jest.mock('../../modules/study/src/models', () => ({
   StudySession: {
     findOne: jest.fn()
@@ -96,7 +96,7 @@ describe('Team Session Rewards Integration', () => {
     StudySession.findOne.mockResolvedValue(session);
     const response = await request(buildApp('host-1'))
       .put('/api/v1/study/sessions/team/session-1/end')
-      .set('Cookie', 'mindflow.test_session=host-auth-token');
+      .set('Cookie', 'ednova.test_session=host-auth-token');
     expect(response.status).toBe(200);
     expect(response.body.message).toBe('Team session ended');
     expect(Array.isArray(response.body.teamRewards)).toBe(true);
@@ -144,7 +144,7 @@ describe('Team Session Rewards Integration', () => {
     StudySession.findOne.mockResolvedValue(session);
     const response = await request(buildApp('member-2'))
       .put('/api/v1/study/sessions/team/session-1/end')
-      .set('Cookie', 'mindflow.test_session=member-auth-token');
+      .set('Cookie', 'ednova.test_session=member-auth-token');
     expect(response.status).toBe(403);
     expect(response.body.error).toMatch(/only the host/i);
     expect(session.save).not.toHaveBeenCalled();
@@ -168,7 +168,7 @@ describe('Team Session Rewards Integration', () => {
     StudySession.findOne.mockResolvedValueOnce(challengeSession).mockResolvedValueOnce(null);
     const response = await request(buildApp('host-1'))
       .put('/api/v1/study/sessions/challenge-session-1')
-      .set('Cookie', 'mindflow.test_session=host-auth-token')
+      .set('Cookie', 'ednova.test_session=host-auth-token')
       .send({
         status: 'completed'
       });

@@ -1,14 +1,14 @@
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { IUser } from '../models/User';
 import { reserveCoupon } from '../services/couponRedemption';
-import { createContracts } from '@study-partner/shared/domainContracts';
+import { createContracts } from '@ednova/shared/domainContracts';
 import Joi from 'joi';
 import type { Response } from 'express';
 import User from '../models/User';
 import Coupon from '../models/Coupon';
 import { sendSubscriptionExpiryNotice } from '../services/emailService';
-import { authenticate } from '@study-partner/shared/auth';
-import { asyncHandler } from '@study-partner/shared/middleware';
+import { authenticate } from '@ednova/shared/auth';
+import { asyncHandler } from '@ednova/shared/middleware';
 
 const router = createContracts();
 

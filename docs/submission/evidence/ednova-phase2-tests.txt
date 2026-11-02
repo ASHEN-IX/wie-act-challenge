@@ -1,0 +1,35 @@
+EdNova Phase 2 validation transcript
+Date: 2026-11-02
+
+API semantic and reader tests:
+PASS modules/study/src/tests/course-reader.test.ts
+PASS modules/study/src/tests/semantic-content.test.ts
+Test Suites: 2 passed, 2 total
+Tests:       16 passed, 16 total
+
+Web renderer and workspace tests:
+Test Files  15 passed (15)
+Tests       83 passed (83)
+
+TypeScript:
+API: npx tsc -p tsconfig.check.json --pretty false -> clean
+Web: npx tsc --noEmit --pretty false -> clean
+
+Python semantic extraction harness:
+PASS test_code_stays_one_block_across_blank_lines
+PASS test_explicit_source_marker_is_not_a_section_or_visible_block
+PASS test_extracts_math_table_and_code_with_exact_line_spans
+PASS test_malformed_table_and_external_media_stay_safe_text
+PASS test_section_spans_keep_the_verified_chunk_and_page
+PASS test_unterminated_code_is_retained_with_an_explicit_flag
+Python py_compile: clean
+
+Demo seed:
+Phase 2 demo ready: 6ae7deb649522fa765d3bb71
+Second unchanged run reused the same course and content-derived revision.
+
+Authenticated browser check (Chromium):
+Desktop: 75 blocks, 2 charts, 2 diagrams, 6 formulas, 10 tables, 4 code blocks, 5 exact topic mappings, 0 page errors.
+Mobile: same content, responsive outline dialog opened, 0 page errors.
+
+Limitations: local pytest is not installed; the semantic test functions were executed directly. PDF corpus uploads and the full ingestion worker suite were not rerun in this pass.

@@ -34,7 +34,7 @@ import { generateActivityCandidate } from '../../modules/study/src/services/cour
 import { registerActivity } from '../../modules/study/src/services/activityAttempt';
 import type { DomainRequest } from '../../src/framework/contracts';
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27018/mindflow-test';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27018/ednova-test';
 
 test('M22 / ED-14: Master End-to-End Educational System Evaluation Scenario', async (t) => {
   await mongoose.connect(MONGO_URI);

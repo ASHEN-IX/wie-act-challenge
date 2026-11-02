@@ -115,6 +115,14 @@ export interface ISubtopic {
   definitions?: Array<{ term?: string; definition?: string }>;
   formulas?: string[];
   examples?: string[];
+  source_spans?: Array<{
+    chunkId: string;
+    documentId: string;
+    pageNumber: number | null;
+    lineStart: number;
+    lineEnd: number;
+  }>;
+  structured_blocks?: unknown[];
   tokenized_chunks?: string[];
   learning_objectives?: Array<
     Partial<
@@ -625,6 +633,8 @@ const courseSchema = new Schema<ICourse>(
             ],
             formulas: [String],
             examples: [String],
+            source_spans: [Schema.Types.Mixed],
+            structured_blocks: [Schema.Types.Mixed],
             tokenized_chunks: [String],
             learning_objectives: [Schema.Types.Mixed]
           }

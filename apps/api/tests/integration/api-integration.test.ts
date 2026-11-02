@@ -1,6 +1,6 @@
-const moduleClient = require('@study-partner/shared/moduleClient');
+const moduleClient = require('@ednova/shared/moduleClient');
 
-jest.mock('@study-partner/shared/moduleClient');
+jest.mock('@ednova/shared/moduleClient');
 
 describe('API Integration Tests', () => {
   let authToken: string;
@@ -232,12 +232,12 @@ describe('API Integration Tests', () => {
 
     test('should enforce authorization by role', async () => {
       const adminRequest = {
-        headers: { Cookie: `mindflow.test_session=${authToken}` },
+        headers: { Cookie: `ednova.test_session=${authToken}` },
         role: 'admin'
       };
 
       const studentRequest = {
-        headers: { Cookie: `mindflow.test_session=${authToken}` },
+        headers: { Cookie: `ednova.test_session=${authToken}` },
         role: 'student'
       };
 

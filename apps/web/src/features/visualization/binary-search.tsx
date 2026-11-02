@@ -5,7 +5,7 @@ import {
   DEFAULT_BINARY_SEARCH,
   parseBinarySearchState,
   type BinarySearchState,
-} from "@study-partner/shared/visualization";
+} from "@ednova/shared/visualization";
 import { Button } from "@/components/ui/button";
 
 export function BinarySearchVisualizer({

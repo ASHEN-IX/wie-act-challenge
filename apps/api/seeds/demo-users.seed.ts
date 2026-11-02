@@ -10,7 +10,7 @@ const users = [
 ];
 
 async function main() {
-  const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/study_partner';
+  const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/ednova';
   const host = new URL(uri).hostname;
   if (!['localhost', '127.0.0.1', 'mongodb'].includes(host)) {
     throw new Error('Demo users can only be seeded into local MongoDB');
@@ -32,7 +32,7 @@ async function main() {
         body: {
           email: user.email,
           name: user.name,
-          password: process.env.DEMO_USER_PASSWORD || 'MindflowDemo!2026'
+          password: process.env.DEMO_USER_PASSWORD || 'EdNovaDemo!2026'
         }
       });
       const identity = await db.collection('auth_users').findOne({ email: user.email });

@@ -448,6 +448,18 @@ describe('validateIngestPayload (study.ingest.course / INGEST-05)', () => {
     expect(validateJobPayload('study.ingest.course', valid)).toEqual({ valid: true, errors: [] });
   });
 
+  test('round-trips the display title and rejects an oversized one', () => {
+    expect(
+      validateJobPayload('study.ingest.course', {
+        ...valid,
+        courseTitle: 'Séries de fonctions'
+      })
+    ).toEqual({ valid: true, errors: [] });
+    expect(
+      validateJobPayload('study.ingest.course', { ...valid, courseTitle: 'x'.repeat(151) }).valid
+    ).toBe(false);
+  });
+
   test('requires courseId + fileRef non-empty within limits', () => {
     expect(validateJobPayload('study.ingest.course', {}).valid).toBe(false);
     expect(validateJobPayload('study.ingest.course', { ...valid, courseId: ' ' }).valid).toBe(

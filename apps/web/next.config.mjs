@@ -6,7 +6,7 @@ export default {
   devIndicators: false,
   experimental: { serverActions: { bodySizeLimit: "26mb" } },
   logging: { incomingRequests: false },
-  transpilePackages: ["@study-partner/shared"],
+  transpilePackages: ["@ednova/shared"],
   serverExternalPackages: ["mongodb", "nodemailer"],
   async redirects() {
     return [

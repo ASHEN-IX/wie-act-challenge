@@ -2,14 +2,14 @@
  * Seed demo analytics events for a user email.
  *
  * Usage:
- *   MONGODB_URI=mongodb://localhost:27017/study_partner npx tsx seeds/analytics-demo.seed.ts kammounaziz12@gmail.com
+ *   MONGODB_URI=mongodb://localhost:27017/ednova npx tsx seeds/analytics-demo.seed.ts kammounaziz12@gmail.com
  */
 import mongoose from 'mongoose';
 import User from '../modules/auth/src/models/User';
 import AnalyticsEvent from '../modules/analytics/src/models/AnalyticsEvent';
 
 const DEFAULT_EMAIL = 'kammounaziz12@gmail.com';
-const DEFAULT_MONGODB_URI = 'mongodb://localhost:27017/study_partner';
+const DEFAULT_MONGODB_URI = 'mongodb://localhost:27017/ednova';
 const SEED_BATCH = 'analytics-demo-v1';
 
 const email = String(process.argv[2] || DEFAULT_EMAIL)

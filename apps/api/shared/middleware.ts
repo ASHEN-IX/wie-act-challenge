@@ -185,12 +185,18 @@ function _getRedisStore(): RateStore | null {
     });
     redisRateClient.on('error', () => {});
   }
+  // A Redis store gets its window from the middleware. Module limiters are
+  // assembled before the gateway owns the request, so initialize this local
+  // store with the standard one-minute window before its first command.
   const client = redisRateClient;
   const store = new RedisStore({
     sendCommand: (...args: string[]) =>
       client.call(args[0], ...args.slice(1)) as ReturnType<RedisCommand>,
     prefix: `rl:module:${limiterIndex++}:`
   });
+  // Align with the library's Store contract; the full middleware options are
+  // not available in this factory and only the window is used by the store.
+  store.windowMs = 60_000;
   // Store scripts load before the first request. Observe failures so optional Redis
   // initialization cannot become an unhandled rejection; RedisFallbackStore then
   // serves those requests from local counters until Redis answers again.
@@ -215,7 +221,7 @@ export function rateLimiter(maxRequests: number = 100, windowMs: number = 60000)
     message: 'Too many requests, please try again later.',
     standardHeaders: true,
     legacyHeaders: false,
-    skip: (req: Request) => Reflect.get(req, Symbol.for('mindflow.moduleCall')) === true,
+    skip: (req: Request) => Reflect.get(req, Symbol.for('ednova.moduleCall')) === true,
     keyGenerator: (req: DomainRequest) => req.user?.userId || req.ip || 'unknown',
     ...(store ? { store } : {})
   });

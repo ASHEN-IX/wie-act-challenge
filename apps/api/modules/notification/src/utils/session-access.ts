@@ -1,4 +1,4 @@
-import moduleClient from '@study-partner/shared/moduleClient';
+import moduleClient from '@ednova/shared/moduleClient';
 
 /** Reuse the owning study module's current membership/source decision. */
 export async function verifySessionMembership(

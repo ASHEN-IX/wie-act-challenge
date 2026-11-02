@@ -15,7 +15,7 @@ const existingWeb = readEnv('apps/web/.env.local');
 const existingAi = readEnv('apps/ai/.env');
 const secret = () => randomBytes(32).toString('hex');
 const common = {
-  MONGODB_URI: existingApi.MONGODB_URI || existingWeb.MONGODB_URI || 'mongodb://127.0.0.1:27018/ednova_dev',
+  MONGODB_URI: existingApi.MONGODB_URI || existingWeb.MONGODB_URI || 'mongodb://127.0.0.1:27018/ednova',
   BETTER_AUTH_SECRET: existingApi.BETTER_AUTH_SECRET || existingWeb.BETTER_AUTH_SECRET || secret(),
   BETTER_AUTH_URL: 'http://localhost:3000',
   AUTH_TRUSTED_ORIGINS: 'http://localhost:3000',
@@ -48,7 +48,7 @@ create('apps/web/.env.local', {
 create('apps/ai/.env', {
   MONGODB_URI: common.MONGODB_URI,
   MONGO_URI: common.MONGODB_URI,
-  DB_NAME: new URL(common.MONGODB_URI).pathname.slice(1) || "study_partner",
+  DB_NAME: new URL(common.MONGODB_URI).pathname.slice(1) || "ednova",
   RABBITMQ_URL: broker,
   REDIS_URL: redis, AI_SERVICE_API_KEY: serviceKey,
   INGEST_UPLOADS_DIR: uploads, FAISS_INDEX_DIR: indexes,

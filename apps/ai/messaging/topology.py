@@ -1,6 +1,6 @@
 """RabbitMQ topology for AI jobs (F01 / AI-COM-06).
 
-Python mirror of `study-partner-api/shared/ai-messaging/topology.js`.
+Python mirror of `ednova-api/shared/ai-messaging/topology.js`.
 Names and semantics MUST stay identical on both sides — enforced by the
 topology-parity tests.
 """

@@ -1,4 +1,4 @@
-import { errorDetails } from '@study-partner/shared/errors';
+import { errorDetails } from '@ednova/shared/errors';
 /**
  * BLOOM-07 — CompetencyProfile estimator service.
  *

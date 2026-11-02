@@ -461,7 +461,7 @@ export async function submitAttempt(actor: string, input: unknown, expectedActiv
             await recordAcceptedEvidence({
               userId: actor,
               objectiveId: definition.objectiveId,
-              bloomLevel: objective.bloomLevel,
+              bloomLevel: String(objective.bloomLevel || 'remember'),
               score: evidence.score,
               masteryAchieved: evidence.masteryAchieved,
               evaluatedAt: new Date(evidence.timestamp),

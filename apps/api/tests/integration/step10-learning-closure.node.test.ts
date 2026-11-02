@@ -22,7 +22,7 @@ import { materializeRevisionFixture } from '../helpers/revisionArtifactFixture';
 import coursesRouter from '../../modules/study/src/routes/courses';
 import type { DomainRequest } from '../../src/framework/contracts';
 
-const MONGO_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27018/mindflow-test';
+const MONGO_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27018/ednova-test';
 
 test('Step 10 Learning Closure: ED-06 Source Isolation, ED-21 Unofficial Flow, and ED-28 Activity Safety', async (t) => {
   if (mongoose.connection.readyState === 0) {

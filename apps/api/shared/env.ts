@@ -6,7 +6,7 @@
  * missing or insecure defaults are detected in production.
  *
  * Usage:
- *   const { requireEnv } = require('@study-partner/shared');
+ *   const { requireEnv } = require('@ednova/shared');
  *   requireEnv(['BETTER_AUTH_SECRET', 'MONGODB_URI']);
  */
 // eslint-disable-next-line @typescript-eslint/no-require-imports

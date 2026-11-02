@@ -1,7 +1,7 @@
 """
 Canonical Bloom's Taxonomy constants (BLOOM-01 — Shared Taxonomy Constants).
 
-Node mirror: `study-partner-api/shared/bloom/taxonomy.js`. Values MUST stay
+Node mirror: `ednova-api/shared/bloom/taxonomy.js`. Values MUST stay
 identical on both sides — parity is covered by contract tests against
 docs/contracts/bloom-fixture.json.
 """

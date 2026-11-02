@@ -11,8 +11,8 @@ import {
   rateLimiter,
   healthCheck,
   requireEnv
-} from '@study-partner/shared';
-import { authenticate } from '@study-partner/shared/auth';
+} from '@ednova/shared';
+import { authenticate } from '@ednova/shared/auth';
 
 // --- Environment validation (fail-fast on missing secrets) ---
 requireEnv(['MONGODB_URI', 'INTERNAL_API_SECRET'], {

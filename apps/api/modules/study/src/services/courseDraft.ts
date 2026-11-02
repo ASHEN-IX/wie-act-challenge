@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { Course, CourseRevision } from '../models';
 import { captureActivitySources } from './activityResolution';
 import { canManageCourse } from './resourceAccess';
+import { activityDigest } from './activityIdentity';
 
 export const VALID_BLOOM_LEVELS = new Set([
   'remember',
@@ -90,6 +91,22 @@ function computeTopicsHash(topics: unknown): string {
   return crypto.createHash('sha256').update(JSON.stringify(topics)).digest('hex');
 }
 
+/** Select a usable editable revision without letting stale retry shells mask
+ * the most recent ingested or reviewed content. */
+async function findEditableDraft(courseId: string) {
+  const drafts = await CourseRevision.find({ courseId, status: 'draft' });
+  return (
+    drafts
+      .filter((draft) => Boolean(draft.topics?.length))
+      .sort(
+        (a, b) =>
+          Number(Boolean(b.contentDocument)) - Number(Boolean(a.contentDocument)) ||
+          b.updatedAt.getTime() - a.updatedAt.getTime() ||
+          String(b._id).localeCompare(String(a._id))
+      )[0] || null
+  );
+}
+
 /**
  * Retrieve the current editable draft for a course.
  * Restricted to course owner, assigned instructors, and university admins.
@@ -105,10 +122,44 @@ export async function getCourseDraft(actorUserId: string, courseId: string) {
     throw new DraftNotFoundError('Course not found');
   }
 
-  let draft = await CourseRevision.findOne({ courseId: course._id, status: 'draft' }).sort({
-    updatedAt: -1,
-    _id: -1
-  });
+  let draft = await findEditableDraft(course._id.toString());
+
+  // A published revision can leave an older, empty draft behind. Opening that
+  // draft would hide the material the instructor just published. Start a new
+  // editable revision from the active published topics instead; older records
+  // remain untouched for audit and recovery.
+  if (!draft || !draft.topics?.length) {
+    const activeRevisionId = course.activeRevisionId;
+    const active = activeRevisionId
+      ? await CourseRevision.findOne({
+          courseId: course._id,
+          ...(activeRevisionId.startsWith('rev_')
+            ? { revisionTag: activeRevisionId }
+            : { _id: activeRevisionId }),
+          status: { $in: ['published', 'deprecated'] },
+          activationState: 'committed',
+          revokedAt: { $exists: false }
+        }).lean()
+      : null;
+    if (active?.topics?.length) {
+      draft = await CourseRevision.create({
+        courseId: course._id,
+        revisionTag: `rev_${crypto.randomUUID().replace(/-/g, '')}`,
+        contentHash: active.contentHash,
+        status: 'draft',
+        topics: active.topics,
+        isInstructorReviewed: false,
+        summary: active.summary,
+        ...(active.contentDocument
+          ? {
+              contentDocument: active.contentDocument,
+              contentDocumentHash: active.contentDocumentHash
+            }
+          : {}),
+        sourceManifest: active.sourceManifest || []
+      });
+    }
+  }
 
   if (!draft) {
     const revisionTag = `rev_${crypto.randomUUID().replace(/-/g, '')}`;
@@ -167,10 +218,7 @@ export async function updateCourseDraft(
     throw new HierarchyValidationError('topics must be a non-empty array');
   }
 
-  const draft = await CourseRevision.findOne({ courseId: course._id, status: 'draft' }).sort({
-    updatedAt: -1,
-    _id: -1
-  });
+  const draft = await findEditableDraft(course._id.toString());
 
   if (!draft || draft.revisionTag !== input.expectedRevisionTag) {
     throw new StaleRevisionError(
@@ -295,6 +343,16 @@ export async function updateCourseDraft(
         revisionTag: newRevisionTag,
         contentHash: newContentHash,
         topics: sanitizedTopics,
+        // Canonical lesson bodies and source evidence belong to the immutable
+        // uploaded census, not to the editable title/objective projection.
+        ...(draft.contentDocument
+          ? {
+              contentDocument: reanchorCanonicalDocument(draft.contentDocument, sanitizedTopics),
+              contentDocumentHash: activityDigest(
+                reanchorCanonicalDocument(draft.contentDocument, sanitizedTopics)
+              )
+            }
+          : {}),
         summary: typeof input.summary === 'string' ? input.summary : draft.summary,
         isInstructorReviewed:
           input.isInstructorReviewed === undefined
@@ -318,5 +376,37 @@ export async function updateCourseDraft(
     isInstructorReviewed: draft.isInstructorReviewed,
     topics: draft.topics,
     updatedAt: draft.updatedAt
+  };
+}
+
+/** Preserve canonical source blocks while applying reviewed hierarchy names. */
+function reanchorCanonicalDocument(
+  value: unknown,
+  topics: Array<{ id: string; title: string; subtopics?: Array<{ id: string; title: string }> }>
+) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+  const document = value as {
+    chapters?: Array<{
+      id?: string;
+      title?: string;
+      lessons?: Array<{ id?: string; title?: string }>;
+    }>;
+  };
+  if (!Array.isArray(document.chapters)) return value;
+  return {
+    ...document,
+    chapters: document.chapters.map((chapter, index) => {
+      const topic = topics.find((candidate) => candidate.id === chapter.id) || topics[index];
+      return {
+        ...chapter,
+        ...(topic ? { id: topic.id, title: topic.title } : {}),
+        lessons: (chapter.lessons || []).map((lesson, lessonIndex) => {
+          const subtopic =
+            topic?.subtopics?.find((candidate) => candidate.id === lesson.id) ||
+            topic?.subtopics?.[lessonIndex];
+          return { ...lesson, ...(subtopic ? { id: subtopic.id, title: subtopic.title } : {}) };
+        })
+      };
+    })
   };
 }

@@ -58,7 +58,7 @@ def convert_objectid_to_str(obj):
 
 # MongoDB connection (only for AI-specific data)
 MONGO_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
-DB_NAME = os.getenv("DB_NAME", "study_partner")
+DB_NAME = os.getenv("DB_NAME", "ednova")
 mongo_client = MongoClient(MONGO_URI)
 db = mongo_client[DB_NAME]
 signals_collection = db["signals"]

@@ -14,9 +14,9 @@ const { createSession } = require('../../../../tests/sessionFixtures');
 const jwt = { sign: createSession };
 import request from 'supertest';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { authenticate } = require('@study-partner/shared/auth');
+const { authenticate } = require('@ednova/shared/auth');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { errorHandler } = require('@study-partner/shared/middleware');
+const { errorHandler } = require('@ednova/shared/middleware');
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const tasksRouter = require('../routes/tasks');
@@ -40,7 +40,7 @@ jest.mock('../models', () => ({
 jest.mock('mongoose', () => ({
   connection: { collection: jest.fn(), once: jest.fn() }
 }));
-jest.mock('@study-partner/shared/moduleClient', () => ({
+jest.mock('@ednova/shared/moduleClient', () => ({
   post: jest.fn().mockResolvedValue({ data: {} })
 }));
 jest.mock('../utils/gamificationService', () => ({
@@ -50,17 +50,17 @@ jest.mock('../utils/gamificationService', () => ({
 jest.mock('../services/competencyQueries', () => ({
   getWeakCompetenciesForCourse: jest.fn().mockResolvedValue([])
 }));
-jest.mock('@study-partner/shared/tierGate', () => ({
+jest.mock('@ednova/shared/tierGate', () => ({
   tierGate: () => (req: DomainRequest, res: Response, next: NextFunction) => next()
 }));
-jest.mock('@study-partner/shared', () => ({
+jest.mock('@ednova/shared', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() }
 }));
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { Task, Topic, StudySession, StudyPlan } = require('../models');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const moduleClient = require('@study-partner/shared/moduleClient');
+const moduleClient = require('@ednova/shared/moduleClient');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const mongooseMock = require('mongoose');
 
@@ -75,7 +75,7 @@ app.use(errorHandler);
 const userA = { userId: 'user-a', email: 'a@test.com', role: 'student', isActive: true };
 
 function authHeader(u = userA) {
-  return { Cookie: `mindflow.test_session=${jwt.sign(u, process.env.JWT_SECRET)}` };
+  return { Cookie: `ednova.test_session=${jwt.sign(u, process.env.JWT_SECRET)}` };
 }
 
 function renderable(doc: unknown) {

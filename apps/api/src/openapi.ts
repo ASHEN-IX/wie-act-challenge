@@ -26,7 +26,7 @@ export interface OpenAPISpec {
 const spec: OpenAPISpec = {
   openapi: '3.0.3',
   info: {
-    title: 'Study Partner API',
+    title: 'EdNova API',
     version: '1.0.0',
     description:
       'NestJS domain API protected by Better Auth cookie sessions. Authentication is hosted by Next.js.'

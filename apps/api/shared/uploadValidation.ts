@@ -19,7 +19,8 @@ export const MAX_UPLOAD_MB = MAX_UPLOAD_BYTES / (1024 * 1024);
 /** Allowed types mapped by declared MIME → accepted extensions. */
 export const ALLOWED_TYPES: Record<string, string[]> = {
   'application/pdf': ['.pdf'],
-  'text/plain': ['.txt', '.md']
+  'text/plain': ['.txt', '.md'],
+  'text/markdown': ['.md']
 };
 
 /** Reasonable header-read size for magic-byte sniffing (PDF header is tiny). */
@@ -34,8 +35,12 @@ export const PDF_EOF_MARKER = '%%EOF';
  */
 export const PDF_ENCRYPT_RE = /\/Encrypt\s+\d+\s+\d+\s+R/;
 
-/** INGEST-04: minimum printable-character ratio for text/plain uploads. */
+/** INGEST-04: minimum printable-character ratio for text uploads. */
 export const MIN_TEXT_PRINTABLE_RATIO = 0.9;
+
+function isTextMimeType(mimetype: string): boolean {
+  return mimetype === 'text/plain' || mimetype === 'text/markdown';
+}
 
 /** Binary/executable magic byte signatures we reject outright. */
 export const BINARY_MAGICS: number[][] = [
@@ -122,7 +127,7 @@ export function checkPdfStructure(buffer: Buffer): string[] {
 }
 
 /**
- * INGEST-04: printable-character ratio for text/plain uploads. Legible text
+ * INGEST-04: printable-character ratio for text uploads. Legible text
  * stays well above the threshold; binary payloads masked behind a text-looking
  * head drop below it. ASCII printable bytes count, as do *valid* multi-byte
  * UTF-8 sequences (so french/unicode content passes) — stray high bytes,
@@ -219,6 +224,7 @@ export function validateUploadFile(file: UploadFileCheck): ValidationResult {
   const errors: string[] = [...meta.errors];
   if (meta.valid) {
     const { buffer, mimetype } = file;
+    const isText = isTextMimeType(mimetype || '');
     if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
       errors.push('file content is missing or empty');
     } else {
@@ -227,8 +233,8 @@ export function validateUploadFile(file: UploadFileCheck): ValidationResult {
         errors.push('file content looks like a binary/script and is not an allowed document');
       } else if (mimetype === 'application/pdf' && sniffed !== 'pdf') {
         errors.push('declared application/pdf but content is not a PDF');
-      } else if (mimetype === 'text/plain' && sniffed === 'pdf') {
-        errors.push('declared text/plain but content is a PDF');
+      } else if (isText && sniffed === 'pdf') {
+        errors.push(`declared ${mimetype} but content is a PDF`);
       }
 
       // INGEST-04: only structure-check content that already passed the header
@@ -236,7 +242,7 @@ export function validateUploadFile(file: UploadFileCheck): ValidationResult {
       if (errors.length === 0 && mimetype === 'application/pdf' && sniffed === 'pdf') {
         errors.push(...checkPdfStructure(buffer));
       }
-      if (errors.length === 0 && mimetype === 'text/plain' && sniffed === 'text') {
+      if (errors.length === 0 && isText && sniffed === 'text') {
         const ratio = printableTextRatio(buffer);
         if (ratio < MIN_TEXT_PRINTABLE_RATIO) {
           errors.push(

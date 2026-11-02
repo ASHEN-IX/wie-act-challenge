@@ -20,6 +20,8 @@ RUN --mount=type=cache,id=ednova-ai-apt-archives,target=/var/cache/apt,sharing=l
 FROM runtime-base AS build
 
 ENV POETRY_NO_INTERACTION=1
+ENV PIP_DEFAULT_TIMEOUT=300
+ENV POETRY_REQUESTS_TIMEOUT=300
 
 # Keep Poetry's dependencies separate from the locked application environment.
 RUN --mount=type=cache,id=ednova-ai-pip,target=/root/.cache/pip,sharing=locked \
@@ -31,11 +33,14 @@ COPY pyproject.toml poetry.lock ./
 RUN --mount=type=cache,id=ednova-ai-poetry,target=/root/.cache/pypoetry,sharing=locked \
     /opt/poetry/bin/poetry check --lock \
     && POETRY_INSTALLER_MAX_WORKERS=4 \
-       POETRY_REQUESTS_TIMEOUT=120 \
+       POETRY_REQUESTS_TIMEOUT=300 \
        POETRY_REQUESTS_MAX_RETRIES=5 \
        /opt/poetry/bin/poetry install --only main --no-ansi
 
 FROM runtime-base AS runtime
+
+ENV HOME=/home/ednova \
+    HF_HOME=/home/ednova/.cache/huggingface
 
 COPY --from=build /opt/venv /opt/venv
 COPY . .
@@ -50,8 +55,11 @@ RUN groupadd --gid 10001 ednova \
     && sed -i 's/\r$//' /app/scripts/container-entrypoint.sh \
     && chmod 755 /app/scripts/container-entrypoint.sh
 
-ENV HOME=/home/ednova \
-    HF_HOME=/home/ednova/.cache/huggingface
+# Course ingestion runs with HF_HUB_OFFLINE=1. Bake the pinned local embedding
+# model into the image so a fresh container does not fail at the embedding step.
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')" \
+    && chown -R ednova:ednova /home/ednova/.cache
+
 USER 10001:10001
 ENTRYPOINT ["/app/scripts/container-entrypoint.sh"]
 

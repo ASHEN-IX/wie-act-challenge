@@ -59,6 +59,17 @@ describe('validateUploadMetadata (multer fileFilter pass)', () => {
     );
   });
 
+  test('accepts text/markdown with .md', () => {
+    const r = validateUploadMetadata({ originalname: 'notes.md', mimetype: 'text/markdown' });
+    expect(r.valid).toBe(true);
+  });
+
+  test('rejects non-Markdown extensions declared as text/markdown', () => {
+    const r = validateUploadMetadata({ originalname: 'notes.txt', mimetype: 'text/markdown' });
+    expect(r.valid).toBe(false);
+    expect(r.errors.join(' ')).toContain('.txt" is not allowed for text/markdown');
+  });
+
   test('rejects unsupported MIME (e.g. application/x-msdownload)', () => {
     const r = validateUploadMetadata({
       originalname: 'evil.exe',
@@ -99,6 +110,25 @@ describe('validateUploadFile (magic-byte sniffing)', () => {
       buffer: textBuffer()
     });
     expect(r.valid).toBe(true);
+  });
+
+  test('accepts Markdown text declared text/markdown', () => {
+    const r = validateUploadFile({
+      originalname: 'notes.md',
+      mimetype: 'text/markdown',
+      buffer: Buffer.from('# Limits\n\nA function is continuous at a point.\n')
+    });
+    expect(r.valid).toBe(true);
+  });
+
+  test('rejects a PDF declared as text/markdown', () => {
+    const r = validateUploadFile({
+      originalname: 'disguised.md',
+      mimetype: 'text/markdown',
+      buffer: pdfBuffer()
+    });
+    expect(r.valid).toBe(false);
+    expect(r.errors.join(' ')).toContain('declared text/markdown but content is a PDF');
   });
 
   test('rejects a PDF renamed to .txt (content mismatch)', () => {

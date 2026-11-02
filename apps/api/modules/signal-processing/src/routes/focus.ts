@@ -1,21 +1,21 @@
-import { errorDetails } from '@study-partner/shared/errors';
+import { errorDetails } from '@ednova/shared/errors';
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { FilterQuery } from 'mongoose';
 import type { IFocusSession } from '../models/FocusSession';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createContracts } = require('@study-partner/shared/domainContracts');
+const { createContracts } = require('@ednova/shared/domainContracts');
 import Joi from 'joi';
 import type { Response } from 'express';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const moduleClient = require('@study-partner/shared/moduleClient');
+const moduleClient = require('@ednova/shared/moduleClient');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const FocusSession: typeof import('../models/FocusSession').default = require('../models/FocusSession');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { tierGate } = require('@study-partner/shared/tierGate');
+const { tierGate } = require('@ednova/shared/tierGate');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { asyncHandler } = require('@study-partner/shared/middleware');
+const { asyncHandler } = require('@ednova/shared/middleware');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { buildInternalHeaders } = require('@study-partner/shared/auth');
+const { buildInternalHeaders } = require('@ednova/shared/auth');
 
 const router = createContracts();
 

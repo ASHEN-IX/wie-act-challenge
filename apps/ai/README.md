@@ -1,4 +1,4 @@
-# Study Partner AI — reusable EdNova foundation
+# EdNova AI — course ingestion and learning services
 
 Independent Python FastAPI and RabbitMQ workers. See [AI operations](../docs/ai-service.md) for compatible Python/Poetry setup, separate HTTP/worker launch, secrets and uploads; [AI specification](../docs/ai-specification.md) distinguishes actual agents/models/fallback from the PLANNED peer facilitator.
 
@@ -9,7 +9,7 @@ The audit implemented no AI features and did not change model configuration. Mis
 Build from the repository root with:
 
 ```sh
-docker build -t mindflow-ai:local apps/ai
+docker build -t ednova-ai:local apps/ai
 ```
 
 The Linux x86_64 environment uses CPU-only PyTorch from the explicit

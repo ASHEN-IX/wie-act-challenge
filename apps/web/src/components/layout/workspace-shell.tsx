@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { logout } from "@/features/auth/actions";
+import { ThemeControl } from "@/features/courses/theme-control";
 
 export function WorkspaceShell({
   email,
@@ -18,7 +19,11 @@ export function WorkspaceShell({
   instructor?: boolean;
   children: React.ReactNode;
 }) {
-  const roleLabel = admin ? "Administrator" : instructor ? "Instructor" : "Learner";
+  const roleLabel = admin
+    ? "Administrator"
+    : instructor
+      ? "Instructor"
+      : "Learner";
 
   return (
     <div className="min-h-screen lg:pl-64">
@@ -28,9 +33,13 @@ export function WorkspaceShell({
             href="/dashboard"
             className="flex items-center gap-2.5 text-xl font-bold tracking-tight text-foreground transition-opacity hover:opacity-90"
           >
-            <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-              <BookOpen className="size-5" />
-            </div>
+            <img
+              src="/ednova-mark.svg"
+              alt=""
+              width="36"
+              height="36"
+              className="size-9 rounded-xl shadow-sm"
+            />
             <span>EdNova</span>
           </Link>
           <Badge variant="outline" className="text-[11px] font-medium">
@@ -51,7 +60,9 @@ export function WorkspaceShell({
               <p className="truncate text-xs font-semibold text-foreground">
                 {email.split("@")[0]}
               </p>
-              <p className="truncate text-[11px] text-muted-foreground">{email}</p>
+              <p className="truncate text-[11px] text-muted-foreground">
+                {email}
+              </p>
             </div>
           </div>
           <form action={logout}>
@@ -66,7 +77,7 @@ export function WorkspaceShell({
           </form>
         </div>
       </aside>
-      <header className="sticky top-0 z-20 flex min-h-16 items-center justify-between gap-4 border-b bg-background/80 backdrop-blur-md px-5 lg:px-8">
+      <header className="sticky top-0 z-20 flex min-h-16 items-center justify-between gap-3 overflow-x-clip border-b bg-background/80 backdrop-blur-md px-4 sm:px-5 lg:px-8">
         <div className="hidden items-center gap-2 text-sm text-muted-foreground lg:flex">
           <span className="font-medium text-foreground">EdNova Workspace</span>
           <span className="text-border">/</span>
@@ -75,6 +86,13 @@ export function WorkspaceShell({
         <details className="relative lg:hidden">
           <summary className="flex cursor-pointer items-center gap-2 text-base font-semibold">
             <BookOpen className="size-5 text-primary" />
+            <img
+              src="/ednova-mark.svg"
+              alt=""
+              width="30"
+              height="30"
+              className="rounded-lg"
+            />
             EdNova
             <span className="rounded bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground">
               Menu
@@ -83,14 +101,23 @@ export function WorkspaceShell({
           <div className="absolute left-0 top-10 z-30 w-64 rounded-xl border bg-card p-4 shadow-xl">
             <Navigation admin={admin} instructor={instructor} />
             <form action={logout} className="mt-4 border-t pt-3">
-              <Button variant="outline" size="sm" type="submit" className="w-full">
+              <Button
+                variant="outline"
+                size="sm"
+                type="submit"
+                className="w-full"
+              >
                 Sign out
               </Button>
             </form>
           </div>
         </details>
-        <div className="flex items-center gap-3">
-          <form action="/courses" className="relative w-44 sm:w-72">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+          <ThemeControl />
+          <form
+            action="/courses"
+            className="relative hidden min-w-0 w-72 sm:block"
+          >
             <Search className="pointer-events-none absolute left-3 top-2.5 size-4 text-muted-foreground" />
             <Input
               name="q"
@@ -99,7 +126,12 @@ export function WorkspaceShell({
               className="h-9 pl-9 text-xs sm:text-sm"
             />
           </form>
-          <Button asChild size="sm" variant="default" className="hidden sm:inline-flex gap-1.5 shadow-xs">
+          <Button
+            asChild
+            size="sm"
+            variant="default"
+            className="hidden sm:inline-flex gap-1.5 shadow-xs"
+          >
             <Link href="/practice">
               <Sparkles className="size-3.5" />
               <span>Practice</span>
@@ -109,7 +141,7 @@ export function WorkspaceShell({
       </header>
       <main
         id="main-content"
-        className="mx-auto max-w-[1500px] px-5 py-8 sm:px-8 lg:py-10"
+        className="mx-auto max-w-[1500px] px-4 py-6 sm:px-8 sm:py-8 lg:py-10"
       >
         {children}
       </main>

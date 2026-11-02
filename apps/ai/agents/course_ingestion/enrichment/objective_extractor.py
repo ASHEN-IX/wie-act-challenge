@@ -32,7 +32,10 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-OBJECTIVE_CAP_PER_DOCUMENT = 40
+# A short, reviewable set is more useful than one objective per extracted
+# paragraph. The document cap remains a hard upper bound for unusual sources.
+OBJECTIVE_CAP_PER_DOCUMENT = 24
+OBJECTIVE_CAP_PER_LESSON = 3
 
 SYSTEM_PROMPT = (
     "You are an educational content analyst that drafts measurable learning "
@@ -43,8 +46,51 @@ SYSTEM_PROMPT = (
     "only from the educational material itself."
 )
 
+
+def _fallback_objective(
+    title: str, content: str, topic_id: str, subtopic_id: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    """Keep a source-backed review prompt when no model is configured.
+
+    This is intentionally a neutral, one-item outline objective. It is not
+    presented as model analysis and never overrides an authored objective.
+    """
+    clean_title = re.sub(r"^\s*(?:#+|\d+(?:\.\d+)*\.?)\s*", "", title or "")
+    clean_title = re.sub(r"\s+", " ", clean_title).strip()
+    if clean_title.lower() in {"course material", "untitled", "overview"} or len(
+        clean_title
+    ) < 5:
+        return []
+    text = f"Explain the main ideas and methods in {clean_title[:150]}."
+    # Preserve the BLOOM contract while keeping the source section title.
+    objective_id = _objective_id(
+        topic_id, text, subtopic_id=subtopic_id
+    )
+    return [
+        {
+            "objectiveId": objective_id,
+            "topicId": topic_id,
+            "knowledgeType": "conceptual",
+            "bloomLevel": "understand",
+            "verb": "Explain",
+            "text": text,
+            "id": objective_id,
+            "statement": text,
+            "provenance": "ai_generated",
+            "classification": {
+                "bloomLevel": "understand",
+                "knowledgeType": "conceptual",
+                "confidence": 0.35,
+                "verbConsistent": True,
+                "needsReview": True,
+                "status": "classified",
+                "reason": "deterministic source-title fallback; review required",
+            },
+        }
+    ]
+
 PROMPT_TEMPLATE = (
-    "Draft up to {cap} concise, measurable learning objectives a student "
+    "Draft at most {cap} concise, measurable learning objectives a student "
     "should be able to demonstrate after mastering the material below.\n\n"
     "Rules:\n"
     "- The text starts with one of the measurable action verbs and is at "
@@ -64,9 +110,17 @@ PROMPT_TEMPLATE = (
 )
 
 
-def _objective_id(topic_id: str, text: str) -> str:
-    """Deterministic, content-addressed objective id (stable across re-runs)."""
-    digest = sha256(f"{topic_id}\x00{text}".encode("utf-8")).hexdigest()[:12]
+def _objective_id(
+    topic_id: str, text: str, subtopic_id: Optional[str] = None
+) -> str:
+    """Content-addressed objective id, scoped to its owning lesson.
+
+    Identical section titles can appear in different chapters. Including the
+    stable lesson id prevents those objectives from colliding in the course
+    hierarchy while keeping the id deterministic for repeat ingestion.
+    """
+    scope = f"{topic_id}\x00{subtopic_id or ''}\x00{text}"
+    digest = sha256(scope.encode("utf-8")).hexdigest()[:12]
     return f"obj_{digest}"
 
 
@@ -75,7 +129,12 @@ def normalize_objective_text(text: str) -> str:
     return re.sub(r"\s+", " ", (text or "").strip().lower())
 
 
-def _draft_objectives(title: str, content: str, topic_id: str) -> List[Dict[str, Any]]:
+def _draft_objectives(
+    title: str,
+    content: str,
+    topic_id: str,
+    subtopic_id: Optional[str] = None,
+) -> List[Dict[str, Any]]:
     """One LLM round-trip for a subtopic.
 
     Returns the list of *validated* BLOOM-02 objectives. Never raises: any
@@ -85,36 +144,44 @@ def _draft_objectives(title: str, content: str, topic_id: str) -> List[Dict[str,
     content_block = wrap_untrusted(content, label="COURSE_MATERIAL")
 
     prompt = PROMPT_TEMPLATE.format(
-        cap=OBJECTIVE_CAP_PER_DOCUMENT,
+        cap=min(OBJECTIVE_CAP_PER_LESSON, OBJECTIVE_CAP_PER_DOCUMENT),
         subtitle=subtitle_block,
         content=content_block,
     )
 
-    raw = call_llm(prompt, system_prompt=SYSTEM_PROMPT)
+    try:
+        raw = call_llm(prompt, system_prompt=SYSTEM_PROMPT)
+    except Exception as exc:
+        logger.warning("objective_extraction_llm_failed", extra={"error": str(exc)})
+        return _fallback_objective(title, content, topic_id, subtopic_id)
     if not raw:
         logger.warning("objective_extraction_llm_empty")
-        return []
+        return _fallback_objective(title, content, topic_id, subtopic_id)
 
     candidates = _parse_candidates(raw)
     if candidates is None:
         logger.warning("objective_extraction_unparseable")
-        return []
+        return _fallback_objective(title, content, topic_id, subtopic_id)
 
     objectives: List[Dict[str, Any]] = []
     rejected = 0
     for candidate in candidates:
-        validated = _validate_candidate(candidate, topic_id)
+        validated = _validate_candidate(candidate, topic_id, subtopic_id)
         if validated is None:
             rejected += 1
             continue
         objectives.append(validated)
+        if len(objectives) >= OBJECTIVE_CAP_PER_LESSON:
+            break
 
     if rejected:
         logger.warning(
             "objective_extraction_rejected",
             extra={"rejected": rejected, "authored": len(candidates)},
         )
-    return objectives
+    return objectives or _fallback_objective(
+        title, content, topic_id, subtopic_id
+    )
 
 
 def _parse_candidates(raw: str) -> Optional[List[Dict[str, Any]]]:
@@ -152,7 +219,9 @@ def _parse_candidates(raw: str) -> Optional[List[Dict[str, Any]]]:
 
 
 def _validate_candidate(
-    candidate: Dict[str, Any], topic_id: str
+    candidate: Dict[str, Any],
+    topic_id: str,
+    subtopic_id: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """Build a BLOOM-02 LearningObjective from an LLM draft; None if invalid."""
     text = str(candidate.get("text") or "").strip()
@@ -160,7 +229,9 @@ def _validate_candidate(
         return None
     try:
         obj = LearningObjective(
-            objectiveId=_objective_id(topic_id, text),
+            objectiveId=_objective_id(
+                topic_id, text, subtopic_id=subtopic_id
+            ),
             topicId=topic_id,
             knowledgeType=str(candidate["knowledgeType"]),
             bloomLevel=str(candidate["bloomLevel"]),
@@ -175,7 +246,7 @@ def _validate_candidate(
 def deduplicate_objectives(
     objectives: List[Dict[str, Any]],
 ) -> Tuple[List[Dict[str, Any]], int]:
-    """Merge objectives with the same ``(topicId, normalized text)``.
+    """Merge objectives with the same topic, lesson and normalized text.
 
     Keeps the first occurrence in order; returns ``(kept, removed)``.
     """
@@ -183,7 +254,11 @@ def deduplicate_objectives(
     kept: List[Dict[str, Any]] = []
     removed = 0
     for obj in objectives:
-        key = (obj.get("topicId"), normalize_objective_text(obj.get("text", "")))
+        key = (
+            obj.get("topicId"),
+            obj.get("subtopicId"),
+            normalize_objective_text(obj.get("text", "")),
+        )
         if key in seen:
             removed += 1
             continue
@@ -193,7 +268,9 @@ def deduplicate_objectives(
 
 
 def extract_objectives_for_document(
-    enriched_subtopics: List[Dict[str, Any]], topic_id: str = "topic_1"
+    enriched_subtopics: List[Dict[str, Any]],
+    topic_id: str = "topic_1",
+    course_title: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Run the extraction stage over all enriched subtopics of a document.
 
@@ -207,22 +284,36 @@ def extract_objectives_for_document(
 
     for subtopic in enriched_subtopics:
         title = subtopic.get("title", "")
+        if not str(title).strip() and course_title:
+            title = course_title
         content = subtopic.get("full_content", "")
         if not content:
             warnings.append(f"skipped empty subtopic: {title!r}")
             subtopic["learning_objectives"] = []
             continue
         try:
-            subtopic["learning_objectives"] = _draft_objectives(
-                title, content, topic_id
-            )
+            objectives = _draft_objectives(
+                title,
+                content,
+                topic_id,
+                subtopic_id=str(subtopic.get("id") or "") or None,
+            )[:OBJECTIVE_CAP_PER_LESSON]
+            subtopic["learning_objectives"] = objectives
         except Exception as exc:  # never fail the ingestion pipeline (AC-5)
             logger.warning("objective_extraction_failed", extra={"error": str(exc)})
-            subtopic["learning_objectives"] = []
+            subtopic["learning_objectives"] = _fallback_objective(
+                title,
+                content,
+                topic_id,
+                str(subtopic.get("id") or "") or None,
+            )
 
-    # Document-level dedup: keep the first occurrence of each (topicId, text).
+    # Document-level dedup: keep the first occurrence of each (topicId,
+    # lessonId, text). Two lessons may legitimately share a section title.
     all_objectives = [
-        obj for s in enriched_subtopics for obj in s.get("learning_objectives", [])
+        {**obj, "subtopicId": s.get("id")}
+        for s in enriched_subtopics
+        for obj in s.get("learning_objectives", [])
     ]
     kept, dropped_duplicates = deduplicate_objectives(all_objectives)
 
@@ -240,13 +331,19 @@ def extract_objectives_for_document(
 
     # Re-scatter the surviving objectives back onto their subtopics.
     surviving = set(
-        (obj["topicId"], normalize_objective_text(obj["text"])) for obj in kept
+        (obj["topicId"], obj.get("subtopicId"), normalize_objective_text(obj["text"]))
+        for obj in kept
     )
     for subtopic in enriched_subtopics:
         subtopic["learning_objectives"] = [
             obj
             for obj in subtopic.get("learning_objectives", [])
-            if (obj["topicId"], normalize_objective_text(obj["text"])) in surviving
+            if (
+                obj["topicId"],
+                subtopic.get("id"),
+                normalize_objective_text(obj["text"]),
+            )
+            in surviving
         ]
 
     return {

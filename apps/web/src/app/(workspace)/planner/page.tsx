@@ -9,13 +9,14 @@ import { JobForm } from "@/features/learning/job-form";
 import { generatePlan, finalizePlan } from "@/features/planning/actions";
 import { getCourses } from "@/features/courses/queries";
 import { DataError } from "@/components/shared/states";
+import { isCourseReady } from "@/features/courses/lifecycle";
 export const metadata = { title: "Study planner" };
 export default async function Planner() {
   const courses = await getCourses();
   // The plan service only reads courses the user owns, so institutional
   // courses assigned to them are not offered here.
   const eligible = (courses.data?.courses ?? []).filter(
-    (c) => c.status === "completed" && c.scope !== "institutional",
+    (c) => isCourseReady(c) && c.scope !== "institutional",
   );
   return (
     <>

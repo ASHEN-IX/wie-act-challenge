@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/native-select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { isCourseReady } from "@/features/courses/lifecycle";
 
 export const metadata = { title: "Study together" };
 
@@ -67,7 +68,7 @@ export default async function Rooms() {
                     Start without a course
                   </NativeSelectOption>
                   {courses.data?.courses
-                    .filter((c) => c.status === "completed")
+                    .filter(isCourseReady)
                     .map((c) => (
                       <NativeSelectOption key={c.id} value={c.id}>
                         {c.title}

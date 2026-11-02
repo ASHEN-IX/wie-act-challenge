@@ -26,7 +26,7 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 MONGO_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
-DB_NAME = os.getenv("DB_NAME", "study_partner")
+DB_NAME = os.getenv("DB_NAME", "ednova")
 COLLECTION = "search_history"
 
 

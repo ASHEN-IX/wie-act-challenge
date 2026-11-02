@@ -16,7 +16,7 @@ def test_coach_scheduler_integration():
     # Set dummy env vars for testing
     os.environ.setdefault("GEMINI_API_KEY", "dummy_key_for_testing")
     os.environ.setdefault("MONGO_URI", "mongodb://localhost:27017")
-    os.environ.setdefault("DB_NAME", "study_partner")
+    os.environ.setdefault("DB_NAME", "ednova")
 
     test_scenarios = [
         {

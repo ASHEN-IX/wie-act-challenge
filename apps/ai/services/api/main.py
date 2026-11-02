@@ -20,7 +20,7 @@ from services.api.routers.tutor import router as tutor_router
 from services.api.routers.sources import router as sources_router
 from utils.llm_client import get_provider_status
 
-app = FastAPI(title="Study Partner AI API", version="1.0.0")
+app = FastAPI(title="EdNova AI API", version="1.0.0")
 
 # CORS configuration
 app.add_middleware(

@@ -82,7 +82,7 @@ async function main() {
     'node',
     ['.next/standalone/apps/web/server.js'],
     {
-      cwd: '/home/ashenix/Projects/mindflow/apps/web',
+      cwd: '/home/ashenix/Projects/ednova/apps/web',
       env: webEnv,
       stdio: ['ignore', 'pipe', 'pipe']
     }

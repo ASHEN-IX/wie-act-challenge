@@ -3,9 +3,9 @@ import type { JobResourceScope } from '../../../ai-orchestrator/src/models/AiJob
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response } from 'express';
 import type { FilterQuery } from 'mongoose';
-import type { AxiosResponse } from '@study-partner/shared/moduleClient';
+import type { AxiosResponse } from '@ednova/shared/moduleClient';
 import type { ICourse, IStudyPlan, IStudyPlanTask } from '../models';
-import { errorDetails } from '@study-partner/shared/errors';
+import { errorDetails } from '@ednova/shared/errors';
 interface SchedulerSession {
   taskId?: string;
   task_id?: string;
@@ -39,15 +39,15 @@ function schedulerDetail(error: unknown): unknown {
   return data && typeof data === 'object' && 'detail' in data ? data.detail : undefined;
 }
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createContracts } = require('@study-partner/shared/domainContracts');
+const { createContracts } = require('@ednova/shared/domainContracts');
 import Joi from 'joi';
 import mongoose from 'mongoose';
 import { StudyPlan, Task, Course } from '../models';
 import { getWeakCompetenciesForCourse } from '../services/competencyQueries';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { tierGate } = require('@study-partner/shared/tierGate');
+const { tierGate } = require('@ednova/shared/tierGate');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { logger } = require('@study-partner/shared');
+const { logger } = require('@ednova/shared');
 
 const router = createContracts();
 
@@ -117,7 +117,7 @@ router.post(
       // Call the orchestrator's POST /jobs route — it creates the AiJob
       // (for result correlation) AND publishes to the bus in one shot.
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const moduleClient = require('@study-partner/shared/moduleClient');
+      const moduleClient = require('@ednova/shared/moduleClient');
       const orchestratorUrl = 'module://ai';
 
       let jobResponse: AxiosResponse<{ jobId: string; correlationId: string }>;
@@ -409,9 +409,9 @@ router.post(
       }
 
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const aiServiceUrl = require('@study-partner/shared/aiClient').getBaseUrl();
+      const aiServiceUrl = require('@ednova/shared/aiClient').getBaseUrl();
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const moduleClient = require('@study-partner/shared/moduleClient');
+      const moduleClient = require('@ednova/shared/moduleClient');
 
       try {
         const schedulerResponse = await moduleClient.post(
@@ -597,9 +597,9 @@ router.post(
       }
 
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const aiServiceUrl = require('@study-partner/shared/aiClient').getBaseUrl();
+      const aiServiceUrl = require('@ednova/shared/aiClient').getBaseUrl();
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const moduleClient = require('@study-partner/shared/moduleClient');
+      const moduleClient = require('@ednova/shared/moduleClient');
 
       try {
         const schedulerResponse = await moduleClient.post(

@@ -1,4 +1,4 @@
-import { errorDetails } from '@study-partner/shared/errors';
+import { errorDetails } from '@ednova/shared/errors';
 import mongoose from 'mongoose';
 import path from 'path';
 import dotenv from 'dotenv';
@@ -8,7 +8,7 @@ dotenv.config({
   path: path.resolve(__dirname, '../../../../.env')
 });
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/study_partner';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/ednova';
 
 export const isChallengeCompletionAction = (action = ''): boolean => {
   const normalizedAction = String(action || '')

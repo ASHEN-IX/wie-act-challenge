@@ -38,7 +38,7 @@ jest.mock('../models/index', () => ({
   }
 }));
 
-jest.mock('@study-partner/shared/moduleClient', () => ({
+jest.mock('@ednova/shared/moduleClient', () => ({
   post: jest.fn(),
   get: jest.fn()
 }));
@@ -50,7 +50,7 @@ jest.mock('../utils/gamificationService', () => ({
 
 import request from 'supertest';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const moduleClient = require('@study-partner/shared/moduleClient');
+const moduleClient = require('@ednova/shared/moduleClient');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { StudySession } = require('../models/index');
 import { fetchGamificationProfile } from '../utils/gamificationService';
@@ -59,7 +59,7 @@ const { createSession: generateToken } = require('../../../../tests/sessionFixtu
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const app = require('../app');
 
-const token = `mindflow.test_session=${generateToken({ userId: 'user-123', role: 'student', tier: 'vip_plus' })}`;
+const token = `ednova.test_session=${generateToken({ userId: 'user-123', role: 'student', tier: 'vip_plus' })}`;
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -68,7 +68,7 @@ beforeEach(() => {
 
 describe('POST /api/v1/coach/nudge', () => {
   it('denies the lower vip tier before loading private session data', async () => {
-    const lowerTier = `mindflow.test_session=${generateToken({ userId: 'user-123', role: 'student', tier: 'vip' })}`;
+    const lowerTier = `ednova.test_session=${generateToken({ userId: 'user-123', role: 'student', tier: 'vip' })}`;
     const res = await request(app).post('/api/v1/coach/nudge').set('Cookie', lowerTier);
     expect(res.status).toBe(403);
     expect(StudySession.findOne).not.toHaveBeenCalled();

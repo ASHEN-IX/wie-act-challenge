@@ -7,7 +7,7 @@ import type { Response, NextFunction } from 'express';
  */
 
 process.env.JWT_SECRET = 'test-secret-key';
-process.env.MONGODB_URI = 'mongodb://localhost:27017/test_study_partner';
+process.env.MONGODB_URI = 'mongodb://localhost:27017/test_ednova';
 process.env.NODE_ENV = 'test';
 
 import fs from 'fs';
@@ -18,7 +18,7 @@ const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => 
 });
 afterAll(() => exitSpy.mockRestore());
 
-jest.mock('@study-partner/shared/ai-messaging', () => ({
+jest.mock('@ednova/shared/ai-messaging', () => ({
   consumeAiProgress: jest.fn(),
   consumeIngestResults: jest.fn(),
   closeAiMessaging: jest.fn(),
@@ -79,7 +79,7 @@ import {
   buildIngestStatus
 } from '../services/ingestStatus';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { consumeAiProgress, consumeIngestResults } = require('@study-partner/shared/ai-messaging');
+const { consumeAiProgress, consumeIngestResults } = require('@ednova/shared/ai-messaging');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { Course } = require('../models/index');
 
@@ -103,12 +103,12 @@ const fakeAuth = (req: DomainRequest, res: Response, next: NextFunction) => {
 app.use('/api/v1/study/courses', fakeAuth, courseRoutes);
 app.use('/api/v1/study/sessions', fakeAuth, sessionTaskRoutes);
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { errorHandler } = require('@study-partner/shared/middleware');
+const { errorHandler } = require('@ednova/shared/middleware');
 app.use(errorHandler);
 
 function authHeader() {
   const token = jwt.sign({ userId: 'user-123', role: 'user' }, process.env.JWT_SECRET);
-  return { Cookie: `mindflow.test_session=${token}` };
+  return { Cookie: `ednova.test_session=${token}` };
 }
 
 const BASE = {
@@ -137,7 +137,13 @@ const WORKER_COURSE = {
           definitions: [{ term: 'Graph', definition: 'A set of nodes and edges' }],
           formulas: ['E = V - 1'],
           examples: ['a tree is a graph'],
-          learning_objectives: [{ level: 'knowledge', text: 'define a graph' }],
+          learning_objectives: [
+            {
+              objectiveId: 'obj_graph',
+              text: 'Define a graph.',
+              bloomLevel: 'remember'
+            }
+          ],
           tokenized_chunks: ['DROP ME'],
           chunk_embeddings: [[0.1, 0.2]]
         }
@@ -235,7 +241,15 @@ describe('handleIngestResult (ingest result routing key)', () => {
     expect(sub.key_concepts).toEqual(['node', 'edge']);
     expect(sub.definitions).toEqual([{ term: 'Graph', definition: 'A set of nodes and edges' }]);
     expect(sub.formulas).toEqual(['E = V - 1']);
-    expect(sub.learning_objectives).toEqual([{ level: 'knowledge', text: 'define a graph' }]);
+    expect(sub.learning_objectives).toEqual([
+      {
+        id: 'obj_graph',
+        statement: 'Define a graph.',
+        text: 'Define a graph.',
+        bloomLevel: 'remember',
+        provenance: 'ai_generated'
+      }
+    ]);
     expect(Reflect.get(sub, 'tokenized_chunks')).toBeUndefined();
     expect(Reflect.get(sub, 'chunk_embeddings')).toBeUndefined();
     expect(Course.updateOne).toHaveBeenCalledWith(
@@ -313,7 +327,7 @@ describe('startIngestStatusTracker (INGEST-07)', () => {
 
   test('stopIngestStatusTracker closes the shared ai-messaging connection', () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { closeAiMessaging } = require('@study-partner/shared/ai-messaging');
+    const { closeAiMessaging } = require('@ednova/shared/ai-messaging');
     stopIngestStatusTracker();
     expect(closeAiMessaging).toHaveBeenCalled();
   });

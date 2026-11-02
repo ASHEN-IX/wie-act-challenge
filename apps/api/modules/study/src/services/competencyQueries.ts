@@ -44,7 +44,7 @@ interface WeakCompetency {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { BLOOM_LEVELS, UNLOCK_THRESHOLD } = require('@study-partner/shared/bloom/taxonomy');
+const { BLOOM_LEVELS, UNLOCK_THRESHOLD } = require('@ednova/shared/bloom/taxonomy');
 
 const BLOOM_ORDER = ['REMEMBER', 'UNDERSTAND', 'APPLY', 'ANALYSE', 'EVALUATE', 'CREATE'];
 

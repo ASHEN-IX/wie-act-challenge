@@ -3,7 +3,7 @@ import {
   parseContract,
   parseRecipient,
   type Contract,
-} from "@study-partner/shared/ednova/contracts";
+} from "@ednova/shared/ednova/contracts";
 export type ActivityDefinition = Contract<"ActivityDefinition">;
 export function decodeActivityDefinition(value: unknown): ActivityDefinition {
   return parseContract("ActivityDefinition", value);

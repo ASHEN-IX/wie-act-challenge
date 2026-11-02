@@ -1,11 +1,11 @@
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response } from 'express';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createContracts } = require('@study-partner/shared/domainContracts');
+const { createContracts } = require('@ednova/shared/domainContracts');
 import Joi from 'joi';
 import { Topic } from '../models';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { asyncHandler } = require('@study-partner/shared/middleware');
+const { asyncHandler } = require('@ednova/shared/middleware');
 
 const router = createContracts();
 

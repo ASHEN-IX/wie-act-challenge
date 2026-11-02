@@ -3,11 +3,11 @@
  */
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const aiMessaging = require('@study-partner/shared/ai-messaging');
+const aiMessaging = require('@ednova/shared/ai-messaging');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { validateJobPayload } = require('@study-partner/shared/ai-messaging/payloadSchemas');
+const { validateJobPayload } = require('@ednova/shared/ai-messaging/payloadSchemas');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { logger } = require('@study-partner/shared');
+const { logger } = require('@ednova/shared');
 
 const INGEST_JOB_TYPE = 'study.ingest.course';
 
@@ -23,6 +23,8 @@ interface IngestFileInfo {
 export interface PublishIngestionParams {
   userId: string;
   courseId: string;
+  /** Display title for the generated course, never an authorization input. */
+  courseTitle?: string;
   revisionId?: string;
   fileRef: string;
   files?: IngestFileInfo[];
@@ -46,6 +48,7 @@ function setCustomPublisher(
 async function publishCourseIngestionJob({
   userId,
   courseId,
+  courseTitle,
   revisionId,
   fileRef,
   files,
@@ -54,6 +57,7 @@ async function publishCourseIngestionJob({
   correlationId: requestedCorrelationId
 }: PublishIngestionParams): Promise<{ jobId: string; correlationId: string }> {
   const payload: Record<string, unknown> = { courseId, fileRef, files: files || [] };
+  if (courseTitle) payload.courseTitle = courseTitle;
   if (revisionId) {
     payload.revisionId = revisionId;
   }

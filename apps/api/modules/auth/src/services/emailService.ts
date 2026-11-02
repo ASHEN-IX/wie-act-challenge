@@ -51,7 +51,7 @@ async function getTransporter(): Promise<MailTransport> {
   return transporter;
 }
 
-const FROM_ADDRESS = process.env.EMAIL_FROM || 'StudyPartner <noreply@studypartner.app>';
+const FROM_ADDRESS = process.env.EMAIL_FROM || 'EdNova <noreply@ednova.app>';
 const APP_URL = process.env.APP_URL || 'http://localhost:3000';
 
 export interface SendSubscriptionExpiryNoticeOptions {
@@ -70,7 +70,7 @@ export async function sendSubscriptionExpiryNotice(
   const info = await t.sendMail({
     from: FROM_ADDRESS,
     to,
-    subject: 'Your StudyPartner subscription is ending soon',
+    subject: 'Your EdNova subscription is ending soon',
     html: `
       <div style="font-family:sans-serif;max-width:520px;margin:auto;padding:24px;">
         <h2 style="color:#7c3aed;">Subscription Reminder</h2>

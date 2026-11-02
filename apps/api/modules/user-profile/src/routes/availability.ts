@@ -1,6 +1,6 @@
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response } from 'express';
-import { createContracts } from '@study-partner/shared/domainContracts';
+import { createContracts } from '@ednova/shared/domainContracts';
 import Joi from 'joi';
 import AvailabilitySlot from '../models/AvailabilitySlot';
 

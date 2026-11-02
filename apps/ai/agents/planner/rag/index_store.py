@@ -23,7 +23,7 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-FAISS_INDEX_DIR = Path(os.getenv("FAISS_INDEX_DIR", "/tmp/study_partner_faiss"))
+FAISS_INDEX_DIR = Path(os.getenv("FAISS_INDEX_DIR", "/tmp/ednova_faiss"))
 
 
 def _ensure_dir() -> None:

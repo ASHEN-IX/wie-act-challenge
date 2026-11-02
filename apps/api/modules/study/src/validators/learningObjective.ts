@@ -1,7 +1,7 @@
 /**
  * LearningObjective schema validator (F01).
  *
- * Python mirror: `study-partner-ai/models/learning_objective.py`. Rules MUST
+ * Python mirror: `ednova-ai/models/learning_objective.py`. Rules MUST
  * stay identical on both sides.
  *
  * Depends on BLOOM-01 (shared/bloom/taxonomy.js) for enums and verb map.

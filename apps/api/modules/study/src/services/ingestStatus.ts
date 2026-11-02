@@ -1,15 +1,20 @@
 import type { ICourse, ISubtopic } from '../models';
-import type {
-  AiProgressEnvelope,
-  AiResultEnvelope
-} from '@study-partner/shared/ai-messaging/envelope';
+import type { AiProgressEnvelope, AiResultEnvelope } from '@ednova/shared/ai-messaging/envelope';
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object';
 }
 type SanitizedSubtopic = Pick<
   ISubtopic,
-  'id' | 'title' | 'summary' | 'key_concepts' | 'formulas' | 'examples' | 'definitions'
+  | 'id'
+  | 'title'
+  | 'summary'
+  | 'key_concepts'
+  | 'formulas'
+  | 'examples'
+  | 'definitions'
+  | 'source_spans'
+  | 'structured_blocks'
 > & { learning_objectives?: unknown };
 interface SanitizedTopic {
   title: string;
@@ -36,15 +41,47 @@ const {
   consumeAiProgress,
   consumeIngestResults,
   closeAiMessaging
-} = require('@study-partner/shared/ai-messaging');
+} = require('@ednova/shared/ai-messaging');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { logger } = require('@study-partner/shared');
+const { logger } = require('@ednova/shared');
 import { Course, CourseRevision } from '../models';
 import { CourseIngestionOperation } from '../models/CourseIngestionOperation';
 import { INGEST_JOB_TYPE } from './ingestionJob';
+import { activityDigest } from './activityIdentity';
 
 // Whitelist of subtopic fields a worker result may write into Course.topics.
 const SUBTOPIC_STRING_ARRAY = ['key_concepts', 'formulas', 'examples'] as const;
+const MAX_SOURCE_SPANS = 400;
+const MAX_STRUCTURED_BLOCKS = 200;
+
+function safeSourceSpans(value: unknown): NonNullable<ISubtopic['source_spans']> {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter(isObject)
+    .slice(0, MAX_SOURCE_SPANS)
+    .flatMap((span) =>
+      typeof span.chunkId === 'string' &&
+      span.chunkId.length <= 128 &&
+      typeof span.documentId === 'string' &&
+      span.documentId.length <= 128 &&
+      (span.pageNumber === null ||
+        (Number.isSafeInteger(span.pageNumber) && Number(span.pageNumber) > 0)) &&
+      Number.isSafeInteger(span.lineStart) &&
+      Number.isSafeInteger(span.lineEnd) &&
+      Number(span.lineStart) > 0 &&
+      Number(span.lineEnd) >= Number(span.lineStart)
+        ? [
+            {
+              chunkId: span.chunkId as string,
+              documentId: span.documentId as string,
+              pageNumber: span.pageNumber as number | null,
+              lineStart: span.lineStart as number,
+              lineEnd: span.lineEnd as number
+            }
+          ]
+        : []
+    );
+}
 
 function sanitizeCourseFromResult(resultCourse: unknown): SanitizedTopic[] {
   if (!isObject(resultCourse)) return [];
@@ -59,6 +96,18 @@ function sanitizeCourseFromResult(resultCourse: unknown): SanitizedTopic[] {
           title: String(sub.title || ''),
           summary: typeof sub.summary === 'string' ? sub.summary : ''
         };
+        // The worker emits BLOOM objective ids with camel-case fields. The
+        // draft editor consumes the id/statement shape; preserve the reviewed
+        // source objective through that adapter rather than dropping it.
+        const workerObjectives = Array.isArray(sub.learning_objectives)
+          ? sub.learning_objectives.filter(isObject).map((objective) => ({
+              id: String(objective.id || objective.objectiveId || ''),
+              statement: String(objective.statement || objective.text || ''),
+              text: String(objective.text || objective.statement || ''),
+              bloomLevel: String(objective.bloomLevel || 'understand'),
+              provenance: objective.provenance === 'manual' ? 'manual' : 'ai_generated'
+            }))
+          : [];
         for (const key of SUBTOPIC_STRING_ARRAY) {
           if (Array.isArray(sub[key])) {
             clean[key] = (sub[key] as unknown[])
@@ -74,15 +123,24 @@ function sanitizeCourseFromResult(resultCourse: unknown): SanitizedTopic[] {
             definition: String(d.definition || '')
           }));
         }
-        if (sub.learning_objectives !== undefined) {
+        if (workerObjectives.length) {
+          clean.learning_objectives = workerObjectives;
+        } else if (sub.learning_objectives !== undefined) {
+          // Preserve legacy fixture/plugin objectives rather than inventing a
+          // Bloom level for records that never followed the worker contract.
           clean.learning_objectives = sub.learning_objectives;
         }
+        clean.source_spans = safeSourceSpans(sub.source_spans);
+        clean.structured_blocks = Array.isArray(sub.structured_blocks)
+          ? sub.structured_blocks.filter(isObject).slice(0, MAX_STRUCTURED_BLOCKS)
+          : [];
         return clean;
       }),
     prerequisites: Array.isArray(topic.prerequisites) ? topic.prerequisites.map(String) : []
   }));
 }
 
+/** Additive canonical fields retain bounded source blocks but no vectors. */
 function retryAction(
   courseId: string,
   status: string
@@ -256,6 +314,7 @@ async function handleIngestResult(
           } else {
             const expectedIndex =
               'faiss/' + course._id.toString() + '/' + rev.revisionTag + '.faiss';
+              const canonical = result.payload.contentDocument;
             const changed = await CourseRevision.updateOne(
               {
                 _id: rev._id,
@@ -268,6 +327,9 @@ async function handleIngestResult(
               {
                 $set: {
                   topics: sanitizedTopics,
+                  ...(canonical && typeof canonical === 'object'
+                    ? { contentDocument: canonical, contentDocumentHash: contentHashOf(canonical) }
+                    : {}),
                   ...(result.payload.vectorIndexRef === expectedIndex
                     ? { vectorIndexRef: expectedIndex }
                     : {})
@@ -313,6 +375,10 @@ async function handleIngestResult(
       { _id: operation._id, state: { $nin: ['cancelled', 'superseded'] } },
       { $set: { state: terminalStatus, resultApplied: true } }
     );
+}
+
+function contentHashOf(value: unknown): string {
+  return activityDigest(value);
 }
 
 /**

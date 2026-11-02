@@ -2,7 +2,7 @@ import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response } from 'express';
 import type { IUserProfile } from '../models/UserProfile';
 import type { FriendshipStatus } from '../models/Friendship';
-import { errorDetails } from '@study-partner/shared/errors';
+import { errorDetails } from '@ednova/shared/errors';
 
 interface FriendProfileProjection {
   userId: string;
@@ -15,12 +15,12 @@ interface FriendProfileProjection {
   isFriend: boolean;
   stats?: IUserProfile['stats'];
 }
-import { createContracts } from '@study-partner/shared/domainContracts';
+import { createContracts } from '@ednova/shared/domainContracts';
 import Friendship from '../models/Friendship';
 import UserProfile from '../models/UserProfile';
 import Gamification from '../models/Gamification';
-import moduleClient from '@study-partner/shared/moduleClient';
-import { buildInternalHeaders } from '@study-partner/shared/auth';
+import moduleClient from '@ednova/shared/moduleClient';
+import { buildInternalHeaders } from '@ednova/shared/auth';
 
 const router = createContracts();
 

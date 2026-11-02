@@ -17,7 +17,7 @@ import activitiesRouter from '../../modules/study/src/routes/activities';
 import { updateCourseDraft } from '../../modules/study/src/services/courseDraft';
 import type { DomainRequest } from '../../src/framework/contracts';
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27018/mindflow-test';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27018/ednova-test';
 
 test('M14 / ED-32: Course Studio Source-Backed Activity Proposal Generation Integration', async (t) => {
   await mongoose.connect(MONGO_URI);

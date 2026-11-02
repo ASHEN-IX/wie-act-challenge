@@ -1,7 +1,7 @@
 /**
  * Bloom taxonomy parity tests (BLOOM-01): the Node taxonomy module must
  * match docs/contracts/bloom-fixture.json — the same fixture the Python
- * side (study-partner-ai/bloom/taxonomy.py) validates against. Drift fails
+ * side (ednova-ai/bloom/taxonomy.py) validates against. Drift fails
  * CI. Pattern follows topology-parity.test.js (AI-COM-06).
  */
 

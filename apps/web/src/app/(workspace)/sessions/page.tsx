@@ -10,6 +10,7 @@ import {
   NativeSelect,
   NativeSelectOption,
 } from "@/components/ui/native-select";
+import { isCourseReady } from "@/features/courses/lifecycle";
 export default async function Sessions() {
   const [result, courses] = await Promise.all([
     load<{
@@ -24,7 +25,7 @@ export default async function Sessions() {
     getCourses(),
   ]);
   const ready =
-    courses.data?.courses.filter((c) => c.status === "completed") || [];
+    courses.data?.courses.filter(isCourseReady) || [];
   return (
     <>
       <PageHeader

@@ -9,16 +9,16 @@ import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response, NextFunction, RequestHandler } from 'express';
 import type { FilterQuery } from 'mongoose';
 import type { ICourse, ICourseTopic, ISubtopic } from '../models';
-import { errorDetails } from '@study-partner/shared/errors';
+import { errorDetails } from '@ednova/shared/errors';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createContracts } = require('@study-partner/shared/domainContracts');
+const { createContracts } = require('@ednova/shared/domainContracts');
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const moduleClient = require('@study-partner/shared/moduleClient');
+const moduleClient = require('@ednova/shared/moduleClient');
 import {
   Course,
   Subject,
@@ -69,9 +69,9 @@ import {
   EnrollmentError
 } from '../services/enrollments';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { tierGate } = require('@study-partner/shared/tierGate');
+const { tierGate } = require('@ednova/shared/tierGate');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { requireMultipart } = require('@study-partner/shared/middleware');
+const { requireMultipart } = require('@ednova/shared/middleware');
 import { deleteObjectivesForDocument } from '../services/objectives';
 import {
   enqueueCourseIngestionOperation,
@@ -81,7 +81,7 @@ import {
   IngestionConflictError
 } from '../services/ingestionControl';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { buildInternalHeaders } = require('@study-partner/shared/auth');
+const { buildInternalHeaders } = require('@ednova/shared/auth');
 
 type CourseUpload = Pick<
   NonNullable<DomainRequest['file']>,
@@ -190,7 +190,7 @@ const {
   MAX_UPLOAD_BYTES,
   MAX_UPLOAD_MB,
   SNIFF_BYTES
-} = require('@study-partner/shared/uploadValidation');
+} = require('@ednova/shared/uploadValidation');
 
 const upload = multer({
   storage: storage,
@@ -268,7 +268,7 @@ async function sniffUploadedFiles(req: DomainRequest, res: Response, next: NextF
       const header = await streamFileSlice(file.path, 0, SNIFF_BYTES - 1);
       if (header.length > 0) {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const { sniffMagicBytes } = require('@study-partner/shared/uploadValidation');
+        const { sniffMagicBytes } = require('@ednova/shared/uploadValidation');
         if (sniffMagicBytes(header) === 'binary') {
           return next(
             rejectAndCleanup(
@@ -402,6 +402,7 @@ router.get('/', async (req: DomainRequest, res: Response) => {
       assignedInstructorIds: course.assignedInstructorIds || [],
       subjectId: course.subjectId,
       status: course.status,
+      activeRevisionId: course.activeRevisionId,
       topicsCount: course.topics?.length || 0,
       filesCount: course.files?.length || 0,
       aiCourseId: course.aiCourseId,
@@ -531,6 +532,7 @@ router.post(
           {
             userId,
             courseId: course._id.toString(),
+            courseTitle: course.title,
             revisionId: revisionTag,
             fileRef: courseFileRef(course._id.toString()),
             files: staged,
@@ -588,6 +590,7 @@ router.get('/:courseId', async (req: DomainRequest, res: Response) => {
         assignedInstructorIds: course.assignedInstructorIds || [],
         subjectId: course.subjectId,
         status: course.status,
+        activeRevisionId: course.activeRevisionId,
         topics: course.topics,
         files: course.files,
         aiCourseId: course.aiCourseId,
@@ -1061,6 +1064,7 @@ router.post(
           {
             userId,
             courseId: course._id.toString(),
+            courseTitle: course.title,
             revisionId: revisionTag,
             fileRef: courseFileRef(course._id.toString()),
             files: staged,

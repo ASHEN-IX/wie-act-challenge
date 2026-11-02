@@ -13,16 +13,19 @@ export async function createSubject(
 ): Promise<ActionState> {
   await requireIdentity();
   try {
-    await api("/api/v1/study/subjects", {
+    const result = await api<{ subject: { id: string; name: string } }>(
+      "/api/v1/study/subjects",
+      {
       method: "POST",
       body: JSON.stringify({
         name: text(form, "name", 100),
         description: optionalText(form, "description"),
       }),
-    });
+      },
+    );
     revalidatePath("/courses");
     revalidatePath("/courses/new");
-    return { success: "Subject created." };
+    return { success: "Subject created.", createdSubject: result.subject };
   } catch (error) {
     unstable_rethrow(error);
     return {
@@ -47,7 +50,7 @@ export async function uploadCourse(
       body.set("institutionId", segment(institutionId));
       body.set("scope", "institutional");
     }
-    const files = form.getAll("files");
+    const files = form.getAll("files").filter((file): file is File => file instanceof File && file.size > 0);
     if (
       files.reduce(
         (sum, file) => sum + (file instanceof File ? file.size : 0),
@@ -60,14 +63,19 @@ export async function uploadCourse(
       return { error: "Choose between 1 and 10 source files." };
     for (const file of files) {
       if (
-        !(file instanceof File) ||
-        !file.size ||
         file.size > 25 * 1024 * 1024 ||
-        !/\.(pdf|txt|md)$/i.test(file.name) ||
-        !["application/pdf", "text/plain", "text/markdown"].includes(file.type)
+        !/\.(pdf|txt|md)$/i.test(file.name)
       )
         return { error: "Choose PDF or text sources up to 25 MB each." };
-      body.append("files", file);
+      // Browsers often leave the MIME type empty or use a generic value for
+      // Markdown. Normalize from the extension, then let the API verify the
+      // actual file contents and reject renamed binaries.
+      body.append(
+        "files",
+        /\.[md]$/i.test(file.name)
+          ? new File([file], file.name, { type: "text/markdown" })
+          : file,
+      );
     }
     const response = await api<{ courseId: string }>("/api/v1/study/courses", {
       method: "POST",
@@ -83,6 +91,7 @@ export async function uploadCourse(
     success:
       "Source upload accepted. Open the course to inspect processing and review the draft.",
     destination: `/courses/${segment(id)}`,
+    selectedSubjectId: String(form.get("subject_id") || ""),
   };
 }
 export async function deleteCourse(

@@ -7,7 +7,7 @@
  * CoachRequest envelope or fail the worker's schema.
  *
  * Bounds mirror `shared/ai-messaging/payloadSchemas.js` and
- * `study-partner-ai/workers/schemas.py`.
+ * `ednova-ai/workers/schemas.py`.
  */
 
 const STATS_BOUNDS: Record<string, [number, number]> = {

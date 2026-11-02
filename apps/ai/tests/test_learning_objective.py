@@ -1,7 +1,7 @@
 """
 LearningObjective model tests (F01 — Learning Objective Schema).
 
-Node mirror: study-partner-api/study/src/tests/study.test.js
+Node mirror: ednova-api/study/src/tests/study.test.js
 ('learningObjective validator' block). Rules must stay identical on both
 sides — see models/learning_objective.py's docstring.
 """

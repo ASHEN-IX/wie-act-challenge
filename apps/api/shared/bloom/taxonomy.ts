@@ -1,7 +1,7 @@
 /**
  * Canonical Bloom's Taxonomy constants (BLOOM-01 — Shared Taxonomy Constants).
  *
- * Python mirror: `study-partner-ai/bloom/taxonomy.py`. Values MUST stay
+ * Python mirror: `ednova-ai/bloom/taxonomy.py`. Values MUST stay
  * identical on both sides — parity is covered by contract tests against
  * docs/contracts/bloom-fixture.json.
  */

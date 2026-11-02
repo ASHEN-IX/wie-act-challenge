@@ -67,6 +67,7 @@ class IngestionWorker(BaseAIWorker):
         # Vector store is heavy (FAISS + Mongo) → built lazily on first job, or
         # injected in tests.
         self._vector_store = vector_store
+        self._course_title: Optional[str] = None
 
     @property
     def vector_store(self):
@@ -80,6 +81,9 @@ class IngestionWorker(BaseAIWorker):
 
     async def handle(self, payload: Dict[str, Any], envelope) -> Dict[str, Any]:
         request = self._build_request(payload)
+        # Titles are display metadata. Every title decision stays local to this
+        # job and the requested sources remain the authority for the outline.
+        self._course_title = request.courseTitle
         await asyncio.to_thread(self._ensure_current_operation, request, envelope)
         revision_manifest = None
         db = getattr(self.vector_store, "_db", None)
@@ -131,7 +135,7 @@ class IngestionWorker(BaseAIWorker):
             detail=f"enriching {len(subtopics)} subtopic(s)",
         )
         enriched, objective_stats, classification_stats = await asyncio.to_thread(
-            self._enrich_stage, subtopics
+            self._enrich_stage, subtopics, self._course_title
         )
         await asyncio.to_thread(self._ensure_current_operation, request, envelope)
 
@@ -213,6 +217,7 @@ class IngestionWorker(BaseAIWorker):
         from agents.course_ingestion.parsing.layout_parser import detect_sections
         from agents.course_ingestion.parsing.section_builder import build_subtopics
 
+
         source_files: List[str] = []
         all_sections = []
         if manifest:
@@ -220,9 +225,15 @@ class IngestionWorker(BaseAIWorker):
                 extract_documents,
                 original_path,
             )
+            from agents.course_ingestion.parsing.semantic_structure import (
+                detect_sections_with_sources,
+            )
 
-            chunks, _ = extract_documents(manifest)
-            all_sections = detect_sections("\n\n".join(chunks))
+            chunks, metas = extract_documents(manifest)
+            # Keep the verified chunk/page identity while detecting sections.
+            # Joining chunks and re-splitting text would make topic spans
+            # impossible to prove after enrichment.
+            all_sections = detect_sections_with_sources(zip(chunks, metas))
             source_files = [str(original_path(d)) for d in manifest["documents"]]
         else:
             for meta in request.files:
@@ -301,7 +312,7 @@ class IngestionWorker(BaseAIWorker):
         return path
 
     def _enrich_stage(
-        self, subtopics: List[dict]
+        self, subtopics: List[dict], course_title: Optional[str] = None
     ) -> Tuple[List[dict], Dict[str, Any], Dict[str, Any]]:
         """LLM enrichment + BLOOM-04 objectives + BLOOM-05 classification."""
         from agents.course_ingestion.enrichment.llm_enricher import (
@@ -316,25 +327,37 @@ class IngestionWorker(BaseAIWorker):
         enriched = []
         for st in subtopics:
             enriched_data = enrich_subtopic_with_llm(st["title"], st["full_content"])
-            cleaned = enriched_data.get("cleaned_text") or st["full_content"]
-            st["full_content"] = cleaned
+            # Model-cleaned text is only a suggestion. It must never replace
+            # canonical source prose; source and generated content stay separate.
+            cleaned = st["full_content"]
             st["key_concepts"] = enriched_data.get(
                 "key_concepts", st.get("key_concepts", [])
             )
             st["definitions"] = enriched_data.get("definitions", [])
             st["formulas"] = enriched_data.get("formulas", [])
             st["examples"] = enriched_data.get("examples", [])
-            try:
-                refined_title = generate_subtopic_title(cleaned)
-                if refined_title:
-                    st["title"] = refined_title
-            except Exception as title_err:  # title refinement is best-effort
-                logger.warning(
-                    "ingest_title_refinement_failed", extra={"error": str(title_err)}
-                )
+            from agents.course_ingestion.parsing.semantic_structure import (
+                _source_section_title,
+            )
+
+            # An author/source chapter heading is stronger evidence than a
+            # model summary. Only descriptive fallbacks should be refined.
+            if not _source_section_title(st.get("title", "")):
+                try:
+                    refined_title = generate_subtopic_title(cleaned)
+                    if refined_title:
+                        # Titles can be refined, but source-backed section
+                        # headings stay untouched above.
+                        st["title"] = refined_title
+                except Exception as title_err:  # refinement is best-effort
+                    logger.warning(
+                        "ingest_title_refinement_failed", extra={"error": str(title_err)}
+                    )
             enriched.append(st)
 
-        objective_stats = extract_objectives_for_document(enriched)
+        objective_stats = extract_objectives_for_document(
+            enriched, course_title=course_title or self._course_title
+        )
         classification_stats = classify_objectives_for_document(enriched)
         return enriched, objective_stats, classification_stats
 
@@ -386,16 +409,35 @@ class IngestionWorker(BaseAIWorker):
         from agents.course_ingestion.normalization.normalizer import normalize_course
 
         rev_tag = revision_id or "rev_1"
-        course_json = normalize_course(course_id, subtopics, source_files)
+        course_json = normalize_course(
+            self._course_title or course_id, subtopics, source_files
+        )
+        from agents.course_ingestion.normalization.canonical_document import (
+            build_canonical_document,
+            retrieval_units,
+        )
+
+        # The canonical document is the reading projection. Search chunks are
+        # derived from these blocks and retain links to their source block ids.
+        canonical = build_canonical_document(
+            course_id, self._course_title or course_id, course_json.topics
+        )
+        units = retrieval_units(canonical)
         chunks, embeddings, metadatas = _flatten_chunk_records(
             course_id, course_json, revision_id=rev_tag
         )
 
         if manifest:
-            from services.vector_store.revision_artifacts import extract_documents
+            from services.vector_store.revision_artifacts import (
+                canonical_units_for_index,
+                extract_documents,
+            )
             from services.vector_store.embedder import get_embedder
 
-            chunks, metadatas = extract_documents(manifest)
+            # Search uses the canonical document's source blocks. These units
+            # retain their canonical block ids while remaining exact source
+            # text for artifact verification.
+            chunks, metadatas = canonical_units_for_index(manifest, units)
             embeddings = get_embedder().encode(chunks)
         indexed = False
         if chunks and embeddings.size:
@@ -420,6 +462,10 @@ class IngestionWorker(BaseAIWorker):
             "files": len(source_files),
             "subtopics": len(subtopics),
             "chunks": len(chunks),
+            "canonicalChapters": len(canonical["chapters"]),
+            "canonicalLessons": sum(len(c["lessons"]) for c in canonical["chapters"]),
+            "canonicalBlocks": sum(len(l["blocks"]) for c in canonical["chapters"] for l in c["lessons"]),
+            "retrievalUnits": len(units),
             "indexedChunks": len(chunks) if indexed else 0,
             "deduplicatedChunks": dedup_removed,
             "objectivesExtracted": int(objective_stats.get("extracted", 0)),
@@ -437,6 +483,7 @@ class IngestionWorker(BaseAIWorker):
             "vectorIndexRef": f"faiss/{course_id}/{rev_tag}.faiss",
             "status": "completed",
             "stats": stats,
+            "contentDocument": canonical,
             "course": _strip_vectors(course_json.model_dump(mode="json")),
         }
 

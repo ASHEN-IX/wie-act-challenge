@@ -1,1 +1,1 @@
-"""Services package for study-partner-ai."""
+"""Services package for ednova-ai."""

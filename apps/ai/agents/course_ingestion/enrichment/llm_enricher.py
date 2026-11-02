@@ -5,7 +5,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Load .env from project root
-# enrichment -> course_ingestion -> agents -> study-partner-ai
+# enrichment -> course_ingestion -> agents -> ednova-ai
 env_path = Path(__file__).resolve().parents[3] / ".env"
 load_dotenv()
 

@@ -91,7 +91,7 @@ async function upsertProfile(
 
 async function run() {
   const dryRun = process.argv.includes('--dry-run');
-  const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/study_partner';
+  const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/ednova';
 
   await mongoose.connect(mongoUri);
   console.log(`[KP Migration] Connected to MongoDB (${dryRun ? 'dry-run' : 'write'})`);

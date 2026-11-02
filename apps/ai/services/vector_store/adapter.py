@@ -33,7 +33,7 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-FAISS_INDEX_DIR = Path(os.getenv("FAISS_INDEX_DIR", "/tmp/study_partner_faiss"))
+FAISS_INDEX_DIR = Path(os.getenv("FAISS_INDEX_DIR", "/tmp/ednova_faiss"))
 CHUNK_EMBED_COLLECTION = "chunk_embeddings"
 
 # course_id is used to build filesystem paths (<id>.faiss) — restrict to a

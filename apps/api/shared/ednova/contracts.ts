@@ -113,7 +113,15 @@ const sources = refine(
 );
 const vectorIndexRef = text(256, /^faiss\/[a-f0-9]{24}\/[a-zA-Z0-9][a-zA-Z0-9_-]*\.faiss$/);
 const objective = object({ objectiveId: id, statement: text(2000), bloomLevel: bloom });
-const topic = object({ topicId: id, title: text(200), objectives: list(objective, 1, 50) });
+const topic = union(
+  object({ topicId: id, title: text(200), objectives: list(objective, 1, 50) }),
+  object({
+    topicId: id,
+    title: text(200),
+    objectives: list(objective, 1, 50),
+    description: refine(text(2000), (value) => value.length > 0)
+  })
+);
 const published = object({
   schemaVersion: version,
   visibility: enumeration('authorized_learner'),

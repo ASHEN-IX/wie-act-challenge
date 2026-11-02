@@ -11,9 +11,9 @@ const {
   rateLimiter,
   healthCheck,
   requireEnv
-} = require('@study-partner/shared');
+} = require('@ednova/shared');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { authenticate } = require('@study-partner/shared/auth');
+const { authenticate } = require('@ednova/shared/auth');
 
 // --- Environment validation (fail-fast on missing secrets) ---
 requireEnv(['MONGODB_URI'], { serviceName: 'analytics' });

@@ -14,8 +14,8 @@ interface SearchResponse {
   sources?: SearchSource[];
   results?: SearchSource[];
 }
-import moduleClient from '@study-partner/shared/moduleClient';
-import { getBaseUrl } from '@study-partner/shared/aiClient';
+import moduleClient from '@ednova/shared/moduleClient';
+import { getBaseUrl } from '@ednova/shared/aiClient';
 import SessionChat, { ISessionChat } from '../models/SessionChat';
 
 const AI_SERVICE_URL = getBaseUrl();

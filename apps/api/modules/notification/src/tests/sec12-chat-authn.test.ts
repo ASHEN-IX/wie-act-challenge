@@ -22,8 +22,8 @@ import { verifySessionMembership } from '../utils/session-access';
 const jwt = { sign: createSession };
 jest.mock('../utils/session-access', () => ({ verifySessionMembership: jest.fn() }));
 import request from 'supertest';
-import { authenticate } from '@study-partner/shared/auth';
-import { errorHandler } from '@study-partner/shared/middleware';
+import { authenticate } from '@ednova/shared/auth';
+import { errorHandler } from '@ednova/shared/middleware';
 
 import chatRouter from '../routes/chat';
 
@@ -32,7 +32,7 @@ jest.mock('../services/chatService', () => ({
   getHistory: jest.fn().mockResolvedValue([{ messageId: 'm-1', sender: 'user-alice', text: 'hi' }]),
   deleteMessage: jest.fn()
 }));
-jest.mock('@study-partner/shared', () => ({
+jest.mock('@ednova/shared', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() }
 }));
 
@@ -49,7 +49,7 @@ function authHeader(
   payload: Parameters<typeof createSession>[0] = alice,
   secret = process.env.JWT_SECRET
 ) {
-  return { Cookie: `mindflow.test_session=${jwt.sign(payload, secret)}` };
+  return { Cookie: `ednova.test_session=${jwt.sign(payload, secret)}` };
 }
 
 function expiredToken() {
@@ -77,7 +77,7 @@ describe('SEC-12 chat endpoints require valid authentication', () => {
   it('401 with an expired token', async () => {
     const res = await request(app)
       .get('/api/v1/session-chat/session-1/history')
-      .set('Cookie', `mindflow.test_session=${expiredToken()}`);
+      .set('Cookie', `ednova.test_session=${expiredToken()}`);
     expect(res.status).toBe(401);
   });
 
@@ -109,7 +109,7 @@ describe('SEC-12 chat endpoints require valid authentication', () => {
     expect(chatService.getHistory).not.toHaveBeenCalled();
     expect(chatService.deleteMessage).not.toHaveBeenCalled();
     expect(verifySessionMembership).toHaveBeenCalledWith(
-      expect.stringContaining('mindflow.test_session='),
+      expect.stringContaining('ednova.test_session='),
       alice.userId,
       'session-1'
     );

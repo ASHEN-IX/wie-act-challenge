@@ -1,9 +1,9 @@
 import type { DomainRequest } from '../../src/framework/contracts';
 import express from 'express';
-import { authenticate } from '@study-partner/shared/auth';
+import { authenticate } from '@ednova/shared/auth';
 import { createSession as generateToken } from '../sessionFixtures';
-import client from '@study-partner/shared/moduleClient';
-import { requireInternal } from '@study-partner/shared';
+import client from '@ednova/shared/moduleClient';
+import { requireInternal } from '@ednova/shared';
 
 const app = express();
 app.use(express.json());
@@ -23,7 +23,7 @@ describe('In-process contracts preserve route boundaries without listening', () 
   });
   test('forwards identity, body and query through authentication and validation', async () => {
     const headers = {
-      Cookie: `mindflow.test_session=${generateToken({ userId: 'reward-owner', email: 'owner@test.com', role: 'student' })}`
+      Cookie: `ednova.test_session=${generateToken({ userId: 'reward-owner', email: 'owner@test.com', role: 'student' })}`
     };
     await expect(
       client.post(

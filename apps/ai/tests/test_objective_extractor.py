@@ -47,9 +47,13 @@ class TestPromptHardening:
         assert injected in prompt
         assert len(result) == 1
 
-    def test_empty_llm_response_degrades_to_no_objectives(self, monkeypatch):
+    def test_empty_llm_response_keeps_a_reviewable_source_objective(self, monkeypatch):
         monkeypatch.setattr(oe, "call_llm", lambda *a, **k: "")
-        assert oe._draft_objectives("t", "content", "topic_1") == []
+        objectives = oe._draft_objectives("Limits and continuity", "content", "topic_1")
+        assert len(objectives) == 1
+        assert objectives[0]["provenance"] == "ai_generated"
+        assert objectives[0]["classification"]["needsReview"] is True
+        LearningObjective(**objectives[0])
 
 
 class TestCandidateValidation:
@@ -80,9 +84,10 @@ class TestCandidateValidation:
         objectives = oe._draft_objectives("t", "content", "topic_1")
         assert len(objectives) == 1  # only the valid one survives
 
-    def test_non_json_output_degrades(self, monkeypatch):
+    def test_non_json_output_uses_a_honest_fallback(self, monkeypatch):
         monkeypatch.setattr(oe, "call_llm", lambda *a, **k: "no json here at all")
-        assert oe._draft_objectives("t", "content", "topic_1") == []
+        objectives = oe._draft_objectives("Limits and continuity", "content", "topic_1")
+        assert "ai_generated" == objectives[0]["provenance"]
 
     def test_untrusted_content_never_shaped_into_a_candidate(self, monkeypatch):
         injected = [
@@ -90,8 +95,9 @@ class TestCandidateValidation:
             {"text": "Solve problems", "bloomLevel": "apply"},
         ]
         monkeypatch.setattr(oe, "call_llm", lambda *a, **k: json.dumps(injected))
-        # The string candidate is not a dict; the bare dict is missing fields.
-        assert oe._draft_objectives("t", "content", "topic_1") == []
+        # Invalid model output never becomes a validated objective.
+        objectives = oe._draft_objectives("Limits and continuity", "content", "topic_1")
+        assert all(item["text"] != "Solve problems" for item in objectives)
 
 
 class TestDeduplication:
@@ -115,6 +121,23 @@ class TestDeduplication:
         assert removed == 0
         assert len(kept) == 2
 
+    def test_same_title_in_different_lessons_gets_distinct_ids(self, monkeypatch):
+        subtopics = [
+            {"id": "sub_chapter_3", "title": "Convergence normale", "full_content": "a"},
+            {"id": "sub_chapter_4", "title": "Convergence normale", "full_content": "b"},
+        ]
+        monkeypatch.setattr(oe, "call_llm", lambda *a, **k: "")
+
+        stats = extract_objectives_for_document(subtopics)
+
+        ids = [
+            objective["id"]
+            for subtopic in subtopics
+            for objective in subtopic["learning_objectives"]
+        ]
+        assert stats["extracted"] == 2
+        assert len(ids) == len(set(ids)) == 2
+
     def test_normalized_text_lowercases_and_collapses_whitespace(self):
         assert normalize_objective_text("  Solve   THIS   thing.  ") == (
             "solve this thing."
@@ -128,7 +151,7 @@ class TestDocumentExtraction:
     ]
 
     def test_attaches_objectives_and_reports_stats(self, monkeypatch):
-        def fake(title, content, topic_id):
+        def fake(title, content, topic_id, **_kwargs):
             if "systems" in content:
                 return [
                     {**VALID_DRAFT, "topicId": topic_id},
@@ -154,8 +177,8 @@ class TestDocumentExtraction:
         assert stats["truncated"] is False
         assert all("learning_objectives" in s for s in subtopics)
 
-    def test_document_level_cap_truncates_and_reports(self, monkeypatch):
-        def fake(title, content, topic_id):
+    def test_lesson_cap_bounds_cost_and_avoids_fragment_objectives(self, monkeypatch):
+        def fake(title, content, topic_id, **_kwargs):
             prefix = "Systems" if "systems" in content else "Limits"
             return [
                 {
@@ -167,30 +190,29 @@ class TestDocumentExtraction:
             ]
 
         monkeypatch.setattr(oe, "_draft_objectives", fake)
-        # Two subtopics → 60 distinct drafts → capped at 40.
+        # Each lesson is capped before the document-level safety cap.
         subtopics = [dict(s) for s in self.SUB]
         stats = extract_objectives_for_document(subtopics)
-        assert stats["truncated"] is True
-        assert stats["extracted"] == OBJECTIVE_CAP_PER_DOCUMENT
-        assert any("truncated" in w for w in stats["warnings"])
-        # Surviving objectives re-scattered across subtopics total 40.
         total = sum(len(s["learning_objectives"]) for s in subtopics)
-        assert total == OBJECTIVE_CAP_PER_DOCUMENT
+        assert total == 6
+        assert all(len(s["learning_objectives"]) <= 3 for s in subtopics)
+        assert stats["extracted"] == 6
+        assert stats["truncated"] is False
 
-    def test_extraction_failure_degrades_gracefully(self, monkeypatch):
-        def exploding(title, content, topic_id):
+    def test_extraction_failure_keeps_reviewable_outline_objectives(self, monkeypatch):
+        def exploding(title, content, topic_id, **_kwargs):
             raise RuntimeError("llm provider down")
 
         monkeypatch.setattr(oe, "_draft_objectives", exploding)
         subtopics = [dict(s) for s in self.SUB]
         stats = extract_objectives_for_document(subtopics)
-        assert stats["extracted"] == 0
-        assert all(s["learning_objectives"] == [] for s in subtopics)
+        assert stats["extracted"] == 2
+        assert all(s["learning_objectives"] for s in subtopics)
 
     def test_empty_subtopic_is_skipped_with_warning(self, monkeypatch):
         called = []
 
-        def fake(title, content, topic_id):
+        def fake(title, content, topic_id, **_kwargs):
             called.append((title, content))
             return []
 
@@ -205,4 +227,4 @@ class TestDocumentExtraction:
         assert subtopics[0]["learning_objectives"] == []
 
     def test_cap_constant_is_reasonable_for_cost_bounds(self):
-        assert 0 < OBJECTIVE_CAP_PER_DOCUMENT <= 40
+        assert 0 < OBJECTIVE_CAP_PER_DOCUMENT <= 24

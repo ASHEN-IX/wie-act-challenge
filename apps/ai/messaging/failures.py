@@ -1,7 +1,7 @@
 """Failure classification for AI jobs (AI-COM-06).
 
 Python mirror of `classifyFailure` in
-`study-partner-api/shared/ai-messaging/topology.js` — the pattern lists must
+`ednova-api/shared/ai-messaging/topology.js` — the pattern lists must
 match so both sides route failures identically.
 """
 

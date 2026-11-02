@@ -1,7 +1,7 @@
 import { verifyRevisionArtifact } from './revisionSources';
 import { Course, CourseRevision, ActivityRecord } from '../models';
-import { activityDigest } from './activityIdentity';
 import { canPublishCourse, canReadCourse } from './resourceAccess';
+import { activityDigest } from './activityIdentity';
 
 interface TopicObjectiveRecord {
   id?: string;
@@ -121,6 +121,13 @@ export async function publishCourseRevision(
   if (draft.status !== 'draft') throw new PublicationConflictError();
   if (!draft.isInstructorReviewed) throw new PublicationReviewRequiredError();
   if (!draft.topics?.length) throw new PublicationValidationError('Reviewed objectives required');
+  if (draft.contentDocument && !draft.contentDocumentHash)
+    throw new PublicationValidationError('Canonical content checksum unavailable');
+  if (
+    draft.contentDocument &&
+    draft.contentDocumentHash !== activityDigest(draft.contentDocument)
+  )
+    throw new PublicationValidationError('Canonical content checksum mismatch');
   const artifact = await verifyRevisionArtifact(draft);
   const activities = await ActivityRecord.find({ courseId, revisionId: draft.revisionTag }).lean();
   const approvedActivities = activities.map((a) => ({
@@ -264,10 +271,15 @@ export async function getPublishedCourseContext(
         }
       }
 
+      const description =
+        typeof (t as TopicRecord & { description?: unknown }).description === 'string'
+          ? (t as TopicRecord & { description: string }).description.trim().slice(0, 2000)
+          : '';
       return {
         topicId,
         title: t.title || 'Untitled Topic',
-        objectives
+        objectives,
+        ...(description ? { description } : {})
       };
     }
   );

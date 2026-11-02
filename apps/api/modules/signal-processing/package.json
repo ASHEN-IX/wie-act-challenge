@@ -1,5 +1,5 @@
 {
-  "name": "@study-partner/signal-processing-service",
+  "name": "@ednova/signal-processing-service",
   "version": "1.0.0",
   "description": "Signal Processing - Eye tracking, focus detection, biometric analysis",
   "main": "index.ts",
@@ -8,7 +8,7 @@
     "lint": "eslint src/**/*.js"
   },
   "dependencies": {
-    "@study-partner/shared": "workspace:*",
+    "@ednova/shared": "workspace:*",
     "express": "^4.18.2",
     "dotenv": "^16.3.1",
     "joi": "^17.11.0",

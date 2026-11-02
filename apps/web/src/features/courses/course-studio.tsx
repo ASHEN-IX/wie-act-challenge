@@ -35,6 +35,7 @@ import {
   studioIngestStatus,
   controlStudioIngestion,
 } from "./studio-actions";
+import { cn } from "@/lib/utils";
 
 interface CourseStudioProps {
   courseId: string;
@@ -42,6 +43,8 @@ interface CourseStudioProps {
   initialDraft: CourseDraft;
   currentUserId: string;
 }
+
+const LESSONS_PER_PAGE = 8;
 
 export function CourseStudio({
   courseId,
@@ -69,7 +72,20 @@ export function CourseStudio({
     string,
     unknown
   > | null>(null);
-  const [ingestion, setIngestion] = useState("No upload requested.");
+  const [ingestion, setIngestion] = useState(
+    initialDraft.topics?.length
+      ? initialDraft.isInstructorReviewed
+        ? "Reviewed draft ready to prepare and publish."
+        : "Draft ready for review."
+      : "Choose a source to begin.",
+  );
+  const [step, setStep] = useState<1 | 2 | 3>(
+    initialDraft.topics?.length
+      ? initialDraft.isInstructorReviewed
+        ? 3
+        : 2
+      : 1,
+  );
   const [candidateReviewed, setCandidateReviewed] = useState(false);
   const [published, setPublished] = useState<string | null>(null);
   useEffect(() => {
@@ -77,6 +93,32 @@ export function CourseStudio({
       .then(setSourceState)
       .catch((e) => setErrorMsg(e.message));
   }, [courseId]);
+
+  // Uploading starts a server-owned job. While it runs, refresh the draft so
+  // the instructor sees the real outline without hunting for a status button.
+  useEffect(() => {
+    if (ingestionStatus?.status !== "processing") return;
+    const timer = window.setInterval(() => {
+      studioIngestStatus(courseId)
+        .then(async (status) => {
+          setIngestionStatus(status);
+          setIngestion(
+            [status.stage, status.detail].filter(Boolean).join(" · ") ||
+              "Reading the source",
+          );
+          if (status.status === "processing") return;
+          window.clearInterval(timer);
+          if (status.status === "completed") {
+            await refreshStudio();
+            setStep(2);
+          }
+        })
+        .catch(() => undefined);
+    }, 2500);
+    return () => window.clearInterval(timer);
+    // refreshStudio closes over the latest render; only restart on a new job.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [courseId, ingestionStatus?.status, ingestionStatus?.jobId]);
   async function refreshStudio() {
     const state = await loadStudio(courseId);
     setSourceState(state);
@@ -90,6 +132,9 @@ export function CourseStudio({
 
   const [topics, setTopics] = useState<DraftTopic[]>(initialDraft.topics || []);
   const [manualObjective, setManualObjective] = useState("");
+  const [selectedChapter, setSelectedChapter] = useState(0);
+  const [selectedLesson, setSelectedLesson] = useState(-1);
+  const [showAllLessons, setShowAllLessons] = useState(false);
   const [summary, setSummary] = useState(initialDraft.summary || "");
   const [isInstructorReviewed, setIsInstructorReviewed] = useState(
     initialDraft.isInstructorReviewed,
@@ -193,21 +238,34 @@ export function CourseStudio({
     });
   };
 
-  const handlePublishRevision = () => {
+  /** Review, save, prepare and publish the same revision in one command. */
+  const handlePrepareAndPublish = () => {
     setErrorMsg(null);
     setSuccessMsg(null);
     startTransition(async () => {
-      const form = new FormData();
-      form.set("courseId", courseId);
-      form.set("expectedRevisionTag", draft.revisionTag);
-
-      const res = await publishRevisionAction({}, form);
-      if (res.error) {
-        setErrorMsg(res.error);
-      } else {
-        setPublished(draft.revisionTag);
-        setSuccessMsg(
-          res.success || "Course revision published for student access.",
+      try {
+        const reviewForm = new FormData();
+        reviewForm.set("courseId", courseId);
+        reviewForm.set("expectedRevisionTag", draft.revisionTag);
+        reviewForm.set("topicsJson", JSON.stringify(topics));
+        reviewForm.set("summary", summary);
+        reviewForm.set("isInstructorReviewed", "true");
+        const saved = await updateDraftAction({}, reviewForm);
+        if (saved.error) throw new Error(saved.error);
+        const state = await refreshStudio();
+        const prepared = await prepareStudio(courseId, state.draft.revisionTag);
+        setSourceState(prepared);
+        const publishForm = new FormData();
+        publishForm.set("courseId", courseId);
+        publishForm.set("expectedRevisionTag", state.draft.revisionTag);
+        const publishedRevision = await publishRevisionAction({}, publishForm);
+        if (publishedRevision.error) throw new Error(publishedRevision.error);
+        setPublished(state.draft.revisionTag);
+        setStep(3);
+        setSuccessMsg("Revision reviewed, source verified, and published.");
+      } catch (error) {
+        setErrorMsg(
+          error instanceof Error ? error.message : "Review and publish failed",
         );
       }
     });
@@ -294,8 +352,8 @@ export function CourseStudio({
       {/* Header status bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border bg-card p-6 shadow-sm">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <h1 className="min-w-0 text-xl font-bold tracking-tight sm:text-2xl">
               Course Studio: {courseTitle}
             </h1>
             <Badge
@@ -319,9 +377,8 @@ export function CourseStudio({
               </Badge>
             )}
           </div>
-          <p className="mt-1 font-mono text-xs text-muted-foreground">
-            Revision: {draft.revisionTag} | Content Hash:{" "}
-            {draft.contentHash?.slice(0, 18)}...
+          <p className="mt-1 text-sm text-muted-foreground">
+            Upload a course, check the lessons the parser found, then publish.
           </p>
         </div>
 
@@ -334,24 +391,56 @@ export function CourseStudio({
             {isPending ? "Saving..." : "Save Draft"}
           </Button>
           <Button
-            onClick={handlePublishRevision}
-            disabled={
-              isPending ||
-              dirty ||
-              !isInstructorReviewed ||
-              !sourceState?.ready ||
-              !!published
-            }
-            title={
-              !isInstructorReviewed
-                ? "Mark draft as reviewed before publishing"
-                : "Publish revision to learners"
-            }
+            onClick={() => {
+              setIsInstructorReviewed(true);
+              handlePrepareAndPublish();
+            }}
+            disabled={isPending || !!published || !topics.length}
+            title="Review the current edit, verify the exact source and publish it"
           >
-            {isPending ? "Publishing..." : "Publish Revision"}
+            {isPending ? "Preparing…" : "Review & Publish"}
           </Button>
         </div>
       </div>
+
+      <ol
+        aria-label="Course review progress"
+        className="grid gap-3 sm:grid-cols-3"
+      >
+        {[
+          [1, "Upload", "Add the original PDF or text"],
+          [2, "Review", "Check chapters and lesson objectives"],
+          [3, "Publish", "Release the reviewed revision"],
+        ].map(([number, title, description]) => (
+          <li
+            key={number}
+            aria-current={step === number ? "step" : undefined}
+            className={cn(
+              "flex items-start gap-3 rounded-xl border p-4",
+              step === number
+                ? "border-primary/40 bg-primary/5"
+                : step > Number(number)
+                  ? "bg-muted/30"
+                  : "bg-card text-muted-foreground",
+            )}
+          >
+            <span
+              className={cn(
+                "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
+                step >= Number(number)
+                  ? "bg-primary text-primary-foreground"
+                  : "border",
+              )}
+            >
+              {number}
+            </span>
+            <span>
+              <span className="block text-sm font-semibold">{title}</span>
+              <span className="mt-0.5 block text-xs">{description}</span>
+            </span>
+          </li>
+        ))}
+      </ol>
 
       {dirty && (
         <p role="status">
@@ -401,13 +490,17 @@ export function CourseStudio({
           Open committed immutable revision
         </a>
       )}
-      <Card>
+      <details className="rounded-xl border bg-card">
+        <summary className="cursor-pointer px-6 py-4 text-sm font-semibold">
+          Advanced source tools
+        </summary>
+        <div className="border-t px-6 pb-6">
+      <Card className="border-0 shadow-none">
         <CardHeader>
-          <CardTitle>Source preparation</CardTitle>
+          <CardTitle>Upload a source</CardTitle>
           <CardDescription>
-            Upload original bytes, inspect worker progress, then explicitly
-            prepare the current reviewed revision. Saving curriculum changes
-            invalidates readiness.
+            The Studio reads the course and builds chapters and lessons. Large
+            documents may take a minute.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -419,9 +512,9 @@ export function CourseStudio({
               startTransition(async () => {
                 try {
                   await uploadStudioSource(courseId, form);
-                  setIngestion(
-                    "Upload acknowledged; worker extraction pending. Refresh progress.",
-                  );
+                  setIngestion("Reading the source…");
+                  setIngestionStatus({ status: "processing" });
+                  setStep(1);
                   setSourceState(null);
                   setActivityProposal(null);
                 } catch (e) {
@@ -430,202 +523,239 @@ export function CourseStudio({
               });
             }}
           >
-            <label>
+            <label className="block text-sm font-medium">
               Original source{" "}
-              <input name="files" type="file" accept=".pdf,.txt,.md" required />
+              <input
+                name="files"
+                type="file"
+                accept=".pdf,.txt,.md"
+                required
+                className="mt-2 block w-full rounded-lg border bg-background p-2 text-sm"
+              />
             </label>
-            <Button disabled={isPending}>Upload source</Button>
+            <Button disabled={isPending} className="mt-3">
+              {isPending ? "Uploading…" : "Upload source"}
+            </Button>
           </form>
-          <Button
-            variant="outline"
-            disabled={isPending}
-            onClick={() =>
-              startTransition(async () => {
-                try {
-                  const status = await studioIngestStatus(courseId);
-                  setIngestionStatus(status);
-                  setIngestion(JSON.stringify(status));
-                  await refreshStudio();
-                } catch (e) {
-                  setErrorMsg(
-                    e instanceof Error
-                      ? e.message
-                      : "Worker status unavailable",
-                  );
-                }
-              })
-            }
-          >
-            Refresh ingestion and draft
-          </Button>
-          <p role="status">{ingestion}</p>
-          {typeof ingestionStatus?.jobId === "string" && (
-            <div
-              className="flex flex-wrap gap-2"
-              aria-label="Ingestion recovery controls"
-            >
-              {(["reconcile", "retry", "cancel"] as const).map((action) => (
-                <Button
-                  key={action}
-                  variant="outline"
-                  disabled={isPending}
-                  onClick={() =>
-                    startTransition(async () => {
-                      try {
-                        await controlStudioIngestion(
-                          courseId,
-                          action,
-                          String(ingestionStatus.jobId),
-                        );
-                        const status = await studioIngestStatus(courseId);
-                        setIngestionStatus(status);
-                        setIngestion(
-                          String(status.status) +
-                            ": " +
-                            String(status.detail || ""),
-                        );
-                      } catch (e) {
-                        setErrorMsg(
-                          e instanceof Error
-                            ? e.message
-                            : "Recovery unavailable",
-                        );
-                      }
-                    })
+          <p role="status" className="text-sm text-muted-foreground">
+            {ingestion}
+          </p>
+          <details className="rounded-lg border p-4">
+            <summary className="cursor-pointer text-sm font-medium">
+              Advanced: verify source and recover an interrupted upload
+            </summary>
+            <Button
+              variant="outline"
+              className="mt-3 w-full sm:w-auto"
+              disabled={isPending}
+              onClick={() =>
+                startTransition(async () => {
+                  try {
+                    const status = await studioIngestStatus(courseId);
+                    setIngestionStatus(status);
+                    setIngestion(
+                      [status.stage, status.detail]
+                        .filter(Boolean)
+                        .join(" · ") || "No ingestion details",
+                    );
+                    if (status.status === "completed") await refreshStudio();
+                  } catch (e) {
+                    setErrorMsg(
+                      e instanceof Error ? e.message : "Status unavailable",
+                    );
                   }
-                >
-                  {action === "reconcile"
-                    ? "Reconcile same operation"
-                    : action === "retry"
-                      ? "Retry failed ingestion"
-                      : "Cancel ingestion"}
-                </Button>
-              ))}
-            </div>
-          )}
+                })
+              }
+            >
+              Check processing status
+            </Button>
+            {typeof ingestionStatus?.jobId === "string" && (
+              <div
+                className="flex flex-wrap gap-2"
+                aria-label="Ingestion recovery controls"
+              >
+                {(["reconcile", "retry", "cancel"] as const).map((action) => (
+                  <Button
+                    key={action}
+                    variant="outline"
+                    disabled={isPending}
+                    onClick={() =>
+                      startTransition(async () => {
+                        try {
+                          await controlStudioIngestion(
+                            courseId,
+                            action,
+                            String(ingestionStatus.jobId),
+                          );
+                          const status = await studioIngestStatus(courseId);
+                          setIngestionStatus(status);
+                          setIngestion(
+                            String(status.status) +
+                              ": " +
+                              String(status.detail || ""),
+                          );
+                        } catch (e) {
+                          setErrorMsg(
+                            e instanceof Error
+                              ? e.message
+                              : "Recovery unavailable",
+                          );
+                        }
+                      })
+                    }
+                  >
+                    {action === "reconcile"
+                      ? "Reconcile same operation"
+                      : action === "retry"
+                        ? "Retry failed ingestion"
+                        : "Cancel ingestion"}
+                  </Button>
+                ))}
+              </div>
+            )}
 
-          <Button
-            disabled={isPending}
-            onClick={() =>
-              startTransition(async () => {
-                setErrorMsg(null);
-                try {
-                  const state = await prepareStudio(
-                    courseId,
-                    draft.revisionTag,
-                  );
-                  setSourceState(state);
-                  setSuccessMsg("Exact source revision prepared and verified.");
-                } catch (e) {
-                  setSourceState(null);
-                  setErrorMsg(
-                    e instanceof Error
-                      ? e.message
-                      : "Source preparation unavailable",
-                  );
-                }
-              })
-            }
-          >
-            Prepare exact source revision
-          </Button>
-          <p>{sourceState?.readiness || "Source readiness unavailable"}</p>
-          <label className="block">
-            Source section
-            <select
-              aria-label="Source section"
-              className="block w-full border p-2"
-              value={sourceSectionId}
-              onChange={(e) => {
-                setSourceSectionId(e.target.value);
-                setSourceChunkId("");
-                setActivityProposal(null);
-                setCandidateReviewed(false);
-              }}
+            <Button
+              className="mt-3"
+              disabled={isPending}
+              onClick={() =>
+                startTransition(async () => {
+                  setErrorMsg(null);
+                  try {
+                    const state = await prepareStudio(
+                      courseId,
+                      draft.revisionTag,
+                    );
+                    setSourceState(state);
+                    setSuccessMsg(
+                      "Exact source revision prepared and verified.",
+                    );
+                  } catch (e) {
+                    setSourceState(null);
+                    setErrorMsg(
+                      e instanceof Error
+                        ? e.message
+                        : "Source preparation unavailable",
+                    );
+                  }
+                })
+              }
             >
-              <option value="">All verified sections</option>
-              {[
-                ...new Set(
-                  sourceState?.sources.map((p) => p.sectionId).filter(Boolean),
-                ),
-              ].map((id) => (
-                <option key={id} value={id}>
-                  {id}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            Verified source passage{" "}
-            <select
-              aria-label="Verified source passage"
-              className="block w-full border p-2"
-              value={sourceChunkId}
-              onChange={(e) => {
-                setSourceChunkId(e.target.value);
-                setActivityProposal(null);
-              }}
-            >
-              <option value="">Select a verified passage</option>
-              {sourceState?.sources
-                .filter(
-                  (p) => !sourceSectionId || p.sectionId === sourceSectionId,
-                )
-                .map((p) => (
-                  <option key={p.chunkId} value={p.chunkId}>
-                    {p.pageNumber ? "Page " + p.pageNumber : "Text"}:{" "}
-                    {p.text.slice(0, 120)}
+              Prepare exact source revision
+            </Button>
+            <p>{sourceState?.readiness || "Source readiness unavailable"}</p>
+            <label className="block">
+              Source section
+              <select
+                aria-label="Source section"
+                className="block w-full border p-2"
+                value={sourceSectionId}
+                onChange={(e) => {
+                  setSourceSectionId(e.target.value);
+                  setSourceChunkId("");
+                  setActivityProposal(null);
+                  setCandidateReviewed(false);
+                }}
+              >
+                <option value="">All verified sections</option>
+                {[
+                  ...new Set(
+                    sourceState?.sources
+                      .map((p) => p.sectionId)
+                      .filter(Boolean),
+                  ),
+                ].map((id) => (
+                  <option key={id} value={id}>
+                    {id}
                   </option>
                 ))}
-            </select>
-          </label>
-          {sourceState?.sources
-            .filter((p) => p.chunkId === sourceChunkId)
-            .map((p) => (
-              <div key={p.chunkId}>
-                {p.extractionMethod === "ocr" && (
-                  <p role="status">
-                    Scanned page: English OCR confidence{" "}
-                    {p.ocrConfidence ?? "unknown"}%.
-                    {p.extractionWarning === "ocr_low_confidence"
-                      ? " Low confidence."
-                      : ""}{" "}
-                    Check the original and correct the draft before publication.
-                  </p>
-                )}
-                <blockquote className="border-l-2 pl-4 whitespace-pre-wrap">
-                  {p.text}
-                </blockquote>
-              </div>
-            ))}
-          <p>
-            Registered in this draft:{" "}
-            {sourceState?.activities.map((a) => a.title).join(", ") || "None"}
-          </p>
+              </select>
+            </label>
+            <label className="block">
+              Verified source passage{" "}
+              <select
+                aria-label="Verified source passage"
+                className="block w-full border p-2"
+                value={sourceChunkId}
+                onChange={(e) => {
+                  setSourceChunkId(e.target.value);
+                  setActivityProposal(null);
+                }}
+              >
+                <option value="">Select a verified passage</option>
+                {sourceState?.sources
+                  .filter(
+                    (p) => !sourceSectionId || p.sectionId === sourceSectionId,
+                  )
+                  .map((p) => (
+                    <option key={p.chunkId} value={p.chunkId}>
+                      {p.pageNumber ? "Page " + p.pageNumber : "Text"}:{" "}
+                      {p.text.slice(0, 120)}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            {sourceState?.sources
+              .filter((p) => p.chunkId === sourceChunkId)
+              .map((p) => (
+                <div key={p.chunkId}>
+                  {p.extractionMethod === "ocr" && (
+                    <p role="status">
+                      Scanned page: English OCR confidence{" "}
+                      {p.ocrConfidence ?? "unknown"}%.
+                      {p.extractionWarning === "ocr_low_confidence"
+                        ? " Low confidence."
+                        : ""}{" "}
+                      Check the original and correct the draft before
+                      publication.
+                    </p>
+                  )}
+                  <blockquote className="border-l-2 pl-4 whitespace-pre-wrap">
+                    {p.text}
+                  </blockquote>
+                </div>
+              ))}
+            <p>
+              Registered in this draft:{" "}
+              {sourceState?.activities.map((a) => a.title).join(", ") || "None"}
+            </p>
+          </details>
         </CardContent>
       </Card>
-      {/* Grid: Editor & Preview */}
-      <div className="grid gap-8 lg:grid-cols-12">
-        {/* Left Column: Draft Outline and Hierarchy Editor */}
-        <div className="flex flex-col gap-6 lg:col-span-7">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">
-                Draft Curriculum Hierarchy
-              </CardTitle>
-              <CardDescription>
-                Correct AI-extracted topics, subtopics, and learning objectives.
-                Changes remain local until saved.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-6">
+        </div>
+      </details>
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <Card>
+          <CardHeader className="border-b">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <label
-                  htmlFor="draft-summary"
-                  className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-                >
-                  Draft Summary
-                </label>
+                <CardTitle className="text-lg">
+                  Review the course outline
+                </CardTitle>
+                <CardDescription>
+                  Check the chapter structure and the lessons that will become
+                  the student journey.
+                </CardDescription>
+              </div>
+              <div className="flex gap-2 text-xs text-muted-foreground">
+                <span className="rounded-full bg-muted px-2.5 py-1">
+                  {topics.length} chapters
+                </span>
+                <span className="rounded-full bg-muted px-2.5 py-1">
+                  {topics.reduce(
+                    (count, topic) => count + (topic.subtopics?.length || 0),
+                    0,
+                  )}{" "}
+                  lessons
+                </span>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-5 pt-5">
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <label className="grid gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">
+                  Course summary
+                </span>
                 <Textarea
                   id="draft-summary"
                   value={summary}
@@ -635,40 +765,43 @@ export function CourseStudio({
                     setIsInstructorReviewed(false);
                     setActivityProposal(null);
                   }}
-                  className="mt-1 text-sm"
                   rows={2}
                 />
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="reviewed-checkbox"
-                  checked={isInstructorReviewed}
-                  onChange={(e) => {
-                    setIsInstructorReviewed(e.target.checked);
-                    setDirty(true);
-                  }}
-                  className="h-4 w-4 rounded border-gray-300"
-                />
-                <label
-                  htmlFor="reviewed-checkbox"
-                  className="text-sm font-medium leading-none"
-                >
-                  Mark this curriculum revision as reviewed by course instructor
+              </label>
+              <div className="flex flex-col justify-end gap-2 rounded-lg border bg-muted/20 p-3">
+                <label className="flex items-start gap-2 text-xs leading-5">
+                  <input
+                    type="checkbox"
+                    id="reviewed-checkbox"
+                    checked={isInstructorReviewed}
+                    onChange={(e) => {
+                      setIsInstructorReviewed(e.target.checked);
+                      setDirty(true);
+                      if (e.target.checked) setStep(3);
+                    }}
+                    className="mt-0.5 size-4 rounded border-gray-300"
+                  />
+                  <span>Mark this curriculum revision as reviewed</span>
                 </label>
               </div>
+            </div>
 
-              <label>
-                Manual learning objective
+            <div className="flex flex-wrap items-end gap-2 rounded-lg border bg-muted/20 p-3">
+              <label className="min-w-0 flex-1">
+                <span className="text-xs font-medium text-muted-foreground">
+                  Add a learning objective
+                </span>
                 <Input
                   aria-label="Manual learning objective"
                   value={manualObjective}
                   onChange={(e) => setManualObjective(e.target.value)}
+                  placeholder="What should students be able to do?"
+                  className="mt-1 bg-background"
                 />
               </label>
               <Button
                 variant="outline"
+                className="w-full sm:w-auto"
                 disabled={!manualObjective.trim()}
                 onClick={() => {
                   const suffix = crypto
@@ -700,38 +833,64 @@ export function CourseStudio({
                       ],
                     },
                   ]);
+                  setSelectedChapter(topics.length);
+                  setSelectedLesson(0);
+                  setShowAllLessons(false);
                   setManualObjective("");
                   setActivityProposal(null);
                 }}
               >
                 Add learning objective
               </Button>
-              <div className="flex flex-col gap-6 divide-y">
-                {topics.map((topic, tIdx) => (
-                  <div key={topic.id || tIdx} className="pt-4 first:pt-0">
-                    <h3 className="font-semibold text-foreground">
-                      {tIdx + 1}. {topic.title}
-                    </h3>
-                    <label className="block text-sm">
-                      Topic heading {tIdx + 1}
-                      <Input
-                        aria-label={`Topic heading ${tIdx + 1}`}
-                        value={topic.title}
-                        onChange={(e) => {
-                          setTopics(
-                            topics.map((t, index) =>
-                              index === tIdx
-                                ? { ...t, title: e.target.value }
-                                : t,
-                            ),
-                          );
-                          setDirty(true);
-                          setIsInstructorReviewed(false);
-                          setActivityProposal(null);
-                        }}
-                      />
-                    </label>
-                    <div className="flex gap-2 mt-2">
+            </div>
+
+            <nav
+              aria-label="Chapters"
+              className="grid grid-cols-2 gap-2 sm:flex sm:snap-x sm:overflow-x-auto sm:pb-1"
+            >
+              {topics.map((topic, index) => (
+                <button
+                  key={topic.id || index}
+                  type="button"
+                  aria-current={selectedChapter === index ? "true" : undefined}
+                  onClick={() => {
+                    setSelectedChapter(index);
+                    setSelectedLesson(0);
+                    setShowAllLessons(false);
+                  }}
+                  className={cn(
+                    "min-w-0 snap-start rounded-lg border px-3 py-2 text-left transition-colors sm:min-w-44",
+                    selectedChapter === index
+                      ? "border-primary/40 bg-primary/5"
+                      : "bg-background hover:bg-muted",
+                  )}
+                >
+                  <span className="block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Chapter {index + 1}
+                  </span>
+                  <span className="line-clamp-2 text-sm font-medium">
+                    {topic.title.replace(/^Chapter \d+:\s*/i, "")}
+                  </span>
+                  <span className="mt-1 block text-xs text-muted-foreground">
+                    {topic.subtopics?.length || 0} lessons
+                  </span>
+                </button>
+              ))}
+            </nav>
+
+            {topics.map((topic, tIdx) =>
+              tIdx !== selectedChapter ? null : (
+                <section key={topic.id || tIdx} className="flex flex-col gap-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Chapter {tIdx + 1}
+                      </p>
+                      <h3 className="mt-1 text-lg font-semibold">
+                        {topic.title.replace(/^Chapter \d+:\s*/i, "")}
+                      </h3>
+                    </div>
+                    <div className="flex gap-2">
                       <Button
                         size="sm"
                         variant="outline"
@@ -744,6 +903,8 @@ export function CourseStudio({
                             reordered[tIdx - 1],
                           ];
                           setTopics(reordered);
+                          setSelectedChapter(tIdx - 1);
+                          setSelectedLesson(0);
                           setDirty(true);
                           setIsInstructorReviewed(false);
                           setActivityProposal(null);
@@ -763,6 +924,8 @@ export function CourseStudio({
                             reordered[tIdx + 1],
                           ];
                           setTopics(reordered);
+                          setSelectedChapter(tIdx + 1);
+                          setSelectedLesson(0);
                           setDirty(true);
                           setIsInstructorReviewed(false);
                           setActivityProposal(null);
@@ -771,122 +934,211 @@ export function CourseStudio({
                         Move down
                       </Button>
                     </div>
-                    <div className="mt-3 flex flex-col gap-4 pl-4">
-                      {topic.subtopics?.map((sub, sIdx) => (
-                        <div
-                          key={sub.id || sIdx}
-                          className="rounded-lg border bg-muted/30 p-4"
-                        >
-                          <div className="flex items-center justify-between">
-                            <h4 className="text-sm font-medium text-foreground">
-                              {sub.title}
-                            </h4>
-                            <Badge variant="outline" className="text-xs">
-                              {sub.provenance || "extracted"}
-                            </Badge>
-                          </div>
-                          <label className="block text-sm mt-2">
-                            Section heading {tIdx + 1}.{sIdx + 1}
-                            <Input
-                              aria-label={`Section heading ${tIdx + 1}.${sIdx + 1}`}
-                              value={sub.title}
-                              onChange={(e) => {
-                                setTopics(
-                                  topics.map((t, index) =>
-                                    index === tIdx
-                                      ? {
-                                          ...t,
-                                          subtopics: t.subtopics?.map(
-                                            (s, idx) =>
-                                              idx === sIdx
-                                                ? {
-                                                    ...s,
-                                                    title: e.target.value,
-                                                    provenance: "manual",
-                                                  }
-                                                : s,
-                                          ),
-                                        }
-                                      : t,
-                                  ),
-                                );
-                                setDirty(true);
-                                setIsInstructorReviewed(false);
-                                setActivityProposal(null);
-                              }}
-                            />
-                          </label>
-
-                          {/* Objectives list */}
-                          <div className="mt-3 flex flex-col gap-3">
-                            <span className="text-xs font-semibold uppercase text-muted-foreground">
-                              Learning Objectives
-                            </span>
-                            {sub.learning_objectives?.map((obj, oIdx) => (
-                              <div
-                                key={obj.id || oIdx}
-                                className="flex flex-col gap-2 rounded border bg-background p-3"
-                              >
-                                <div className="flex items-center justify-between">
-                                  <Badge
-                                    variant="secondary"
-                                    className="font-mono text-xs uppercase"
-                                  >
-                                    Bloom: {obj.bloomLevel}
-                                  </Badge>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleGenerateProposal(obj)}
-                                    disabled={
-                                      isPending ||
-                                      dirty ||
-                                      !sourceState?.ready ||
-                                      !sourceChunkId
-                                    }
-                                  >
-                                    Generate Proposal
-                                  </Button>
-                                </div>
-                                <Input
-                                  aria-label={`Learning objective ${tIdx + 1}.${sIdx + 1}.${oIdx + 1}`}
-                                  value={obj.text || obj.statement || ""}
-                                  onChange={(e) =>
-                                    handleObjectiveTextChange(
-                                      tIdx,
-                                      sIdx,
-                                      oIdx,
-                                      e.target.value,
-                                    )
-                                  }
-                                  className="text-xs font-medium"
-                                />
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                  <label className="grid gap-1.5">
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Topic heading {tIdx + 1}
+                    </span>
+                    <Input
+                      aria-label={`Topic heading ${tIdx + 1}`}
+                      value={topic.title}
+                      onChange={(e) => {
+                        setTopics(
+                          topics.map((candidate, index) =>
+                            index === tIdx
+                              ? { ...candidate, title: e.target.value }
+                              : candidate,
+                          ),
+                        );
+                        setDirty(true);
+                        setIsInstructorReviewed(false);
+                        setActivityProposal(null);
+                      }}
+                    />
+                  </label>
 
-        {/* Right Column: AI Activity Proposal Generation & Live Preview */}
-        <div className="flex flex-col gap-6 lg:col-span-5">
-          <Card>
+                  <div className="divide-y rounded-lg border">
+                    {(showAllLessons
+                      ? topic.subtopics || []
+                      : (topic.subtopics || []).slice(0, LESSONS_PER_PAGE)
+                    ).map((sub, sIdx) => {
+                      const isOpen = selectedLesson === sIdx;
+                      return (
+                        <div key={sub.id || sIdx}>
+                          <button
+                            type="button"
+                            aria-expanded={isOpen}
+                            onClick={() =>
+                              setSelectedLesson(isOpen ? -1 : sIdx)
+                            }
+                            className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-3 py-3 text-left hover:bg-muted/40"
+                          >
+                            <span className="flex size-7 items-center justify-center rounded-full bg-muted text-xs font-semibold">
+                              {sIdx + 1}
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm font-medium">
+                                {sub.title}
+                              </span>
+                              <span className="block text-xs text-muted-foreground">
+                                {sub.learning_objectives?.length || 0}{" "}
+                                {sub.learning_objectives?.length === 1
+                                  ? "objective"
+                                  : "objectives"}
+                              </span>
+                            </span>
+                            <span className="text-xs font-medium text-muted-foreground">
+                              {isOpen ? "Close" : "Review"}
+                            </span>
+                          </button>
+                          {isOpen && (
+                            <div className="space-y-4 border-t bg-muted/20 p-4">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <Badge variant="outline" className="text-xs">
+                                  {sub.provenance || "extracted"}
+                                </Badge>
+                                <p className="text-xs text-muted-foreground">
+                                  Lesson {sIdx + 1} of{" "}
+                                  {topic.subtopics?.length || 0}
+                                </p>
+                              </div>
+                              <label className="grid gap-1.5">
+                                <span className="text-xs font-medium text-muted-foreground">
+                                  Section heading {tIdx + 1}.{sIdx + 1}
+                                </span>
+                                <Input
+                                  aria-label={`Section heading ${tIdx + 1}.${sIdx + 1}`}
+                                  value={sub.title}
+                                  onChange={(e) => {
+                                    setTopics(
+                                      topics.map((candidate, index) =>
+                                        index === tIdx
+                                          ? {
+                                              ...candidate,
+                                              subtopics:
+                                                candidate.subtopics?.map(
+                                                  (lesson, lessonIndex) =>
+                                                    lessonIndex === sIdx
+                                                      ? {
+                                                          ...lesson,
+                                                          title: e.target.value,
+                                                          provenance: "manual",
+                                                        }
+                                                      : lesson,
+                                                ),
+                                            }
+                                          : candidate,
+                                      ),
+                                    );
+                                    setDirty(true);
+                                    setIsInstructorReviewed(false);
+                                    setActivityProposal(null);
+                                  }}
+                                />
+                              </label>
+
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-semibold uppercase text-muted-foreground">
+                                    Learning objectives
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    Review before publishing
+                                  </span>
+                                </div>
+                                {sub.learning_objectives?.map((obj, oIdx) => (
+                                  <div
+                                    key={obj.id || oIdx}
+                                    className="rounded-lg border bg-background p-3"
+                                  >
+                                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                                      <Badge
+                                        variant="secondary"
+                                        className="font-mono text-xs uppercase"
+                                      >
+                                        Bloom: {obj.bloomLevel}
+                                      </Badge>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() =>
+                                          handleGenerateProposal(obj)
+                                        }
+                                        disabled={
+                                          isPending ||
+                                          dirty ||
+                                          !sourceState?.ready ||
+                                          !sourceChunkId
+                                        }
+                                      >
+                                        Generate Proposal
+                                      </Button>
+                                    </div>
+                                    <Input
+                                      aria-label={`Learning objective ${tIdx + 1}.${sIdx + 1}.${oIdx + 1}`}
+                                      value={obj.text || obj.statement || ""}
+                                      onChange={(e) =>
+                                        handleObjectiveTextChange(
+                                          tIdx,
+                                          sIdx,
+                                          oIdx,
+                                          e.target.value,
+                                        )
+                                      }
+                                      className="text-sm"
+                                    />
+                                  </div>
+                                ))}
+                                {!sub.learning_objectives?.length && (
+                                  <p className="text-sm text-muted-foreground">
+                                    No learning objective was found. Add one
+                                    above to make this lesson ready to review.
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {(topic.subtopics?.length || 0) > LESSONS_PER_PAGE && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="self-start"
+                      onClick={() => setShowAllLessons((value) => !value)}
+                    >
+                      {showAllLessons
+                        ? `Show first ${LESSONS_PER_PAGE} lessons`
+                        : `Show all ${topic.subtopics?.length} lessons`}
+                    </Button>
+                  )}
+                </section>
+              ),
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Optional practice remains a side panel, not a second full workflow. */}
+        <details className="rounded-xl border bg-card">
+          <summary className="cursor-pointer px-5 py-4 text-sm font-semibold">
+            Build student practice (optional)
+          </summary>
+          <div className="border-t px-5 pb-5">
+          <Card className="border-0 shadow-none">
             <CardHeader>
-              <CardTitle className="text-lg">
-                Activity Proposal Studio
-              </CardTitle>
+              <CardTitle className="text-lg">Add student practice</CardTitle>
               <CardDescription>
-                Select an objective to generate source-backed student activities.
-                AI cannot publish or change your draft on its own.
+                Optional: choose an objective to draft a source-backed practice
+                activity. Review it before adding it to the course.
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
+              <p className="text-sm text-muted-foreground">
+                Activity Proposal Studio · Source review remains separate from
+                the draft.
+              </p>
               {isPending && (
                 <Button
                   variant="outline"
@@ -899,80 +1151,85 @@ export function CourseStudio({
                   Discard pending candidate
                 </Button>
               )}
-              <fieldset
-                className="grid gap-3"
-                onChange={() => {
-                  setActivityProposal(null);
-                  setCandidateReviewed(false);
-                }}
-              >
-                <legend>Offline quotation settings</legend>
-                <label>
-                  Prompt language
-                  <select
-                    aria-label="Prompt language"
-                    value={generationLanguage}
-                    onChange={(e) =>
-                      setGenerationLanguage(
-                        e.target.value as typeof generationLanguage,
-                      )
-                    }
-                    className="block w-full border p-2"
-                  >
-                    <option value="en">English</option>
-                    <option value="fr">Français</option>
-                    <option value="ar">العربية</option>
-                    <option value="ary">تونسي</option>
-                  </select>
-                </label>
-                <label>
-                  Quotation difficulty
-                  <select
-                    aria-label="Quotation difficulty"
-                    value={generationDifficulty}
-                    onChange={(e) =>
-                      setGenerationDifficulty(
-                        e.target.value as typeof generationDifficulty,
-                      )
-                    }
-                    className="block w-full border p-2"
-                  >
-                    <option value="beginner">
-                      Beginner: 2 choices / 1 blank
-                    </option>
-                    <option value="standard">
-                      Standard: 4 choices / 2 blanks
-                    </option>
-                    <option value="advanced">
-                      Advanced: 6 choices / 3 blanks
-                    </option>
-                  </select>
-                </label>
-                <label>
-                  Hint depth
-                  <select
-                    aria-label="Hint depth"
-                    value={hintDepth}
-                    onChange={(e) =>
-                      setHintDepth(e.target.value as typeof hintDepth)
-                    }
-                    className="block w-full border p-2"
-                  >
-                    <option value="none">No cue</option>
-                    <option value="cue">First letter</option>
-                    <option value="context">
-                      First letter and word length
-                    </option>
-                  </select>
-                </label>
-                <p className="text-sm">
-                  Source quotations remain in their original language. Prompt
-                  translations need human review. Difficulty changes quotation
-                  complexity, not an academic level estimate.
-                </p>
-              </fieldset>
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-medium">Activity Type:</span>
+              <details className="rounded-lg border p-3">
+                <summary className="cursor-pointer text-xs font-medium">
+                  Settings
+                </summary>
+                <fieldset
+                  className="mt-3 grid gap-3"
+                  onChange={() => {
+                    setActivityProposal(null);
+                    setCandidateReviewed(false);
+                  }}
+                >
+                  <legend>Offline quotation settings</legend>
+                  <label>
+                    Prompt language
+                    <select
+                      aria-label="Prompt language"
+                      value={generationLanguage}
+                      onChange={(e) =>
+                        setGenerationLanguage(
+                          e.target.value as typeof generationLanguage,
+                        )
+                      }
+                      className="block w-full border p-2"
+                    >
+                      <option value="en">English</option>
+                      <option value="fr">Français</option>
+                      <option value="ar">العربية</option>
+                      <option value="ary">تونسي</option>
+                    </select>
+                  </label>
+                  <label>
+                    Quotation difficulty
+                    <select
+                      aria-label="Quotation difficulty"
+                      value={generationDifficulty}
+                      onChange={(e) =>
+                        setGenerationDifficulty(
+                          e.target.value as typeof generationDifficulty,
+                        )
+                      }
+                      className="block w-full border p-2"
+                    >
+                      <option value="beginner">
+                        Beginner: 2 choices / 1 blank
+                      </option>
+                      <option value="standard">
+                        Standard: 4 choices / 2 blanks
+                      </option>
+                      <option value="advanced">
+                        Advanced: 6 choices / 3 blanks
+                      </option>
+                    </select>
+                  </label>
+                  <label>
+                    Hint depth
+                    <select
+                      aria-label="Hint depth"
+                      value={hintDepth}
+                      onChange={(e) =>
+                        setHintDepth(e.target.value as typeof hintDepth)
+                      }
+                      className="block w-full border p-2"
+                    >
+                      <option value="none">No cue</option>
+                      <option value="cue">First letter</option>
+                      <option value="context">
+                        First letter and word length
+                      </option>
+                    </select>
+                  </label>
+                  <p className="text-sm">
+                    Source quotations remain in their original language. Prompt
+                    translations need human review. Difficulty changes quotation
+                    complexity, not an academic level estimate.
+                  </p>
+                </fieldset>
+              </details>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-medium">Activity type</span>
                 <Button
                   size="sm"
                   variant={
@@ -1144,7 +1401,8 @@ export function CourseStudio({
               )}
             </CardContent>
           </Card>
-        </div>
+          </div>
+        </details>
       </div>
     </div>
   );

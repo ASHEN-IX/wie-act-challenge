@@ -7,7 +7,7 @@ export const logger: Logger = winston.createLogger({
     winston.format.errors({ stack: true }),
     winston.format.json()
   ),
-  defaultMeta: { service: process.env.SERVICE_NAME || 'study-partner' },
+  defaultMeta: { service: process.env.SERVICE_NAME || 'ednova' },
   transports: [
     new winston.transports.Console({
       format: winston.format.combine(winston.format.colorize(), winston.format.simple())

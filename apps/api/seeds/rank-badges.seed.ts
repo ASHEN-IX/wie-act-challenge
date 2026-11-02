@@ -47,14 +47,14 @@ function buildBadgeDoc(rank: any) {
 
 function buildMongoCandidates(): string[] {
   const primary =
-    process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/study_partner';
+    process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/ednova';
 
   const candidates = [primary];
   if (primary.includes('host.docker.internal')) {
     candidates.push(primary.replace(/host\.docker\.internal/g, 'localhost'));
   }
 
-  const localhostDefault = 'mongodb://localhost:27017/study_partner';
+  const localhostDefault = 'mongodb://localhost:27017/ednova';
   if (!candidates.includes(localhostDefault)) {
     candidates.push(localhostDefault);
   }

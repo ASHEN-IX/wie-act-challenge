@@ -4,7 +4,7 @@
  */
 
 process.env.JWT_SECRET = 'test-secret-key';
-process.env.MONGODB_URI = 'mongodb://localhost:27017/test_study_partner';
+process.env.MONGODB_URI = 'mongodb://localhost:27017/test_ednova';
 process.env.RABBITMQ_URL = 'amqp://localhost:5672/%2F';
 process.env.NODE_ENV = 'test';
 const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => {
@@ -22,7 +22,7 @@ jest.mock('../models/AiJob', () => ({
   createPending: jest.fn(),
   findOne: jest.fn()
 }));
-jest.mock('@study-partner/shared/ai-messaging', () => ({
+jest.mock('@ednova/shared/ai-messaging', () => ({
   publishAiJob: jest.fn(),
   AI_JOB_TYPES: [
     'study.plan.generate',
@@ -38,7 +38,7 @@ jest.mock('../services/objectiveContext', () => ({
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const AiJob = require('../models/AiJob');
-import { publishAiJob } from '@study-partner/shared/ai-messaging';
+import { publishAiJob } from '@ednova/shared/ai-messaging';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { resolveObjectiveContext } = require('../services/objectiveContext');
 
@@ -47,7 +47,7 @@ const app = require('../app');
 
 function authHeader(userId = 'user-1', role = 'user') {
   const token = jwt.sign({ userId, role }, process.env.JWT_SECRET);
-  return { Cookie: `mindflow.test_session=${token}` };
+  return { Cookie: `ednova.test_session=${token}` };
 }
 
 const VALID_STEP = {

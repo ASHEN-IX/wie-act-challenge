@@ -4,15 +4,15 @@ import type { ITask } from '../models';
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response } from 'express';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createContracts } = require('@study-partner/shared/domainContracts');
+const { createContracts } = require('@ednova/shared/domainContracts');
 import Joi from 'joi';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const moduleClient = require('@study-partner/shared/moduleClient');
+const moduleClient = require('@ednova/shared/moduleClient');
 import { Task } from '../models';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { asyncHandler } = require('@study-partner/shared/middleware');
+const { asyncHandler } = require('@ednova/shared/middleware');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { buildInternalHeaders } = require('@study-partner/shared/auth');
+const { buildInternalHeaders } = require('@ednova/shared/auth');
 
 const router = createContracts();
 

@@ -9,6 +9,7 @@ import { getInstitutionContexts } from "@/features/institutions/queries";
 import { ActionForm } from "@/components/shared/action-form";
 import { TextField } from "@/components/shared/form-field";
 import { acceptCourseInvitationAction } from "@/features/courses/actions";
+import { isCourseReady } from "@/features/courses/lifecycle";
 
 export const metadata = { title: "Courses" };
 
@@ -31,7 +32,10 @@ export default async function Courses({
   const visible = (courses.data?.courses || []).filter(
     (c) =>
       (!query.q || c.title.toLowerCase().includes(query.q.toLowerCase())) &&
-      (!query.status || c.status === query.status),
+      (!query.status ||
+        (query.status === "ready"
+          ? isCourseReady(c)
+          : c.status === query.status)),
   );
 
   const institutions = instContexts.data?.institutions || [];
@@ -131,8 +135,8 @@ export default async function Courses({
         <Link
           href={
             query.institution_id
-              ? `/courses?institution_id=${query.institution_id}&status=completed`
-              : "/courses?status=completed"
+              ? `/courses?institution_id=${query.institution_id}&status=ready`
+              : "/courses?status=ready"
           }
           className="text-muted-foreground"
         >

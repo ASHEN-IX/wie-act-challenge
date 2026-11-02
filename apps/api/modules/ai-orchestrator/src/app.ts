@@ -1,6 +1,6 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
-import { authenticate } from '@study-partner/shared/auth';
+import { authenticate } from '@ednova/shared/auth';
 import {
   corsMiddleware,
   securityMiddleware,
@@ -8,7 +8,7 @@ import {
   errorHandler,
   rateLimiter,
   requireEnv
-} from '@study-partner/shared';
+} from '@ednova/shared';
 import aiRoutes from './routes/ai';
 import jobsRoutes from './routes/jobs';
 import evalRoutes from './routes/eval';

@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://host.docker.internal:27017/study_partner';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://host.docker.internal:27017/ednova';
 const EMAIL = process.argv[2] || 'kammounaziz12@gmail.com';
 const SEED_BATCH = `seed-${Date.now()}`;
 

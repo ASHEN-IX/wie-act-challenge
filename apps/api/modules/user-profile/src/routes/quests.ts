@@ -1,13 +1,13 @@
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response } from 'express';
-import { createContracts } from '@study-partner/shared/domainContracts';
+import { createContracts } from '@ednova/shared/domainContracts';
 import Quest, { IQuest } from '../models/Quest';
 
 type QuestTemplate = Pick<
   IQuest,
   'title' | 'description' | 'icon' | 'action' | 'targetCount' | 'xpReward'
 >;
-import { requireInternal } from '@study-partner/shared/auth';
+import { requireInternal } from '@ednova/shared/auth';
 
 const router = createContracts();
 

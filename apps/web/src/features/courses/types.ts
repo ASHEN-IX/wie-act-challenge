@@ -20,6 +20,7 @@ export interface Course {
   title: string;
   description?: string;
   status: string;
+  activeRevisionId?: string;
   subjectId: string;
   scope?: "personal" | "institutional";
   institutionId?: string;

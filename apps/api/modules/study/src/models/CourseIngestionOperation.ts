@@ -1,6 +1,6 @@
 import { Schema, model, models, type Model, type Types } from 'mongoose';
 import type { PublishIngestionParams } from '../services/ingestionJob';
-import type { AiResultEnvelope } from '@study-partner/shared/ai-messaging/envelope';
+import type { AiResultEnvelope } from '@ednova/shared/ai-messaging/envelope';
 
 export interface IngestionOperation {
   _id: string;
@@ -10,6 +10,8 @@ export interface IngestionOperation {
   userId: string;
   requestId?: string;
   fileRef: string;
+  /** Display-only title captured with this operation for an exact retry/reconcile. */
+  courseTitle?: string;
   files: NonNullable<PublishIngestionParams['files']>;
   state: 'prepared' | 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'superseded';
   result?: Pick<AiResultEnvelope, 'type' | 'correlationId' | 'status' | 'payload' | 'error'>;
@@ -28,6 +30,7 @@ const schema = new Schema<IngestionOperation>(
     userId: { type: String, required: true },
     requestId: String,
     fileRef: { type: String, required: true },
+    courseTitle: { type: String, trim: true, maxlength: 150 },
     files: {
       type: [
         new Schema<NonNullable<PublishIngestionParams['files']>[number]>(

@@ -2,7 +2,7 @@
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { parse } from "set-cookie-parser";
-import { getAuth } from "@study-partner/shared/betterAuth";
+import { getAuth } from "@ednova/shared/betterAuth";
 import { text } from "@/lib/validation";
 import type { ActionState } from "@/lib/action-state";
 

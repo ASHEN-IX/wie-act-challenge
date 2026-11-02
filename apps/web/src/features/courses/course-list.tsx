@@ -20,6 +20,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { EmptyState } from "@/components/shared/states";
 import type { Course, Subject } from "./types";
+import { courseStage, courseStageLabel } from "./lifecycle";
 export function CourseList({
   courses,
   subjects,
@@ -31,51 +32,65 @@ export function CourseList({
     <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_260px]">
       <div className="flex min-w-0 flex-col gap-5">
         {courses.length ? (
-          courses.map((course) => (
-            <article
-              key={course.id}
-              className="flex flex-wrap items-center gap-5 rounded-lg border p-5 sm:flex-nowrap sm:p-6"
-            >
-              <div className="flex h-28 w-20 shrink-0 items-center justify-center rounded-md bg-secondary text-primary">
-                <BookOpen className="size-8" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <h2 className="truncate text-lg font-semibold sm:text-xl">
-                  <Link
-                    href={`/courses/${course.id}`}
-                    className="hover:underline"
-                  >
-                    {course.title}
+          courses.map((course) => {
+            const stage = courseStage(course);
+            return (
+              <article
+                key={course.id}
+                className="flex flex-wrap items-center gap-5 rounded-lg border p-5 sm:flex-nowrap sm:p-6"
+              >
+                <div className="flex h-28 w-20 shrink-0 items-center justify-center rounded-md bg-secondary text-primary">
+                  <BookOpen className="size-8" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h2 className="truncate text-lg font-semibold sm:text-xl">
+                    <Link
+                      href={`/courses/${course.id}`}
+                      className="hover:underline"
+                    >
+                      {course.title}
+                    </Link>
+                  </h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {subjects.find((s) => s.id === course.subjectId)?.name ||
+                      "Course material"}
+                  </p>
+                  <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                    <FileText className="size-4" />
+                    <span>{plural(course.filesCount || 0, "source file")}</span>
+                    <span>
+                      Uploaded{" "}
+                      {new Intl.DateTimeFormat("en", {
+                        dateStyle: "medium",
+                      }).format(new Date(course.createdAt))}
+                    </span>
+                  </div>
+                  <div className="mt-4">
+                    <Badge
+                      variant={
+                        stage === "failed"
+                          ? "destructive"
+                          : stage === "ready"
+                            ? "default"
+                            : "secondary"
+                      }
+                    >
+                      {courseStageLabel(stage)}
+                    </Badge>
+                    <span className="ml-3 text-xs text-muted-foreground">
+                      {plural(course.topicsCount || 0, "extracted topic")}
+                    </span>
+                  </div>
+                </div>
+                <Button variant="outline" asChild>
+                  <Link href={`/courses/${course.id}`}>
+                    {stage === "review" ? "Review" : "Open"}{" "}
+                    <ArrowRight data-icon="inline-end" />
                   </Link>
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {subjects.find((s) => s.id === course.subjectId)?.name ||
-                    "Course material"}
-                </p>
-                <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                  <FileText className="size-4" />
-                  <span>{plural(course.filesCount || 0, "source file")}</span>
-                  <span>
-                    Uploaded{" "}
-                    {new Intl.DateTimeFormat("en", {
-                      dateStyle: "medium",
-                    }).format(new Date(course.createdAt))}
-                  </span>
-                </div>
-                <div className="mt-4">
-                  <Badge variant="secondary">{course.status}</Badge>
-                  <span className="ml-3 text-xs text-muted-foreground">
-                    {plural(course.topicsCount || 0, "extracted topic")}
-                  </span>
-                </div>
-              </div>
-              <Button variant="outline" asChild>
-                <Link href={`/courses/${course.id}`}>
-                  Open <ArrowRight data-icon="inline-end" />
-                </Link>
-              </Button>
-            </article>
-          ))
+                </Button>
+              </article>
+            );
+          })
         ) : (
           <EmptyState
             title="Your next chapter starts here"

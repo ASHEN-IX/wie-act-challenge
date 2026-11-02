@@ -6,6 +6,7 @@ import { type ICourseFile, Course, CourseRevision } from '../models';
 import { activityDigest } from './activityIdentity';
 import { canAuthorCourse } from './resourceAccess';
 import aiClient from '../../../../shared/aiClient';
+import { parseCanonicalDocument } from '../../../../shared/ednova/canonicalDocument';
 export class SourceIntegrityError extends Error {
   readonly status = 503;
   readonly code = 'SOURCE_INTEGRITY_UNAVAILABLE';
@@ -49,6 +50,8 @@ export interface SourcePassage {
   ocrConfidence?: number | null;
   reviewRequired?: boolean;
   extractionWarning?: 'ocr_low_confidence' | 'ocr_no_text' | null;
+  blockIds?: string[];
+  sourceChunkIds?: string[];
 }
 export interface RevisionArtifact {
   schemaVersion: '1.0.0';
@@ -60,6 +63,71 @@ export interface RevisionArtifact {
   indexHash: string;
   chunks: string[];
   metas: Array<Record<string, unknown>>;
+}
+export interface CanonicalIndexUnit {
+  text: string;
+  documentIds: string[];
+  blockIds: string[];
+  chunkIds: string[];
+  lessonId: string;
+}
+
+/** Derive the same paragraph-bounded retrieval units used by ingestion. */
+export function canonicalUnitsForIndex(value: unknown): CanonicalIndexUnit[] {
+  const document = parseCanonicalDocument(value);
+  const units: CanonicalIndexUnit[] = [];
+  for (const chapter of document.chapters) {
+    for (const lesson of chapter.lessons) {
+      const source = lesson.blocks.find((block) => block.type === 'source_lesson');
+      const text = typeof source?.text === 'string' ? source.text : '';
+      if (!source || !text.trim()) continue;
+      const parts = text.split(/\n\s*\n/).map((part) => part.trim()).filter(Boolean);
+      // Keep every derived unit within the AI index contract. Extraction can
+      // leave an individual paragraph over the limit, so split only oversized
+      // paragraphs rather than rejecting the whole reviewed revision.
+      const chunks: string[] = [];
+      for (const part of parts) {
+        if (part.length <= 2_000) chunks.push(part);
+        else {
+          let offset = 0;
+          while (offset < part.length) {
+            const end = Math.min(part.length, offset + 2_000);
+            const lastSpace = part.lastIndexOf(' ', end);
+            const split = lastSpace > offset + 1_000 ? lastSpace : end;
+            chunks.push(part.slice(offset, split).trim());
+            offset = split;
+          }
+        }
+      }
+      const groups: string[][] = [];
+      let current: string[] = [];
+      let size = 0;
+      for (const chunk of chunks) {
+        if (current.length && size + chunk.length > 1_900) {
+          groups.push(current);
+          current = [];
+          size = 0;
+        }
+        current.push(chunk);
+        size += chunk.length + 2;
+      }
+      if (current.length) groups.push(current);
+      const spans = Array.isArray(source.evidence) ? source.evidence as Array<Record<string, unknown>> : [];
+      const documentIds = [...new Set(spans.map((span) => span.documentId).filter((id): id is string => typeof id === 'string'))].sort();
+      const chunkIds = [...new Set(spans.map((span) => span.chunkId).filter((id): id is string => typeof id === 'string'))].sort();
+      if (!documentIds.length || !chunkIds.length) continue;
+      for (const group of groups) {
+        units.push({
+          text: group.join('\n\n'),
+          documentIds,
+          blockIds: [String(source.id)],
+          chunkIds,
+          lessonId: lesson.id
+        });
+      }
+    }
+  }
+  return units.slice(0, 2_000);
 }
 export function manifestDigest(
   courseId: string,
@@ -208,7 +276,17 @@ export async function verifyRevisionArtifact(revision: {
         extractionMethod: m.extraction_method as SourcePassage['extractionMethod'],
         ocrConfidence: m.ocr_confidence as number | null | undefined,
         reviewRequired: m.review_required === true,
-        extractionWarning: m.extraction_warning as SourcePassage['extractionWarning']
+        extractionWarning: m.extraction_warning as SourcePassage['extractionWarning'],
+        ...(Array.isArray(m.block_ids)
+          ? { blockIds: m.block_ids.filter((v): v is string => typeof v === 'string').slice(0, 40) }
+          : {}),
+        ...(Array.isArray(m.source_chunk_ids)
+          ? {
+              sourceChunkIds: m.source_chunk_ids
+                .filter((v): v is string => typeof v === 'string')
+                .slice(0, 400)
+            }
+          : {})
       };
     });
     return { metadata, passages, artifactHash: contentHash(metadataBytes) };
@@ -229,13 +307,22 @@ export async function prepareRevisionSources(actor: string, courseId: string, re
   const documents = await captureImmutableSources(courseId),
     hash = 'sha256:' + draft.contentHash.replace(/^sha256:/, '');
   const digest = manifestDigest(courseId, revisionId, hash, documents);
+  let units: CanonicalIndexUnit[] | undefined;
+  if (draft.contentDocument) {
+    try {
+      units = canonicalUnitsForIndex(draft.contentDocument);
+    } catch {
+      throw new SourceIntegrityError('Canonical content unavailable for indexing');
+    }
+  }
   await aiClient.post('/api/ai/sources/index', {
     schemaVersion: '1.0.0',
     courseId,
     revisionId,
     contentHash: hash,
     documents,
-    manifestDigest: digest
+    manifestDigest: digest,
+    ...(units?.length ? { units } : {})
   });
   if (!(await canAuthorCourse(actor, courseId)))
     throw Object.assign(new Error('Forbidden'), { status: 403 });

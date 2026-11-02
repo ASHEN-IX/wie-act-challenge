@@ -4,7 +4,7 @@ import { requireIdentity } from "@/server/identity";
 import {
   parseBinarySearchState,
   type BinarySearchState,
-} from "@study-partner/shared/visualization";
+} from "@ednova/shared/visualization";
 
 export async function loadRoomVisualization(roomId: string) {
   await requireIdentity();

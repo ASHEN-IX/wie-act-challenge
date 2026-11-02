@@ -147,7 +147,7 @@ function toBadgeKey(rank: any): string {
 }
 
 async function main() {
-  const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/ednova_dev';
+  const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/ednova';
   const password = process.env.DEMO_USER_PASSWORD || 'EdNovaDemo!2026';
 
   console.log('🌱 Starting Complete EdNova Demo Seeder...');
@@ -381,11 +381,13 @@ async function main() {
     for (const topic of resolvedRevision.topics || []) {
       for (const sub of topic.subtopics || []) {
         for (const objective of sub.learning_objectives || []) {
+          const statement = objective.statement || objective.text;
+          if (!statement) continue;
           await LearningObjective.updateOne(
             {
               documentId: sourceDocument.documentId,
               topicId: topic.id,
-              textHash: contentHash(objective.statement)
+              textHash: contentHash(statement)
             },
             {
               $setOnInsert: {
@@ -396,8 +398,8 @@ async function main() {
                 knowledgeType: 'procedural',
                 bloomLevel: objective.bloomLevel,
                 verb: objective.bloomLevel,
-                text: objective.statement,
-                textHash: contentHash(objective.statement),
+                text: statement,
+                textHash: contentHash(statement),
                 version: 1,
                 isActive: true
               }

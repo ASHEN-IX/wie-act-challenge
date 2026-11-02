@@ -8,7 +8,7 @@ import { productionApiInstance } from './framework/single-instance';
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 process.env.MONGODB_URI ||=
-  process.env.DOCKER_MONGODB_URI || 'mongodb://localhost:27017/study_partner';
+  process.env.DOCKER_MONGODB_URI || 'mongodb://localhost:27017/ednova';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const {
@@ -16,17 +16,17 @@ const {
   disconnectDatabase,
   logger,
   requireEnv
-} = require('@study-partner/shared');
+} = require('@ednova/shared');
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const {
   closeAiMessaging,
   ensureTopologyForType,
   AI_JOB_TYPES
-} = require('@study-partner/shared/ai-messaging');
+} = require('@ednova/shared/ai-messaging');
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { registerProcessHandlers } = require('@study-partner/shared/processHandlers');
+const { registerProcessHandlers } = require('@ednova/shared/processHandlers');
 
 export interface StartOptions {
   port?: number;
@@ -44,9 +44,9 @@ export async function start({
   workers = true
 }: StartOptions = {}): Promise<StartedApplication> {
   requireEnv(['MONGODB_URI', 'BETTER_AUTH_SECRET', 'INTERNAL_API_SECRET', 'RABBITMQ_URL'], {
-    serviceName: 'study-partner-api'
+    serviceName: 'ednova-api'
   });
-  registerProcessHandlers('study-partner-api');
+  registerProcessHandlers('ednova-api');
   await connectDatabase();
   let stopLostInstance = () => {};
   const instanceLease = await productionApiInstance(() => stopLostInstance());
@@ -61,12 +61,12 @@ export async function start({
   if (instanceLease) cleanups.push(() => instanceLease.close());
 
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { attachRealtime } = require('@study-partner/notification-service');
+  const { attachRealtime } = require('@ednova/notification-service');
   cleanups.push(attachRealtime(server));
 
   if (workers) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const study = require('@study-partner/study-service');
+    const study = require('@ednova/study-service');
     cleanups.push(study.startPoller());
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
     let cancelled = false;
@@ -76,7 +76,7 @@ export async function start({
         await Promise.all([
           study.startConsumers(),
           // eslint-disable-next-line @typescript-eslint/no-require-imports
-          require('@study-partner/ai-orchestrator-service').startConsumers(),
+          require('@ednova/ai-orchestrator-service').startConsumers(),
           ...AI_JOB_TYPES.map((type: string) => ensureTopologyForType(type))
         ]);
       } catch (error: unknown) {
@@ -106,7 +106,7 @@ export async function start({
 
   const address = server.address();
   const boundPort = address && typeof address === 'object' ? address.port : port;
-  logger.info(`Study Partner API listening on port ${boundPort}`);
+  logger.info(`EdNova API listening on port ${boundPort}`);
 
   let stopping: Promise<void> | null = null;
   const stop = (): Promise<void> => {
@@ -126,9 +126,9 @@ export async function start({
       await nest.close();
       await disconnectDatabase();
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      await require('@study-partner/shared/cache').closeCache();
+      await require('@ednova/shared/cache').closeCache();
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      await require('@study-partner/shared/middleware').closeRateLimits();
+      await require('@ednova/shared/middleware').closeRateLimits();
     })();
     return stopping;
   };

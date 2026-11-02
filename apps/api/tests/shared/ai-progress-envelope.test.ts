@@ -1,6 +1,6 @@
 /**
  * INGEST-06/07 — AI progress envelope tests.
- * Mirrors `TestProgressEnvelope` in study-partner-ai/tests/test_ai_envelope_contract.py
+ * Mirrors `TestProgressEnvelope` in ednova-ai/tests/test_ai_envelope_contract.py
  * so both sides validate the `progress` routing-key events identically.
  */
 

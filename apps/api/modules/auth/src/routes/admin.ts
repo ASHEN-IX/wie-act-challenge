@@ -2,14 +2,14 @@ import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { FilterQuery } from 'mongoose';
 import type { IUser } from '../models/User';
 import type { IPayment } from '../models/Payment';
-import { createContracts } from '@study-partner/shared/domainContracts';
+import { createContracts } from '@ednova/shared/domainContracts';
 import Joi from 'joi';
 import crypto from 'crypto';
 import type { Response } from 'express';
 import User from '../models/User';
 import Coupon from '../models/Coupon';
 import Payment from '../models/Payment';
-import { requireRole } from '@study-partner/shared/auth';
+import { requireRole } from '@ednova/shared/auth';
 
 const router = createContracts();
 
@@ -55,7 +55,7 @@ router.get('/users', async (req: DomainRequest, res: Response) => {
       ];
     }
 
-    const { boundedInteger } = require('@study-partner/shared/pagination');
+    const { boundedInteger } = require('@ednova/shared/pagination');
     const pageNumber = boundedInteger(page, 1, 10000);
     const pageSize = boundedInteger(limit, 50, 100);
     const skip = (pageNumber - 1) * pageSize;
@@ -262,7 +262,7 @@ router.get('/subscriptions', async (req: DomainRequest, res: Response) => {
       filter.tier = tier;
     }
 
-    const { boundedInteger } = require('@study-partner/shared/pagination');
+    const { boundedInteger } = require('@ednova/shared/pagination');
     const pageNumber = boundedInteger(page, 1, 10000);
     const pageSize = boundedInteger(limit, 50, 100);
     const skip = (pageNumber - 1) * pageSize;

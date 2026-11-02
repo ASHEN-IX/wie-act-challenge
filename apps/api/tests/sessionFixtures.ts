@@ -33,7 +33,7 @@ export async function resolveIdentity(
 ): Promise<{ identity: TestIdentity; domain: TestIdentity } | null> {
   const cookie = headers.cookie || headers.Cookie || '';
   if (typeof cookie !== 'string') return null;
-  const token = cookie.match(/mindflow\.test_session=([^;]+)/)?.[1];
+  const token = cookie.match(/ednova\.test_session=([^;]+)/)?.[1];
   if (!token) return null;
   const session = sessions.get(token);
   if (!session || session.invalid || session.identity.isActive === false) return null;

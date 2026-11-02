@@ -65,22 +65,24 @@ def ingest_course(course_title: str, pdf_files: list):
         enriched_data = enrich_subtopic_with_llm(
             subtopic["title"], subtopic["full_content"]
         )
-        cleaned_content = enriched_data.get("cleaned_text") or subtopic["full_content"]
-        # Update subtopic with enriched content
-        subtopic["full_content"] = cleaned_content
+        # Generated text is an annotation, never a replacement for the
+        # uploaded source body.
+        cleaned_content = subtopic["full_content"]
         subtopic["key_concepts"] = enriched_data.get(
             "key_concepts", subtopic.get("key_concepts", [])
         )
         subtopic["definitions"] = enriched_data.get("definitions", [])
         subtopic["formulas"] = enriched_data.get("formulas", [])
         subtopic["examples"] = enriched_data.get("examples", [])
-        # Re-generate the title from the now-clean content so metadata is gone
-        try:
-            refined_title = generate_subtopic_title(cleaned_content)
-            if refined_title:
-                subtopic["title"] = refined_title
-        except Exception as title_err:
-            logger.warning("title_refinement_failed", extra={"error": str(title_err)})
+        if not subtopic.get("title"):
+            try:
+                refined_title = generate_subtopic_title(cleaned_content)
+                if refined_title:
+                    subtopic["title"] = refined_title
+            except Exception as title_err:
+                logger.warning(
+                    "title_refinement_failed", extra={"error": str(title_err)}
+                )
         enriched_subtopics.append(subtopic)
 
     # Step 4b: extract draft learning objectives between enrich and chunk (BLOOM-04)

@@ -20,7 +20,29 @@ export interface ICourseRevision {
       text: string;
       bloomLevel: string;
     }>;
+    subtopics?: Array<{
+      id: string;
+      title: string;
+      source_spans?: Array<{
+        chunkId: string;
+        documentId: string;
+        pageNumber: number | null;
+        lineStart: number;
+        lineEnd: number;
+      }>;
+      structured_blocks?: unknown[];
+      learning_objectives?: Array<{
+        id?: string;
+        statement?: string;
+        text?: string;
+        bloomLevel?: string;
+      }>;
+    }>;
   }>;
+  /** Canonical source-backed reading document. Optional for legacy revisions. */
+  contentDocument?: unknown;
+  /** Hash of the canonical reading document, independent of draft metadata. */
+  contentDocumentHash?: string;
   vectorIndexRef?: string;
   isInstructorReviewed: boolean;
   /** Server-captured source inventory. Legacy revisions without it cannot execute activities. */
@@ -86,6 +108,13 @@ const courseRevisionSchema = new Schema<ICourseRevision>(
     topics: {
       type: [Schema.Types.Mixed],
       default: []
+    },
+    contentDocument: {
+      type: Schema.Types.Mixed,
+      default: undefined
+    },
+    contentDocumentHash: {
+      type: String
     },
     vectorIndexRef: {
       type: String

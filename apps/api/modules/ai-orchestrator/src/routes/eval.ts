@@ -16,11 +16,11 @@ import type { FilterQuery } from 'mongoose';
  * are persisted by the result consumer (EVAL-08).
  */
 
-import { createContracts } from '@study-partner/shared/domainContracts';
+import { createContracts } from '@ednova/shared/domainContracts';
 import crypto from 'crypto';
-import { logger } from '@study-partner/shared';
-import { publishAiJob } from '@study-partner/shared/ai-messaging';
-import { validateJobPayload } from '@study-partner/shared/ai-messaging/payloadSchemas';
+import { logger } from '@ednova/shared';
+import { publishAiJob } from '@ednova/shared/ai-messaging';
+import { validateJobPayload } from '@ednova/shared/ai-messaging/payloadSchemas';
 import AiJob from '../models/AiJob';
 import { resolveObjectiveContext } from '../services/objectiveContext';
 

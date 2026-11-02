@@ -37,7 +37,7 @@ def _contains_non_measurable_phrase(text: str) -> Optional[str]:
 class LearningObjective(BaseModel):
     """Model representing a single learning objective.
 
-    Node mirror: `study-partner-api/study/src/validators/learningObjective.js`.
+    Node mirror: `ednova-api/study/src/validators/learningObjective.js`.
     Rules MUST stay identical on both sides. Depends on BLOOM-01
     (bloom/taxonomy.py) for enums and the verb map.
 

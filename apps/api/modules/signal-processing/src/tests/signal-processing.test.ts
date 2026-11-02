@@ -2,7 +2,7 @@ import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response, NextFunction } from 'express';
 // Set environment variables BEFORE any imports
 process.env.JWT_SECRET = 'test-secret-key';
-process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27018/test_study_partner';
+process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27018/test_ednova';
 process.env.NODE_ENV = 'test';
 process.env.AI_SERVICE_URL = 'http://localhost:8000';
 
@@ -13,9 +13,9 @@ const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => 
 afterAll(() => exitSpy.mockRestore());
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const moduleClient = require('@study-partner/shared/moduleClient');
+const moduleClient = require('@ednova/shared/moduleClient');
 
-jest.mock('@study-partner/shared/moduleClient');
+jest.mock('@ednova/shared/moduleClient');
 
 jest.mock('../models/FocusSession', () => ({
   create: jest.fn(),
@@ -24,7 +24,7 @@ jest.mock('../models/FocusSession', () => ({
   updateOne: jest.fn()
 }));
 
-jest.mock('@study-partner/shared/auth', () => ({
+jest.mock('@ednova/shared/auth', () => ({
   authenticate: jest.fn(
     (req: DomainRequest & { userTier?: string }, _res: Response, next: NextFunction) => {
       req.user = { userId: 'test-user-123', role: 'student' };
@@ -33,7 +33,7 @@ jest.mock('@study-partner/shared/auth', () => ({
   )
 }));
 
-jest.mock('@study-partner/shared', () => ({
+jest.mock('@ednova/shared', () => ({
   corsMiddleware: jest.fn(
     () => (_req: DomainRequest & { userTier?: string }, _res: Response, next: NextFunction) =>
       next()

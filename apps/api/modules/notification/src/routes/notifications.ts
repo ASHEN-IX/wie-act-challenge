@@ -1,12 +1,12 @@
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { FilterQuery } from 'mongoose';
 import type { INotification } from '../models/Notification';
-import { createContracts } from '@study-partner/shared/domainContracts';
+import { createContracts } from '@ednova/shared/domainContracts';
 import Joi from 'joi';
 import type { Response, NextFunction } from 'express';
 import Notification from '../models/Notification';
 import { isEmailEnabled, sendNotificationEmail } from '../services/emailService';
-import { requireInternal } from '@study-partner/shared/auth';
+import { requireInternal } from '@ednova/shared/auth';
 import {
   broadcastToSession as realtimeBroadcastToSession,
   broadcastToUser as realtimeBroadcastToUser
@@ -176,7 +176,7 @@ router.post(
       const payload = {
         type: req.body?.type || 'system',
         title: req.body?.title || 'Test Email Notification',
-        message: req.body?.message || 'This is a test email from Study Partner.',
+        message: req.body?.message || 'This is a test email from EdNova.',
         metadata: req.body?.metadata || {}
       };
 

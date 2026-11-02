@@ -49,13 +49,13 @@ jest.mock('../services/competencyQueries', () => ({
   getWeakCompetenciesForCourse: jest.fn()
 }));
 
-jest.mock('@study-partner/shared/moduleClient', () => ({
+jest.mock('@ednova/shared/moduleClient', () => ({
   post: jest.fn()
 }));
 
 import mongoose from 'mongoose';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const moduleClient = require('@study-partner/shared/moduleClient');
+const moduleClient = require('@ednova/shared/moduleClient');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { StudyPlan, Task } = require('../models/index');
 import { getWeakCompetenciesForCourse } from '../services/competencyQueries';

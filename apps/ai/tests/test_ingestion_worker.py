@@ -116,6 +116,53 @@ def make_subtopics():
     ]
 
 
+def test_index_stage_uses_canonical_units_when_source_manifest_exists(worker, monkeypatch):
+    subtopics = make_subtopics()
+    subtopics[0]["source_spans"] = [
+        {
+            "chunkId": "chk_source",
+            "documentId": "doc_source",
+            "pageNumber": 1,
+            "lineStart": 1,
+            "lineEnd": 1,
+        }
+    ]
+    calls = []
+
+    def canonical_units(manifest, units):
+        calls.append((manifest, units))
+        return ["Graphs connect nodes."], [{"chunk_id": "chk_source"}]
+
+    monkeypatch.setattr(
+        "services.vector_store.revision_artifacts.canonical_units_for_index",
+        canonical_units,
+    )
+    monkeypatch.setattr(
+        "services.vector_store.embedder.get_embedder",
+        lambda: SimpleNamespace(encode=lambda chunks: __import__("numpy").zeros((len(chunks), 384), dtype="float32")),
+    )
+    result = worker._index_stage(
+        "6ae7ff644dd60a8f44879e84",
+        subtopics,
+        [],
+        {},
+        {},
+        0,
+        revision_id="rev_test",
+        manifest={
+            "schemaVersion": "1.0.0",
+            "courseId": "6ae7ff644dd60a8f44879e84",
+            "revisionId": "rev_test",
+            "contentHash": "sha256:" + "a" * 64,
+            "documents": [],
+            "manifestDigest": "sha256:" + "b" * 64,
+        },
+    )
+    assert calls and calls[0][1][0]["text"] == subtopics[0]["full_content"]
+    assert result["contentDocument"]["chapters"][0]["lessons"][0]["blocks"][0]["type"] == "source_lesson"
+    assert result["stats"]["indexedChunks"] == 1
+
+
 @pytest.fixture
 def worker(tmp_path):
     return RecordingIngestionWorker(tmp_path)
@@ -128,7 +175,7 @@ async def test_pipeline_completes_and_emits_progress_in_order(worker, tmp_path):
         3,
         ["uploads/courses/course-1/a.pdf"],
     )
-    worker._enrich_stage = lambda st: (
+    worker._enrich_stage = lambda st, _title=None: (
         st,
         {"extracted": 5, "truncated": 0, "dropped_duplicates": 1, "warnings": []},
         {"classified": 4, "needs_review": 1, "failed": 0, "warnings": []},
@@ -170,7 +217,7 @@ async def test_pipeline_completes_and_emits_progress_in_order(worker, tmp_path):
 
 async def test_no_dedup_defaults_when_stages_produce_nothing(worker, tmp_path):
     worker._parse_stage = lambda req, manifest: ([], 0, [])
-    worker._enrich_stage = lambda st: (st, {}, {})
+    worker._enrich_stage = lambda st, _title=None: (st, {}, {})
     worker._embed_stage = lambda st: (st, 0)
 
     with pytest.raises(TerminalError):
@@ -215,7 +262,7 @@ async def test_concurrent_jobs_keep_their_own_revision_manifest(worker):
 
     worker._publish_progress = progress
     worker._parse_stage = parse
-    worker._enrich_stage = lambda subtopics: (subtopics, {}, {})
+    worker._enrich_stage = lambda subtopics, _title=None: (subtopics, {}, {})
     worker._embed_stage = lambda subtopics: (subtopics, 0)
     worker._index_stage = index
     assert ObjectId.is_valid(first) and ObjectId.is_valid(second)

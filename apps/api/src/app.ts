@@ -10,27 +10,27 @@ const {
   securityMiddleware,
   loggingMiddleware,
   errorHandler
-} = require('@study-partner/shared');
-const { registerModule } = require('@study-partner/shared/moduleClient');
+} = require('@ednova/shared');
+const { registerModule } = require('@ednova/shared/moduleClient');
 
 export const moduleDefinitions: Array<[name: string, packageName: string, prefixes: string[]]> = [
-  ['auth', '@study-partner/auth-service', ['/api/v1/auth']],
-  ['users', '@study-partner/user-profile-service', ['/api/v1/users', '/uploads']],
+  ['auth', '@ednova/auth-service', ['/api/v1/auth']],
+  ['users', '@ednova/user-profile-service', ['/api/v1/users', '/uploads']],
   [
     'study',
-    '@study-partner/study-service',
+    '@ednova/study-service',
     ['/api/v1/study', '/api/v1/competencies', '/api/v1/coach', '/uploads']
   ],
   [
     'ai',
-    '@study-partner/ai-orchestrator-service',
+    '@ednova/ai-orchestrator-service',
     ['/api/v1/ai', '/api/v1/eval', '/api/v1/search']
   ],
-  ['signals', '@study-partner/signal-processing-service', ['/api/v1/signals']],
-  ['analytics', '@study-partner/analytics-service', ['/api/v1/analytics']],
+  ['signals', '@ednova/signal-processing-service', ['/api/v1/signals']],
+  ['analytics', '@ednova/analytics-service', ['/api/v1/analytics']],
   [
     'notifications',
-    '@study-partner/notification-service',
+    '@ednova/notification-service',
     ['/api/v1/notifications', '/api/v1/session-chat', '/api/v1/voice']
   ]
 ];
@@ -70,7 +70,7 @@ export function createApp(): Application {
     );
     let aiHealthy = false;
     try {
-      await require('@study-partner/shared/aiClient').get('/health', { timeout: 2000 });
+      await require('@ednova/shared/aiClient').get('/health', { timeout: 2000 });
       aiHealthy = true;
     } catch {
       /* AI availability does not prevent non-AI workflows. */
@@ -82,7 +82,7 @@ export function createApp(): Application {
       timestamp: new Date().toISOString()
     });
   });
-  app.get('/api/v1/health', healthCheck('study-partner-api'));
+  app.get('/api/v1/health', healthCheck('ednova-api'));
   app.get('/api/v1/docs/openapi.json', (_req: Request, res: Response) =>
     res.json(require('./openapi'))
   );
@@ -90,7 +90,7 @@ export function createApp(): Application {
     res
       .type('html')
       .send(
-        '<h1>Study Partner API</h1><a href="/api/v1/docs/openapi.json">OpenAPI specification</a>'
+        '<h1>EdNova API</h1><a href="/api/v1/docs/openapi.json">OpenAPI specification</a>'
       )
   );
   app.post('/api/v1/study/courses', requireMultipart);

@@ -12,11 +12,11 @@ import type { FilterQuery } from 'mongoose';
  * userId comes from the authenticated context only, never the body.
  */
 
-import { createContracts } from '@study-partner/shared/domainContracts';
+import { createContracts } from '@ednova/shared/domainContracts';
 import crypto from 'crypto';
-import { logger } from '@study-partner/shared';
-import { publishAiJob } from '@study-partner/shared/ai-messaging';
-import { validateJobPayload } from '@study-partner/shared/ai-messaging/payloadSchemas';
+import { logger } from '@ednova/shared';
+import { publishAiJob } from '@ednova/shared/ai-messaging';
+import { validateJobPayload } from '@ednova/shared/ai-messaging/payloadSchemas';
 import AiJob from '../models/AiJob';
 
 const SEARCH_JOB_TYPE = 'study.search.query';

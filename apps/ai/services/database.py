@@ -13,7 +13,7 @@ sensible defaults for local development.
 Environment variables
 ---------------------
 MONGODB_URI   MongoDB connection string  (default: mongodb://localhost:27017)
-DB_NAME       Database name              (default: study_partner)
+DB_NAME       Database name              (default: ednova)
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 _MONGO_URI: str = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
-_DB_NAME: str = os.getenv("DB_NAME", "study_partner")
+_DB_NAME: str = os.getenv("DB_NAME", "ednova")
 
 
 class _DatabaseUnavailable(Exception):

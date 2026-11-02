@@ -12,7 +12,7 @@ const { createSession } = require('../../../../tests/sessionFixtures');
 const jwt = { sign: createSession };
 import request from 'supertest';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { authenticate } = require('@study-partner/shared/auth');
+const { authenticate } = require('@ednova/shared/auth');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const tasksRouter = require('../routes/tasks');
 
@@ -31,7 +31,7 @@ jest.mock('../models', () => {
     }
   };
 });
-jest.mock('@study-partner/shared/moduleClient', () => ({
+jest.mock('@ednova/shared/moduleClient', () => ({
   post: jest.fn().mockResolvedValue({ data: {} })
 }));
 
@@ -58,35 +58,35 @@ describe('SEC-12 negative authentication (real middleware, mounted route)', () =
   it('rejects an expired token with 401', async () => {
     const res = await request(app)
       .get('/api/v1/study/tasks')
-      .set('Cookie', `mindflow.test_session=${expiredToken()}`);
+      .set('Cookie', `ednova.test_session=${expiredToken()}`);
     expect(res.status).toBe(401);
   });
 
   it('rejects a token signed with the wrong secret with 401', async () => {
     const res = await request(app)
       .get('/api/v1/study/tasks')
-      .set('Cookie', `mindflow.test_session=${token(bob, 'wrong-secret')}`);
+      .set('Cookie', `ednova.test_session=${token(bob, 'wrong-secret')}`);
     expect(res.status).toBe(401);
   });
 
   it('rejects a malformed junk token with 401', async () => {
     const res = await request(app)
       .get('/api/v1/study/tasks')
-      .set('Cookie', 'mindflow.test_session=not.a.jwt');
+      .set('Cookie', 'ednova.test_session=not.a.jwt');
     expect(res.status).toBe(401);
   });
 
   it('rejects a deactivated account (isActive:false) with 401', async () => {
     const res = await request(app)
       .get('/api/v1/study/tasks')
-      .set('Cookie', `mindflow.test_session=${token({ ...bob, isActive: false })}`);
+      .set('Cookie', `ednova.test_session=${token({ ...bob, isActive: false })}`);
     expect(res.status).toBe(401);
   });
 
   it('accepts a valid token (200)', async () => {
     const res = await request(app)
       .get('/api/v1/study/tasks')
-      .set('Cookie', `mindflow.test_session=${token()}`);
+      .set('Cookie', `ednova.test_session=${token()}`);
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('tasks');
   });

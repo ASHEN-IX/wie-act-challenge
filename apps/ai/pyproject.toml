@@ -1,7 +1,7 @@
 [tool.poetry]
-name = "study-partner-ai"
+name = "ednova-ai"
 version = "0.1.0"
-description = "Mindflow study and AI worker services"
+description = "EdNova study and AI worker services"
 authors = ["Your Name <kammoun.mohamedaziz@esprit.tn>"]
 package-mode = false
 

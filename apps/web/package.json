@@ -21,11 +21,12 @@
     "test:auth:e2e": "AUTH_E2E=1 playwright test e2e/better-auth.spec.ts e2e/smoke.spec.ts e2e/workspace.spec.ts --reporter=list"
   },
   "dependencies": {
-    "@study-partner/shared": "workspace:*",
+    "@ednova/shared": "workspace:*",
     "@tailwindcss/postcss": "^4.3.3",
     "better-auth": "^1.7.7",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "katex": "^0.19.1",
     "lucide-react": "^0.563.0",
     "next": "^16.4.1",
     "postcss": "^8.5.6",
@@ -39,22 +40,23 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
+    "@types/katex": "^0.16.8",
     "@types/node": "^26.6.4",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/set-cookie-parser": "^2.4.10",
+    "@typescript-eslint/eslint-plugin": "^8.71.1",
+    "@typescript-eslint/parser": "^8.71.1",
     "@vitest/coverage-v8": "^3.2.1",
+    "bcryptjs": "^2.4.3",
     "eslint": "^8.56.0",
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-react-hooks": "^4.6.0",
+    "mongodb": "^7.7.0",
     "prettier": "^3.1.1",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",
-    "vitest": "^3.2.1",
-    "@typescript-eslint/parser": "^8.71.1",
-    "@typescript-eslint/eslint-plugin": "^8.71.1",
-    "mongodb": "^7.7.0",
-    "bcryptjs": "^2.4.3"
+    "vitest": "^3.2.1"
   },
   "packageManager": "pnpm@11.3.0"
 }

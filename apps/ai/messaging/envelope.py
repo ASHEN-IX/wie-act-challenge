@@ -1,6 +1,6 @@
 """AI message contract — canonical envelopes (AI-COM-02 / AI-COM-03).
 
-Python mirror of `study-partner-api/shared/ai-messaging/envelope.js`.
+Python mirror of `ednova-api/shared/ai-messaging/envelope.js`.
 Both sides validate on publish AND on consume. Any schema change must be
 applied to both files and to docs/contracts/ai-message-contract.md in the
 same commit (enforced by the TEST-04 contract tests).

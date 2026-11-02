@@ -1,7 +1,7 @@
 """
 Bloom taxonomy parity tests (BLOOM-01): the Python taxonomy module must
 match docs/contracts/bloom-fixture.json — the same fixture the Node side
-(study-partner-api/shared/bloom/taxonomy.js) validates against. Drift fails
+(ednova-api/shared/bloom/taxonomy.js) validates against. Drift fails
 CI.
 
 Note: bloom/taxonomy.py intentionally uses tuples (immutable, mirroring the

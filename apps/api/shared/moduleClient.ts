@@ -88,7 +88,7 @@ export function request<T = unknown>(
     Object.defineProperty(socket, 'remoteAddress', { value: '127.0.0.1' });
     const req = new IncomingMessage(socket) as DomainRequest & { _body: boolean };
     req._read = () => req.push(null);
-    Reflect.set(req, Symbol.for('mindflow.moduleCall'), true);
+    Reflect.set(req, Symbol.for('ednova.moduleCall'), true);
     req.method = method.toUpperCase();
     req.url = url.pathname + url.search;
     req.headers = Object.fromEntries(

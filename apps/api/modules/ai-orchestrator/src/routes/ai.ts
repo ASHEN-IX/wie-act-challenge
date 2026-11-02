@@ -1,16 +1,16 @@
 import { canReadCourse } from '../../../study/src/services/resourceAccess';
-import { createContracts } from '@study-partner/shared/domainContracts';
+import { createContracts } from '@ednova/shared/domainContracts';
 import Joi from 'joi';
-import moduleClient from '@study-partner/shared/moduleClient';
+import moduleClient from '@ednova/shared/moduleClient';
 import FormData from 'form-data';
 import { createProxy } from '../utils/proxyBuilder';
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response } from 'express';
-import { errorDetails } from '@study-partner/shared/errors';
-import { tierGate } from '@study-partner/shared/tierGate';
+import { errorDetails } from '@ednova/shared/errors';
+import { tierGate } from '@ednova/shared/tierGate';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const aiClient = require('@study-partner/shared/aiClient');
+const aiClient = require('@ednova/shared/aiClient');
 const AI_URL = (aiClient.getBaseUrl ? aiClient.getBaseUrl() : null) || 'http://localhost:8000';
 const router = createContracts();
 
@@ -571,7 +571,7 @@ router.post(
 
 router.get('/status', async (req: DomainRequest, res: Response) => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const aiCli = require('@study-partner/shared/aiClient');
+  const aiCli = require('@ednova/shared/aiClient');
   // Report the provider's real state. A hardcoded "available" told the product,
   // operators and the demo that inference was up while every agent was actually
   // answering from deterministic fallbacks. The probe is bounded and never fails

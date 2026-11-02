@@ -5,7 +5,7 @@
 import request from 'supertest';
 
 process.env.JWT_SECRET = 'test-secret-key';
-process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27018/test_study_partner';
+process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27018/test_ednova';
 process.env.NODE_ENV = 'test';
 
 // Prevent process.exit() from killing tests

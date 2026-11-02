@@ -6,7 +6,7 @@ import type { Response, NextFunction } from 'express';
  */
 
 process.env.JWT_SECRET = 'test-secret-key';
-process.env.MONGODB_URI = 'mongodb://localhost:27017/test_study_partner';
+process.env.MONGODB_URI = 'mongodb://localhost:27017/test_ednova';
 process.env.NODE_ENV = 'test';
 process.env.AI_SERVICE_URL = 'http://ai.test.local';
 
@@ -104,26 +104,26 @@ const fakeAuth = (req: DomainRequest, res: Response, next: NextFunction) => {
   next();
 };
 
-jest.mock('@study-partner/shared/uploadValidation', () => {
-  const actual = jest.requireActual('@study-partner/shared/uploadValidation');
+jest.mock('@ednova/shared/uploadValidation', () => {
+  const actual = jest.requireActual('@ednova/shared/uploadValidation');
   return { ...actual };
 });
 
-jest.mock('@study-partner/shared/ai-messaging', () => ({
+jest.mock('@ednova/shared/ai-messaging', () => ({
   publishAiJob: jest.fn()
 }));
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { publishAiJob } = require('@study-partner/shared/ai-messaging');
+const { publishAiJob } = require('@ednova/shared/ai-messaging');
 
 app.use('/api/v1/study/courses', fakeAuth, courseRoutes);
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { errorHandler } = require('@study-partner/shared/middleware');
+const { errorHandler } = require('@ednova/shared/middleware');
 app.use(errorHandler);
 
 function authHeader(userId = 'user-123') {
   const token = jwt.sign({ userId, role: 'user' }, process.env.JWT_SECRET);
-  return { Cookie: `mindflow.test_session=${token}` };
+  return { Cookie: `ednova.test_session=${token}` };
 }
 
 const VALID_PDF = Buffer.from('%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n%%EOF');
@@ -249,11 +249,38 @@ describe('INGEST-01 POST /api/v1/study/courses (file validation)', () => {
     expect(instance.status).toBe('failed');
     expect(instance.warning).toMatch(/enqueued/);
   });
+
+  test('accepts a Markdown source with its standard browser MIME type (202)', async () => {
+    publishAiJob.mockResolvedValue({ messageId: 'job-md', correlationId: 'corr-md' });
+
+    const res = await request(app)
+      .post('/api/v1/study/courses')
+      .set(authHeader())
+      .field('title', 'Markdown Course')
+      .field('subject_id', 'subj-1')
+      .attach('files', Buffer.from('# Limits\n\nA clear Markdown note.\n'), {
+        filename: 'notes.md',
+        contentType: 'text/markdown'
+      });
+
+    expect(res.status).toBe(202);
+    expect(res.body.status).toBe('processing');
+    expect(publishAiJob).toHaveBeenCalledWith(
+      'study.ingest.course',
+      'user-123',
+      expect.objectContaining({
+        files: expect.arrayContaining([
+          expect.objectContaining({ originalName: 'notes.md', mimetype: 'text/markdown' })
+        ])
+      }),
+      expect.objectContaining({ requestId: expect.any(String) })
+    );
+  });
 });
 
 describe('INGEST-02 POST /api/v1/study/courses (size limits → 413)', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { MAX_UPLOAD_MB } = require('@study-partner/shared/uploadValidation');
+  const { MAX_UPLOAD_MB } = require('@ednova/shared/uploadValidation');
 
   beforeEach(() => {
     jest.clearAllMocks();

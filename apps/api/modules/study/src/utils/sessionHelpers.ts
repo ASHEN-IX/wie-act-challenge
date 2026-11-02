@@ -1,7 +1,7 @@
-import { errorDetails } from '@study-partner/shared/errors';
+import { errorDetails } from '@ednova/shared/errors';
 import type { IStudySession } from '../models';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { buildInternalHeaders } = require('@study-partner/shared/auth');
+const { buildInternalHeaders } = require('@ednova/shared/auth');
 
 const DEFAULT_TASK_ESTIMATED_MINUTES = 30;
 

@@ -15,10 +15,10 @@ import express from 'express';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const jwt = { sign: require('../../../../tests/sessionFixtures').createSession };
 import request from 'supertest';
-import { authenticate } from '@study-partner/shared/auth';
-import { errorHandler } from '@study-partner/shared/middleware';
+import { authenticate } from '@ednova/shared/auth';
+import { errorHandler } from '@ednova/shared/middleware';
 
-jest.mock('@study-partner/shared', () => ({
+jest.mock('@ednova/shared', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() }
 }));
 jest.mock('../models/UserProfile');
@@ -36,7 +36,7 @@ app.use(errorHandler);
 const alice = { userId: 'user-alice', email: 'alice@test.com', role: 'student', isActive: true };
 
 function authHeader() {
-  return { Cookie: `mindflow.test_session=${jwt.sign(alice, process.env.JWT_SECRET)}` };
+  return { Cookie: `ednova.test_session=${jwt.sign(alice, process.env.JWT_SECRET)}` };
 }
 
 function ownProfile() {

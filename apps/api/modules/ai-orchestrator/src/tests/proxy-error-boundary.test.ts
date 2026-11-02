@@ -10,7 +10,7 @@ import type { Request, Response, NextFunction } from 'express';
  */
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret-key';
-process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/test_study_partner';
+process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/test_ednova';
 process.env.RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://localhost:5672/%2F';
 process.env.NODE_ENV = 'test';
 process.env.AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
@@ -22,23 +22,23 @@ const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => 
 afterAll(() => exitSpy.mockRestore());
 
 import request from 'supertest';
-const moduleClient = require('@study-partner/shared/moduleClient');
+const moduleClient = require('@ednova/shared/moduleClient');
 
-jest.mock('@study-partner/shared/auth', () => ({
+jest.mock('@ednova/shared/auth', () => ({
   authenticate: jest.fn((req, res, next) => {
     req.user = { userId: 'test-user-123' };
     next();
   })
 }));
 
-jest.mock('@study-partner/shared/tierGate', () => ({
+jest.mock('@ednova/shared/tierGate', () => ({
   tierGate: jest.fn(() => (req: Request, res: Response, next: NextFunction) => next())
 }));
 
 const app = require('../app');
 
 // Mock moduleClient to prevent actual HTTP calls
-jest.mock('@study-partner/shared/moduleClient');
+jest.mock('@ednova/shared/moduleClient');
 
 describe('plan proxy upstream error boundary', () => {
   it.each(['upstream text', null, { detail: 'synthetic upstream detail' }])(

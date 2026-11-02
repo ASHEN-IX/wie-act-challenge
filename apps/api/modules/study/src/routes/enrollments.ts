@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import type { DomainRequest } from '../../../../src/framework/contracts';
-import { errorDetails } from '@study-partner/shared/errors';
+import { errorDetails } from '@ednova/shared/errors';
 import {
   acceptCourseInvitation,
   assignInstructorToCourse,
@@ -13,7 +13,7 @@ import {
 } from '../services/enrollments';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createContracts } = require('@study-partner/shared/domainContracts');
+const { createContracts } = require('@ednova/shared/domainContracts');
 const router = createContracts();
 
 function handleError(res: Response, error: unknown) {

@@ -2,12 +2,12 @@ import http from 'http';
 import WebSocket from 'ws';
 import { createSession as generateToken } from '../sessionFixtures';
 
-jest.mock('@study-partner/shared/moduleClient', () => ({
+jest.mock('@ednova/shared/moduleClient', () => ({
   put: jest.fn().mockResolvedValue({ data: {} })
 }));
 
-import client from '@study-partner/shared/moduleClient';
-import { attachRealtime } from '@study-partner/notification-service';
+import client from '@ednova/shared/moduleClient';
+import { attachRealtime } from '@ednova/notification-service';
 
 let server: http.Server;
 let closeRealtime: () => Promise<void>;
@@ -42,7 +42,7 @@ test.each(['', '&token=invalid', `&token=${generateToken({ userId: 'other-user' 
 test('accepts cookie-authenticated connections on the main listener and forwards identity', async () => {
   const token = generateToken({ userId: 'owner', email: 'owner@test.com', role: 'student' });
   const ws = new WebSocket(`${base}?userId=owner`, {
-    headers: { Cookie: `mindflow.test_session=${token}` }
+    headers: { Cookie: `ednova.test_session=${token}` }
   });
   await new Promise<void>((resolve, reject) => {
     ws.on('open', () => resolve());
@@ -54,7 +54,7 @@ test('accepts cookie-authenticated connections on the main listener and forwards
     expect.stringContaining('module://users/'),
     expect.any(Object),
     expect.objectContaining({
-      headers: expect.objectContaining({ Cookie: `mindflow.test_session=${token}` })
+      headers: expect.objectContaining({ Cookie: `ednova.test_session=${token}` })
     })
   );
   const closed = new Promise((resolve) => ws.once('close', resolve));

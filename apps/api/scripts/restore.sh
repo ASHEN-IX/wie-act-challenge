@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# MongoDB restore script for Study Partner
+# MongoDB restore script for EdNova
 # Usage: ./restore.sh <BACKUP_DIR> [MONGODB_URI]
 #
 # Args:
 #   BACKUP_DIR   - Path to a backup directory (e.g., ./backups/20260818_120000)
-#   MONGODB_URI  - Target URI (default: $MONGODB_URI or mongodb://localhost:27017/study_partner)
+#   MONGODB_URI  - Target URI (default: $MONGODB_URI or mongodb://localhost:27017/ednova)
 #
 # WARNING: This drops and replaces collections in the target database.
 
@@ -13,19 +13,19 @@ set -euo pipefail
 if [ $# -lt 1 ]; then
   echo "Usage: $0 <BACKUP_DIR> [MONGODB_URI]"
   echo "  BACKUP_DIR: path to backup (e.g., ./backups/20260818_120000)"
-  echo "  MONGODB_URI: target database URI (default: \$MONGODB_URI or mongodb://localhost:27017/study_partner)"
+  echo "  MONGODB_URI: target database URI (default: \$MONGODB_URI or mongodb://localhost:27017/ednova)"
   exit 1
 fi
 
 BACKUP_DIR="$1"
-MONGODB_URI="${2:-${MONGODB_URI:-mongodb://localhost:27017/study_partner}}"
+MONGODB_URI="${2:-${MONGODB_URI:-mongodb://localhost:27017/ednova}}"
 
 if [ ! -d "${BACKUP_DIR}" ]; then
   echo "ERROR: Backup directory not found: ${BACKUP_DIR}" >&2
   exit 1
 fi
 
-# Find the database dump subdirectory (could be study_partner or another name)
+# Find the database dump subdirectory (could be ednova or another name)
 DB_DUMP_DIR=""
 for d in "${BACKUP_DIR}"/*/; do
   if [ -d "$d" ] && ls "$d"/*.gz &>/dev/null; then

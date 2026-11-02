@@ -23,6 +23,7 @@ export async function enqueueCourseIngestionOperation(
     revisionId: params.revisionId,
     userId: params.userId,
     fileRef: params.fileRef,
+    courseTitle: params.courseTitle,
     files: params.files || [],
     requestId: params.requestId,
     state: 'prepared'
@@ -72,6 +73,8 @@ export async function dispatchIngestionOperation(jobId: string) {
   );
   try {
     await publishCourseIngestionJob({
+      // Recovery replays display metadata with the exact retained operation.
+      courseTitle: operation.courseTitle,
       courseId: String(operation.courseId),
       revisionId: operation.revisionId,
       userId: operation.userId,
@@ -202,7 +205,14 @@ export async function retryIngestionOperation(
     isInstructorReviewed: false
   });
   return enqueueCourseIngestionOperation(
-    { userId: actor, courseId, revisionId, fileRef: operation.fileRef, files: operation.files },
+    {
+      userId: actor,
+      courseId,
+      courseTitle: course.title,
+      revisionId,
+      fileRef: operation.fileRef,
+      files: operation.files
+    },
     expectedJobId
   );
 }

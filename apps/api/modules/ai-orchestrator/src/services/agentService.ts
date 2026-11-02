@@ -1,5 +1,5 @@
-import { errorDetails } from '@study-partner/shared/errors';
-import moduleClient from '@study-partner/shared/moduleClient';
+import { errorDetails } from '@ednova/shared/errors';
+import moduleClient from '@ednova/shared/moduleClient';
 
 // Temporary logger until shared package is fixed
 const logger = {
@@ -9,7 +9,7 @@ const logger = {
 };
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const aiClient = require('@study-partner/shared/aiClient');
+const aiClient = require('@ednova/shared/aiClient');
 const AI_SERVICE_URL =
   (aiClient.getBaseUrl ? aiClient.getBaseUrl() : null) || 'http://localhost:8000';
 

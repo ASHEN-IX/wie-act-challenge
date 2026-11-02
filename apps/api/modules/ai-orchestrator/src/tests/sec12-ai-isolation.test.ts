@@ -25,20 +25,20 @@ const jwt = { sign: require('../../../../tests/sessionFixtures').createSession }
 import request from 'supertest';
 import { Writable } from 'stream';
 import fileUpload from 'express-fileupload';
-import { authenticate } from '@study-partner/shared/auth';
+import { authenticate } from '@ednova/shared/auth';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const aiRouter = require('../routes/ai');
 
-jest.mock('@study-partner/shared', () => ({
+jest.mock('@ednova/shared', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() }
 }));
-jest.mock('@study-partner/shared/tierGate', () => ({
+jest.mock('@ednova/shared/tierGate', () => ({
   tierGate: () => (req: Request, res: Response, next: NextFunction) => next()
 }));
-jest.mock('@study-partner/shared/moduleClient');
+jest.mock('@ednova/shared/moduleClient');
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const moduleClient = require('@study-partner/shared/moduleClient');
+const moduleClient = require('@ednova/shared/moduleClient');
 
 const app = express();
 app.use(express.json());
@@ -46,7 +46,7 @@ app.use(fileUpload({ limits: { fileSize: 10 * 1024 * 1024 } }));
 app.use('/api/v1/ai', authenticate, aiRouter);
 
 function authHeader(payload: { userId: string; email: string; role: string; isActive: boolean }) {
-  return { Cookie: `mindflow.test_session=${jwt.sign(payload, process.env.JWT_SECRET)}` };
+  return { Cookie: `ednova.test_session=${jwt.sign(payload, process.env.JWT_SECRET)}` };
 }
 
 const alice = { userId: 'user-alice', email: 'alice@test.com', role: 'student', isActive: true };

@@ -1,4 +1,4 @@
-import { errorDetails } from '@study-partner/shared/errors';
+import { errorDetails } from '@ednova/shared/errors';
 import VoiceSession, { IVoiceSession } from '../models/VoiceSession';
 
 function findParticipantIndex(session: IVoiceSession, userId: string): number {

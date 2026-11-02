@@ -104,12 +104,12 @@ export async function createAuth(
           : undefined
       });
       await transport.sendMail({
-        from: process.env.EMAIL_FROM || 'Mindflow <noreply@mindflow.app>',
+        from: process.env.EMAIL_FROM || 'EdNova <noreply@ednova.app>',
         ...message
       });
     });
   return betterAuth({
-    appName: 'Mindflow',
+    appName: 'EdNova',
     disabledPaths: ['/sign-in/email-otp'],
     baseURL,
     basePath: '/api/auth',
@@ -145,7 +145,7 @@ export async function createAuth(
       sendResetPassword: async ({ user, url }) =>
         deliver({
           to: user.email,
-          subject: 'Reset your Mindflow password',
+          subject: 'Reset your EdNova password',
           text: `Reset your password: ${url}`
         })
     },
@@ -155,7 +155,7 @@ export async function createAuth(
       sendVerificationEmail: async ({ user, url }) =>
         deliver({
           to: user.email,
-          subject: 'Verify your Mindflow email',
+          subject: 'Verify your EdNova email',
           text: `Verify your email: ${url}`
         }),
       afterEmailVerification: async (user): Promise<void> => {
@@ -173,7 +173,7 @@ export async function createAuth(
         sendVerificationOTP: async ({ email, otp }: { email: string; otp: string }) =>
           deliver({
             to: email,
-            subject: 'Your Mindflow verification code',
+            subject: 'Your EdNova verification code',
             text: `Verification code: ${otp}. Expires in 10 minutes.`
           })
       })
@@ -267,7 +267,7 @@ export async function getAuth() {
       let uri =
         process.env.MONGODB_URI ||
         process.env.DOCKER_MONGODB_URI ||
-        'mongodb://localhost:27017/study_partner';
+        'mongodb://localhost:27017/ednova';
       // If running outside Docker and DOCKER_MONGODB_URI points to service name 'mongodb'
       if (uri.includes('mongodb:') && !uri.includes('localhost') && !uri.includes('127.0.0.1')) {
         uri = uri

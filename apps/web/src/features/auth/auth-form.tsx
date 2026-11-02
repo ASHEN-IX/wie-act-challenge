@@ -54,7 +54,8 @@ export function AuthForm({
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
       <aside className="hidden w-[44%] flex-col justify-between bg-primary p-14 text-primary-foreground lg:flex">
-        <Link href="/" className="text-3xl font-semibold tracking-tight">
+        <Link href="/" className="inline-flex items-center gap-3 text-3xl font-semibold tracking-tight">
+          <img src="/ednova-mark.svg" alt="" width="40" height="40" className="rounded-[11px]" />
           EdNova
         </Link>
         <div className="max-w-md">
@@ -78,8 +79,9 @@ export function AuthForm({
         <div className="w-full max-w-sm">
           <Link
             href="/"
-            className="mb-12 block text-2xl font-semibold lg:hidden"
+            className="mb-12 inline-flex items-center gap-2.5 text-2xl font-semibold lg:hidden"
           >
+            <img src="/ednova-mark.svg" alt="" width="32" height="32" className="rounded-lg" />
             EdNova
           </Link>
           <h1 className="text-3xl font-semibold tracking-tight">

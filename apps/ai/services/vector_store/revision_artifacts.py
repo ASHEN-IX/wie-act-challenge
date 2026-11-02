@@ -86,6 +86,28 @@ def validate_artifact(meta, course_id, revision_id, index_bytes=None):
             )
             or row.get("extraction_warning")
             not in (None, "ocr_low_confidence", "ocr_no_text")
+            or (
+                row.get("block_ids") is not None
+                and (
+                    not isinstance(row.get("block_ids"), list)
+                    or len(row["block_ids"]) > 40
+                    or any(
+                        not isinstance(block_id, str) or len(block_id) > 128
+                        for block_id in row["block_ids"]
+                    )
+                )
+            )
+            or (
+                row.get("source_chunk_ids") is not None
+                and (
+                    not isinstance(row.get("source_chunk_ids"), list)
+                    or len(row["source_chunk_ids"]) > 400
+                    or any(
+                        not isinstance(chunk_id, str) or len(chunk_id) > 128
+                        for chunk_id in row["source_chunk_ids"]
+                    )
+                )
+            )
         ):
             raise ValueError("Invalid source chunk")
 
@@ -155,4 +177,82 @@ def extract_documents(manifest):
                 )
     if not chunks:
         raise ValueError("No extracted passages")
+    return chunks, metas
+
+
+def canonical_units_for_index(manifest, units):
+    """Turn canonical retrieval units into verified, block-linked chunks.
+
+    The original document bytes remain immutable. Only the derived searchable
+    representation changes, and every chunk names the canonical blocks it came
+    from plus the raw passages used to build those blocks.
+    """
+    if manifest_digest(manifest) != manifest["manifestDigest"]:
+        raise ValueError("Manifest mismatch")
+    documents = {d["documentId"]: d for d in manifest["documents"]}
+    source_chunks, source_metas = extract_documents(manifest)
+    passage_by_id = {
+        meta["chunk_id"]: (text, meta)
+        for text, meta in zip(source_chunks, source_metas)
+    }
+    chunks, metas = [], []
+    for unit in units:
+        text = str(unit.get("text") or "").strip()
+        document_ids = unit.get("documentIds") or []
+        if not text or not document_ids:
+            continue
+        source_ids = [str(value) for value in unit.get("chunkIds") or []]
+        passages = [passage_by_id[value] for value in source_ids if value in passage_by_id]
+        document = documents.get(document_ids[0])
+        if not document or not passages:
+            continue
+        target = original_path(document)
+        if target.stat().st_size < 0:  # pragma: no cover - explicit read guard
+            continue
+        hashed = byte_hash(text.encode())
+        review_required = any(meta.get("review_required") is True for _, meta in passages)
+        extraction_methods = {meta.get("extraction_method") for _, meta in passages}
+        extraction_warning = (
+            "ocr_low_confidence"
+            if review_required
+            else next(
+                (
+                    meta.get("extraction_warning")
+                    for _, meta in passages
+                    if meta.get("extraction_warning")
+                ),
+                None,
+            )
+        )
+        confidences = [
+            meta["ocr_confidence"]
+            for _, meta in passages
+            if isinstance(meta.get("ocr_confidence"), (int, float))
+        ]
+        chunks.append(text)
+        metas.append(
+            {
+                "course_id": manifest["courseId"],
+                "revision_id": manifest["revisionId"],
+                "document_id": document["documentId"],
+                "content_hash": document["contentHash"],
+                "chunk_id": "chk_" + hashed[7:],
+                "text_hash": hashed,
+                "page_number": None,
+                "section_id": unit.get("lessonId") or "canonical",
+                # These identifiers are links for retrieval, not a claim that
+                # OCR or symbol fidelity was verified.
+                "block_ids": list(unit.get("blockIds") or [])[:40],
+                "source_chunk_ids": list(unit.get("chunkIds") or [])[:400],
+                "provenance": "extracted",
+                "extraction_method": "ocr" if "ocr" in extraction_methods else "text",
+                "ocr_confidence": min(confidences) if confidences else None,
+                "review_required": review_required,
+                # Indexing does not validate glyph fidelity; warnings remain
+                # tied to the original artifact rather than being cleared.
+                "extraction_warning": extraction_warning,
+            }
+        )
+    if not chunks:
+        raise ValueError("Canonical document has no retrieval text")
     return chunks, metas

@@ -16,7 +16,7 @@ import {
   requireInternal,
   buildInternalHeaders,
   isInternalRequest
-} from '@study-partner/shared/auth';
+} from '@ednova/shared/auth';
 
 const ORIG_SECRET = process.env.INTERNAL_API_SECRET;
 
@@ -80,8 +80,8 @@ describe('SEC-05 requireInternal middleware (single shared implementation)', () 
 describe('SEC-05 buildInternalHeaders + isInternalRequest', () => {
   it('sets the shared secret and optional propagated Authorization', () => {
     process.env.INTERNAL_API_SECRET = 's3cret';
-    expect(buildInternalHeaders('mindflow.test_session=x')).toEqual({
-      Cookie: 'mindflow.test_session=x',
+    expect(buildInternalHeaders('ednova.test_session=x')).toEqual({
+      Cookie: 'ednova.test_session=x',
       'x-internal-secret': 's3cret'
     });
     expect(buildInternalHeaders()).toEqual({ 'x-internal-secret': 's3cret' });
@@ -89,8 +89,8 @@ describe('SEC-05 buildInternalHeaders + isInternalRequest', () => {
 
   it('omits the secret header when none is configured', () => {
     delete process.env.INTERNAL_API_SECRET;
-    expect(buildInternalHeaders('mindflow.test_session=x')).toEqual({
-      Cookie: 'mindflow.test_session=x'
+    expect(buildInternalHeaders('ednova.test_session=x')).toEqual({
+      Cookie: 'ednova.test_session=x'
     });
   });
 

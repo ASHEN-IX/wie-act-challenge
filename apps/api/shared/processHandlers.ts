@@ -1,7 +1,7 @@
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const logger = require('./logger');
 
-export function registerProcessHandlers(serviceName: string = 'study-partner-service'): void {
+export function registerProcessHandlers(serviceName: string = 'ednova-service'): void {
   const tag = `[${serviceName}] `;
 
   process.on('uncaughtException', (err: Error) => {

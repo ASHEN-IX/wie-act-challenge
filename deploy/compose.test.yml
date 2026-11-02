@@ -1,4 +1,4 @@
-name: mindflow-tests
+name: ednova-tests
 services:
   mongodb:
     image: mongo:7

@@ -13,10 +13,10 @@ jest.setTimeout(30000);
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'integration-test-secret';
 process.env.JWT_REFRESH_SECRET =
   process.env.JWT_REFRESH_SECRET || 'integration-test-refresh-secret';
-process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/study_partner_test';
+process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/ednova_test';
 process.env.NODE_ENV = 'test';
 
-jest.mock('@study-partner/shared/ai-messaging', () => {
+jest.mock('@ednova/shared/ai-messaging', () => {
   const actual = jest.requireActual('../../shared/ai-messaging/envelope');
   const topology = jest.requireActual('../../shared/ai-messaging/topology');
   return {
@@ -36,7 +36,7 @@ const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => 
 });
 afterAll(() => exitSpy.mockRestore());
 
-const { publishAiJob } = require('@study-partner/shared/ai-messaging');
+const { publishAiJob } = require('@ednova/shared/ai-messaging');
 const app = require('../../modules/ai-orchestrator/src/app');
 const AiJob = require('../../modules/ai-orchestrator/src/models/AiJob');
 const { createSession: generateToken } = require('../sessionFixtures');
@@ -51,8 +51,8 @@ beforeAll(async () => {
     serverSelectionTimeoutMS: 5000
   });
   await AiJob.deleteMany({});
-  tokenA = `mindflow.test_session=${generateToken(userA)}`;
-  tokenB = `mindflow.test_session=${generateToken(userB)}`;
+  tokenA = `ednova.test_session=${generateToken(userA)}`;
+  tokenB = `ednova.test_session=${generateToken(userB)}`;
 });
 
 afterEach(async () => {

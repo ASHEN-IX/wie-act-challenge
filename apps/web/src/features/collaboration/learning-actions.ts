@@ -7,7 +7,7 @@ import {
   decodePrivateAssessmentResult,
   type ActivityDefinition,
 } from "@/lib/activity-contracts";
-import type { Contract } from "@study-partner/shared/ednova/contracts";
+import type { Contract } from "@ednova/shared/ednova/contracts";
 export type PrivateRoomCheck = {
   status: string;
   message?: string;

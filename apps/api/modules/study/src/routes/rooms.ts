@@ -5,7 +5,7 @@ import type { FilterQuery } from 'mongoose';
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { IStudyRoom, IStudyRoomParticipant, RoomPhase } from '../models/StudyRoom';
 import type { IFacilitatorIntervention } from '../models/FacilitatorIntervention';
-import { errorDetails } from '@study-partner/shared/errors';
+import { errorDetails } from '@ednova/shared/errors';
 
 // Existing Python Contract 15 response and local-policy projection.
 interface FacilitatorProposal {
@@ -28,14 +28,14 @@ interface RoomRequest extends DomainRequest {
   studyRoom?: IStudyRoom;
 }
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createContracts } = require('@study-partner/shared/domainContracts');
+const { createContracts } = require('@ednova/shared/domainContracts');
 import crypto from 'crypto';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const moduleClient = require('@study-partner/shared/moduleClient');
+const moduleClient = require('@ednova/shared/moduleClient');
 import Joi from 'joi';
 import { StudyRoom, FacilitatorIntervention, Course, StudentAttempt } from '../models';
 import { buildInternalHeaders } from '../utils/sessionHelpers';
-import { logger } from '@study-partner/shared';
+import { logger } from '@ednova/shared';
 import { runRoomCommand } from '../services/roomCommands';
 import { canReadCourse } from '../services/resourceAccess';
 import {
@@ -49,7 +49,7 @@ import { activeLearningRoom } from '../services/roomLearning';
 import { getAttemptResult } from '../services/activityAttempt';
 import type { DomainMiddleware } from '../../../../src/framework/contracts';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const aiClient = require('@study-partner/shared/aiClient');
+const aiClient = require('@ednova/shared/aiClient');
 
 const router = createContracts();
 const NOTIFICATION_URL = 'module://notifications';

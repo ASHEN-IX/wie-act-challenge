@@ -23,6 +23,7 @@ import {
   saveLearningStyle
 } from '../services/learningStyle';
 import UserProfile from '../../../user-profile/src/models/UserProfile';
+import { getLearningDocument } from '../services/courseReader';
 
 // Interface languages the learning workspace can actually render. Keep this list
 // in step with the translations in the web workspace; a persisted value outside
@@ -49,7 +50,7 @@ function operation(run: (req: DomainRequest) => Promise<unknown>) {
     } catch (error) {
       const status = (error as { status?: number }).status;
       res
-        .status(status && [400, 401, 403, 404, 409, 503].includes(status) ? status : 503)
+        .status(status && [400, 401, 403, 404, 409, 422, 503].includes(status) ? status : 503)
         .json({ error: error instanceof Error ? error.message : 'Learning unavailable' });
     }
   };
@@ -62,6 +63,12 @@ const revision = (r: DomainRequest) => {
 router.get(
   '/courses/:courseId/activities',
   operation((r) => publishedActivities(r.user!.userId, String(r.params.courseId), revision(r)))
+);
+router.get(
+  '/courses/:courseId/document',
+  operation((r) =>
+    getLearningDocument(r.user!.userId, String(r.params.courseId), revision(r))
+  )
 );
 router.get(
   '/courses/:courseId/progress',

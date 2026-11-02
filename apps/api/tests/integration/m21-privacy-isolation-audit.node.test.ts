@@ -32,7 +32,7 @@ import { publishCourseRevision } from '../../modules/study/src/services/coursePu
 import { registerActivity, submitAttempt } from '../../modules/study/src/services/activityAttempt';
 import type { DomainRequest } from '../../src/framework/contracts';
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27018/mindflow-test';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27018/ednova-test';
 
 test('M21 / ED-13: Comprehensive Privacy, Resource Isolation & Synthetic Compliance Audit', async (t) => {
   await mongoose.connect(MONGO_URI);

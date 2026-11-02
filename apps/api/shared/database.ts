@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const logger = require('./logger');
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/study_partner';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/ednova';
 
 let isConnected = false;
 

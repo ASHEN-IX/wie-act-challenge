@@ -1,4 +1,4 @@
-# Study Partner API — reusable EdNova foundation
+# EdNova API — course, learning and account services
 
 NestJS modular API in the parent pnpm workspace. From root: `pnpm install --frozen-lockfile`, then `pnpm --filter api dev` (or `pnpm dev:api`). Source entrypoint: `src/main.ts`; compiled entrypoint: `dist/main.js`. Configuration, database/broker requirements and known startup blockers: [development](../../docs/development.md) and [validation](../../docs/audit/validation.md).
 

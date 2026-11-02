@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script to demonstrate the study partner system with goal storage.
+Test script to demonstrate the EdNova system with goal storage.
 
 This script shows how to:
 1. Process a PDF course material
@@ -22,7 +22,7 @@ from agents.course_ingestion.services.database_service import DatabaseService
 
 def test_with_pdf():
     """Test the system with a PDF file and store goals in database."""
-    print("🧪 Testing Study Partner System with PDF")
+    print("🧪 Testing EdNova System with PDF")
     print("=" * 50)
 
     # Path to test PDF

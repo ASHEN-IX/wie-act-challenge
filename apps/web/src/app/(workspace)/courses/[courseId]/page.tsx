@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { PageHeader } from "@/components/shared/page-header";
 import { DataError, EmptyState } from "@/components/shared/states";
 import { ActionForm } from "@/components/shared/action-form";
 import { TextField } from "@/components/shared/form-field";
 import { getCourse } from "@/features/courses/queries";
 import { deleteCourse } from "@/features/courses/actions";
+import { courseStage, courseStageLabel } from "@/features/courses/lifecycle";
 export default async function CoursePage({
   params,
 }: {
@@ -17,6 +19,7 @@ export default async function CoursePage({
   const course = result.data?.course;
   if (!course)
     return <DataError message={result.error || "Course not found."} />;
+  const stage = courseStage(course);
   return (
     <>
       <PageHeader
@@ -25,19 +28,58 @@ export default async function CoursePage({
           course.description || "Your source material and extracted topics."
         }
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" asChild>
               <Link href={`/courses/${course.id}/studio`}>Course Studio</Link>
             </Button>
-            <Button variant="outline" asChild>
-              <Link href={`/courses/${course.id}/learn`}>
-                Open published learning
-              </Link>
-            </Button>
+            {stage === "ready" && (
+              <Button asChild>
+                <Link href={`/courses/${course.id}/learn`}>Open course</Link>
+              </Button>
+            )}
           </div>
         }
       />
-      <Badge variant="secondary">{course.status}</Badge>
+      <Badge
+        variant={
+          stage === "ready"
+            ? "default"
+            : stage === "failed"
+              ? "destructive"
+              : "secondary"
+        }
+      >
+        {courseStageLabel(stage)}
+      </Badge>
+      {course.status === "processing" && (
+        <Alert className="mt-5">
+          <AlertTitle>Preparing your course</AlertTitle>
+          <AlertDescription>
+            EdNova is reading your sources and building the course outline. This
+            usually takes a few minutes; you can safely leave this page and
+            check back later.
+          </AlertDescription>
+        </Alert>
+      )}
+      {stage === "review" && (
+        <Alert className="mt-5 border-amber-500/40 bg-amber-500/10">
+          <AlertTitle>Course material is ready for your review</AlertTitle>
+          <AlertDescription>
+            EdNova has processed your sources. Review the course outline in
+            Course Studio and publish the revision to make it available for
+            learning.
+          </AlertDescription>
+        </Alert>
+      )}
+      {stage === "failed" && (
+        <Alert variant="destructive" className="mt-5">
+          <AlertTitle>Course processing failed</AlertTitle>
+          <AlertDescription>
+            Your original files are still available. Open Course Studio to
+            review the source and retry processing.
+          </AlertDescription>
+        </Alert>
+      )}
       <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1fr)_280px]">
         <section className="flex flex-col gap-7">
           <h2 className="text-xl font-semibold">Course outline</h2>
@@ -68,7 +110,9 @@ export default async function CoursePage({
               description={
                 course.status === "processing"
                   ? "Processing is queued. Refresh this page after the ingestion worker finishes."
-                  : "Your source files are available below. Processing may need to be retried by the course owner."
+                  : stage === "review"
+                    ? "Open Course Studio to review the draft and publish it."
+                    : "Your source files are available below. Processing may need to be retried by the course owner."
               }
             />
           )}

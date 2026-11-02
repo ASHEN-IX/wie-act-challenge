@@ -1,7 +1,7 @@
 /**
  * RabbitMQ topology for AI jobs (F01 / AI-COM-06).
  *
- * Mirrored by `study-partner-ai/messaging/topology.py`. Names and semantics
+ * Mirrored by `ednova-ai/messaging/topology.py`. Names and semantics
  * MUST stay identical on both sides — covered by topology-parity tests.
  *
  * Layout (vhost `/`):

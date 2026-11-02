@@ -131,7 +131,7 @@ async def test_llm_enrichment_failure_schedules_backoff_retry(worker, monkeypatc
             {"title": "t", "full_content": "content", "key_concepts": []}, 1, ["n.pdf"]
         ]
 
-    def enrich_fail(self, subtopics):
+    def enrich_fail(self, subtopics, _course_title=None):
         raise TimeoutError(LLM_RETRYABLE)
 
     monkeypatch.setattr(worker, "_parse_stage", parse_stub.__get__(worker))
