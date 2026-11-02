@@ -18,6 +18,7 @@ from services.api.routers.facilitator import router as facilitator_router
 from services.api.routers.provider import router as provider_router
 from services.api.routers.tutor import router as tutor_router
 from services.api.routers.sources import router as sources_router
+from services.api.routers.formula_recognition import router as formula_recognition_router
 from utils.llm_client import get_provider_status
 
 app = FastAPI(title="EdNova AI API", version="1.0.0")
@@ -44,6 +45,7 @@ for router in (
     provider_router,
     tutor_router,
     sources_router,
+    formula_recognition_router,
 ):
     app.include_router(router, dependencies=[Depends(require_service)])
 

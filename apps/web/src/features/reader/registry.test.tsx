@@ -101,3 +101,16 @@ describe("trusted learning block registry", () => {
     expect(codeHtml).not.toContain("<script");
   });
 });
+
+it("uses original equation imagery for unreviewed plain extraction, preserving text without a verification claim", () => {
+  const block: Extract<LessonBlockV2, { type: "math" }> = {
+    id: "unreviewed", type: "math", expression: "∫ f x a b", notation: "plain",
+    sourceMeta: { page: 2, regionId: "region_aaaaaaaaaaaaaaaaaaaa", reviewRequired: true },
+  };
+  const html = renderToStaticMarkup(<LearningBlockView block={block} context={{ title: "Math", revisionId: "rev_1", mathCropHref: () => "/api/v1/study/courses/aaaaaaaaaaaaaaaaaaaaaaaa/revisions/rev_1/sources/doc_aaaaaaaaaaaaaaaa/regions/region_aaaaaaaaaaaaaaaaaaaa" }} />);
+  expect(html).toContain("<img");
+  expect(html).toContain("Automatic transcription is unverified");
+  expect(html).toContain("∫ f x a b");
+  expect(html).not.toContain("Instructor-approved");
+  expect(html).not.toContain("class=\"katex");
+});

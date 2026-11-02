@@ -1,0 +1,424 @@
+{
+  "schema_version": "1.0.0",
+  "source": "reference-course.pdf",
+  "region_count": 85,
+  "sampling": "purposive, not representative for accuracy",
+  "cases": [
+    {
+      "id": "eq-000",
+      "category": "summation_scripts",
+      "document_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "page": 1,
+      "region_id": "region_22d55ef3c62c7aefa2da",
+      "region_bbox": [
+        263.76,
+        384.76,
+        322.23,
+        418.8
+      ],
+      "crop_bbox": [
+        259.76,
+        380.76,
+        326.23,
+        422.8
+      ],
+      "crop": "crops/eq-000.png",
+      "reviewer": null,
+      "annotation_status": "pending_review",
+      "expected_expression": null,
+      "expected_latex": "S_n = \\sum_{p=0}^{n} u_p",
+      "baseline_text": "∑ up. Sn =\np=0",
+      "recognition_output": null
+    },
+    {
+      "id": "eq-001",
+      "category": "limits_summation",
+      "document_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "page": 1,
+      "region_id": "region_42116d94dec3d2a81d58",
+      "region_bbox": [
+        239.85,
+        451.26,
+        330.29,
+        485.3
+      ],
+      "crop_bbox": [
+        235.85,
+        447.26,
+        334.29,
+        489.3
+      ],
+      "crop": "crops/eq-001.png",
+      "reviewer": null,
+      "annotation_status": "pending_review",
+      "expected_expression": null,
+      "expected_latex": null,
+      "baseline_text": "∑ un =\nn→+∞ n=0 p=0",
+      "recognition_output": null
+    },
+    {
+      "id": "eq-002",
+      "category": "quantifiers_inequality_mixed",
+      "document_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "page": 1,
+      "region_id": "region_84094eabebe8648865da",
+      "region_bbox": [
+        170.97,
+        626.61,
+        415.02,
+        660.24
+      ],
+      "crop_bbox": [
+        166.97,
+        622.61,
+        419.02,
+        664.24
+      ],
+      "crop": "crops/eq-002.png",
+      "reviewer": null,
+      "annotation_status": "pending_review",
+      "expected_expression": null,
+      "expected_latex": null,
+      "baseline_text": "∑ un| ≤ε. ∀ε > 0, ∃Nε ∈N tel que q ≥p ≥Nε ⇒|\nn=p",
+      "recognition_output": null
+    },
+    {
+      "id": "eq-005",
+      "category": "small_mixed",
+      "document_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "page": 2,
+      "region_id": "region_55f2693d71d63e914711",
+      "region_bbox": [
+        261.59,
+        457.59,
+        318.23,
+        491.18
+      ],
+      "crop_bbox": [
+        257.59,
+        453.59,
+        322.23,
+        495.18
+      ],
+      "crop": "crops/eq-005.png",
+      "reviewer": null,
+      "annotation_status": "pending_review",
+      "expected_expression": null,
+      "expected_latex": null,
+      "baseline_text": "# f′ = f,\nf(0) = 1.",
+      "recognition_output": null
+    },
+    {
+      "id": "eq-006",
+      "category": "integral",
+      "document_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "page": 2,
+      "region_id": "region_bc2895a49f1eed51e9a2",
+      "region_bbox": [
+        192.09,
+        552.73,
+        393.91,
+        588.19
+      ],
+      "crop_bbox": [
+        188.09,
+        548.73,
+        397.91,
+        592.19
+      ],
+      "crop": "crops/eq-006.png",
+      "reviewer": null,
+      "annotation_status": "pending_review",
+      "expected_expression": null,
+      "expected_latex": null,
+      "baseline_text": "∫x f′(t)dt + f(0) = 1 + f(x) = f(t)dt.\n0\n0",
+      "recognition_output": null
+    },
+    {
+      "id": "eq-008",
+      "category": "multiline_mixed",
+      "document_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "page": 2,
+      "region_id": "region_281ea531f2651acd6607",
+      "region_bbox": [
+        72.5,
+        675.38,
+        513.5,
+        713.2
+      ],
+      "crop_bbox": [
+        68.5,
+        671.38,
+        517.5,
+        717.2
+      ],
+      "crop": "crops/eq-008.png",
+      "reviewer": null,
+      "annotation_status": "pending_review",
+      "expected_expression": null,
+      "expected_latex": null,
+      "baseline_text": "S(x) = lim\n∫x lim n→+∞Sn+1(x) =\n∫x lim Sn−1(t)dt) = 1+ n→+∞(1+\n∫x S(t)dt. n→+∞Sn−1(t)dt = 1+ 0\n0\n0",
+      "recognition_output": null
+    },
+    {
+      "id": "eq-010",
+      "category": "multiline_fraction",
+      "document_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "page": 3,
+      "region_id": "region_7540c5520d1dcb955310",
+      "region_bbox": [
+        199.66,
+        119.5,
+        386.33,
+        246.57
+      ],
+      "crop_bbox": [
+        195.66,
+        115.5,
+        390.33,
+        250.57
+      ],
+      "crop": "crops/eq-010.png",
+      "reviewer": null,
+      "annotation_status": "pending_review",
+      "expected_expression": null,
+      "expected_latex": null,
+      "baseline_text": "∫x 1dt = 1 + x, S1(x) = 1 +\n0\n∫x (1 + t)dt = 1 + x + x2 S2(x) = 1 +\n2 ,\n0 ...\n∑ xp Sn(x) =\nn p! ·\np=0",
+      "recognition_output": null
+    },
+    {
+      "id": "eq-017",
+      "category": "limit_fraction",
+      "document_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "page": 4,
+      "region_id": "region_76765c6249290c3b8651",
+      "region_bbox": [
+        230.66,
+        173.09,
+        409.1,
+        206.71
+      ],
+      "crop_bbox": [
+        226.66,
+        169.09,
+        413.1,
+        210.71
+      ],
+      "crop": "crops/eq-017.png",
+      "reviewer": null,
+      "annotation_status": "pending_review",
+      "expected_expression": null,
+      "expected_latex": null,
+      "baseline_text": "= lim n + 1 = 0. n→+∞ ∑\nn→+∞ |un|",
+      "recognition_output": null
+    },
+    {
+      "id": "eq-039",
+      "category": "fraction_limit",
+      "document_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "page": 8,
+      "region_id": "region_02518de3d60c5cbe8f2e",
+      "region_bbox": [
+        207.45,
+        719.71,
+        378.54,
+        751.55
+      ],
+      "crop_bbox": [
+        203.45,
+        715.71,
+        382.54,
+        755.55
+      ],
+      "crop": "crops/eq-039.png",
+      "reviewer": null,
+      "annotation_status": "pending_review",
+      "expected_expression": null,
+      "expected_latex": null,
+      "baseline_text": "R = 1 , où ℓ+ = lim sup\nℓ+\nn→∞|an|1/n.",
+      "recognition_output": null
+    },
+    {
+      "id": "eq-045",
+      "category": "definite_integral",
+      "document_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "page": 11,
+      "region_id": "region_775beaf00828c96fe413",
+      "region_bbox": [
+        244.34,
+        384.78,
+        341.65,
+        420.24
+      ],
+      "crop_bbox": [
+        240.34,
+        380.78,
+        345.65,
+        424.24
+      ],
+      "crop": "crops/eq-045.png",
+      "reviewer": null,
+      "annotation_status": "pending_review",
+      "expected_expression": null,
+      "expected_latex": null,
+      "baseline_text": "∫b F(x) = f(x, t)dt,\na",
+      "recognition_output": null
+    },
+    {
+      "id": "eq-047",
+      "category": "quantifiers_inequalities",
+      "document_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "page": 11,
+      "region_id": "region_d7b82f0fe9e36284cbe5",
+      "region_bbox": [
+        125.17,
+        710.49,
+        460.82,
+        729.42
+      ],
+      "crop_bbox": [
+        121.17,
+        706.49,
+        464.82,
+        733.42
+      ],
+      "crop": "crops/eq-047.png",
+      "reviewer": null,
+      "annotation_status": "pending_review",
+      "expected_expression": null,
+      "expected_latex": null,
+      "baseline_text": "∀ε > 0, ∃α(ε) > 0 tel que ∀x, y ∈I, |y −x| ≤α(ε) ⇒|φ(y) −φ(x)| ≤ε.",
+      "recognition_output": null
+    },
+    {
+      "id": "eq-054",
+      "category": "fraction_nested",
+      "document_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "page": 13,
+      "region_id": "region_7743da15eb26e0241a44",
+      "region_bbox": [
+        213.2,
+        519.55,
+        372.79,
+        556.51
+      ],
+      "crop_bbox": [
+        209.2,
+        515.55,
+        376.79,
+        560.51
+      ],
+      "crop": "crops/eq-054.png",
+      "reviewer": null,
+      "annotation_status": "pending_review",
+      "expected_expression": null,
+      "expected_latex": null,
+      "baseline_text": "& '1 = 1 −cos x F(x) = ,\n−cos(tx) x\nx 0",
+      "recognition_output": null
+    },
+    {
+      "id": "eq-063",
+      "category": "improper_integral",
+      "document_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "page": 15,
+      "region_id": "region_5ca30cfdf0504e0e00de",
+      "region_bbox": [
+        238.63,
+        152.97,
+        347.37,
+        188.44
+      ],
+      "crop_bbox": [
+        234.63,
+        148.97,
+        351.37,
+        192.44
+      ],
+      "crop": "crops/eq-063.png",
+      "reviewer": null,
+      "annotation_status": "pending_review",
+      "expected_expression": null,
+      "expected_latex": null,
+      "baseline_text": "∫+∞ F(x) = f(x, t)dt,\n0",
+      "recognition_output": null
+    },
+    {
+      "id": "eq-079",
+      "category": "mixed_text_math",
+      "document_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "page": 18,
+      "region_id": "region_494b73067ee1aef37ae3",
+      "region_bbox": [
+        72.5,
+        704.17,
+        513.49,
+        750.21
+      ],
+      "crop_bbox": [
+        68.5,
+        700.17,
+        517.49,
+        754.21
+      ],
+      "crop": "crops/eq-079.png",
+      "reviewer": null,
+      "annotation_status": "pending_review",
+      "expected_expression": null,
+      "expected_latex": null,
+      "baseline_text": "(indication : poser φ(x, u) = x cos(u)\n**∂2 ** sur des\nxφ(x, u) u2 + x2 , et majorer |φ(x, u)|, |∂xφ(x, u)|, et intervalles [a, b] ⊂]0, +∞[)",
+      "recognition_output": null
+    },
+    {
+      "id": "eq-083",
+      "category": "multiline_nested",
+      "document_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "page": 19,
+      "region_id": "region_16ed0cd2cef1f5d3b926",
+      "region_bbox": [
+        91.05,
+        581.54,
+        494.94,
+        697.26
+      ],
+      "crop_bbox": [
+        87.05,
+        577.54,
+        498.94,
+        701.26
+      ],
+      "crop": "crops/eq-083.png",
+      "reviewer": null,
+      "annotation_status": "pending_review",
+      "expected_expression": null,
+      "expected_latex": null,
+      "baseline_text": "∫+∞\n∫+∞ - x sin u x cos(u) 2xu F(x) =\n.+∞ = + u2 + x2 du (x2 + u2)2 du 0\nx2 + u2 0 0\n∫+∞ 2xu =\n(x2 + u2)2 du 0 - ∫+∞\n.+∞ 2xu 2x(x2 −3u2) = cos u du\n+ (x2 + u2)3\n− (x2 + u2)2 cos u 0 0 =\nF ′′(x).",
+      "recognition_output": null
+    },
+    {
+      "id": "eq-084",
+      "category": "multiline_fraction",
+      "document_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "page": 20,
+      "region_id": "region_41d94453246492aa5bcc",
+      "region_bbox": [
+        72.5,
+        123.48,
+        398.12,
+        191.19
+      ],
+      "crop_bbox": [
+        68.5,
+        119.48,
+        402.12,
+        195.19
+      ],
+      "crop": "crops/eq-084.png",
+      "reviewer": null,
+      "annotation_status": "pending_review",
+      "expected_expression": null,
+      "expected_latex": null,
+      "baseline_text": "∫+∞ 1 F(0) =\n= π 1 + t2 dt = [arctan(t)]+∞ 0\n0 2 ·\nOn a donc, ﬁnalement, F(x) = π\n2 e−|x|.",
+      "recognition_output": null
+    }
+  ]
+}

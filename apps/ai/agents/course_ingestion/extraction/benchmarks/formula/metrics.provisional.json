@@ -1,0 +1,22 @@
+{
+  "status": "provisional_not_independently_reviewed",
+  "expected_annotation_count": 10,
+  "compared_count": 10,
+  "normalization": "remove Unicode whitespace; remove trailing periods, commas and semicolons; no LaTeX equivalence normalization",
+  "normalized_exact_count": 0,
+  "normalized_exact_ids": [],
+  "note": "literal comparison is not mathematical accuracy; plain baseline cannot be compared in this LaTeX syntax",
+  "case_count": 16,
+  "completed_outputs": 16,
+  "case_errors": 0,
+  "latency_median_seconds": 0.8645,
+  "latency_min_seconds": 0.236,
+  "latency_max_seconds": 11.749,
+  "latency_total_seconds": 31.719,
+  "cpu_total_seconds": 62.981,
+  "mean_cpu_percent_of_one_core": 198.6,
+  "peak_rss_kib": 787356,
+  "initialization_seconds": 6.522,
+  "weight_bytes": 102113875,
+  "weight_sha256": "a63d9141c53d266cb682fb5a8bd83bd5cbe283145e0e78ebdc0f895195a1dfaa"
+}

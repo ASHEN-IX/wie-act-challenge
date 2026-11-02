@@ -19,6 +19,7 @@ class Subtopic(BaseModel):
     figures: List[Dict] = []
     tables: List[Dict] = []
     source_spans: List[Dict] = []
+    source_regions: List[Dict] = []
     structured_blocks: List[Dict] = []
     difficulty_estimate: float = 0.0
     tokenized_chunks: List[str] = []

@@ -101,3 +101,13 @@ def test_summary_can_never_substitute_for_empty_canonical_body():
     )
     assert retrieval_units(canonical) == []
     assert canonical["chapters"][0]["lessons"][0]["blocks"][0]["text"] == ""
+
+
+def test_long_source_equation_is_not_silently_cut_at_600_characters():
+    # Use the same source-region projection as ingestion, retaining full original text.
+    text = 'x + ' * 200 + 'y = 0'
+    sub = lesson()
+    sub['source_regions'] = [{'id': 'long', 'type': 'math', 'text': text, 'page': 1, 'bbox': [1,2,300,200], 'documentId':'doc_course'}]
+    document = build_canonical_document('64a000000000000000000001', 'Course', [{'id':'chapter','title':'Source','subtopics':[sub]}])
+    blocks = document['chapters'][0]['lessons'][0]['blocks']
+    assert any(b.get('expression') == text for b in blocks)

@@ -1,0 +1,528 @@
+{
+  "source_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+  "status": "pending_independent_review",
+  "cases": [
+    {
+      "id": "eq-000",
+      "page": 1,
+      "source_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "original_region_bbox": [
+        263.76,
+        384.76,
+        322.23,
+        418.8
+      ],
+      "original_crop_bbox": [
+        259.76,
+        380.76,
+        326.23,
+        422.8
+      ],
+      "original_crop": "crops/eq-000.png",
+      "page_image": "review/pages/page-01.png",
+      "baseline": "∑ up. Sn =\np=0",
+      "provisional_expression": "S_n = \\sum_{p=0}^{n} u_p",
+      "provisional_latex": "S_n = \\sum_{p=0}^{n} u_p",
+      "annotation_status": "pending_review",
+      "reviewer": null,
+      "notes": "Summation, scripts and punctuation.",
+      "candidate_crop": null,
+      "pix2tex_output": "S_{n}=\\sum_{p=0}^{n}u_{p}."
+    },
+    {
+      "id": "eq-001",
+      "page": 1,
+      "source_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "original_region_bbox": [
+        239.85,
+        451.26,
+        330.29,
+        485.3
+      ],
+      "original_crop_bbox": [
+        235.85,
+        447.26,
+        334.29,
+        489.3
+      ],
+      "original_crop": "crops/eq-001.png",
+      "page_image": "review/pages/page-01.png",
+      "baseline": "∑ un =\nn→+∞ n=0 p=0",
+      "provisional_expression": "\\sum_{n=0}^{+\\infty}u_n=\\lim_{n\\to+\\infty}\\sum_{p=0}^{n}u_p",
+      "provisional_latex": "\\sum_{n=0}^{+\\infty}u_n=\\lim_{n\\to+\\infty}\\sum_{p=0}^{n}u_p",
+      "annotation_status": "pending_review",
+      "reviewer": null,
+      "notes": "Detector clips final summand on the right; candidate expands it.",
+      "candidate_crop": {
+        "bbox": [
+          239,
+          449,
+          352,
+          486
+        ],
+        "crop": "review/corrected/eq-001.png",
+        "sha256": "b098c9e9979f03e408d0f217d0b6724adfd4181f130e3c7ebbe11b11a4d3c58f",
+        "status": "candidate_unverified"
+      },
+      "pix2tex_output": "\\sum_{n=0}^{+\\infty}u_{n}=\\operatorname*{lim}_{n\\to+\\infty}\\sum_{p=0}^{n}v"
+    },
+    {
+      "id": "eq-002",
+      "page": 1,
+      "source_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "original_region_bbox": [
+        170.97,
+        626.61,
+        415.02,
+        660.24
+      ],
+      "original_crop_bbox": [
+        166.97,
+        622.61,
+        419.02,
+        664.24
+      ],
+      "original_crop": "crops/eq-002.png",
+      "page_image": "review/pages/page-01.png",
+      "baseline": "∑ un| ≤ε. ∀ε > 0, ∃Nε ∈N tel que q ≥p ≥Nε ⇒|\nn=p",
+      "provisional_expression": "\\forall\\epsilon>0,\\exists N_\\epsilon\\in\\mathbb N\\;\\text{tel que }q\\ge p\\ge N_\\epsilon\\Rightarrow|\\sum_{n=p}^{q}u_n|\\le\\epsilon",
+      "provisional_latex": "\\forall\\epsilon>0,\\exists N_\\epsilon\\in\\mathbb N\\;\\text{tel que }q\\ge p\\ge N_\\epsilon\\Rightarrow|\\sum_{n=p}^{q}u_n|\\le\\epsilon",
+      "annotation_status": "pending_review",
+      "reviewer": null,
+      "notes": "Quantifiers, sum and French prose; cropped bounds require review.",
+      "candidate_crop": null,
+      "pix2tex_output": "\\forall\\epsilon>0,\\exists N_{\\epsilon}\\in\\mathbb{N}{\\mathrm{~tel~que~}}q\\geq p\\geq N_{\\epsilon}\\Rightarrow|\\sum_{n=p}^{q}u_{n}|\\leq\\epsilon."
+    },
+    {
+      "id": "eq-005",
+      "page": 2,
+      "source_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "original_region_bbox": [
+        261.59,
+        457.59,
+        318.23,
+        491.18
+      ],
+      "original_crop_bbox": [
+        257.59,
+        453.59,
+        322.23,
+        495.18
+      ],
+      "original_crop": "crops/eq-005.png",
+      "page_image": "review/pages/page-02.png",
+      "baseline": "# f′ = f,\nf(0) = 1.",
+      "provisional_expression": "\\begin{cases} f' = f, \\\\ f(0) = 1. \\end{cases}",
+      "provisional_latex": "\\begin{cases} f' = f, \\\\ f(0) = 1. \\end{cases}",
+      "annotation_status": "pending_review",
+      "reviewer": null,
+      "notes": "Padded original includes a strip of the preceding line; candidate removes padding.",
+      "candidate_crop": {
+        "bbox": [
+          256,
+          457.5,
+          320,
+          492
+        ],
+        "crop": "review/corrected/eq-005.png",
+        "sha256": "f50135600dfe90e1a69fb009556405effe8a06d99c9fb43016f9bd3feaa1a28b",
+        "status": "candidate_unverified"
+      },
+      "pix2tex_output": "\\left\\{\\begin{array}{l l}{\\infty\\to-\\infty-\\infty-\\infty-{}}\\\\ {f^{\\prime}=f,}\\\\ {f(0)=1.}\\end{array}\\right."
+    },
+    {
+      "id": "eq-006",
+      "page": 2,
+      "source_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "original_region_bbox": [
+        192.09,
+        552.73,
+        393.91,
+        588.19
+      ],
+      "original_crop_bbox": [
+        188.09,
+        548.73,
+        397.91,
+        592.19
+      ],
+      "original_crop": "crops/eq-006.png",
+      "page_image": "review/pages/page-02.png",
+      "baseline": "∫x f′(t)dt + f(0) = 1 + f(x) = f(t)dt.\n0\n0",
+      "provisional_expression": "f(x) = \\int_0^x f'(t)dt + f(0) = 1 + \\int_0^x f(t)dt",
+      "provisional_latex": "f(x) = \\int_0^x f'(t)dt + f(0) = 1 + \\int_0^x f(t)dt",
+      "annotation_status": "pending_review",
+      "reviewer": null,
+      "notes": "Padded original includes preceding-line fragments; candidate uses tight bounds.",
+      "candidate_crop": {
+        "bbox": [
+          192,
+          552.7,
+          394,
+          588.2
+        ],
+        "crop": "review/corrected/eq-006.png",
+        "sha256": "578c19e0be4c45371942c8ec3bde0670e44127751bfe1c23ad449504338a0e78",
+        "status": "candidate_unverified"
+      },
+      "pix2tex_output": "\\begin{array}{c}{{f(\\operatorname*{mon}\\leftrightarrow\\cdots\\leftrightarrow\\operatorname*{max}\\leftrightarrow\\operatorname*{max}\\leftrightarrow\\operatorname*{max}\\leftrightarrow\\cdots}}\\\\ {{f(x)=\\displaystyle\\int_{0}^{x}f^{\\prime}(t)d t+f(0)=1+\\int_{0}^{x}f(t)d t.}}\\end{array}"
+    },
+    {
+      "id": "eq-008",
+      "page": 2,
+      "source_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "original_region_bbox": [
+        72.5,
+        675.38,
+        513.5,
+        713.2
+      ],
+      "original_crop_bbox": [
+        68.5,
+        671.38,
+        517.5,
+        717.2
+      ],
+      "original_crop": "crops/eq-008.png",
+      "page_image": "review/pages/page-02.png",
+      "baseline": "S(x) = lim\n∫x lim n→+∞Sn+1(x) =\n∫x lim Sn−1(t)dt) = 1+ n→+∞(1+\n∫x S(t)dt. n→+∞Sn−1(t)dt = 1+ 0\n0\n0",
+      "provisional_expression": "S(x)=\\lim_{n\\to+\\infty}S_{n+1}(x)=\\lim_{n\\to+\\infty}(1+\\int_0^x S_{n-1}(t)dt)=1+\\int_0^x\\lim_{n\\to+\\infty}S_{n-1}(t)dt=1+\\int_0^x S(t)dt",
+      "provisional_latex": "S(x)=\\lim_{n\\to+\\infty}S_{n+1}(x)=\\lim_{n\\to+\\infty}(1+\\int_0^x S_{n-1}(t)dt)=1+\\int_0^x\\lim_{n\\to+\\infty}S_{n-1}(t)dt=1+\\int_0^x S(t)dt",
+      "annotation_status": "pending_review",
+      "reviewer": null,
+      "notes": "Padded original includes preceding text; long multi-step equation, tight candidate.",
+      "candidate_crop": {
+        "bbox": [
+          72.5,
+          675.4,
+          513.5,
+          713.2
+        ],
+        "crop": "review/corrected/eq-008.png",
+        "sha256": "661146e8974dbc8dcd30bd6053eaf1f78b5533ca9a9ca67206052bad33d0a87d",
+        "status": "candidate_unverified"
+      },
+      "pix2tex_output": "\\begin{array}{l}{{\\stackrel{\\infty}{\\I{\\infty}\\propto\\infty\\infty\\infty}\\underbrace{\\langle\\textsf{s eto s e..............\\rangle}_{\\infty}\\underbrace{\\scriptstyle{\\mathrm{s\\leftrightarrow-}}\\ \\;\\leftrightarrow\\cdots\\ \\;\\leftrightarrow\\cdots\\ \\;\\operatorname{se...\\to}}_{\\mathrm{s\\to-\\infty}\\ \\;\\vrule\\operatorname{s\\to\\infty}\\ \\;\\operatorname{s\\to\\infty}\\ \\;\\operatorname{s\\to\\infty}\\cdot\\cdot\\cdot\\cdot\\cdot\\cdots\\times\\cdot\\cdots\\times\\cdot\\cdots\\times\\cdot\\leftrightarrow\\cdots\\times\\cdot\\cdot\\leftrightarrow}_{n\\geq1}(t)d t=1+\\displaystyle\\int_{0}^{x}S(t)d t.}}\\end{array}"
+    },
+    {
+      "id": "eq-010",
+      "page": 3,
+      "source_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "original_region_bbox": [
+        199.66,
+        119.5,
+        386.33,
+        246.57
+      ],
+      "original_crop_bbox": [
+        195.66,
+        115.5,
+        390.33,
+        250.57
+      ],
+      "original_crop": "crops/eq-010.png",
+      "page_image": "review/pages/page-03.png",
+      "baseline": "∫x 1dt = 1 + x, S1(x) = 1 +\n0\n∫x (1 + t)dt = 1 + x + x2 S2(x) = 1 +\n2 ,\n0 ...\n∑ xp Sn(x) =\nn p! ·\np=0",
+      "provisional_expression": "S_1(x)=1+\\int_0^x1dt=1+x,\\quad S_2(x)=1+\\int_0^x(1+t)dt=1+x+\\frac{x^2}{2},\\quad\\ldots,\\quad S_n(x)=\\sum_{p=0}^{n}\\frac{x^p}{p!}",
+      "provisional_latex": "S_1(x)=1+\\int_0^x1dt=1+x,\\quad S_2(x)=1+\\int_0^x(1+t)dt=1+x+\\frac{x^2}{2},\\quad\\ldots,\\quad S_n(x)=\\sum_{p=0}^{n}\\frac{x^p}{p!}",
+      "annotation_status": "pending_review",
+      "reviewer": null,
+      "notes": "Padded original includes nearby prose; candidate uses detector bounds; all steps require review.",
+      "candidate_crop": {
+        "bbox": [
+          199.5,
+          119.5,
+          386.4,
+          246.6
+        ],
+        "crop": "review/corrected/eq-010.png",
+        "sha256": "288cc30f7aeec80870d062fb697935d4a955db70b04d2c74768be0ab207db645",
+        "status": "candidate_unverified"
+      },
+      "pix2tex_output": "\\begin{array}{l}{{\\sqrt[[object Object]]{4}\\hfill}}\\\\ {{S_{1}(x)=1+\\displaystyle\\int_{0}^{x}1d t=1+x,}}\\\\ {{S_{2}(x)=1+\\displaystyle\\int_{0}^{x}(1+t)d t=1+x+{\\cfrac{x^{2}}{2}},}}\\end{array}"
+    },
+    {
+      "id": "eq-017",
+      "page": 4,
+      "source_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "original_region_bbox": [
+        230.66,
+        173.09,
+        409.1,
+        206.71
+      ],
+      "original_crop_bbox": [
+        226.66,
+        169.09,
+        413.1,
+        210.71
+      ],
+      "original_crop": "crops/eq-017.png",
+      "page_image": "review/pages/page-04.png",
+      "baseline": "= lim n + 1 = 0. n→+∞ ∑\nn→+∞ |un|",
+      "provisional_expression": "\\lim_{n\\to+\\infty} \\frac{|u_{n+1}|}{|u_n|} = \\lim_{n\\to+\\infty} \\frac{|x|}{n+1} = 0",
+      "provisional_latex": "\\lim_{n\\to+\\infty} \\frac{|u_{n+1}|}{|u_n|} = \\lim_{n\\to+\\infty} \\frac{|x|}{n+1} = 0",
+      "annotation_status": "pending_review",
+      "reviewer": null,
+      "notes": "Nearby prose below; tight candidate.",
+      "candidate_crop": {
+        "bbox": [
+          226.66,
+          169.09,
+          413.1,
+          205.0
+        ],
+        "crop": "review/corrected/eq-017.png",
+        "sha256": "b471e84d8bc579746ddac82b9dc2897eb4786a6efb30f4ebd7c445c3d2bb5fb8",
+        "status": "candidate_unverified"
+      },
+      "pix2tex_output": "\\operatorname*{lim}_{n\\rightarrow+\\infty}\\frac{|u_{n+1}|}{|u_{n}|}=\\operatorname*{lim}_{n\\rightarrow+\\infty}\\frac{|x|}{n+1}=0."
+    },
+    {
+      "id": "eq-039",
+      "page": 8,
+      "source_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "original_region_bbox": [
+        207.45,
+        719.71,
+        378.54,
+        751.55
+      ],
+      "original_crop_bbox": [
+        203.45,
+        715.71,
+        382.54,
+        755.55
+      ],
+      "original_crop": "crops/eq-039.png",
+      "page_image": "review/pages/page-08.png",
+      "baseline": "R = 1 , où ℓ+ = lim sup\nℓ+\nn→∞|an|1/n.",
+      "provisional_expression": "R=\\frac{1}{\\ell_+}, \\quad \\ell_+=\\limsup_{n\\to\\infty}|a_n|^{1/n}",
+      "provisional_latex": "R=\\frac{1}{\\ell_+}, \\quad \\ell_+=\\limsup_{n\\to\\infty}|a_n|^{1/n}",
+      "annotation_status": "pending_review",
+      "reviewer": null,
+      "notes": "Fraction, limit superior and French connective.",
+      "candidate_crop": null,
+      "pix2tex_output": "R=\\frac{1}{\\ell_{+}},\\quad\\mathrm{ol}\\quad\\ell_{+}=\\operatorname*{lim}_{n\\to\\infty}\\operatorname*{sup}_{n\\to\\infty}|a_{n}|^{1/n}."
+    },
+    {
+      "id": "eq-045",
+      "page": 11,
+      "source_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "original_region_bbox": [
+        244.34,
+        384.78,
+        341.65,
+        420.24
+      ],
+      "original_crop_bbox": [
+        240.34,
+        380.78,
+        345.65,
+        424.24
+      ],
+      "original_crop": "crops/eq-045.png",
+      "page_image": "review/pages/page-11.png",
+      "baseline": "∫b F(x) = f(x, t)dt,\na",
+      "provisional_expression": "F(x)=\\int_a^b f(x,t)dt",
+      "provisional_latex": "F(x)=\\int_a^b f(x,t)dt",
+      "annotation_status": "pending_review",
+      "reviewer": null,
+      "notes": "Neighboring prose overlaps the crop envelope; tight candidate may still be contaminated.",
+      "candidate_crop": {
+        "bbox": [
+          244.3,
+          384.8,
+          341.7,
+          420.3
+        ],
+        "crop": "review/corrected/eq-045.png",
+        "sha256": "684200d96191029d5c8aca53eb71292d02eddd2350d8170140f3c4c0f1678a09",
+        "status": "candidate_unverified"
+      },
+      "pix2tex_output": "\\begin{array}{c}{{{}^{\\textstyle{a\\times\\quad}}^{\\prime}{\\overset{\\ \\,a\\times\\ \\,}{\\leftrightarrow\\quad}}\\;{}^{\\mathrm{r\\times\\alpha\\to\\infty\\times\\psi\\times\\cdots\\quad}}\\;{}^{\\mathrm{r\\times\\alpha\\quad}}\\;}}\\\\ {{F(x)=\\int_{a}^{b}f(x,t)d t,}}\\\\ {{{}~{{}~\\cdot\\quad},}}\\end{array}"
+    },
+    {
+      "id": "eq-047",
+      "page": 11,
+      "source_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "original_region_bbox": [
+        125.17,
+        710.49,
+        460.82,
+        729.42
+      ],
+      "original_crop_bbox": [
+        121.17,
+        706.49,
+        464.82,
+        733.42
+      ],
+      "original_crop": "crops/eq-047.png",
+      "page_image": "review/pages/page-11.png",
+      "baseline": "∀ε > 0, ∃α(ε) > 0 tel que ∀x, y ∈I, |y −x| ≤α(ε) ⇒|φ(y) −φ(x)| ≤ε.",
+      "provisional_expression": "\\forall\\epsilon>0, \\exists\\alpha(\\epsilon)>0\\text{ tel que }\\forall x,y\\in I, |y-x|\\le\\alpha(\\epsilon)\\Rightarrow|\\phi(y)-\\phi(x)|\\le\\epsilon",
+      "provisional_latex": "\\forall\\epsilon>0, \\exists\\alpha(\\epsilon)>0\\text{ tel que }\\forall x,y\\in I, |y-x|\\le\\alpha(\\epsilon)\\Rightarrow|\\phi(y)-\\phi(x)|\\le\\epsilon",
+      "annotation_status": "pending_review",
+      "reviewer": null,
+      "notes": "Quantifiers, inequality and French connective.",
+      "candidate_crop": null,
+      "pix2tex_output": "\\forall\\epsilon>0,\\exists\\alpha(\\epsilon)>0\\;\\mathrm{tel~que~}\\forall x,y\\in I,\\ |y-x|\\leq\\alpha(\\epsilon)\\Rightarrow|\\phi(y)-\\phi(x)|\\leq\\epsilon."
+    },
+    {
+      "id": "eq-054",
+      "page": 13,
+      "source_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "original_region_bbox": [
+        213.2,
+        519.55,
+        372.79,
+        556.51
+      ],
+      "original_crop_bbox": [
+        209.2,
+        515.55,
+        376.79,
+        560.51
+      ],
+      "original_crop": "crops/eq-054.png",
+      "page_image": "review/pages/page-13.png",
+      "baseline": "& '1 = 1 −cos x F(x) = ,\n−cos(tx) x\nx 0",
+      "provisional_expression": "F(x)=\\left[-\\frac{\\cos(tx)}{x}\\right]_0^1=\\frac{1-\\cos x}{x}",
+      "provisional_latex": "F(x)=\\left[-\\frac{\\cos(tx)}{x}\\right]_0^1=\\frac{1-\\cos x}{x}",
+      "annotation_status": "pending_review",
+      "reviewer": null,
+      "notes": "Nested fraction, bracket, integral evaluation limits.",
+      "candidate_crop": null,
+      "pix2tex_output": "F(x)=\\left[-{\\frac{\\cos(t x)}{x}}\\right]_{0}^{1}={\\frac{1-\\cos x}{x}},"
+    },
+    {
+      "id": "eq-063",
+      "page": 15,
+      "source_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "original_region_bbox": [
+        238.63,
+        152.97,
+        347.37,
+        188.44
+      ],
+      "original_crop_bbox": [
+        234.63,
+        148.97,
+        351.37,
+        192.44
+      ],
+      "original_crop": "crops/eq-063.png",
+      "page_image": "review/pages/page-15.png",
+      "baseline": "∫+∞ F(x) = f(x, t)dt,\n0",
+      "provisional_expression": "F(x)=\\int_0^{+\\infty}f(x,t)dt",
+      "provisional_latex": "F(x)=\\int_0^{+\\infty}f(x,t)dt",
+      "annotation_status": "pending_review",
+      "reviewer": null,
+      "notes": "Tiny mark above original crop; tight candidate tests padding removal.",
+      "candidate_crop": {
+        "bbox": [
+          238.6,
+          153,
+          347.4,
+          188.5
+        ],
+        "crop": "review/corrected/eq-063.png",
+        "sha256": "6342c9f8c476d7236877e8a077190766f887abded7ae0fa5bbaabb409f370b84",
+        "status": "candidate_unverified"
+      },
+      "pix2tex_output": "F(x)=\\int_{0}^{+\\infty}f(x,t)d t,"
+    },
+    {
+      "id": "eq-079",
+      "page": 18,
+      "source_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "original_region_bbox": [
+        72.5,
+        704.17,
+        513.49,
+        750.21
+      ],
+      "original_crop_bbox": [
+        68.5,
+        700.17,
+        517.49,
+        754.21
+      ],
+      "original_crop": "crops/eq-079.png",
+      "page_image": "review/pages/page-18.png",
+      "baseline": "(indication : poser φ(x, u) = x cos(u)\n**∂2 ** sur des\nxφ(x, u) u2 + x2 , et majorer |φ(x, u)|, |∂xφ(x, u)|, et intervalles [a, b] ⊂]0, +∞[)",
+      "provisional_expression": "\\phi(x,u)=\\frac{x\\cos(u)}{u^2+x^2}\\quad\\text{(partial: surrounding French instruction and derivatives require review)}",
+      "provisional_latex": "\\phi(x,u)=\\frac{x\\cos(u)}{u^2+x^2}\\quad\\text{(partial: surrounding French instruction and derivatives require review)}",
+      "annotation_status": "pending_review",
+      "reviewer": null,
+      "notes": "French instruction with several derivatives; partial transcription only.",
+      "candidate_crop": null,
+      "pix2tex_output": "\\frac{(i n d i c a t i o n:\\mathrm{poser~}\\phi(x,u)}{\\mathrm{intervalles~}[[object Object]]{o}+\\infty[)}\\qquad"
+    },
+    {
+      "id": "eq-083",
+      "page": 19,
+      "source_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "original_region_bbox": [
+        91.05,
+        581.54,
+        494.94,
+        697.26
+      ],
+      "original_crop_bbox": [
+        87.05,
+        577.54,
+        498.94,
+        701.26
+      ],
+      "original_crop": "crops/eq-083.png",
+      "page_image": "review/pages/page-19.png",
+      "baseline": "∫+∞\n∫+∞ - x sin u x cos(u) 2xu F(x) =\n.+∞ = + u2 + x2 du (x2 + u2)2 du 0\nx2 + u2 0 0\n∫+∞ 2xu =\n(x2 + u2)2 du 0 - ∫+∞\n.+∞ 2xu 2x(x2 −3u2) = cos u du\n+ (x2 + u2)3\n− (x2 + u2)2 cos u 0 0 =\nF ′′(x).",
+      "provisional_expression": "F(x)=\\int_0^{+\\infty}\\frac{x\\cos(u)}{u^2+x^2}\\,du\\quad\\text{(partial: multi-line derivation requires review)}",
+      "provisional_latex": "F(x)=\\int_0^{+\\infty}\\frac{x\\cos(u)}{u^2+x^2}\\,du\\quad\\text{(partial: multi-line derivation requires review)}",
+      "annotation_status": "pending_review",
+      "reviewer": null,
+      "notes": "Long derivation; partial transcription only.",
+      "candidate_crop": null,
+      "pix2tex_output": "\\begin{array}{r c l}{{F(x)=\\int_{0}^{+\\infty}\\frac{x\\cos(u)}{u^{2}+x^{2}}d u}}&{{=}}&{{\\left[\\frac{x\\sin u}{x^{2}+u^{2}\\right]_{0}^{+\\infty}}+\\int_{0}^{\\mp\\infty}\\frac{2x u}{(x^{2}+u^{2})^{2}}d u}}\\\\ {{}}&{{=}}&{{\\int_{0}^{+\\infty}\\frac{2x u}{(x^{2}+u^{2})^{2}}d u}}\\\\ {{}}&{{=}}&{{\\int_{0}^{+\\infty}\\frac{2x u}{(x^{2}+u^{2})^{2}}\\cos u\\right]_{0}^{+\\infty}+\\displaystyle\\int_{F^{\\prime\\prime}(x).}}}\\end{array}"
+    },
+    {
+      "id": "eq-084",
+      "page": 20,
+      "source_sha256": "ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+      "original_region_bbox": [
+        72.5,
+        123.48,
+        398.12,
+        191.19
+      ],
+      "original_crop_bbox": [
+        68.5,
+        119.48,
+        402.12,
+        195.19
+      ],
+      "original_crop": "crops/eq-084.png",
+      "page_image": "review/pages/page-20.png",
+      "baseline": "∫+∞ 1 F(0) =\n= π 1 + t2 dt = [arctan(t)]+∞ 0\n0 2 ·\nOn a donc, ﬁnalement, F(x) = π\n2 e−|x|.",
+      "provisional_expression": "F(0)=\\int_0^{+\\infty}\\frac{1}{1+t^2}dt=[\\arctan(t)]_0^{+\\infty}=\\frac{\\pi}{2}",
+      "provisional_latex": "F(0)=\\int_0^{+\\infty}\\frac{1}{1+t^2}dt=[\\arctan(t)]_0^{+\\infty}=\\frac{\\pi}{2}",
+      "annotation_status": "pending_review",
+      "reviewer": null,
+      "notes": "Original includes two separate expressions and prose; candidate isolates first formula.",
+      "candidate_crop": {
+        "bbox": [
+          186,
+          122,
+          399,
+          160
+        ],
+        "crop": "review/corrected/eq-084.png",
+        "sha256": "de0a70cf66bd01c32708a98dd8e3f0dc9891410d03ccd9869b2c93c076e1a54f",
+        "status": "candidate_unverified"
+      },
+      "pix2tex_output": "\\begin{array}{c l}{{F(0)=\\int_{0}^{+\\infty}\\frac{1}{1+t^{2}}d t=\\left[\\arctan(t)\\right]_{0}^{+\\infty}=\\frac{\\pi}{2}.}}\\end{array}"
+    }
+  ]
+}

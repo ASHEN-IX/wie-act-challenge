@@ -27,6 +27,8 @@ services:
       INGEST_UPLOADS_DIR: /app/uploads
       FAISS_INDEX_DIR: /app/faiss
       LLM_APPROVALS_JSON: ${LLM_APPROVALS_JSON:-}
+      LLM_BUDGET_MONGODB_URI: ${LLM_BUDGET_MONGODB_URI:-}
+      LLM_BUDGET_DB_NAME: ${LLM_BUDGET_DB_NAME:-}
     extra_hosts:
     - host.docker.internal:host-gateway
     volumes:

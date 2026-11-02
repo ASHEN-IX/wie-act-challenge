@@ -3,8 +3,11 @@ import {
   SourceIntegrityError,
   captureImmutableSources,
   verifyRevisionArtifact,
-  verifyBlob
+  verifyBlob,
+  manifestDigest,
+  type SourceDocument,
 } from '../services/revisionSources';
+import aiClient from '../../../../shared/aiClient';
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response, NextFunction, RequestHandler } from 'express';
 import type { FilterQuery } from 'mongoose';
@@ -17,6 +20,12 @@ import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { reviewContext, ensureSnapshot, validateCorrection, fail } from '../services/formulaReview';
+import { parseCanonicalDocument } from '../../../../shared/ednova/canonicalDocument';
+import { FormulaRecognitionJob } from '../models/FormulaRecognitionJob';
+import * as formulaJobs from '../services/formulaJobs';
+import { activityDigest } from '../services/activityIdentity';
+import { FormulaProposal } from '../models/FormulaProposal';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const moduleClient = require('@ednova/shared/moduleClient');
 import {
@@ -30,6 +39,8 @@ import {
 import { canReadCourse, canManageCourse } from '../services/resourceAccess';
 import {
   getCourseDraft,
+  withExtractionReview,
+  findEditableDraft,
   updateCourseDraft,
   DraftForbiddenError,
   DraftNotFoundError,
@@ -523,7 +534,7 @@ router.post(
         contentHash,
         status: 'draft',
         isInstructorReviewed: false,
-        sourceManifest: await captureImmutableSources(course._id.toString(), course.files),
+        sourceManifest: await captureImmutableSources(course._id.toString(), course.files, '2.0'),
         vectorIndexRef: `faiss/${course._id.toString()}/${revisionTag}.faiss`
       });
 
@@ -630,13 +641,20 @@ router.put('/:courseId/draft', async (req: DomainRequest, res: Response) => {
   try {
     const courseId = String(req.params.courseId);
     const userId = req.user!.userId;
-    const { expectedRevisionTag, topics, summary, isInstructorReviewed } = req.body;
+    const {
+      expectedRevisionTag,
+      topics,
+      summary,
+      isInstructorReviewed,
+      extractionReviewAcknowledged
+    } = req.body;
 
     const result = await updateCourseDraft(userId, courseId, {
       expectedRevisionTag,
       topics,
       summary,
-      isInstructorReviewed
+      isInstructorReviewed,
+      extractionReviewAcknowledged
     });
     res.status(200).json(result);
   } catch (error) {
@@ -683,6 +701,19 @@ router.post('/:courseId/draft/sources/prepare', async (req: DomainRequest, res: 
 });
 
 // ED-05: Publish reviewed course draft revision
+router.post('/:courseId/drafts/:revisionId/approve', async (req: DomainRequest,res: Response) => {
+  try {
+    const actor=req.user?.userId,courseId=String(req.params.courseId),tag=String(req.params.revisionId);
+    const draft=await formulaJobs.snapshot(actor,courseId,tag,req.body?.draftVersion);
+    const canonical=draft.contentDocument as any;
+    if(canonical?.quality?.publicationState==='review_required' && !canonical.extractionReview?.acknowledged && req.body?.extractionReviewAcknowledged!==true) return res.status(400).json({error:'EXTRACTION_REVIEW_REQUIRED'});
+    const next=req.body?.extractionReviewAcknowledged===true ? withExtractionReview(canonical) : canonical;
+    const changed=await CourseRevision.updateOne({_id:draft._id,revisionTag:tag,__v:draft.__v,status:'draft',activationState:{$exists:false}},{$set:{isInstructorReviewed:true,...(next?{contentDocument:next,contentDocumentHash:activityDigest(next)}:{})}});
+    if(!changed.matchedCount)return res.status(409).json({error:'DRAFT_CHANGED'});
+    return res.status(200).json({approved:true});
+  }catch(e){return res.status((e as any).status||503).json({error:(e as any).status?(e as Error).message:'APPROVAL_UNAVAILABLE'});}
+});
+
 router.post('/:courseId/publish', async (req: DomainRequest, res: Response) => {
   try {
     const courseId = String(req.params.courseId);
@@ -708,6 +739,8 @@ router.post('/:courseId/publish', async (req: DomainRequest, res: Response) => {
       return res.status(400).json({ error: error.code, message: error.message });
     }
     if (error instanceof SourceIntegrityError) return res.status(503).json({ error: error.code });
+    if ((error as any).code === 'FORMULA_SNAPSHOT_CHANGED') return res.status(409).json({error:'Formula source or draft changed. Reload Studio and review this draft again.',code:'FORMULA_SNAPSHOT_CHANGED'});
+    if ((error as { status?: number }).status === 422) return res.status(422).json({error:'Reviewed formula validation failed. Review a fresh proposal.'});
     if ((error as { status?: number }).status === 409)
       return res.status(409).json({ error: 'STALE_REVISION' });
     console.error('Error publishing course revision:', error);
@@ -905,6 +938,284 @@ router.get(
   }
 );
 
+router.get('/:courseId/drafts/:revisionId/formula-workspace', async (req: DomainRequest, res: Response) => {
+  try {
+    const actor = req.user?.userId, courseId = String(req.params.courseId), tag = String(req.params.revisionId);
+    if (!actor) return res.status(401).json({ error: 'UNAUTHENTICATED' });
+    if (!(await canManageCourse(actor, courseId))) return res.status(403).json({ error: 'FORBIDDEN' });
+    const draft = await findEditableDraft(courseId);
+    if (!draft || draft.revisionTag !== tag || draft.revokedAt) return res.status(409).json({ error: 'DRAFT_CHANGED' });
+    const course = await Course.findById(courseId).lean();
+    const document = draft.contentDocument ? parseCanonicalDocument(draft.contentDocument) : null;
+    const regions = (document?.chapters || []).flatMap(ch => ch.lessons.flatMap(lesson => lesson.blocks.filter(b => b.type === 'math').map(b => {
+      const block = b as Record<string, any>;
+      const documentId = block.evidence?.[0]?.documentId;
+      return { regionId: block.regionId, documentId, page: block.page, text: typeof block.expression === 'string' ? block.expression.slice(0,8000) : '', warnings: Array.isArray(block.issues) ? block.issues.filter((w: unknown) => typeof w === 'string').slice(0,12).map((w: string) => w.slice(0,500)) : [] };
+    }))).filter(r => typeof r.regionId === 'string' && draft.sourceManifest?.some(d => d.documentId === r.documentId)).slice(0, 200);
+    const [proposals, jobs] = await Promise.all([
+      FormulaProposal.find({ courseId, revisionId: draft._id, draftVersion: draft.__v }).limit(200).lean(),
+      FormulaRecognitionJob.find({ courseId, revisionId: String(draft._id), draftVersion: draft.__v }).sort({ createdAt: -1 }).limit(200).lean(),
+    ]);
+    await ensureSnapshot(actor, draft);
+    return res.json({ draftVersion: draft.__v, revisionTag: tag, canConsent: !!course && [course.ownerUserId, course.userId].includes(actor), regions, proposals, jobs, staleFormulaReviews: await FormulaProposal.countDocuments({courseId,state:{$in:['accepted','corrected']},$or:[{revisionId:{$ne:draft._id}},{revisionTag:{$ne:tag}},{draftVersion:{$ne:draft.__v}}]}) });
+  } catch (e) { return res.status((e as any).status || 503).json({ error: (e as any).status ? (e as Error).message : 'FORMULA_WORKSPACE_UNAVAILABLE' }); }
+});
+
+router.post('/:courseId/drafts/:revisionId/formula-consent', async (req: DomainRequest, res: Response) => {
+  try {
+    if (!req.user?.userId) return res.status(401).json({ error: 'UNAUTHENTICATED' });
+    if (req.body?.consent !== true) return res.status(422).json({ error: 'EXPLICIT_CONSENT_REQUIRED' });
+    return res.json(await formulaJobs.consent(req.user.userId, String(req.params.courseId), String(req.params.revisionId), req.body.draftVersion, req.body.documentId));
+  } catch (e) { const status = (e as any).status || 503; return res.status(status).json({ error: status === 503 ? 'CONSENT_UNAVAILABLE' : (e as Error).message }); }
+});
+router.post('/:courseId/drafts/:revisionId/recognition-jobs', async (req: DomainRequest, res: Response) => {
+  try {
+    const job = await formulaJobs.submit(req.user?.userId || '', String(req.params.courseId), String(req.params.revisionId), req.body);
+    return res.status(202).json({ job });
+  } catch (e) { const status = (e as any).status || 503; return res.status(status).json({ error: (e as any).status ? (e as Error).message : 'RECOGNITION_UNAVAILABLE' }); }
+});
+router.get('/:courseId/drafts/:revisionId/recognition-jobs/:jobId', async (req: DomainRequest, res: Response) => {
+  try { return res.json({ job: await formulaJobs.status(req.user?.userId || '', String(req.params.courseId), String(req.params.revisionId), String(req.params.jobId)) }); }
+  catch (e) { const status = (e as any).status || 503; return res.status(status).json({ error: status === 503 ? 'JOB_UNAVAILABLE' : (e as Error).message }); }
+});
+router.post('/:courseId/drafts/:revisionId/recognition-jobs/:jobId/cancel', async (req: DomainRequest, res: Response) => {
+  try { return res.json({ job: await formulaJobs.cancel(req.user?.userId || '', String(req.params.courseId), String(req.params.revisionId), String(req.params.jobId)) }); }
+  catch (e) { const status = (e as any).status || 503; return res.status(status).json({ error: status === 503 ? 'JOB_UNAVAILABLE' : (e as Error).message }); }
+});
+
+router.post('/:courseId/drafts/:revisionId/formula-proposals/test', async (req: DomainRequest, res: Response) => {
+  if (process.env.NODE_ENV !== 'test' || process.env.FORMULA_MOCK_PROVIDER !== '1')
+    return res.status(404).json({ error: 'NOT_FOUND' });
+  try {
+    const courseId = String(req.params.courseId), revisionId = String(req.params.revisionId);
+    const { documentId, regionId, draftVersion } = req.body || {};
+    if (Object.keys(req.body || {}).some(k => !['documentId', 'regionId', 'draftVersion'].includes(k)) ||
+        !/^[a-f0-9]{24}$/.test(courseId) || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(revisionId) ||
+        typeof documentId !== 'string' || !/^doc_[a-f0-9]{16}$/.test(documentId) ||
+        typeof regionId !== 'string' || !/^region_[a-f0-9]{20}$/.test(regionId) ||
+        !Number.isSafeInteger(draftVersion) || draftVersion < 0)
+      return res.status(422).json({ error: 'INVALID_REQUEST' });
+    if (!req.user?.userId) return res.status(401).json({ error: 'UNAUTHENTICATED' });
+    if (!(await canManageCourse(req.user.userId, courseId))) return res.status(403).json({ error: 'FORBIDDEN' });
+    const draft = await CourseRevision.findOne({ courseId, revisionTag: revisionId, status: 'draft', revokedAt: { $exists: false } }).lean();
+    if (!draft || draft.__v !== draftVersion) return res.status(409).json({ error: 'DRAFT_CHANGED' });
+    if (String((await findEditableDraft(courseId))?._id) !== String(draft._id)) return res.status(409).json({ error: 'DRAFT_CHANGED' });
+    const documents = draft.sourceManifest || [];
+    if (!documents.length || documents.some(d => !d.storageRef || !d.mediaType))
+      return res.status(503).json({ error: 'SOURCE_INTEGRITY_UNAVAILABLE' });
+    const sources = documents as SourceDocument[];
+    const doc = sources.find(d => d.documentId === documentId);
+    if (!doc || doc.mediaType !== 'application/pdf') return res.status(404).json({ error: 'NOT_FOUND' });
+    await verifyBlob(doc);
+    const contentHash = 'sha256:' + draft.contentHash.replace(/^sha256:/, '');
+    const output = await aiClient.post('/api/ai/sources/validate-formula-proposal', {
+      schemaVersion: '1.0.0', courseId, revisionId, contentHash, documents: sources,
+      manifestDigest: manifestDigest(courseId, revisionId, contentHash, sources), documentId, regionId,
+    }, { timeout: 30_000 });
+    const { region, proposal } = output.data || {};
+    if (!region || region.documentId !== documentId || region.documentHash !== doc.contentHash ||
+        region.regionId !== regionId || !Number.isSafeInteger(region.page) || region.page < 1 ||
+        !Array.isArray(region.bbox) || region.bbox.length !== 4 || !region.bbox.every(Number.isFinite) ||
+        typeof region.text !== 'string' || !region.text || region.text.length > 8000 ||
+        !/^sha256:[a-f0-9]{64}$/.test(region.cropHash) || proposal?.provider !== 'mock' ||
+        proposal?.model !== 'mock-v1' || proposal?.review_disposition !== 'pending' ||
+        proposal?.response?.status !== 'proposed' || proposal?.response?.content !== 'x^2' ||
+        !Array.isArray(proposal?.validation?.syntax_warnings))
+      return res.status(503).json({ error: 'SOURCE_INTEGRITY_UNAVAILABLE' });
+    if (!(await canManageCourse(req.user.userId, courseId)) || !(await CourseRevision.exists({
+      _id: draft._id, courseId, revisionTag: revisionId, status: 'draft', __v: draftVersion, revokedAt: { $exists: false },
+    }))) return res.status(409).json({ error: 'DRAFT_CHANGED' });
+    const identity = 'sha256:' + crypto.createHash('sha256').update(JSON.stringify([
+      courseId, String(draft._id), revisionId, draftVersion, documentId, doc.contentHash,
+      regionId, region.cropHash, 'mock', 'mock-v1', 'x^2',
+    ])).digest('hex');
+    const payload = {
+      identity, courseId, revisionId: draft._id, revisionTag: revisionId, draftVersion,
+      documentId, documentHash: doc.contentHash, regionId, page: region.page, bbox: region.bbox,
+      sourceText: region.text, cropHash: region.cropHash, provider: 'mock', model: 'mock-v1',
+      latex: 'x^2', warnings: proposal.validation.syntax_warnings, state: 'pending', reviewVersion: 0, history: [],
+    };
+    let saved;
+    try {
+      saved = await FormulaProposal.findOneAndUpdate({ identity }, { $setOnInsert: payload }, { upsert: true, new: true, setDefaultsOnInsert: true }).lean();
+    } catch (error) {
+      if ((error as { code?: number }).code !== 11000) throw error;
+      saved = await FormulaProposal.findOne({ identity }).lean();
+    }
+    if (!saved || Array.isArray(saved) || ['courseId', 'revisionId', 'revisionTag', 'draftVersion', 'documentId', 'documentHash', 'regionId', 'page', 'cropHash', 'provider', 'model', 'latex', 'sourceText'].some(key => String((saved as any)[key]) !== String((payload as any)[key])) || JSON.stringify(saved.bbox) !== JSON.stringify(payload.bbox))
+      return res.status(409).json({ error: 'PROPOSAL_IDENTITY_CONFLICT' });
+    if (!(await canManageCourse(req.user.userId, courseId)) ||
+        String((await findEditableDraft(courseId))?._id) !== String(draft._id) ||
+        !(await CourseRevision.exists({ _id: draft._id, courseId, revisionTag: revisionId, status: 'draft', __v: draftVersion, revokedAt: { $exists: false } })))
+      return res.status(409).json({ error: 'DRAFT_CHANGED' });
+    return res.status(200).json({ proposal: saved });
+  } catch (error) {
+    const status = (error as { response?: { status?: number } }).response?.status;
+    return res.status(status === 404 || status === 422 ? status : 503).json({ error: 'SOURCE_REGION_UNAVAILABLE' });
+  }
+});
+
+router.post('/:courseId/drafts/:revisionId/formula-proposals/:proposalId/review', async (req: DomainRequest, res: Response) => {
+  try {
+    const { action, reviewVersion, draftVersion, latex } = req.body || {};
+    if (Object.keys(req.body || {}).some(k => !['action', 'reviewVersion', 'draftVersion', 'latex'].includes(k)) ||
+        !['accept', 'correct', 'reject'].includes(action) || !Number.isSafeInteger(reviewVersion) || reviewVersion < 0 ||
+        !Number.isSafeInteger(draftVersion) || draftVersion < 0 || (action !== 'correct' && latex !== undefined)) fail(422, 'INVALID_REQUEST');
+    const actor = req.user?.userId;
+    const { draft, proposal } = await reviewContext(actor, String(req.params.courseId), String(req.params.revisionId), String(req.params.proposalId));
+    if (draftVersion !== draft.__v || proposal.reviewVersion !== reviewVersion || proposal.state !== 'pending') fail(409, 'REVIEW_CONFLICT');
+    const state = { accept: 'accepted', correct: 'corrected', reject: 'rejected' }[action as 'accept' | 'correct' | 'reject']!;
+    const expression = action === 'correct' ? validateCorrection(latex) : action === 'accept' ? validateCorrection(proposal.latex) : undefined;
+    await ensureSnapshot(actor!, draft);
+    const updated = await FormulaProposal.findOneAndUpdate({ _id: proposal._id, courseId: draft.courseId,
+      revisionId: draft._id, revisionTag: draft.revisionTag, draftVersion, state: 'pending', reviewVersion }, {
+      $set: { state, ...(expression !== undefined ? { reviewedLatex: expression } : {}) },
+      $inc: { reviewVersion: 1 },
+      $push: { history: { reviewer: actor, action: state, previous: 'pending', next: state,
+        ...(action === 'correct' ? { expression } : {}), at: new Date(), draftVersion,
+        revisionTag: draft.revisionTag, revisionId: String(draft._id), reviewVersion: reviewVersion + 1 } },
+    }, { new: true, runValidators: true }).lean();
+    if (!updated) fail(409, 'REVIEW_CONFLICT');
+    await ensureSnapshot(actor!, draft);
+    return res.status(200).json({ proposal: updated });
+  } catch (error) { const status = (error as { status?: number }).status || 503; return res.status(status).json({ error: status === 503 ? 'REVIEW_UNAVAILABLE' : (error as Error).message }); }
+});
+
+router.get('/:courseId/drafts/:revisionId/formula-proposals/:proposalId/history', async (req: DomainRequest, res: Response) => {
+  try {
+    const { draft, proposal } = await reviewContext(req.user?.userId, String(req.params.courseId), String(req.params.revisionId), String(req.params.proposalId));
+    await ensureSnapshot(req.user!.userId, draft);
+    return res.json({ history: proposal.history, reviewVersion: proposal.reviewVersion, state: proposal.state });
+  } catch (error) { const status = (error as { status?: number }).status || 503; return res.status(status).json({ error: status === 503 ? 'REVIEW_UNAVAILABLE' : (error as Error).message }); }
+});
+
+router.get('/:courseId/drafts/:revisionId/formula-proposals/:proposalId', async (req: DomainRequest, res: Response) => {
+  try {
+    const courseId = String(req.params.courseId), revisionId = String(req.params.revisionId), proposalId = String(req.params.proposalId);
+    if (!req.user?.userId) return res.status(401).json({ error: 'UNAUTHENTICATED' });
+    if (!/^[a-f0-9]{24}$/.test(courseId) || !/^[a-f0-9]{24}$/.test(proposalId)) return res.status(422).json({ error: 'INVALID_REQUEST' });
+    if (!(await canManageCourse(req.user.userId, courseId))) return res.status(403).json({ error: 'FORBIDDEN' });
+    const draft = await CourseRevision.findOne({ courseId, revisionTag: revisionId, status: 'draft', revokedAt: { $exists: false } }).lean();
+    if (!draft) return res.status(409).json({ error: 'DRAFT_CHANGED' });
+    if (String((await findEditableDraft(courseId))?._id) !== String(draft._id)) return res.status(409).json({ error: 'DRAFT_CHANGED' });
+    const proposal = await FormulaProposal.findOne({ _id: proposalId, courseId, revisionId: draft._id,
+      revisionTag: revisionId }).lean();
+    if (!proposal || Array.isArray(proposal)) return res.status(404).json({ error: 'NOT_FOUND' });
+    if (proposal.draftVersion !== draft.__v) return res.status(409).json({ error: 'DRAFT_CHANGED' });
+    if (!(await canManageCourse(req.user.userId, courseId)) || !(await CourseRevision.exists({ _id: draft._id, status: 'draft', __v: draft.__v, revisionTag: revisionId })))
+      return res.status(409).json({ error: 'DRAFT_CHANGED' });
+    return res.status(200).json({ proposal });
+  } catch { return res.status(503).json({ error: 'PROPOSAL_UNAVAILABLE' }); }
+});
+
+router.get(
+  '/:courseId/drafts/:revisionId/sources/:documentId/regions/:regionId',
+  async (req: DomainRequest, res: Response) => {
+    try {
+      const courseId = String(req.params.courseId), revisionId = String(req.params.revisionId),
+        documentId = String(req.params.documentId), regionId = String(req.params.regionId);
+      if (!/^[a-f0-9]{24}$/.test(courseId) || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(revisionId) ||
+          !/^doc_[a-f0-9]{16}$/.test(documentId) || !/^region_[a-f0-9]{20}$/.test(regionId))
+        return res.status(422).json({ error: 'INVALID_SOURCE_REGION' });
+      if (!(await canManageCourse(req.user!.userId, courseId)))
+        return res.status(403).json({ error: 'FORBIDDEN' });
+      const draft = await CourseRevision.findOne({ courseId, revisionTag: revisionId, status: 'draft', revokedAt: { $exists: false } }).lean();
+      if (!draft) return res.status(404).json({ error: 'NOT_FOUND' });
+      const documents = draft.sourceManifest || [];
+      if (!documents.length || documents.some((item) => !item.storageRef || !item.mediaType))
+        return res.status(503).json({ error: 'SOURCE_INTEGRITY_UNAVAILABLE' });
+      const sourceDocuments = documents as SourceDocument[];
+      const document = sourceDocuments.find((item) => item.documentId === documentId);
+      if (!document || document.mediaType !== 'application/pdf')
+        return res.status(404).json({ error: 'NOT_FOUND' });
+      await verifyBlob(document);
+      const contentHash = 'sha256:' + draft.contentHash.replace(/^sha256:/, '');
+      const digest = manifestDigest(courseId, revisionId, contentHash, sourceDocuments);
+      const crop = await aiClient.post('/api/ai/sources/region-crop', {
+        schemaVersion: '1.0.0', courseId, revisionId, contentHash,
+        documents: sourceDocuments, manifestDigest: digest, documentId, regionId,
+      }, { responseType: 'arraybuffer', timeout: 30_000 });
+      if (crop.headers['content-type'] !== 'image/png')
+        return res.status(503).json({ error: 'SOURCE_REGION_UNAVAILABLE' });
+      if (!(await canManageCourse(req.user!.userId, courseId)) ||
+          !(await CourseRevision.exists({ _id: draft._id, status: 'draft', __v: draft.__v, revokedAt: { $exists: false } })))
+        return res.status(409).json({ error: 'DRAFT_CHANGED' });
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'");
+      return res.status(200).send(Buffer.from(crop.data));
+    } catch (error) {
+      const status = (error as { response?: { status?: number } }).response?.status;
+      return res.status(status === 404 || status === 422 ? status : 503)
+        .json({ error: status === 422 ? 'INVALID_SOURCE_REGION' : 'SOURCE_REGION_UNAVAILABLE' });
+    }
+  }
+);
+
+router.get(
+  '/:courseId/revisions/:revisionId/sources/:documentId/regions/:regionId',
+  async (req: DomainRequest, res: Response) => {
+    try {
+      const courseId = String(req.params.courseId),
+        revisionId = String(req.params.revisionId),
+        documentId = String(req.params.documentId),
+        regionId = String(req.params.regionId);
+      if (
+        !/^doc_[a-f0-9]{16}$/.test(documentId) ||
+        !/^region_[a-f0-9]{20}$/.test(regionId)
+      )
+        return res.status(422).json({ error: 'INVALID_SOURCE_REGION' });
+      const resolution = await resolveCourseSource(req.user!.userId, courseId, revisionId);
+      if (resolution.access.decision !== 'allowed')
+        return res.status(403).json({ error: 'FORBIDDEN' });
+      const revision = await CourseRevision.findOne({
+        courseId,
+        revisionTag: revisionId,
+        status: { $in: ['published', 'deprecated'] },
+        activationState: 'committed',
+        revokedAt: { $exists: false },
+      }).lean();
+      if (!revision) return res.status(404).json({ error: 'NOT_FOUND' });
+      const artifact = await verifyRevisionArtifact(revision);
+      const document = artifact.metadata.documents.find((item) => item.documentId === documentId);
+      if (!document || document.mediaType !== 'application/pdf')
+        return res.status(404).json({ error: 'NOT_FOUND' });
+      const contentHash = 'sha256:' + revision.contentHash.replace(/^sha256:/, '');
+      const digest = manifestDigest(courseId, revisionId, contentHash, artifact.metadata.documents);
+      if (!(await canReadCourse(req.user!.userId, courseId)))
+        return res.status(403).json({ error: 'FORBIDDEN' });
+      const crop = await aiClient.post(
+        '/api/ai/sources/region-crop',
+        {
+          schemaVersion: '1.0.0',
+          courseId,
+          revisionId,
+          contentHash,
+          documents: artifact.metadata.documents,
+          manifestDigest: digest,
+          documentId,
+          regionId,
+          view: 'math_context',
+        },
+        { responseType: 'arraybuffer', timeout: 30_000 },
+      );
+      if (crop.headers['content-type'] !== 'image/png')
+        return res.status(503).json({ error: 'SOURCE_REGION_UNAVAILABLE' });
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'");
+      return res.status(200).send(Buffer.from(crop.data));
+    } catch (error) {
+      if (error instanceof SourceIntegrityError)
+        return res.status(503).json({ error: error.code });
+      const status = (error as { response?: { status?: number } }).response?.status;
+      return res
+        .status(status === 404 || status === 422 ? status : 503)
+        .json({ error: status === 422 ? 'INVALID_SOURCE_REGION' : 'SOURCE_REGION_UNAVAILABLE' });
+    }
+  }
+);
+
 // INGEST-07: current ingestion progress + status for a course
 router.get('/:courseId/ingest-status', async (req: DomainRequest, res: Response) => {
   try {
@@ -1055,7 +1366,7 @@ router.post(
         contentHash,
         status: 'draft',
         isInstructorReviewed: false,
-        sourceManifest: await captureImmutableSources(course._id.toString(), course.files),
+        sourceManifest: await captureImmutableSources(course._id.toString(), course.files, '2.0'),
         vectorIndexRef: `faiss/${course._id.toString()}/${revisionTag}.faiss`
       });
 

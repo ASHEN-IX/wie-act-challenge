@@ -324,6 +324,17 @@ export class StudyController {
       res
     );
   }
+  @Post('/api/v1/study/courses/:courseId/drafts/:revisionId/approve')
+  post_api_v1_study_courses_drafts_approve_f79dee86(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute(
+      'POST /api/v1/study/courses/:courseId/drafts/:revisionId/approve',
+      req,
+      res
+    );
+  }
   @Post('/api/v1/study/courses/:courseId/publish')
   post_api_v1_study_courses_publish_e69b94f8(
     @Req() req: DomainRequest,
@@ -370,6 +381,129 @@ export class StudyController {
   ): Promise<void> {
     return this.service.execute(
       'GET /api/v1/study/courses/:courseId/revisions/:revisionId/sources/:documentId',
+      req,
+      res
+    );
+  }
+  @Get('/api/v1/study/courses/:courseId/drafts/:revisionId/formula-workspace')
+  get_api_v1_study_courses_drafts_formulaworkspace_e1af2a5a(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute(
+      'GET /api/v1/study/courses/:courseId/drafts/:revisionId/formula-workspace',
+      req,
+      res
+    );
+  }
+  @Post('/api/v1/study/courses/:courseId/drafts/:revisionId/formula-consent')
+  post_api_v1_study_courses_drafts_formulaconsent_28c176d8(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute(
+      'POST /api/v1/study/courses/:courseId/drafts/:revisionId/formula-consent',
+      req,
+      res
+    );
+  }
+  @Post('/api/v1/study/courses/:courseId/drafts/:revisionId/recognition-jobs')
+  post_api_v1_study_courses_drafts_recognitionjobs_faaf0d5d(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute(
+      'POST /api/v1/study/courses/:courseId/drafts/:revisionId/recognition-jobs',
+      req,
+      res
+    );
+  }
+  @Get('/api/v1/study/courses/:courseId/drafts/:revisionId/recognition-jobs/:jobId')
+  get_api_v1_study_courses_drafts_recognitionjobs_284e1be0(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute(
+      'GET /api/v1/study/courses/:courseId/drafts/:revisionId/recognition-jobs/:jobId',
+      req,
+      res
+    );
+  }
+  @Post('/api/v1/study/courses/:courseId/drafts/:revisionId/recognition-jobs/:jobId/cancel')
+  post_api_v1_study_courses_drafts_recognitionjobs_cancel_3f365c8d(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute(
+      'POST /api/v1/study/courses/:courseId/drafts/:revisionId/recognition-jobs/:jobId/cancel',
+      req,
+      res
+    );
+  }
+  @Post('/api/v1/study/courses/:courseId/drafts/:revisionId/formula-proposals/test')
+  post_api_v1_study_courses_drafts_formulaproposals_test_38222c2c(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute(
+      'POST /api/v1/study/courses/:courseId/drafts/:revisionId/formula-proposals/test',
+      req,
+      res
+    );
+  }
+  @Post('/api/v1/study/courses/:courseId/drafts/:revisionId/formula-proposals/:proposalId/review')
+  post_api_v1_study_courses_drafts_formulaproposals_review_a632122a(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute(
+      'POST /api/v1/study/courses/:courseId/drafts/:revisionId/formula-proposals/:proposalId/review',
+      req,
+      res
+    );
+  }
+  @Get('/api/v1/study/courses/:courseId/drafts/:revisionId/formula-proposals/:proposalId/history')
+  get_api_v1_study_courses_drafts_formulaproposals_history_b7212cdb(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute(
+      'GET /api/v1/study/courses/:courseId/drafts/:revisionId/formula-proposals/:proposalId/history',
+      req,
+      res
+    );
+  }
+  @Get('/api/v1/study/courses/:courseId/drafts/:revisionId/formula-proposals/:proposalId')
+  get_api_v1_study_courses_drafts_formulaproposals_304daf15(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute(
+      'GET /api/v1/study/courses/:courseId/drafts/:revisionId/formula-proposals/:proposalId',
+      req,
+      res
+    );
+  }
+  @Get('/api/v1/study/courses/:courseId/drafts/:revisionId/sources/:documentId/regions/:regionId')
+  get_api_v1_study_courses_drafts_sources_regions_bffbbd43(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute(
+      'GET /api/v1/study/courses/:courseId/drafts/:revisionId/sources/:documentId/regions/:regionId',
+      req,
+      res
+    );
+  }
+  @Get(
+    '/api/v1/study/courses/:courseId/revisions/:revisionId/sources/:documentId/regions/:regionId'
+  )
+  get_api_v1_study_courses_revisions_sources_regions_207334a4(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute(
+      'GET /api/v1/study/courses/:courseId/revisions/:revisionId/sources/:documentId/regions/:regionId',
       req,
       res
     );

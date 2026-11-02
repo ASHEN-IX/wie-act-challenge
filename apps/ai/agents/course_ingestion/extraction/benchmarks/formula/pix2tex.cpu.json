@@ -1,0 +1,144 @@
+{
+  "model": "pix2tex 0.1.4, v0.0.1 weights",
+  "device": "cpu",
+  "cases": [
+    {
+      "id": "eq-000",
+      "output": "S_{n}=\\sum_{p=0}^{n}u_{p}.",
+      "error": null,
+      "seconds": 0.268,
+      "cpu_seconds": 0.455,
+      "max_rss_kib": 667520
+    },
+    {
+      "id": "eq-001",
+      "output": "\\sum_{n=0}^{+\\infty}u_{n}=\\operatorname*{lim}_{n\\to+\\infty}\\sum_{p=0}^{n}v",
+      "error": null,
+      "seconds": 0.518,
+      "cpu_seconds": 1.033,
+      "max_rss_kib": 667520
+    },
+    {
+      "id": "eq-002",
+      "output": "\\forall\\epsilon>0,\\exists N_{\\epsilon}\\in\\mathbb{N}{\\mathrm{~tel~que~}}q\\geq p\\geq N_{\\epsilon}\\Rightarrow|\\sum_{n=p}^{q}u_{n}|\\leq\\epsilon.",
+      "error": null,
+      "seconds": 0.908,
+      "cpu_seconds": 1.814,
+      "max_rss_kib": 667520
+    },
+    {
+      "id": "eq-005",
+      "output": "\\left\\{\\begin{array}{l l}{\\infty\\to-\\infty-\\infty-\\infty-{}}\\\\ {f^{\\prime}=f,}\\\\ {f(0)=1.}\\end{array}\\right.",
+      "error": null,
+      "seconds": 0.564,
+      "cpu_seconds": 1.127,
+      "max_rss_kib": 667520
+    },
+    {
+      "id": "eq-006",
+      "output": "\\begin{array}{c}{{f(\\operatorname*{mon}\\leftrightarrow\\cdots\\leftrightarrow\\operatorname*{max}\\leftrightarrow\\operatorname*{max}\\leftrightarrow\\operatorname*{max}\\leftrightarrow\\cdots}}\\\\ {{f(x)=\\displaystyle\\int_{0}^{x}f^{\\prime}(t)d t+f(0)=1+\\int_{0}^{x}f(t)d t.}}\\end{array}",
+      "error": null,
+      "seconds": 1.935,
+      "cpu_seconds": 3.865,
+      "max_rss_kib": 667520
+    },
+    {
+      "id": "eq-008",
+      "output": "\\begin{array}{l}{{\\stackrel{\\infty}{\\I{\\infty}\\propto\\infty\\infty\\infty}\\underbrace{\\langle\\textsf{s eto s e..............\\rangle}_{\\infty}\\underbrace{\\scriptstyle{\\mathrm{s\\leftrightarrow-}}\\ \\;\\leftrightarrow\\cdots\\ \\;\\leftrightarrow\\cdots\\ \\;\\operatorname{se...\\to}}_{\\mathrm{s\\to-\\infty}\\ \\;\\vrule\\operatorname{s\\to\\infty}\\ \\;\\operatorname{s\\to\\infty}\\ \\;\\operatorname{s\\to\\infty}\\cdot\\cdot\\cdot\\cdot\\cdot\\cdots\\times\\cdot\\cdots\\times\\cdot\\cdots\\times\\cdot\\leftrightarrow\\cdots\\times\\cdot\\cdot\\leftrightarrow}_{n\\geq1}(t)d t=1+\\displaystyle\\int_{0}^{x}S(t)d t.}}\\end{array}",
+      "error": null,
+      "seconds": 5.809,
+      "cpu_seconds": 11.596,
+      "max_rss_kib": 677288
+    },
+    {
+      "id": "eq-010",
+      "output": "\\begin{array}{l}{{\\sqrt[[object Object]]{4}\\hfill}}\\\\ {{S_{1}(x)=1+\\displaystyle\\int_{0}^{x}1d t=1+x,}}\\\\ {{S_{2}(x)=1+\\displaystyle\\int_{0}^{x}(1+t)d t=1+x+{\\cfrac{x^{2}}{2}},}}\\end{array}",
+      "error": null,
+      "seconds": 1.967,
+      "cpu_seconds": 3.923,
+      "max_rss_kib": 677288
+    },
+    {
+      "id": "eq-017",
+      "output": "\\operatorname*{lim}_{n\\rightarrow+\\infty}\\frac{|u_{n+1}|}{|u_{n}|}=\\operatorname*{lim}_{n\\rightarrow+\\infty}\\frac{|x|}{n+1}=0.",
+      "error": null,
+      "seconds": 0.836,
+      "cpu_seconds": 1.67,
+      "max_rss_kib": 677288
+    },
+    {
+      "id": "eq-039",
+      "output": "R=\\frac{1}{\\ell_{+}},\\quad\\mathrm{ol}\\quad\\ell_{+}=\\operatorname*{lim}_{n\\to\\infty}\\operatorname*{sup}_{n\\to\\infty}|a_{n}|^{1/n}.",
+      "error": null,
+      "seconds": 0.891,
+      "cpu_seconds": 1.777,
+      "max_rss_kib": 677288
+    },
+    {
+      "id": "eq-045",
+      "output": "\\begin{array}{c}{{{}^{\\textstyle{a\\times\\quad}}^{\\prime}{\\overset{\\ \\,a\\times\\ \\,}{\\leftrightarrow\\quad}}\\;{}^{\\mathrm{r\\times\\alpha\\to\\infty\\times\\psi\\times\\cdots\\quad}}\\;{}^{\\mathrm{r\\times\\alpha\\quad}}\\;}}\\\\ {{F(x)=\\int_{a}^{b}f(x,t)d t,}}\\\\ {{{}~{{}~\\cdot\\quad},}}\\end{array}",
+      "error": null,
+      "seconds": 2.306,
+      "cpu_seconds": 4.607,
+      "max_rss_kib": 677288
+    },
+    {
+      "id": "eq-047",
+      "output": "\\forall\\epsilon>0,\\exists\\alpha(\\epsilon)>0\\;\\mathrm{tel~que~}\\forall x,y\\in I,\\ |y-x|\\leq\\alpha(\\epsilon)\\Rightarrow|\\phi(y)-\\phi(x)|\\leq\\epsilon.",
+      "error": null,
+      "seconds": 0.804,
+      "cpu_seconds": 1.606,
+      "max_rss_kib": 677288
+    },
+    {
+      "id": "eq-054",
+      "output": "F(x)=\\left[-{\\frac{\\cos(t x)}{x}}\\right]_{0}^{1}={\\frac{1-\\cos x}{x}},",
+      "error": null,
+      "seconds": 0.495,
+      "cpu_seconds": 0.989,
+      "max_rss_kib": 677288
+    },
+    {
+      "id": "eq-063",
+      "output": "F(x)=\\int_{0}^{+\\infty}f(x,t)d t,",
+      "error": null,
+      "seconds": 0.236,
+      "cpu_seconds": 0.472,
+      "max_rss_kib": 677288
+    },
+    {
+      "id": "eq-079",
+      "output": "\\frac{(i n d i c a t i o n:\\mathrm{poser~}\\phi(x,u)}{\\mathrm{intervalles~}[[object Object]]{o}+\\infty[)}\\qquad",
+      "error": null,
+      "seconds": 0.838,
+      "cpu_seconds": 1.672,
+      "max_rss_kib": 677288
+    },
+    {
+      "id": "eq-083",
+      "output": "\\begin{array}{r c l}{{F(x)=\\int_{0}^{+\\infty}\\frac{x\\cos(u)}{u^{2}+x^{2}}d u}}&{{=}}&{{\\left[\\frac{x\\sin u}{x^{2}+u^{2}\\right]_{0}^{+\\infty}}+\\int_{0}^{\\mp\\infty}\\frac{2x u}{(x^{2}+u^{2})^{2}}d u}}\\\\ {{}}&{{=}}&{{\\int_{0}^{+\\infty}\\frac{2x u}{(x^{2}+u^{2})^{2}}d u}}\\\\ {{}}&{{=}}&{{\\int_{0}^{+\\infty}\\frac{2x u}{(x^{2}+u^{2})^{2}}\\cos u\\right]_{0}^{+\\infty}+\\displaystyle\\int_{F^{\\prime\\prime}(x).}}}\\end{array}",
+      "error": null,
+      "seconds": 11.749,
+      "cpu_seconds": 23.199,
+      "max_rss_kib": 787356
+    },
+    {
+      "id": "eq-084",
+      "output": "\\begin{array}{c l}{{F(0)=\\int_{0}^{+\\infty}\\frac{1}{1+t^{2}}d t=\\left[\\arctan(t)\\right]_{0}^{+\\infty}=\\frac{\\pi}{2}.}}\\end{array}",
+      "error": null,
+      "seconds": 1.595,
+      "cpu_seconds": 3.176,
+      "max_rss_kib": 787356
+    }
+  ],
+  "annotation_status": "pending_review",
+  "limits": {
+    "per_case_seconds": 30,
+    "cpu_threads": 2,
+    "memory_container_bytes": 3221225472
+  },
+  "batch_support": "sequential; no native batch measurement",
+  "initialization_seconds": 6.522,
+  "status": "completed",
+  "peak_rss_kib": 787356
+}

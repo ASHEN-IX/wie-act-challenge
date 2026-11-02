@@ -32,8 +32,18 @@ export type LessonChart = {
 };
 
 export type LessonBlockV2 =
-  | ((LearningBlockV1 & { provenance?: EvidenceSpan[] }) & { chart?: never })
+  | ((LearningBlockV1 & { provenance?: EvidenceSpan[]; sourceMeta?: SourceBlockMeta }) & { chart?: never })
   | LessonChart;
+
+export type SourceBlockMeta = {
+  regionId: string;
+  page: number | null;
+  bbox: [number, number, number, number];
+  extractionMethod: 'text' | 'ocr' | 'image' | 'vector';
+  confidence: number;
+  reviewRequired: boolean;
+  issues: string[];
+};
 
 export type LearningBlockV1 =
   | { type: 'heading'; id: string; level: 1 | 2 | 3 | 4; text: string }
@@ -41,7 +51,7 @@ export type LearningBlockV1 =
   | { type: 'list'; id: string; ordered: boolean; items: string[]; evidence: string[] }
   | { type: 'quote'; id: string; text: string; evidence: string[] }
   | { type: 'code'; id: string; language: string; code: string; caption?: string; evidence?: string[] }
-  | { type: 'math'; id: string; expression: string; notation: 'latex' | 'plain'; caption?: string; evidence?: string[] }
+  | { type: 'math'; id: string; expression: string; notation: 'latex' | 'plain'; caption?: string; evidence?: string[]; review?: { state: 'accepted' | 'corrected'; originalExpression: string; modelExpression: string; reviewer: string } }
   | {
       type: 'table';
       id: string;
@@ -53,6 +63,12 @@ export type LearningBlockV1 =
   | { type: 'media'; id: string; mediaType: 'image' | 'audio' | 'video'; src?: string; alt: string; caption?: string; evidence?: string[] }
   | { type: 'diagram'; id: string; title: string; description: string; steps: Array<{ id: string; label: string; detail?: string }>; evidence?: string[] }
   | { type: 'callout'; id: string; kind: string; title?: string; text: string; evidence: string[] };
+
+function formulaReview(value: unknown) {
+  const v = exact(value, ['state','originalExpression','modelExpression','reviewer']);
+  if (v.state !== 'accepted' && v.state !== 'corrected') fail();
+  return {state:v.state as 'accepted'|'corrected',originalExpression:str(v.originalExpression,8000),modelExpression:str(v.modelExpression,8000),reviewer:str(v.reviewer,128)};
+}
 
 export type ReadingDocumentV2 = {
   schemaVersion: '2.0.0';
@@ -112,6 +128,19 @@ export type CanonicalDocumentV1 = {
   title: string;
   provenance: { content: 'extracted'; structure: 'deterministic' };
   verification: 'source_text_unverified';
+  quality?: {
+    schemaVersion: '1.0.0';
+    sourceIntegrity: 'verified' | 'unavailable';
+    extractionCompleteness: 'complete' | 'partial';
+    structuralValidity: 'valid' | 'invalid';
+    semanticFidelity: 'deterministic_unverified' | 'review_required';
+    humanReview: 'required' | 'not_requested';
+    publicationState: 'review_required' | 'ready_for_instructor_review';
+    reviewRegionIds: string[];
+    counts: { regions: number; reviewRequired: number; types: Record<string, number> };
+  };
+  /** Server-recorded instructor acknowledgement for low-confidence regions. */
+  extractionReview?: { acknowledged: true; acknowledgedAt: string };
   chapters: Array<{
     id: string;
     title: string;
@@ -170,47 +199,67 @@ const base = (value: unknown, keys: string[]) => {
   return v;
 };
 
+const sourceMeta = (value: unknown): SourceBlockMeta => {
+  const v = exact(value, ['regionId', 'page', 'bbox', 'extractionMethod', 'confidence', 'reviewRequired', 'issues']);
+  if (!Array.isArray(v.bbox) || v.bbox.length !== 4 || v.bbox.some((n) => typeof n !== 'number' || !Number.isFinite(n))) fail();
+  if (!['text', 'ocr', 'image', 'vector'].includes(String(v.extractionMethod))) fail();
+  if (typeof v.confidence !== 'number' || !Number.isFinite(v.confidence) || v.confidence < 0 || v.confidence > 1) fail();
+  if (typeof v.reviewRequired !== 'boolean') fail();
+  return {
+    regionId: str(v.regionId, 128),
+    page: nullableInt(v.page),
+    bbox: v.bbox as [number, number, number, number],
+    extractionMethod: v.extractionMethod as SourceBlockMeta['extractionMethod'],
+    confidence: v.confidence as number,
+    reviewRequired: v.reviewRequired as boolean,
+    issues: list(v.issues, (x) => str(x, 100), 16),
+  };
+};
+
 function block(value: unknown): LessonBlockV2 {
   if (!isRecord(value) || typeof (value as Record<string, unknown>).type !== 'string') fail();
   const type = (value as Record<string, unknown>).type as string;
+  const optionalMeta = (v: Record<string, unknown>) => (v.sourceMeta !== undefined ? { sourceMeta: sourceMeta(v.sourceMeta) } : {});
   if (type === 'heading') {
-    const v = base(value, ['type', 'id', 'level', 'text', 'provenance']);
+    const v = base(value, ['type', 'id', 'level', 'text', 'provenance', 'sourceMeta']);
     if (!Number.isInteger(v.level) || (v.level as number) < 1 || (v.level as number) > 4) fail();
-    return { type, id: str(v.id, 128), level: v.level as 1 | 2 | 3 | 4, text: str(v.text, 500), ...(v.provenance !== undefined ? { provenance: list(v.provenance, evidenceSpan, 8) } : {}) };
+    return { type, id: str(v.id, 128), level: v.level as 1 | 2 | 3 | 4, text: str(v.text, 500), ...(v.provenance !== undefined ? { provenance: list(v.provenance, evidenceSpan, 8) } : {}), ...optionalMeta(v) };
   }
   if (type === 'paragraph' || type === 'quote' || type === 'callout') {
-    const keys = type === 'callout' ? ['type', 'id', 'kind', 'title', 'text', 'evidence', 'provenance'] : ['type', 'id', 'text', 'evidence', 'provenance'];
+    const keys = type === 'callout' ? ['type', 'id', 'kind', 'title', 'text', 'evidence', 'provenance', 'sourceMeta'] : ['type', 'id', 'text', 'evidence', 'provenance', 'sourceMeta'];
     const v = base(value, keys);
     const result: Record<string, unknown> = { type, id: str(v.id, 128), text: str(v.text, type === 'quote' ? 4000 : 8000), evidence: evidence(v.evidence) };
     if (type === 'callout') { result.kind = str(v.kind, 40); if (v.title !== undefined) result.title = str(v.title, 500); }
     if (v.provenance !== undefined) result.provenance = list(v.provenance, evidenceSpan, 8);
+    result.sourceMeta = optionalMeta(v).sourceMeta;
+    if (!result.sourceMeta) delete result.sourceMeta;
     return result as LessonBlockV2;
   }
   if (type === 'list') {
-    const v = base(value, ['type', 'id', 'ordered', 'items', 'evidence', 'provenance']);
+    const v = base(value, ['type', 'id', 'ordered', 'items', 'evidence', 'provenance', 'sourceMeta']);
     if (typeof v.ordered !== 'boolean') fail();
-    return { type, id: str(v.id, 128), ordered: v.ordered as boolean, items: list(v.items, (x) => str(x, 1200), 80), evidence: evidence(v.evidence), ...(v.provenance !== undefined ? { provenance: list(v.provenance, evidenceSpan, 8) } : {}) };
+    return { type, id: str(v.id, 128), ordered: v.ordered as boolean, items: list(v.items, (x) => str(x, 1200), 80), evidence: evidence(v.evidence), ...(v.provenance !== undefined ? { provenance: list(v.provenance, evidenceSpan, 8) } : {}), ...optionalMeta(v) };
   }
   if (type === 'code') {
-    const v = base(value, ['type', 'id', 'language', 'code', 'caption', 'evidence', 'provenance']);
-    return { type, id: str(v.id, 128), language: str(v.language, 24), code: str(v.code, 20000), ...(v.caption !== undefined ? { caption: str(v.caption, 500) } : {}), ...(v.evidence !== undefined ? { evidence: evidence(v.evidence) } : {}), ...(v.provenance !== undefined ? { provenance: list(v.provenance, evidenceSpan, 8) } : {}) } as LessonBlockV2;
+    const v = base(value, ['type', 'id', 'language', 'code', 'caption', 'evidence', 'provenance', 'sourceMeta']);
+    return { type, id: str(v.id, 128), language: str(v.language, 24), code: str(v.code, 20000), ...(v.caption !== undefined ? { caption: str(v.caption, 500) } : {}), ...(v.evidence !== undefined ? { evidence: evidence(v.evidence) } : {}), ...(v.provenance !== undefined ? { provenance: list(v.provenance, evidenceSpan, 8) } : {}), ...optionalMeta(v) } as LessonBlockV2;
   }
   if (type === 'math') {
-    const v = base(value, ['type', 'id', 'expression', 'notation', 'caption', 'evidence', 'provenance']);
+    const v = base(value, ['type', 'id', 'expression', 'notation', 'caption', 'evidence', 'provenance', 'sourceMeta', 'review']);
     if (v.notation !== 'latex' && v.notation !== 'plain') fail();
-    return { type, id: str(v.id, 128), expression: str(v.expression, 600), notation: v.notation, ...(v.caption !== undefined ? { caption: str(v.caption, 500) } : {}), ...(v.evidence !== undefined ? { evidence: evidence(v.evidence) } : {}), ...(v.provenance !== undefined ? { provenance: list(v.provenance, evidenceSpan, 8) } : {}) } as LessonBlockV2;
+    return { type, id: str(v.id, 128), expression: str(v.expression, 8000), notation: v.notation, ...(v.review !== undefined ? {review: formulaReview(v.review)} : {}), ...(v.caption !== undefined ? { caption: str(v.caption, 500) } : {}), ...(v.evidence !== undefined ? { evidence: evidence(v.evidence) } : {}), ...(v.provenance !== undefined ? { provenance: list(v.provenance, evidenceSpan, 8) } : {}), ...optionalMeta(v) } as LessonBlockV2;
   }
   if (type === 'table') {
-    const v = base(value, ['type', 'id', 'caption', 'columns', 'rows', 'evidence', 'provenance']);
+    const v = base(value, ['type', 'id', 'caption', 'columns', 'rows', 'evidence', 'provenance', 'sourceMeta']);
     const columns = list(v.columns, (x) => str(x, 300), 20);
     const rows = list(v.rows, (row: unknown) => list(row, (x) => str(x, 1200), 20), 100);
     if (rows.some((row) => row.length !== columns.length)) fail();
-    return { type, id: str(v.id, 128), columns, rows, evidence: evidence(v.evidence), ...(v.caption !== undefined ? { caption: str(v.caption, 500) } : {}), ...(v.provenance !== undefined ? { provenance: list(v.provenance, evidenceSpan, 8) } : {}) };
+    return { type, id: str(v.id, 128), columns, rows, evidence: evidence(v.evidence), ...(v.caption !== undefined ? { caption: str(v.caption, 500) } : {}), ...(v.provenance !== undefined ? { provenance: list(v.provenance, evidenceSpan, 8) } : {}), ...optionalMeta(v) };
   }
   if (type === 'media') {
-    const v = base(value, ['type', 'id', 'mediaType', 'src', 'alt', 'caption', 'evidence', 'provenance']);
+    const v = base(value, ['type', 'id', 'mediaType', 'src', 'alt', 'caption', 'evidence', 'provenance', 'sourceMeta']);
     if (v.mediaType !== 'image' && v.mediaType !== 'audio' && v.mediaType !== 'video') fail();
-    return { type, id: str(v.id, 128), mediaType: v.mediaType, alt: str(v.alt, 500), ...(v.src !== undefined ? { src: str(v.src, 2048) } : {}), ...(v.caption !== undefined ? { caption: str(v.caption, 500) } : {}), ...(v.evidence !== undefined ? { evidence: evidence(v.evidence) } : {}), ...(v.provenance !== undefined ? { provenance: list(v.provenance, evidenceSpan, 8) } : {}) } as LessonBlockV2;
+    return { type, id: str(v.id, 128), mediaType: v.mediaType, alt: str(v.alt, 500), ...(v.src !== undefined ? { src: str(v.src, 2048) } : {}), ...(v.caption !== undefined ? { caption: str(v.caption, 500) } : {}), ...(v.evidence !== undefined ? { evidence: evidence(v.evidence) } : {}), ...(v.provenance !== undefined ? { provenance: list(v.provenance, evidenceSpan, 8) } : {}), ...optionalMeta(v) } as LessonBlockV2;
   }
   if (type === 'diagram') {
     const v = base(value, ['type', 'id', 'title', 'description', 'steps', 'evidence', 'provenance']);

@@ -1,0 +1,2032 @@
+{
+  "cases": [
+    {
+      "id": "eq-000",
+      "page": 1,
+      "region_id": "region_22d55ef3c62c7aefa2da",
+      "old_region_bbox": [
+        263.76,
+        384.76,
+        322.23,
+        418.8
+      ],
+      "old_crop_bbox": [
+        259.76,
+        380.76,
+        326.23,
+        422.8
+      ],
+      "context_bbox": [
+        263.76,
+        384.76,
+        322.23,
+        418.8
+      ],
+      "old_crop": "crops/eq-000.png",
+      "new_crop": "review/remediation/eq-000.png",
+      "source_page": "review/pages/page-01.png",
+      "deterministic_text": "∑ up. Sn =\np=0",
+      "provisional_latex": "S_n = \\sum_{p=0}^{n} u_p",
+      "warnings": "Summation, scripts and punctuation.",
+      "review_status": "pending_review",
+      "reviewer": null
+    },
+    {
+      "id": "eq-001",
+      "page": 1,
+      "region_id": "region_42116d94dec3d2a81d58",
+      "old_region_bbox": [
+        239.85,
+        451.26,
+        330.29,
+        485.3
+      ],
+      "old_crop_bbox": [
+        235.85,
+        447.26,
+        334.29,
+        489.3
+      ],
+      "context_bbox": [
+        239.85,
+        451.26,
+        347.14,
+        485.3
+      ],
+      "old_crop": "crops/eq-001.png",
+      "new_crop": "review/remediation/eq-001.png",
+      "source_page": "review/pages/page-01.png",
+      "deterministic_text": "∑ un =\nn→+∞ n=0 p=0",
+      "provisional_latex": "\\sum_{n=0}^{+\\infty}u_n=\\lim_{n\\to+\\infty}\\sum_{p=0}^{n}u_p",
+      "warnings": "Detector clips final summand on the right; candidate expands it.",
+      "review_status": "pending_review",
+      "reviewer": null
+    },
+    {
+      "id": "eq-002",
+      "page": 1,
+      "region_id": "region_84094eabebe8648865da",
+      "old_region_bbox": [
+        170.97,
+        626.61,
+        415.02,
+        660.24
+      ],
+      "old_crop_bbox": [
+        166.97,
+        622.61,
+        419.02,
+        664.24
+      ],
+      "context_bbox": [
+        170.97,
+        626.61,
+        415.02,
+        660.24
+      ],
+      "old_crop": "crops/eq-002.png",
+      "new_crop": "review/remediation/eq-002.png",
+      "source_page": "review/pages/page-01.png",
+      "deterministic_text": "∑ un| ≤ε. ∀ε > 0, ∃Nε ∈N tel que q ≥p ≥Nε ⇒|\nn=p",
+      "provisional_latex": "\\forall\\epsilon>0,\\exists N_\\epsilon\\in\\mathbb N\\;\\text{tel que }q\\ge p\\ge N_\\epsilon\\Rightarrow|\\sum_{n=p}^{q}u_n|\\le\\epsilon",
+      "warnings": "Quantifiers, sum and French prose; cropped bounds require review.",
+      "review_status": "pending_review",
+      "reviewer": null
+    },
+    {
+      "id": "eq-005",
+      "page": 2,
+      "region_id": "region_55f2693d71d63e914711",
+      "old_region_bbox": [
+        261.59,
+        457.59,
+        318.23,
+        491.18
+      ],
+      "old_crop_bbox": [
+        257.59,
+        453.59,
+        322.23,
+        495.18
+      ],
+      "context_bbox": [
+        261.59,
+        457.59,
+        318.23,
+        491.18
+      ],
+      "old_crop": "crops/eq-005.png",
+      "new_crop": "review/remediation/eq-005.png",
+      "source_page": "review/pages/page-02.png",
+      "deterministic_text": "# f′ = f,\nf(0) = 1.",
+      "provisional_latex": "\\begin{cases} f' = f, \\\\ f(0) = 1. \\end{cases}",
+      "warnings": "Padded original includes a strip of the preceding line; candidate removes padding.",
+      "review_status": "pending_review",
+      "reviewer": null
+    },
+    {
+      "id": "eq-006",
+      "page": 2,
+      "region_id": "region_bc2895a49f1eed51e9a2",
+      "old_region_bbox": [
+        192.09,
+        552.73,
+        393.91,
+        588.19
+      ],
+      "old_crop_bbox": [
+        188.09,
+        548.73,
+        397.91,
+        592.19
+      ],
+      "context_bbox": [
+        192.09,
+        552.73,
+        393.91,
+        588.19
+      ],
+      "old_crop": "crops/eq-006.png",
+      "new_crop": "review/remediation/eq-006.png",
+      "source_page": "review/pages/page-02.png",
+      "deterministic_text": "∫x f′(t)dt + f(0) = 1 + f(x) = f(t)dt.\n0\n0",
+      "provisional_latex": "f(x) = \\int_0^x f'(t)dt + f(0) = 1 + \\int_0^x f(t)dt",
+      "warnings": "Padded original includes preceding-line fragments; candidate uses tight bounds.",
+      "review_status": "pending_review",
+      "reviewer": null
+    },
+    {
+      "id": "eq-008",
+      "page": 2,
+      "region_id": "region_281ea531f2651acd6607",
+      "old_region_bbox": [
+        72.5,
+        675.38,
+        513.5,
+        713.2
+      ],
+      "old_crop_bbox": [
+        68.5,
+        671.38,
+        517.5,
+        717.2
+      ],
+      "context_bbox": [
+        72.5,
+        675.38,
+        513.5,
+        713.2
+      ],
+      "old_crop": "crops/eq-008.png",
+      "new_crop": "review/remediation/eq-008.png",
+      "source_page": "review/pages/page-02.png",
+      "deterministic_text": "S(x) = lim\n∫x lim n→+∞Sn+1(x) =\n∫x lim Sn−1(t)dt) = 1+ n→+∞(1+\n∫x S(t)dt. n→+∞Sn−1(t)dt = 1+ 0\n0\n0",
+      "provisional_latex": "S(x)=\\lim_{n\\to+\\infty}S_{n+1}(x)=\\lim_{n\\to+\\infty}(1+\\int_0^x S_{n-1}(t)dt)=1+\\int_0^x\\lim_{n\\to+\\infty}S_{n-1}(t)dt=1+\\int_0^x S(t)dt",
+      "warnings": "Padded original includes preceding text; long multi-step equation, tight candidate.",
+      "review_status": "pending_review",
+      "reviewer": null
+    },
+    {
+      "id": "eq-010",
+      "page": 3,
+      "region_id": "region_7540c5520d1dcb955310",
+      "old_region_bbox": [
+        199.66,
+        119.5,
+        386.33,
+        246.57
+      ],
+      "old_crop_bbox": [
+        195.66,
+        115.5,
+        390.33,
+        250.57
+      ],
+      "context_bbox": [
+        199.66,
+        119.5,
+        386.33,
+        246.57
+      ],
+      "old_crop": "crops/eq-010.png",
+      "new_crop": "review/remediation/eq-010.png",
+      "source_page": "review/pages/page-03.png",
+      "deterministic_text": "∫x 1dt = 1 + x, S1(x) = 1 +\n0\n∫x (1 + t)dt = 1 + x + x2 S2(x) = 1 +\n2 ,\n0 ...\n∑ xp Sn(x) =\nn p! ·\np=0",
+      "provisional_latex": "S_1(x)=1+\\int_0^x1dt=1+x,\\quad S_2(x)=1+\\int_0^x(1+t)dt=1+x+\\frac{x^2}{2},\\quad\\ldots,\\quad S_n(x)=\\sum_{p=0}^{n}\\frac{x^p}{p!}",
+      "warnings": "Padded original includes nearby prose; candidate uses detector bounds; all steps require review.",
+      "review_status": "pending_review",
+      "reviewer": null
+    },
+    {
+      "id": "eq-017",
+      "page": 4,
+      "region_id": "region_76765c6249290c3b8651",
+      "old_region_bbox": [
+        230.66,
+        173.09,
+        409.1,
+        206.71
+      ],
+      "old_crop_bbox": [
+        226.66,
+        169.09,
+        413.1,
+        210.71
+      ],
+      "context_bbox": [
+        230.66,
+        173.09,
+        409.1,
+        206.71
+      ],
+      "old_crop": "crops/eq-017.png",
+      "new_crop": "review/remediation/eq-017.png",
+      "source_page": "review/pages/page-04.png",
+      "deterministic_text": "= lim n + 1 = 0. n→+∞ ∑\nn→+∞ |un|",
+      "provisional_latex": "\\lim_{n\\to+\\infty} \\frac{|u_{n+1}|}{|u_n|} = \\lim_{n\\to+\\infty} \\frac{|x|}{n+1} = 0",
+      "warnings": "Nearby prose below; tight candidate.",
+      "review_status": "pending_review",
+      "reviewer": null
+    },
+    {
+      "id": "eq-039",
+      "page": 8,
+      "region_id": "region_02518de3d60c5cbe8f2e",
+      "old_region_bbox": [
+        207.45,
+        719.71,
+        378.54,
+        751.55
+      ],
+      "old_crop_bbox": [
+        203.45,
+        715.71,
+        382.54,
+        755.55
+      ],
+      "context_bbox": [
+        207.45,
+        719.71,
+        378.54,
+        751.55
+      ],
+      "old_crop": "crops/eq-039.png",
+      "new_crop": "review/remediation/eq-039.png",
+      "source_page": "review/pages/page-08.png",
+      "deterministic_text": "R = 1 , où ℓ+ = lim sup\nℓ+\nn→∞|an|1/n.",
+      "provisional_latex": "R=\\frac{1}{\\ell_+}, \\quad \\ell_+=\\limsup_{n\\to\\infty}|a_n|^{1/n}",
+      "warnings": "Fraction, limit superior and French connective.",
+      "review_status": "pending_review",
+      "reviewer": null
+    },
+    {
+      "id": "eq-045",
+      "page": 11,
+      "region_id": "region_775beaf00828c96fe413",
+      "old_region_bbox": [
+        244.34,
+        384.78,
+        341.65,
+        420.24
+      ],
+      "old_crop_bbox": [
+        240.34,
+        380.78,
+        345.65,
+        424.24
+      ],
+      "context_bbox": [
+        244.34,
+        384.78,
+        341.65,
+        420.24
+      ],
+      "old_crop": "crops/eq-045.png",
+      "new_crop": "review/remediation/eq-045.png",
+      "source_page": "review/pages/page-11.png",
+      "deterministic_text": "∫b F(x) = f(x, t)dt,\na",
+      "provisional_latex": "F(x)=\\int_a^b f(x,t)dt",
+      "warnings": "Neighboring prose overlaps the crop envelope; tight candidate may still be contaminated.",
+      "review_status": "pending_review",
+      "reviewer": null
+    },
+    {
+      "id": "eq-047",
+      "page": 11,
+      "region_id": "region_d7b82f0fe9e36284cbe5",
+      "old_region_bbox": [
+        125.17,
+        710.49,
+        460.82,
+        729.42
+      ],
+      "old_crop_bbox": [
+        121.17,
+        706.49,
+        464.82,
+        733.42
+      ],
+      "context_bbox": [
+        125.17,
+        710.49,
+        460.82,
+        729.42
+      ],
+      "old_crop": "crops/eq-047.png",
+      "new_crop": "review/remediation/eq-047.png",
+      "source_page": "review/pages/page-11.png",
+      "deterministic_text": "∀ε > 0, ∃α(ε) > 0 tel que ∀x, y ∈I, |y −x| ≤α(ε) ⇒|φ(y) −φ(x)| ≤ε.",
+      "provisional_latex": "\\forall\\epsilon>0, \\exists\\alpha(\\epsilon)>0\\text{ tel que }\\forall x,y\\in I, |y-x|\\le\\alpha(\\epsilon)\\Rightarrow|\\phi(y)-\\phi(x)|\\le\\epsilon",
+      "warnings": "Quantifiers, inequality and French connective.",
+      "review_status": "pending_review",
+      "reviewer": null
+    },
+    {
+      "id": "eq-054",
+      "page": 13,
+      "region_id": "region_7743da15eb26e0241a44",
+      "old_region_bbox": [
+        213.2,
+        519.55,
+        372.79,
+        556.51
+      ],
+      "old_crop_bbox": [
+        209.2,
+        515.55,
+        376.79,
+        560.51
+      ],
+      "context_bbox": [
+        213.2,
+        519.55,
+        372.79,
+        556.51
+      ],
+      "old_crop": "crops/eq-054.png",
+      "new_crop": "review/remediation/eq-054.png",
+      "source_page": "review/pages/page-13.png",
+      "deterministic_text": "& '1 = 1 −cos x F(x) = ,\n−cos(tx) x\nx 0",
+      "provisional_latex": "F(x)=\\left[-\\frac{\\cos(tx)}{x}\\right]_0^1=\\frac{1-\\cos x}{x}",
+      "warnings": "Nested fraction, bracket, integral evaluation limits.",
+      "review_status": "pending_review",
+      "reviewer": null
+    },
+    {
+      "id": "eq-063",
+      "page": 15,
+      "region_id": "region_5ca30cfdf0504e0e00de",
+      "old_region_bbox": [
+        238.63,
+        152.97,
+        347.37,
+        188.44
+      ],
+      "old_crop_bbox": [
+        234.63,
+        148.97,
+        351.37,
+        192.44
+      ],
+      "context_bbox": [
+        238.63,
+        152.97,
+        347.37,
+        188.44
+      ],
+      "old_crop": "crops/eq-063.png",
+      "new_crop": "review/remediation/eq-063.png",
+      "source_page": "review/pages/page-15.png",
+      "deterministic_text": "∫+∞ F(x) = f(x, t)dt,\n0",
+      "provisional_latex": "F(x)=\\int_0^{+\\infty}f(x,t)dt",
+      "warnings": "Tiny mark above original crop; tight candidate tests padding removal.",
+      "review_status": "pending_review",
+      "reviewer": null
+    },
+    {
+      "id": "eq-079",
+      "page": 18,
+      "region_id": "region_494b73067ee1aef37ae3",
+      "old_region_bbox": [
+        72.5,
+        704.17,
+        513.49,
+        750.21
+      ],
+      "old_crop_bbox": [
+        68.5,
+        700.17,
+        517.49,
+        754.21
+      ],
+      "context_bbox": [
+        72.5,
+        704.17,
+        513.49,
+        750.21
+      ],
+      "old_crop": "crops/eq-079.png",
+      "new_crop": "review/remediation/eq-079.png",
+      "source_page": "review/pages/page-18.png",
+      "deterministic_text": "(indication : poser φ(x, u) = x cos(u)\n**∂2 ** sur des\nxφ(x, u) u2 + x2 , et majorer |φ(x, u)|, |∂xφ(x, u)|, et intervalles [a, b] ⊂]0, +∞[)",
+      "provisional_latex": "\\phi(x,u)=\\frac{x\\cos(u)}{u^2+x^2}\\quad\\text{(partial: surrounding French instruction and derivatives require review)}",
+      "warnings": "French instruction with several derivatives; partial transcription only.",
+      "review_status": "pending_review",
+      "reviewer": null
+    },
+    {
+      "id": "eq-083",
+      "page": 19,
+      "region_id": "region_16ed0cd2cef1f5d3b926",
+      "old_region_bbox": [
+        91.05,
+        581.54,
+        494.94,
+        697.26
+      ],
+      "old_crop_bbox": [
+        87.05,
+        577.54,
+        498.94,
+        701.26
+      ],
+      "context_bbox": [
+        91.05,
+        581.54,
+        494.94,
+        697.26
+      ],
+      "old_crop": "crops/eq-083.png",
+      "new_crop": "review/remediation/eq-083.png",
+      "source_page": "review/pages/page-19.png",
+      "deterministic_text": "∫+∞\n∫+∞ - x sin u x cos(u) 2xu F(x) =\n.+∞ = + u2 + x2 du (x2 + u2)2 du 0\nx2 + u2 0 0\n∫+∞ 2xu =\n(x2 + u2)2 du 0 - ∫+∞\n.+∞ 2xu 2x(x2 −3u2) = cos u du\n+ (x2 + u2)3\n− (x2 + u2)2 cos u 0 0 =\nF ′′(x).",
+      "provisional_latex": "F(x)=\\int_0^{+\\infty}\\frac{x\\cos(u)}{u^2+x^2}\\,du\\quad\\text{(partial: multi-line derivation requires review)}",
+      "warnings": "Long derivation; partial transcription only.",
+      "review_status": "pending_review",
+      "reviewer": null
+    },
+    {
+      "id": "eq-084",
+      "page": 20,
+      "region_id": "region_41d94453246492aa5bcc",
+      "old_region_bbox": [
+        72.5,
+        123.48,
+        398.12,
+        191.19
+      ],
+      "old_crop_bbox": [
+        68.5,
+        119.48,
+        402.12,
+        195.19
+      ],
+      "context_bbox": [
+        72.5,
+        123.48,
+        398.12,
+        191.19
+      ],
+      "old_crop": "crops/eq-084.png",
+      "new_crop": "review/remediation/eq-084.png",
+      "source_page": "review/pages/page-20.png",
+      "deterministic_text": "∫+∞ 1 F(0) =\n= π 1 + t2 dt = [arctan(t)]+∞ 0\n0 2 ·\nOn a donc, ﬁnalement, F(x) = π\n2 e−|x|.",
+      "provisional_latex": "F(0)=\\int_0^{+\\infty}\\frac{1}{1+t^2}dt=[\\arctan(t)]_0^{+\\infty}=\\frac{\\pi}{2}",
+      "warnings": "Original includes two separate expressions and prose; candidate isolates first formula.",
+      "review_status": "pending_review",
+      "reviewer": null
+    }
+  ],
+  "math_regions": [
+    {
+      "id": "region_22d55ef3c62c7aefa2da",
+      "page": 1,
+      "bbox": [
+        263.76,
+        384.76,
+        322.23,
+        418.8
+      ],
+      "context_bbox": [
+        263.76,
+        384.76,
+        322.23,
+        418.8
+      ],
+      "text": "∑ up. Sn =\np=0",
+      "review_required": true
+    },
+    {
+      "id": "region_42116d94dec3d2a81d58",
+      "page": 1,
+      "bbox": [
+        239.85,
+        451.26,
+        330.29,
+        485.3
+      ],
+      "context_bbox": [
+        239.85,
+        451.26,
+        347.14,
+        485.3
+      ],
+      "text": "∑ un =\nn→+∞ n=0 p=0",
+      "review_required": true
+    },
+    {
+      "id": "region_84094eabebe8648865da",
+      "page": 1,
+      "bbox": [
+        170.97,
+        626.61,
+        415.02,
+        660.24
+      ],
+      "context_bbox": [
+        170.97,
+        626.61,
+        415.02,
+        660.24
+      ],
+      "text": "∑ un| ≤ε. ∀ε > 0, ∃Nε ∈N tel que q ≥p ≥Nε ⇒|\nn=p",
+      "review_required": true
+    },
+    {
+      "id": "region_b6c3ffacfa824de49e8d",
+      "page": 2,
+      "bbox": [
+        256.5,
+        133.27,
+        272.46,
+        147.09
+      ],
+      "context_bbox": [
+        256.5,
+        133.27,
+        272.46,
+        147.09
+      ],
+      "text": "n≥0",
+      "review_required": true
+    },
+    {
+      "id": "region_cd73fcad46957fbfeb6c",
+      "page": 2,
+      "bbox": [
+        181.38,
+        336.07,
+        440.01,
+        353.13
+      ],
+      "context_bbox": [
+        181.38,
+        336.07,
+        440.01,
+        353.13
+      ],
+      "text": "n≥0 converge.\nn≥0",
+      "review_required": true
+    },
+    {
+      "id": "region_55f2693d71d63e914711",
+      "page": 2,
+      "bbox": [
+        261.59,
+        457.59,
+        318.23,
+        491.18
+      ],
+      "context_bbox": [
+        261.59,
+        457.59,
+        318.23,
+        491.18
+      ],
+      "text": "# f′ = f,\nf(0) = 1.",
+      "review_required": true
+    },
+    {
+      "id": "region_bc2895a49f1eed51e9a2",
+      "page": 2,
+      "bbox": [
+        192.09,
+        552.73,
+        393.91,
+        588.19
+      ],
+      "context_bbox": [
+        192.09,
+        552.73,
+        393.91,
+        588.19
+      ],
+      "text": "∫x f′(t)dt + f(0) = 1 + f(x) = f(t)dt.\n0\n0",
+      "review_required": true
+    },
+    {
+      "id": "region_5ee6e94efa4f017d7727",
+      "page": 2,
+      "bbox": [
+        72.5,
+        621.58,
+        363.22,
+        659.68
+      ],
+      "context_bbox": [
+        72.5,
+        621.58,
+        363.22,
+        659.68
+      ],
+      "text": "S0 : x ↦→1 et\n∫x Sn−1(t)dt. Sn+1 : x ↦→1 +\n0",
+      "review_required": true
+    },
+    {
+      "id": "region_281ea531f2651acd6607",
+      "page": 2,
+      "bbox": [
+        72.5,
+        675.38,
+        513.5,
+        713.2
+      ],
+      "context_bbox": [
+        72.5,
+        675.38,
+        513.5,
+        713.2
+      ],
+      "text": "S(x) = lim\n∫x lim n→+∞Sn+1(x) =\n∫x lim Sn−1(t)dt) = 1+ n→+∞(1+\n∫x S(t)dt. n→+∞Sn−1(t)dt = 1+ 0\n0\n0",
+      "review_required": true
+    },
+    {
+      "id": "region_addb7d379bc5d9e92179",
+      "page": 2,
+      "bbox": [
+        72.5,
+        729.8,
+        122.45,
+        742.46
+      ],
+      "context_bbox": [
+        72.5,
+        729.8,
+        122.45,
+        742.46
+      ],
+      "text": "S(x) = ex.",
+      "review_required": true
+    },
+    {
+      "id": "region_7540c5520d1dcb955310",
+      "page": 3,
+      "bbox": [
+        199.66,
+        119.5,
+        386.33,
+        246.57
+      ],
+      "context_bbox": [
+        199.66,
+        119.5,
+        386.33,
+        246.57
+      ],
+      "text": "∫x 1dt = 1 + x, S1(x) = 1 +\n0\n∫x (1 + t)dt = 1 + x + x2 S2(x) = 1 +\n2 ,\n0 ...\n∑ xp Sn(x) =\nn p! ·\np=0",
+      "review_required": true
+    },
+    {
+      "id": "region_011561db94c99245f7aa",
+      "page": 3,
+      "bbox": [
+        72.5,
+        261.71,
+        170.66,
+        296.98
+      ],
+      "context_bbox": [
+        72.5,
+        261.71,
+        170.66,
+        296.98
+      ],
+      "text": "général fn : x ↦→xn\nn! ·",
+      "review_required": true
+    },
+    {
+      "id": "region_283a8011a0e31e17f904",
+      "page": 3,
+      "bbox": [
+        249.49,
+        349.19,
+        336.5,
+        371.91
+      ],
+      "context_bbox": [
+        249.49,
+        349.19,
+        336.5,
+        371.91
+      ],
+      "text": "∑ Sn(x) = fp(x).",
+      "review_required": true
+    },
+    {
+      "id": "region_9f0a5f720f84ae637b57",
+      "page": 3,
+      "bbox": [
+        291.42,
+        375.26,
+        306.5,
+        383.23
+      ],
+      "context_bbox": [
+        291.42,
+        375.26,
+        306.5,
+        383.23
+      ],
+      "text": "p=0",
+      "review_required": true
+    },
+    {
+      "id": "region_a2c761c4f0d40563dade",
+      "page": 3,
+      "bbox": [
+        415.4,
+        409.74,
+        431.36,
+        423.56
+      ],
+      "context_bbox": [
+        415.4,
+        409.74,
+        431.36,
+        423.56
+      ],
+      "text": "n≥0",
+      "review_required": true
+    },
+    {
+      "id": "region_b297ac237cf887a2ffde",
+      "page": 3,
+      "bbox": [
+        81.86,
+        626.59,
+        370.57,
+        672.65
+      ],
+      "context_bbox": [
+        81.86,
+        626.59,
+        370.57,
+        672.65
+      ],
+      "text": "pour x ∈I,\n∑ +∞ fn(x). n→+∞Sn(x) =\nS(x) = lim n=0",
+      "review_required": true
+    },
+    {
+      "id": "region_45954ff1afedc3917047",
+      "page": 3,
+      "bbox": [
+        369.98,
+        719.6,
+        455.03,
+        750.39
+      ],
+      "context_bbox": [
+        369.98,
+        719.6,
+        455.03,
+        750.39
+      ],
+      "text": "n! sur I = R. n≥0",
+      "review_required": true
+    },
+    {
+      "id": "region_76765c6249290c3b8651",
+      "page": 4,
+      "bbox": [
+        230.66,
+        173.09,
+        409.1,
+        206.71
+      ],
+      "context_bbox": [
+        230.66,
+        173.09,
+        409.1,
+        206.71
+      ],
+      "text": "= lim n + 1 = 0. n→+∞ ∑\nn→+∞ |un|",
+      "review_required": true
+    },
+    {
+      "id": "region_c26e77453eb9f049be21",
+      "page": 4,
+      "bbox": [
+        105.23,
+        221.83,
+        409.21,
+        267.0
+      ],
+      "context_bbox": [
+        105.23,
+        221.83,
+        409.21,
+        267.0
+      ],
+      "text": "∑ xn série de fonctions\nn≥0 n! converge simplement sur R. n≥0",
+      "review_required": true
+    },
+    {
+      "id": "region_7afd2bc694b3d8d37950",
+      "page": 4,
+      "bbox": [
+        242.07,
+        280.15,
+        376.65,
+        320.0
+      ],
+      "context_bbox": [
+        242.07,
+        280.15,
+        376.65,
+        320.0
+      ],
+      "text": "∑ xn |S −Sn|∞= sup\n| n! |, x∈R\np≥n+1",
+      "review_required": true
+    },
+    {
+      "id": "region_b80175765a38d6a9423b",
+      "page": 4,
+      "bbox": [
+        101.86,
+        470.64,
+        253.8,
+        489.56
+      ],
+      "context_bbox": [
+        101.86,
+        470.64,
+        253.8,
+        489.56
+      ],
+      "text": "i) Pour tout n ∈N, |fn|∞≤an,",
+      "review_required": true
+    },
+    {
+      "id": "region_97d6f1f2e7121d6e93a2",
+      "page": 4,
+      "bbox": [
+        200.8,
+        505.09,
+        216.76,
+        518.91
+      ],
+      "context_bbox": [
+        200.8,
+        505.09,
+        216.76,
+        518.91
+      ],
+      "text": "n≥0",
+      "review_required": true
+    },
+    {
+      "id": "region_2a2246edcf60c40ffecd",
+      "page": 4,
+      "bbox": [
+        82.96,
+        587.91,
+        248.83,
+        607.86
+      ],
+      "context_bbox": [
+        82.96,
+        587.91,
+        248.83,
+        607.86
+      ],
+      "text": "n≥0\nformément sur I.",
+      "review_required": true
+    },
+    {
+      "id": "region_c50c4f9d23a439d7b133",
+      "page": 4,
+      "bbox": [
+        170.18,
+        701.17,
+        415.81,
+        735.21
+      ],
+      "context_bbox": [
+        170.18,
+        701.17,
+        415.81,
+        735.21
+      ],
+      "text": "∑ ∑ ∑ an| ≤ε.\nan = | q ≥p ≥Nε ⇒0 ≤ an −\nn=p+1 n=0 n=0",
+      "review_required": true
+    },
+    {
+      "id": "region_10ca1a3f2d2237f71378",
+      "page": 5,
+      "bbox": [
+        190.96,
+        119.24,
+        395.03,
+        153.28
+      ],
+      "context_bbox": [
+        190.96,
+        119.24,
+        395.03,
+        153.28
+      ],
+      "text": "∑ |Sq(x) −Sp(x)| ≤ n=p+1\n∑ an, |fn(x)| ≤ n=p+1",
+      "review_required": true
+    },
+    {
+      "id": "region_edaea00d0a25d78afb52",
+      "page": 5,
+      "bbox": [
+        221.72,
+        173.95,
+        364.27,
+        194.51
+      ],
+      "context_bbox": [
+        221.72,
+        173.95,
+        364.27,
+        194.51
+      ],
+      "text": "q ≥p ≥Nε ⇒|Sq −Sp|∞≤ε.",
+      "review_required": true
+    },
+    {
+      "id": "region_941c933c5cd02e661704",
+      "page": 5,
+      "bbox": [
+        72.5,
+        321.9,
+        317.64,
+        362.2
+      ],
+      "context_bbox": [
+        72.5,
+        321.9,
+        317.64,
+        362.2
+      ],
+      "text": "n! | ≤an,\npuisque xn",
+      "review_required": true
+    },
+    {
+      "id": "region_d000540fd3ac6d635a3e",
+      "page": 5,
+      "bbox": [
+        72.5,
+        385.22,
+        320.05,
+        439.54
+      ],
+      "context_bbox": [
+        72.5,
+        385.22,
+        320.05,
+        439.54
+      ],
+      "text": "|xn n! ·\nn! | ≤An\n∑ An Or",
+      "review_required": true
+    },
+    {
+      "id": "region_53ef16a1bef7361e1761",
+      "page": 6,
+      "bbox": [
+        72.5,
+        266.25,
+        182.68,
+        289.11
+      ],
+      "context_bbox": [
+        72.5,
+        266.25,
+        182.68,
+        289.11
+      ],
+      "text": "(ﬁnies !) Sn = ∑n\np=0 fp.",
+      "review_required": true
+    },
+    {
+      "id": "region_04152ca4c3281ac8e68b",
+      "page": 6,
+      "bbox": [
+        323.55,
+        435.04,
+        353.79,
+        449.48
+      ],
+      "context_bbox": [
+        323.55,
+        435.04,
+        353.79,
+        449.48
+      ],
+      "text": "∑ xn",
+      "review_required": true
+    },
+    {
+      "id": "region_4d7892cf8b041b1ca740",
+      "page": 6,
+      "bbox": [
+        233.57,
+        557.71,
+        395.61,
+        602.04
+      ],
+      "context_bbox": [
+        233.57,
+        557.71,
+        395.61,
+        602.04
+      ],
+      "text": "∫b ∑\n∫b ∑ fn(x)dx = fn(x)dx. a\na\nn≥0 n≥0",
+      "review_required": true
+    },
+    {
+      "id": "region_f7af1ad5db3a8f8c34ce",
+      "page": 6,
+      "bbox": [
+        220.2,
+        699.83,
+        247.29,
+        720.84
+      ],
+      "context_bbox": [
+        220.2,
+        699.83,
+        247.29,
+        720.84
+      ],
+      "text": "n≥0 f′",
+      "review_required": true
+    },
+    {
+      "id": "region_e3b59ad87bd7ce5aa4ce",
+      "page": 7,
+      "bbox": [
+        189.18,
+        139.09,
+        398.01,
+        178.94
+      ],
+      "context_bbox": [
+        189.18,
+        139.09,
+        398.01,
+        178.94
+      ],
+      "text": "∑ d\n∑ d fn(x) = S′(x) = σ(x) = dx\ndxfn(x). n≥0\nn≥0",
+      "review_required": true
+    },
+    {
+      "id": "region_90a261b057698293a6d1",
+      "page": 7,
+      "bbox": [
+        81.86,
+        263.31,
+        258.03,
+        291.05
+      ],
+      "context_bbox": [
+        81.86,
+        263.31,
+        258.03,
+        291.05
+      ],
+      "text": "S′(x) = ∑ n≥0 f′\nn(x) pour tout x ∈I.",
+      "review_required": true
+    },
+    {
+      "id": "region_4e094f6b3b6ad6f8f883",
+      "page": 7,
+      "bbox": [
+        105.23,
+        343.11,
+        385.27,
+        388.8
+      ],
+      "context_bbox": [
+        105.23,
+        343.11,
+        385.27,
+        388.8
+      ],
+      "text": "quand n →+∞[,\nn |fn+1(x)|\n= |x| n + 1 →|x| < 1. |fn(x)|",
+      "review_required": true
+    },
+    {
+      "id": "region_75b481f3da6a5d833699",
+      "page": 7,
+      "bbox": [
+        223.35,
+        437.43,
+        395.37,
+        470.88
+      ],
+      "context_bbox": [
+        223.35,
+        437.43,
+        395.37,
+        470.88
+      ],
+      "text": "S′(x) = f′ n≥0\nxn = n(x) = 1 −x· n≥0",
+      "review_required": true
+    },
+    {
+      "id": "region_c8cb92fea5fd19b214d7",
+      "page": 7,
+      "bbox": [
+        146.76,
+        490.71,
+        324.86,
+        530.56
+      ],
+      "context_bbox": [
+        146.76,
+        490.71,
+        324.86,
+        530.56
+      ],
+      "text": "∑ xn+1\nn + 1 = S(x) = S(x) −S(0) = 0 n≥0",
+      "review_required": true
+    },
+    {
+      "id": "region_b49922e456faadf71fbd",
+      "page": 8,
+      "bbox": [
+        82.96,
+        173.98,
+        144.47,
+        192.91
+      ],
+      "context_bbox": [
+        82.96,
+        173.98,
+        144.47,
+        192.91
+      ],
+      "text": "et 1/∞= 0).",
+      "review_required": true
+    },
+    {
+      "id": "region_5b8717234e9e125a3b4e",
+      "page": 8,
+      "bbox": [
+        194.18,
+        596.52,
+        241.99,
+        609.07
+      ],
+      "context_bbox": [
+        194.18,
+        596.52,
+        241.99,
+        609.07
+      ],
+      "text": "ℓ+ := lim",
+      "review_required": true
+    },
+    {
+      "id": "region_02518de3d60c5cbe8f2e",
+      "page": 8,
+      "bbox": [
+        207.45,
+        719.71,
+        378.54,
+        751.55
+      ],
+      "context_bbox": [
+        207.45,
+        719.71,
+        378.54,
+        751.55
+      ],
+      "text": "R = 1 , où ℓ+ = lim sup\nℓ+\nn→∞|an|1/n.",
+      "review_required": true
+    },
+    {
+      "id": "region_c5fca41b6a2e308e4726",
+      "page": 9,
+      "bbox": [
+        256.02,
+        455.28,
+        329.98,
+        483.3
+      ],
+      "context_bbox": [
+        256.02,
+        455.28,
+        329.98,
+        483.3
+      ],
+      "text": "fn(x) = xe−nx ·\nnx",
+      "review_required": true
+    },
+    {
+      "id": "region_0034a6dfe09c476e4027",
+      "page": 9,
+      "bbox": [
+        233.51,
+        624.08,
+        249.46,
+        637.9
+      ],
+      "context_bbox": [
+        233.51,
+        624.08,
+        249.46,
+        637.9
+      ],
+      "text": "n≥0",
+      "review_required": true
+    },
+    {
+      "id": "region_be46fbfe15dea91c93e0",
+      "page": 10,
+      "bbox": [
+        254.53,
+        188.16,
+        325.11,
+        214.19
+      ],
+      "context_bbox": [
+        254.53,
+        188.16,
+        325.11,
+        214.19
+      ],
+      "text": "0 ≤fn(x) ≤C",
+      "review_required": true
+    },
+    {
+      "id": "region_9dbc248c9177dfffdf11",
+      "page": 10,
+      "bbox": [
+        255.84,
+        342.84,
+        330.15,
+        363.41
+      ],
+      "context_bbox": [
+        255.84,
+        342.84,
+        330.15,
+        363.41
+      ],
+      "text": "2en, an ≥dn ≥",
+      "review_required": true
+    },
+    {
+      "id": "region_0bf4bb5f19849fb4e418",
+      "page": 10,
+      "bbox": [
+        180.8,
+        481.47,
+        217.82,
+        495.29
+      ],
+      "context_bbox": [
+        180.8,
+        481.47,
+        217.82,
+        495.29
+      ],
+      "text": "x∈[a,+∞[",
+      "review_required": true
+    },
+    {
+      "id": "region_775beaf00828c96fe413",
+      "page": 11,
+      "bbox": [
+        244.34,
+        384.78,
+        341.65,
+        420.24
+      ],
+      "context_bbox": [
+        244.34,
+        384.78,
+        341.65,
+        420.24
+      ],
+      "text": "∫b F(x) = f(x, t)dt,\na",
+      "review_required": true
+    },
+    {
+      "id": "region_788f381e36f3f3c5b90a",
+      "page": 11,
+      "bbox": [
+        120.26,
+        585.92,
+        465.73,
+        604.84
+      ],
+      "context_bbox": [
+        120.26,
+        585.92,
+        465.73,
+        604.84
+      ],
+      "text": "∀x ∈I, ∀ε > 0, ∃α(ε, x) > 0 tel que |y −x| ≤α(ε, x) ⇒|φ(y) −φ(x)| ≤ε.",
+      "review_required": true
+    },
+    {
+      "id": "region_d7b82f0fe9e36284cbe5",
+      "page": 11,
+      "bbox": [
+        125.17,
+        710.49,
+        460.82,
+        729.42
+      ],
+      "context_bbox": [
+        125.17,
+        710.49,
+        460.82,
+        729.42
+      ],
+      "text": "∀ε > 0, ∃α(ε) > 0 tel que ∀x, y ∈I, |y −x| ≤α(ε) ⇒|φ(y) −φ(x)| ≤ε.",
+      "review_required": true
+    },
+    {
+      "id": "region_b8db48187ba214213641",
+      "page": 12,
+      "bbox": [
+        194.77,
+        165.05,
+        391.22,
+        188.48
+      ],
+      "context_bbox": [
+        194.77,
+        165.05,
+        391.22,
+        188.48
+      ],
+      "text": "∀x, y ∈R+, |x −y| ≤α =⇒|x2 −y2| ≤1.",
+      "review_required": true
+    },
+    {
+      "id": "region_a8d96e5d941c23feaac4",
+      "page": 12,
+      "bbox": [
+        200.42,
+        206.83,
+        385.57,
+        230.26
+      ],
+      "context_bbox": [
+        200.42,
+        206.83,
+        385.57,
+        230.26
+      ],
+      "text": "|x2 −y2| = (x + y)|x −y| = α(2y + α),",
+      "review_required": true
+    },
+    {
+      "id": "region_65ef032bbef3beea2fae",
+      "page": 12,
+      "bbox": [
+        88.86,
+        308.15,
+        484.51,
+        401.93
+      ],
+      "context_bbox": [
+        88.86,
+        308.15,
+        484.51,
+        401.93
+      ],
+      "text": "∀(t, x) ∈I × J, ∀ε > 0, ∃α(ε, t, x) > 0 tel que\n|(s, y) −(t, x)| ≤α(ε, t, x) ⇒|f(s, y) −f(t, x)| ≤ε.\n— uniformément continue sur I × J lorsque\n∀ε > 0, ∃α(ε) > 0 tel que\n∀(t, x) ∈I × J, |(s, y) −(t, x)| ≤α(ε) ⇒|f(s, y) −f(t, x)| ≤ε.",
+      "review_required": true
+    },
+    {
+      "id": "region_781144a608edf49409dc",
+      "page": 13,
+      "bbox": [
+        249.57,
+        148.92,
+        346.88,
+        184.38
+      ],
+      "context_bbox": [
+        249.57,
+        148.92,
+        346.88,
+        184.38
+      ],
+      "text": "∫b F(x) = f(x, t)dt,\na",
+      "review_required": true
+    },
+    {
+      "id": "region_6f763c6b16f5f6374d6a",
+      "page": 13,
+      "bbox": [
+        139.15,
+        314.74,
+        446.84,
+        348.26
+      ],
+      "context_bbox": [
+        139.15,
+        314.74,
+        446.84,
+        348.26
+      ],
+      "text": "ε ∀(x, t) ∈I × [a, b], |x −x0| ≤α(ε) ⇒|f(x, t) −f(x0, t)| ≤\nb −a·",
+      "review_required": true
+    },
+    {
+      "id": "region_c958a6428f775e4ff1c9",
+      "page": 13,
+      "bbox": [
+        184.09,
+        365.72,
+        401.9,
+        401.18
+      ],
+      "context_bbox": [
+        184.09,
+        365.72,
+        401.9,
+        401.18
+      ],
+      "text": "∫b |F(x) −F(x0)| ≤ |f(x, t) −f(x0, t)|dt ≤ε,\na",
+      "review_required": true
+    },
+    {
+      "id": "region_7743da15eb26e0241a44",
+      "page": 13,
+      "bbox": [
+        213.2,
+        519.55,
+        372.79,
+        556.51
+      ],
+      "context_bbox": [
+        213.2,
+        519.55,
+        372.79,
+        556.51
+      ],
+      "text": "& '1 = 1 −cos x F(x) = ,\n−cos(tx) x\nx 0",
+      "review_required": true
+    },
+    {
+      "id": "region_b740853948669b20b1c7",
+      "page": 13,
+      "bbox": [
+        245.86,
+        644.43,
+        340.14,
+        679.89
+      ],
+      "context_bbox": [
+        245.86,
+        644.43,
+        340.14,
+        679.89
+      ],
+      "text": "∫b F(x) = f(x, t)dt\na",
+      "review_required": true
+    },
+    {
+      "id": "region_4d71704f09a529f8cabc",
+      "page": 14,
+      "bbox": [
+        242.65,
+        163.08,
+        353.81,
+        198.54
+      ],
+      "context_bbox": [
+        242.65,
+        163.08,
+        353.81,
+        198.54
+      ],
+      "text": "∫b ∂xf(x, t)dt. F ′(x) =\na",
+      "review_required": true
+    },
+    {
+      "id": "region_966e44b2051e21ee7375",
+      "page": 14,
+      "bbox": [
+        72.5,
+        261.26,
+        491.81,
+        323.23
+      ],
+      "context_bbox": [
+        72.5,
+        261.26,
+        491.81,
+        323.23
+      ],
+      "text": "x→x0\na x −x0\nOr\n∫b\n∫b ∂xf(x, t)dt = F(x) −F(x0) −(x −x0) f(x, t) −f(x0, t) −(x −x0)∂xf(x, t)dt",
+      "review_required": true
+    },
+    {
+      "id": "region_da0103f7e8181c793dbe",
+      "page": 14,
+      "bbox": [
+        283.5,
+        320.28,
+        399.56,
+        355.75
+      ],
+      "context_bbox": [
+        283.5,
+        320.28,
+        399.56,
+        355.75
+      ],
+      "text": "∫b = g(x, t) −g(x0, t)dt,\na",
+      "review_required": true
+    },
+    {
+      "id": "region_16928d0c0c81482edb17",
+      "page": 14,
+      "bbox": [
+        113.13,
+        450.14,
+        472.86,
+        469.07
+      ],
+      "context_bbox": [
+        113.13,
+        450.14,
+        472.86,
+        469.07
+      ],
+      "text": "∀t ∈[a, b], ∀x ∈I, |x −x0| ≤α(ε) ⇒|∂xg(x, t)| = |∂xf(x, t) −∂xf(x0, t)| ≤ε",
+      "review_required": true
+    },
+    {
+      "id": "region_40dcacee49a46f3b3498",
+      "page": 14,
+      "bbox": [
+        72.5,
+        491.2,
+        450.31,
+        557.27
+      ],
+      "context_bbox": [
+        72.5,
+        491.2,
+        450.31,
+        557.27
+      ],
+      "text": "∀t ∈[a, b], ∀x ∈I, |x −x0| ≤α(ε) ⇒|g(x, t) −g(x0, t)| ≤ε|x −x0|.\nFinalement on obtient\n∫b |F(x) −F(x0) −(x −x0) ∂xf(x, t)dt| ≤ε(b −a)|x −x0|,\na",
+      "review_required": true
+    },
+    {
+      "id": "region_3d97e2451f39c8f5e43c",
+      "page": 14,
+      "bbox": [
+        243.86,
+        661.93,
+        342.13,
+        673.74
+      ],
+      "context_bbox": [
+        243.86,
+        661.93,
+        342.13,
+        673.74
+      ],
+      "text": "∂x(sin(tx)) = g(t, x),",
+      "review_required": true
+    },
+    {
+      "id": "region_454b35a352564109c0d8",
+      "page": 14,
+      "bbox": [
+        168.61,
+        721.66,
+        376.01,
+        741.73
+      ],
+      "context_bbox": [
+        168.61,
+        721.66,
+        376.01,
+        741.73
+      ],
+      "text": "G(x) = 0\nx2",
+      "review_required": true
+    },
+    {
+      "id": "region_5ca30cfdf0504e0e00de",
+      "page": 15,
+      "bbox": [
+        238.63,
+        152.97,
+        347.37,
+        188.44
+      ],
+      "context_bbox": [
+        238.63,
+        152.97,
+        347.37,
+        188.44
+      ],
+      "text": "∫+∞ F(x) = f(x, t)dt,\n0",
+      "review_required": true
+    },
+    {
+      "id": "region_c08e5f5403d87a1256a4",
+      "page": 15,
+      "bbox": [
+        195.44,
+        264.63,
+        390.56,
+        284.97
+      ],
+      "context_bbox": [
+        195.44,
+        264.63,
+        390.56,
+        284.97
+      ],
+      "text": "F(x) −F(x0) = f(x, t) −f(x0, t)dt\n0",
+      "review_required": true
+    },
+    {
+      "id": "region_55319b1ebd80167dcea9",
+      "page": 15,
+      "bbox": [
+        133.61,
+        306.03,
+        452.39,
+        341.49
+      ],
+      "context_bbox": [
+        133.61,
+        306.03,
+        452.39,
+        341.49
+      ],
+      "text": "∫A F(x) −F(x0) =\n∫+∞ f(x, t) −f(x0, t)dt + f(x, t) −f(x0, t)dt, 0\nA",
+      "review_required": true
+    },
+    {
+      "id": "region_ba3eae7375c9e82fcacd",
+      "page": 15,
+      "bbox": [
+        244.32,
+        677.14,
+        352.14,
+        711.19
+      ],
+      "context_bbox": [
+        244.32,
+        677.14,
+        352.14,
+        711.19
+      ],
+      "text": "∫un f(x, t)dt Fn : x ↦→",
+      "review_required": true
+    },
+    {
+      "id": "region_3b28aa3ede0da905981c",
+      "page": 16,
+      "bbox": [
+        179.06,
+        123.48,
+        406.93,
+        159.17
+      ],
+      "context_bbox": [
+        179.06,
+        123.48,
+        406.93,
+        159.17
+      ],
+      "text": "∫+∞ f(x, t)dt| ≤ε pour tout x ∈I. A ≥Aε ⇒|\nA",
+      "review_required": true
+    },
+    {
+      "id": "region_127aac7632a8862fb609",
+      "page": 16,
+      "bbox": [
+        181.94,
+        183.49,
+        404.06,
+        219.45
+      ],
+      "context_bbox": [
+        181.94,
+        183.49,
+        404.06,
+        219.45
+      ],
+      "text": "∫+∞ ∀x ∈I, |F(x) −Fn(x)| ≤| f(x, t)dt| ≤ε,\nun",
+      "review_required": true
+    },
+    {
+      "id": "region_396ebf140466b86f8f63",
+      "page": 16,
+      "bbox": [
+        245.37,
+        372.69,
+        351.09,
+        408.15
+      ],
+      "context_bbox": [
+        245.37,
+        372.69,
+        351.09,
+        408.15
+      ],
+      "text": "∫+∞ F(x) = f(x, t)dt\n0",
+      "review_required": true
+    },
+    {
+      "id": "region_897532d1435856c92978",
+      "page": 16,
+      "bbox": [
+        115.69,
+        607.67,
+        371.96,
+        658.92
+      ],
+      "context_bbox": [
+        115.69,
+        607.67,
+        371.96,
+        658.92
+      ],
+      "text": "∫+∞ φ(x) = ∂xf(x, t)dt\n0 est uniformément convergente sur I,",
+      "review_required": true
+    },
+    {
+      "id": "region_cd999cffe3f38d3a4526",
+      "page": 16,
+      "bbox": [
+        202.66,
+        680.7,
+        394.99,
+        716.69
+      ],
+      "context_bbox": [
+        202.66,
+        680.7,
+        394.99,
+        716.69
+      ],
+      "text": ") (∫+∞ ∫+∞ d\nf(x, t)dt = ∂xf(x, t)dt dx\n0\n0",
+      "review_required": true
+    },
+    {
+      "id": "region_9819547d03311b8bd152",
+      "page": 17,
+      "bbox": [
+        302.2,
+        210.08,
+        329.28,
+        231.08
+      ],
+      "context_bbox": [
+        302.2,
+        210.08,
+        329.28,
+        231.08
+      ],
+      "text": "n≥0 f′",
+      "review_required": true
+    },
+    {
+      "id": "region_1d25fbaa39d3d236393e",
+      "page": 17,
+      "bbox": [
+        81.86,
+        351.26,
+        145.62,
+        377.56
+      ],
+      "context_bbox": [
+        81.86,
+        351.26,
+        145.62,
+        377.56
+      ],
+      "text": "∫+∞ F(x) =",
+      "review_required": true
+    },
+    {
+      "id": "region_a344f22b995b0f8a4e48",
+      "page": 17,
+      "bbox": [
+        82.96,
+        608.97,
+        108.92,
+        628.47
+      ],
+      "context_bbox": [
+        82.96,
+        608.97,
+        108.92,
+        628.47
+      ],
+      "text": "∫+∞",
+      "review_required": true
+    },
+    {
+      "id": "region_f9f50f8ff6a60af50618",
+      "page": 18,
+      "bbox": [
+        245.37,
+        199.61,
+        351.09,
+        235.07
+      ],
+      "context_bbox": [
+        245.37,
+        199.61,
+        351.09,
+        235.07
+      ],
+      "text": "∫+∞ F(x) = f(x, t)dt\n0",
+      "review_required": true
+    },
+    {
+      "id": "region_c357f4ccd5b915205f34",
+      "page": 18,
+      "bbox": [
+        238.45,
+        428.2,
+        358.01,
+        463.66
+      ],
+      "context_bbox": [
+        238.45,
+        428.2,
+        358.01,
+        463.66
+      ],
+      "text": "∫+∞ ∂xf(x, t)dt F ′(x) =\n0",
+      "review_required": true
+    },
+    {
+      "id": "region_4f2ceff848d48e9bcabb",
+      "page": 18,
+      "bbox": [
+        72.5,
+        565.08,
+        334.62,
+        610.12
+      ],
+      "context_bbox": [
+        72.5,
+        565.08,
+        334.62,
+        610.12
+      ],
+      "text": "t2 + 1 · ∫+∞ 1. Montrer que la fonction F(x) =",
+      "review_required": true
+    },
+    {
+      "id": "region_57fb1aef95f4c5c4f3cf",
+      "page": 18,
+      "bbox": [
+        232.6,
+        652.35,
+        353.4,
+        672.42
+      ],
+      "context_bbox": [
+        232.6,
+        652.35,
+        353.4,
+        672.42
+      ],
+      "text": "F(x) = u2 + x2 du.\n0",
+      "review_required": true
+    },
+    {
+      "id": "region_494b73067ee1aef37ae3",
+      "page": 18,
+      "bbox": [
+        72.5,
+        704.17,
+        513.49,
+        750.21
+      ],
+      "context_bbox": [
+        72.5,
+        704.17,
+        513.49,
+        750.21
+      ],
+      "text": "(indication : poser φ(x, u) = x cos(u)\n**∂2 ** sur des\nxφ(x, u) u2 + x2 , et majorer |φ(x, u)|, |∂xφ(x, u)|, et intervalles [a, b] ⊂]0, +∞[)",
+      "review_required": true
+    },
+    {
+      "id": "region_2866ae5d7f5d27ac41b5",
+      "page": 19,
+      "bbox": [
+        198.11,
+        173.8,
+        335.17,
+        210.23
+      ],
+      "context_bbox": [
+        191.05,
+        173.8,
+        335.17,
+        210.23
+      ],
+      "text": "∫+∞ cos(tx) 1 ****\nt2 + 1 0 0",
+      "review_required": true
+    },
+    {
+      "id": "region_914b1fde8db71729c28b",
+      "page": 19,
+      "bbox": [
+        233.45,
+        251.31,
+        352.54,
+        277.34
+      ],
+      "context_bbox": [
+        233.45,
+        251.31,
+        352.54,
+        277.34
+      ],
+      "text": "1 |f(x, t)| ≤g(t) :=\n1 + t2 ,",
+      "review_required": true
+    },
+    {
+      "id": "region_c8a0c2aa0296fe46ae63",
+      "page": 19,
+      "bbox": [
+        72.5,
+        383.53,
+        513.39,
+        510.47
+      ],
+      "context_bbox": [
+        72.5,
+        383.53,
+        513.39,
+        510.47
+      ],
+      "text": "b |φ(x, u)| ≤ +\na2 + u2 := g0(u), ***** ≤ (a2 + u2)2 := g1(u),\n∂φ cos (u) **** **** **** = (u2 + x2)2 (u2 + x2)2\nb2 + u2 −u2 + x2, **** = *****−cos (u) u2 + x2 −2 x2 cos (u) ∂x et\n∂2φ **** **** = ****−6 cos (u) x (u2 + x2)3\n+ −3 u2 + x2, *****2 cos (u) x **** = ***** ≤2b(b2 + 3u2) (u2 + x2)2 + 8 x3 cos (u) := g2(u). ∂x2\n(a2 + u2)3 (u2 + x2)3",
+      "review_required": true
+    },
+    {
+      "id": "region_16ed0cd2cef1f5d3b926",
+      "page": 19,
+      "bbox": [
+        91.05,
+        581.54,
+        494.94,
+        697.26
+      ],
+      "context_bbox": [
+        91.05,
+        581.54,
+        494.94,
+        697.26
+      ],
+      "text": "∫+∞\n∫+∞ - x sin u x cos(u) 2xu F(x) =\n.+∞ = + u2 + x2 du (x2 + u2)2 du 0\nx2 + u2 0 0\n∫+∞ 2xu =\n(x2 + u2)2 du 0 - ∫+∞\n.+∞ 2xu 2x(x2 −3u2) = cos u du\n+ (x2 + u2)3\n− (x2 + u2)2 cos u 0 0 =\nF ′′(x).",
+      "review_required": true
+    },
+    {
+      "id": "region_41d94453246492aa5bcc",
+      "page": 20,
+      "bbox": [
+        72.5,
+        123.48,
+        398.12,
+        191.19
+      ],
+      "context_bbox": [
+        72.5,
+        123.48,
+        398.12,
+        191.19
+      ],
+      "text": "∫+∞ 1 F(0) =\n= π 1 + t2 dt = [arctan(t)]+∞ 0\n0 2 ·\nOn a donc, ﬁnalement, F(x) = π\n2 e−|x|.",
+      "review_required": true
+    }
+  ]
+}

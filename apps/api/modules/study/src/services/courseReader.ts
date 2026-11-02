@@ -209,7 +209,7 @@ function sourceV2Section(passages: SourcePassage[]): ReadingDocumentV2['sections
           {
             type: 'paragraph',
             id: 'source-empty',
-            text: 'The verified source contains no readable passages.',
+            text: 'The preserved source contains no readable extracted passages.',
             evidence: ['source-empty'],
           },
         ],
@@ -220,11 +220,15 @@ function sourceV2Section(passages: SourcePassage[]): ReadingDocumentV2['sections
 
 export function canonicalBlocks(
   blocks: Array<Record<string, unknown>>,
+  mediaContext?: { courseId: string; revisionId: string },
 ): LessonBlockV2[] {
   return blocks.flatMap((block, index): LessonBlockV2[] => {
     if (block.type === 'source_lesson') {
       const text = compact(block.text, 1_000_000);
       if (!text) return [];
+      // Batch 2 projects source regions after the complete source lesson. The
+      // reader displays those exact regions so prose is not shown twice.
+      if (blocks.some((candidate) => typeof candidate.regionId === 'string')) return [];
       const id = String(block.id || `canonical-${index}`);
       const evidence = canonicalSpans(block.evidence);
       const chunkId = evidence[0]?.chunkId || 'canonical';
@@ -254,7 +258,26 @@ export function canonicalBlocks(
     const evidenceIds = canonicalSpans(block.evidence)
       .map((span) => span.chunkId)
       .slice(0, 128);
-    const shape = canonicalBlockShape(block, id, evidenceIds);
+    const semanticTypes = new Set([
+      'definition', 'theorem', 'proposition', 'lemma', 'corollary',
+      'proof', 'example', 'exercise', 'solution', 'remark',
+    ]);
+    if (semanticTypes.has(String(block.type))) {
+      const text = compact(block.text, 8_000);
+      if (!text) return [];
+      const shape = {
+        type: 'callout',
+        id,
+        kind: String(block.type).slice(0, 40),
+        title: compact(block.title, 500) || String(block.type).replace(/^./, (c) => c.toUpperCase()),
+        text,
+        evidence: evidenceIds,
+        provenance: canonicalSpans(block.evidence).slice(0, 8),
+        ...sourceMetaShape(block),
+      };
+      try { return parseReadingDocumentBlock(shape); } catch { return []; }
+    }
+    const shape = canonicalBlockShape(block, id, evidenceIds, mediaContext);
     if (!shape) return [];
     try {
       return parseReadingDocumentBlock(shape);
@@ -265,6 +288,31 @@ export function canonicalBlocks(
         : [];
     }
   });
+}
+
+function sourceMetaShape(block: Record<string, unknown>) {
+  const bbox = Array.isArray(block.bbox) && block.bbox.length === 4 && block.bbox.every((value) => typeof value === 'number' && Number.isFinite(value))
+    ? block.bbox as [number, number, number, number]
+    : null;
+  if (typeof block.regionId !== 'string' || !bbox) return {};
+  const method = ['text', 'ocr', 'image', 'vector'].includes(String(block.extractionMethod))
+    ? block.extractionMethod as 'text' | 'ocr' | 'image' | 'vector'
+    : 'text';
+  return {
+    sourceMeta: {
+      regionId: block.regionId.slice(0, 128),
+      page: Number.isSafeInteger(block.page) && Number(block.page) > 0 ? Number(block.page) : null,
+      bbox,
+      extractionMethod: method,
+      confidence: typeof block.confidence === 'number' && Number.isFinite(block.confidence)
+        ? Math.max(0, Math.min(1, block.confidence))
+        : block.reviewRequired === true ? 0 : 1,
+      reviewRequired: block.reviewRequired === true,
+      issues: Array.isArray(block.issues)
+        ? block.issues.filter((issue): issue is string => typeof issue === 'string').slice(0, 16)
+        : [],
+    },
+  };
 }
 
 function canonicalSpans(value: unknown): EvidenceSpan[] {
@@ -293,8 +341,9 @@ function canonicalBlockShape(
   block: Record<string, unknown>,
   id: string,
   evidenceIds: string[],
+  mediaContext?: { courseId: string; revisionId: string },
 ): Record<string, unknown> | null {
-  const base = { id, evidence: evidenceIds };
+  const base = { id, evidence: evidenceIds, provenance: canonicalSpans(block.evidence).slice(0, 8), ...sourceMetaShape(block) };
   switch (block.type) {
     case 'heading':
       return typeof block.text === 'string'
@@ -302,7 +351,11 @@ function canonicalBlockShape(
         : null;
     case 'math':
       return typeof block.expression === 'string'
-        ? { ...base, type: 'math', expression: compact(block.expression, 600), notation: block.notation === 'latex' ? 'latex' : 'plain' }
+        ? { ...base, type: 'math', expression: compact((block.reviewedFormula as any)?.expression || block.expression, 8000), notation: block.reviewedFormula || block.notation === 'latex' ? 'latex' : 'plain', ...(block.reviewedFormula ? {review:{state:(block.reviewedFormula as any).state,originalExpression:block.expression,modelExpression:(block.reviewedFormula as any).originalModelLatex,reviewer:(block.reviewedFormula as any).reviewer}} : {}) }
+        : null;
+    case 'paragraph':
+      return typeof block.text === 'string'
+        ? { ...base, type: 'paragraph', text: compact(block.text, 8_000) }
         : null;
     case 'table':
       return Array.isArray(block.columns) && Array.isArray(block.rows)
@@ -319,9 +372,19 @@ function canonicalBlockShape(
         ? { ...base, type: 'code', language: compact(block.language, 24) || 'text', code: compact(block.code, 20_000) }
         : null;
     case 'media':
-      return typeof block.alt === 'string'
-        ? { ...base, type: 'media', mediaType: ['image', 'audio', 'video'].includes(String(block.mediaType)) ? block.mediaType : 'image', alt: compact(block.alt, 500) }
-        : null;
+      if (typeof block.alt !== 'string') return null;
+      const span = canonicalSpans(block.evidence)[0];
+      const regionId = compact(block.sourceRegionId || block.regionId, 128);
+      const src = mediaContext && span && regionId
+        ? `/api/v1/study/courses/${encodeURIComponent(mediaContext.courseId)}/revisions/${encodeURIComponent(mediaContext.revisionId)}/sources/${encodeURIComponent(span.documentId)}/regions/${encodeURIComponent(regionId)}`
+        : undefined;
+      return {
+        ...base,
+        type: 'media',
+        mediaType: ['image', 'audio', 'video'].includes(String(block.mediaType)) ? block.mediaType : 'image',
+        alt: compact(block.alt, 500),
+        ...(src ? { src } : {}),
+      };
     default:
       return null;
   }
@@ -475,6 +538,8 @@ export async function getLearningDocument(
     revision.contentDocumentHash !== activityDigest(revision.contentDocument)
   )
     throw new LearningDocumentVersionError('Canonical content checksum mismatch');
+  if (storedCanonical && revision.formulaPublication?.sourceDraftId && revision.contentDocumentHash!==revision.formulaPublication.projectionHash) throw new LearningDocumentVersionError('Frozen reviewed representation checksum mismatch');
+  if (storedCanonical && !revision.formulaPublication?.sourceDraftId) for (const c of storedCanonical.chapters) for (const l of c.lessons) for (const b of l.blocks) delete (b as any).reviewedFormula;
   const generatedSummary = compact(
     revision.summary || topics.map((topic) => topic.description).filter(Boolean).join(' '),
     2_000,
@@ -484,7 +549,10 @@ export async function getLearningDocument(
         const blocks: LessonBlockV2[] = [];
         for (const lesson of chapter.lessons) {
           blocks.push({ type: 'heading', id: `${lesson.id}-title`, level: 2, text: lesson.title });
-          blocks.push(...canonicalBlocks(lesson.blocks as Array<Record<string, unknown>>));
+          blocks.push(...canonicalBlocks(
+            lesson.blocks as Array<Record<string, unknown>>,
+            { courseId, revisionId: context.revisionId },
+          ));
         }
         return {
           id: compact(chapter.id, 128) || `topic-${index + 1}`,
@@ -535,6 +603,9 @@ export async function getLearningDocument(
     })),
     mappings: projection.mappings,
   };
+  const qualityWarnings = storedCanonical?.quality?.publicationState === 'review_required'
+    ? ['Extraction fidelity needs review. Source linkage does not establish mathematical correctness.']
+    : [];
   const document = {
     schemaVersion: LEARNING_DOCUMENT_VERSION,
     courseId,
@@ -574,11 +645,11 @@ export async function getLearningDocument(
       pageNumber: null,
       href: `/api/v1/study/courses/${encodeURIComponent(courseId)}/revisions/${encodeURIComponent(context.revisionId)}/sources/${encodeURIComponent(source.documentId)}`,
     })),
-    warnings: passages.some((passage) => passage.reviewRequired)
-      ? ['Some pages came from low-confidence OCR. Check the original source before relying on exact wording.']
+    warnings: passages.some((passage) => passage.extractionMethod === 'ocr' && passage.reviewRequired)
+      ? ['Some pages came from low-confidence OCR. Check the original source before relying on exact wording.', ...qualityWarnings]
       : storedCanonical
-        ? ['Source text integrity has not been verified. Canonical content preserves the current extraction without claiming symbol or layout fidelity.' ]
-        : [],
+        ? ['Source provenance is bound to the preserved document. Extraction fidelity, including symbols and layout, is unverified.', ...qualityWarnings]
+      : qualityWarnings.length ? qualityWarnings : [],
   };
   return parseReadingDocumentV2(document);
 }

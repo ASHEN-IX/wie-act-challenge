@@ -175,3 +175,25 @@ def test_chapter_pdf_structure_ignores_equations_exercises_and_running_heads():
         "Chapter 4: Fonctions définies par des intégrales à paramètre",
     ]
     assert [len(topic.subtopics) for topic in normalized.topics] == [3, 1]
+
+
+def test_repeated_text_keeps_each_regions_exact_page_and_identity():
+    passages = [
+        ('# Chapter\nRepeated source text.', {'chunk_id': 'same_hash', 'document_id': 'doc',
+          'page_number': 1, 'region_id': 'region_first', 'bbox': [10, 10, 100, 30], 'region_type': 'paragraph'}),
+        ('# Chapter\nRepeated source text.', {'chunk_id': 'same_hash', 'document_id': 'doc',
+          'page_number': 3, 'region_id': 'region_second', 'bbox': [10, 40, 100, 60], 'region_type': 'paragraph'}),
+    ]
+    regions = [r for section in detect_sections_with_sources(passages) for r in section['source_regions']]
+    assert [(r['id'], r['page']) for r in regions] == [('region_first', 1), ('region_second', 3)]
+
+
+def test_top_level_numbered_heading_requires_trusted_layout():
+    from agents.course_ingestion.parsing.semantic_structure import detect_sections_with_sources
+    def meta(i, kind):
+        return {'chunk_id':str(i),'document_id':'doc','page_number':1,'region_type':kind}
+    passages=[('1 Network reliability',meta(1,'heading')),('A sender awaits acknowledgement.',meta(2,'paragraph')),('2 Failure handling',meta(3,'heading')),('A timeout triggers a retry.',meta(4,'paragraph'))]
+    sections=detect_sections_with_sources(passages)
+    assert [s['title'] for s in sections] == ['1 Network reliability','2 Failure handling']
+    untrusted=detect_sections_with_sources([(text,{**m,'region_type':'paragraph'}) for text,m in passages])
+    assert len(untrusted)==1

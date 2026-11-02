@@ -37,6 +37,7 @@ export interface SourceDocument {
   provenance: 'extracted';
   storageRef: string;
   mediaType: string;
+  extractionVersion?: '1.0' | '2.0';
 }
 export interface SourcePassage {
   documentId: string;
@@ -52,6 +53,12 @@ export interface SourcePassage {
   extractionWarning?: 'ocr_low_confidence' | 'ocr_no_text' | null;
   blockIds?: string[];
   sourceChunkIds?: string[];
+  regionId?: string;
+  regionType?: string;
+  bbox?: number[];
+  readingOrder?: number;
+  regionConfidence?: number;
+  regionIssues?: string[];
 }
 export interface RevisionArtifact {
   schemaVersion: '1.0.0';
@@ -65,6 +72,7 @@ export interface RevisionArtifact {
   metas: Array<Record<string, unknown>>;
 }
 export interface CanonicalIndexUnit {
+  formulaReview?: {state: string; proposalIdentity: string; documentHash: string; cropHash: string; reviewer: string};
   text: string;
   documentIds: string[];
   blockIds: string[];
@@ -80,6 +88,13 @@ export function canonicalUnitsForIndex(value: unknown): CanonicalIndexUnit[] {
     for (const lesson of chapter.lessons) {
       const source = lesson.blocks.find((block) => block.type === 'source_lesson');
       const text = typeof source?.text === 'string' ? source.text : '';
+      for (const b of lesson.blocks as Array<Record<string, any>>) {
+        if (b.type !== 'math' || (!b.reviewedFormula && source)) continue;
+        const expression = b.reviewedFormula ? 'Instructor-reviewed representation: '+b.reviewedFormula.expression+'\nOriginal extraction: '+b.expression : b.expression;
+        const spans = b.evidence || [];
+        if (!spans.length || typeof expression !== 'string') continue;
+        for(let offset=0; offset<expression.length; offset+=1800) if(expression.slice(offset,offset+1800).trim()) units.push({...(b.reviewedFormula ? {formulaReview:{state:b.reviewedFormula.state,proposalIdentity:b.reviewedFormula.proposalIdentity,documentHash:b.reviewedFormula.documentHash,cropHash:b.reviewedFormula.cropHash,reviewer:b.reviewedFormula.reviewer}} : {}),text:expression.slice(offset,offset+1800).trim(),documentIds:[...new Set<string>(spans.map((s:any)=>s.documentId))],blockIds:[String(b.id)],chunkIds:spans.map((s:any)=>s.chunkId),lessonId:lesson.id});
+      }
       if (!source || !text.trim()) continue;
       const parts = text.split(/\n\s*\n/).map((part) => part.trim()).filter(Boolean);
       // Keep every derived unit within the AI index contract. Extraction can
@@ -127,6 +142,7 @@ export function canonicalUnitsForIndex(value: unknown): CanonicalIndexUnit[] {
       }
     }
   }
+  if (units.length>2000 && units.some(u=>u.formulaReview)) throw new SourceIntegrityError('Reviewed formula index exceeds the bounded publication limit');
   return units.slice(0, 2_000);
 }
 export function manifestDigest(
@@ -150,7 +166,7 @@ export async function verifyBlob(document: SourceDocument) {
     throw new SourceIntegrityError('Original bytes mismatch');
   return file;
 }
-export async function captureImmutableSources(courseId: string, uploadedFiles?: ICourseFile[]) {
+export async function captureImmutableSources(courseId: string, uploadedFiles?: ICourseFile[], extractionVersion: '1.0' | '2.0' = '1.0') {
   const files = uploadedFiles || (await Course.findById(courseId).lean())?.files;
   if (!files?.length) throw new SourceIntegrityError('Original documents required');
   const root = sourceRoots().uploads;
@@ -168,7 +184,8 @@ export async function captureImmutableSources(courseId: string, uploadedFiles?: 
       contentHash: hash,
       provenance: 'extracted',
       storageRef,
-      mediaType: file.filename.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'text/plain'
+      mediaType: file.filename.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'text/plain',
+      ...(extractionVersion === '2.0' && file.filename.toLowerCase().endsWith('.pdf') ? { extractionVersion } : {})
     };
     await fs.mkdir(path.join(root, 'originals'), { recursive: true });
     try {
@@ -263,6 +280,12 @@ export async function verifyRevisionArtifact(revision: {
         (m.extraction_warning !== undefined &&
           m.extraction_warning !== null &&
           !['ocr_low_confidence', 'ocr_no_text'].includes(String(m.extraction_warning)))
+        || (m.region_id !== undefined &&
+          (typeof m.region_id !== 'string' || m.region_id.length > 128)) ||
+        (m.bbox !== undefined &&
+          (!Array.isArray(m.bbox) ||
+            m.bbox.length !== 4 ||
+            m.bbox.some((v) => typeof v !== 'number' || !Number.isFinite(v))))
       )
         throw new Error();
       return {
@@ -286,6 +309,14 @@ export async function verifyRevisionArtifact(revision: {
                 .filter((v): v is string => typeof v === 'string')
                 .slice(0, 400)
             }
+          : {}),
+        ...(typeof m.region_id === 'string' ? { regionId: m.region_id } : {}),
+        ...(typeof m.region_type === 'string' ? { regionType: m.region_type } : {}),
+        ...(Array.isArray(m.bbox) && m.bbox.length === 4 ? { bbox: m.bbox as number[] } : {}),
+        ...(Number.isSafeInteger(m.reading_order) ? { readingOrder: m.reading_order as number } : {}),
+        ...(typeof m.region_confidence === 'number' ? { regionConfidence: m.region_confidence } : {}),
+        ...(Array.isArray(m.region_issues)
+          ? { regionIssues: m.region_issues.filter((v): v is string => typeof v === 'string').slice(0, 16) }
           : {})
       };
     });
@@ -304,13 +335,17 @@ export async function prepareRevisionSources(actor: string, courseId: string, re
     activationState: { $ne: 'prepared' }
   }).lean();
   if (!draft) throw Object.assign(new Error('Draft conflict'), { status: 409 });
-  const documents = await captureImmutableSources(courseId),
+  const documents = Array.isArray(draft.sourceManifest) && draft.sourceManifest.length
+    ? draft.sourceManifest as SourceDocument[] : await captureImmutableSources(courseId),
     hash = 'sha256:' + draft.contentHash.replace(/^sha256:/, '');
+  for (const document of documents) await verifyBlob(document);
   const digest = manifestDigest(courseId, revisionId, hash, documents);
   let units: CanonicalIndexUnit[] | undefined;
   if (draft.contentDocument) {
     try {
-      units = canonicalUnitsForIndex(draft.contentDocument);
+      const indexCanonical = JSON.parse(JSON.stringify(draft.contentDocument));
+      if (!draft.formulaPublication?.sourceDraftId) for (const c of indexCanonical.chapters || []) for (const l of c.lessons || []) for (const b of l.blocks || []) delete b.reviewedFormula;
+      units = canonicalUnitsForIndex(indexCanonical);
     } catch {
       throw new SourceIntegrityError('Canonical content unavailable for indexing');
     }
@@ -351,6 +386,7 @@ export async function prepareRevisionSources(actor: string, courseId: string, re
     sourceManifestDigest: digest,
     vectorIndexRef: 'faiss/' + courseId + '/' + revisionId + '.faiss'
   });
+  if (units?.some(u=>u.formulaReview && !ready.metadata.chunks.includes(u.text))) throw new SourceIntegrityError('Reviewed representation missing from exact retrieval index');
   const pinned = await CourseRevision.updateOne(
     {
       _id: draft._id,

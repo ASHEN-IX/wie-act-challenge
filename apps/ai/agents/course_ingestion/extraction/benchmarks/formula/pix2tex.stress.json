@@ -1,0 +1,50 @@
+{
+  "cases": [
+    {
+      "name": "small",
+      "output": "\\scriptstyle{\\epsilon\\times\\Sigma}",
+      "error": null,
+      "seconds": 0.146,
+      "cpu_seconds": 0.236
+    },
+    {
+      "name": "blurred",
+      "output": "\\hat{\\tilde{\\tilde{\\mathrm{g}}}}_{i\\leq p}\\ {\\stackrel{\\scriptstyle(n\\neq n\\neq n\\neq n\\leq n}{\\ \\;(n o n/\\hbar\\varepsilon\\in{\\mathfrak{g}})}}",
+      "error": null,
+      "seconds": 0.749,
+      "cpu_seconds": 1.497
+    },
+    {
+      "name": "clipped",
+      "output": "S_{n}={\\begin{array}{l}{\\star}\\\\ {\\displaystyle\\eta}\\end{array}}\\,",
+      "error": null,
+      "seconds": 0.287,
+      "cpu_seconds": 0.572
+    },
+    {
+      "name": "blank",
+      "output": null,
+      "error": "error: OpenCV(4.10.0) /io/opencv/modules/imgproc/src/color.cpp:196: error: (-215:Assertion failed) !_src.empty() in function 'cvtColor'\n",
+      "seconds": 0.011,
+      "cpu_seconds": 0.013
+    },
+    {
+      "name": "multiline",
+      "output": "\\begin{array}{r c l}{{F(x)=\\displaystyle\\int_{0}^{\\mp\\infty}\\frac{x\\cos(u)}{u^{2}+x^{2}}d u~~=~\\left[\\frac{x\\sin u}{x^{2}+u^{2}}\\right]_{0}^{+\\infty}+\\displaystyle\\int_{0}^{\\mp\\infty}\\frac{2x u}{(x^{2}+u^{2})^{2}}d u}}\\\\ {{}}&{{=~\\displaystyle\\int_{0}^{+\\infty}\\frac{2x u}{(x^{2}+u^{2})^{2}}\\cos u\\right]_{0}^{+\\infty}+\\displaystyle\\int_{G}^{+\\infty}\\frac{2x(x^{2}-3u^{2})}{(x^{2}+u^{2})^{2}}\\cos u\\right]}}\\end{array}",
+      "error": null,
+      "seconds": 10.827,
+      "cpu_seconds": 21.617
+    },
+    {
+      "name": "malformed",
+      "output": null,
+      "error": "ValueError: invalid image input",
+      "seconds": 0.0,
+      "cpu_seconds": 0.0
+    }
+  ],
+  "device": "cpu",
+  "initialization_seconds": 7.392,
+  "status": "completed",
+  "peak_rss_kib": 739516
+}

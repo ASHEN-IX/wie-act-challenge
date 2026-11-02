@@ -183,11 +183,37 @@ export async function studioContext(actor: string, courseId: string, revisionId?
     /* preparation is an explicit author action */
   }
   const records = await ActivityRecord.find({ courseId, revisionId: draft.revisionTag }).lean();
+  const contentDocument =
+    revision.contentDocument && typeof revision.contentDocument === 'object'
+      ? (revision.contentDocument as Record<string, unknown>)
+      : null;
+  const quality =
+    contentDocument?.quality && typeof contentDocument.quality === 'object'
+      ? (contentDocument.quality as Record<string, unknown>)
+      : null;
+  const extractionReview =
+    contentDocument?.extractionReview && typeof contentDocument.extractionReview === 'object'
+      ? (contentDocument.extractionReview as Record<string, unknown>)
+      : null;
   if (!(await canAuthorCourse(actor, courseId))) throw new PublicationForbiddenError();
   return {
     draft,
     ready,
     sources,
+    extractionReview: {
+      required: quality?.publicationState === 'review_required',
+      acknowledged: extractionReview?.acknowledged === true,
+      acknowledgedAt:
+        typeof extractionReview?.acknowledgedAt === 'string'
+          ? extractionReview.acknowledgedAt
+          : null,
+      reviewRegionCount:
+        typeof (quality?.counts as Record<string, unknown> | undefined)?.reviewRequired === 'number'
+          ? Number((quality?.counts as Record<string, unknown>).reviewRequired)
+          : 0,
+      publicationState:
+        typeof quality?.publicationState === 'string' ? quality.publicationState : null
+    },
     activities: records.map((r) => ({
       activityId: r.activityId,
       title: (r.publicDefinition as { title?: string }).title,

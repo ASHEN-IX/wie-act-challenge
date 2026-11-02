@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
+vi.mock("./formula-actions", () => ({ loadFormulaWorkspace: vi.fn() }));
+
 vi.mock("./studio-actions", () => ({
   loadStudio: vi.fn(),
   prepareStudio: vi.fn(),
@@ -58,6 +60,22 @@ const mockReviewedDraft: CourseDraft = {
 };
 
 describe("CourseStudio Component (ED-31 / M15)", () => {
+  it("keeps raw source text behind one bounded inspector and exposes review", () => {
+    const html = renderToStaticMarkup(
+      <CourseStudio
+        courseId={mockUnreviewedDraft.courseId}
+        courseTitle="Algorithms & Data Structures"
+        initialDraft={mockUnreviewedDraft}
+        currentUserId="usr_instructor_1"
+      />,
+    );
+
+    expect(html).toContain("Source tools and audit");
+    expect(html).toContain("Source passage");
+    expect(html).not.toContain("Normalized text");
+    expect(html).not.toContain("extracted regions</summary>");
+  });
+
   it("renders course title, active revision tag, and unreviewed status badge", () => {
     const html = renderToStaticMarkup(
       <CourseStudio

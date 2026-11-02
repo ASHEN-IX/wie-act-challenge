@@ -1,5 +1,6 @@
 export interface ActionState {
   error?: string;
+  publishedRevisionTag?: string;
   success?: string;
   createdSubject?: { id: string; name: string };
   destination?: string;

@@ -1,0 +1,149 @@
+{
+  "instructions": "A qualified independent reviewer must compare each original PDF page and both crops, then record their own identity, date, decision, corrected transcription and any boundary correction. Do not copy model output as ground truth.",
+  "cases": [
+    {
+      "id": "eq-000",
+      "status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "approved_latex": null,
+      "corrected_bbox": null,
+      "notes": null
+    },
+    {
+      "id": "eq-001",
+      "status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "approved_latex": null,
+      "corrected_bbox": null,
+      "notes": null
+    },
+    {
+      "id": "eq-002",
+      "status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "approved_latex": null,
+      "corrected_bbox": null,
+      "notes": null
+    },
+    {
+      "id": "eq-005",
+      "status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "approved_latex": null,
+      "corrected_bbox": null,
+      "notes": null
+    },
+    {
+      "id": "eq-006",
+      "status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "approved_latex": null,
+      "corrected_bbox": null,
+      "notes": null
+    },
+    {
+      "id": "eq-008",
+      "status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "approved_latex": null,
+      "corrected_bbox": null,
+      "notes": null
+    },
+    {
+      "id": "eq-010",
+      "status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "approved_latex": null,
+      "corrected_bbox": null,
+      "notes": null
+    },
+    {
+      "id": "eq-017",
+      "status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "approved_latex": null,
+      "corrected_bbox": null,
+      "notes": null
+    },
+    {
+      "id": "eq-039",
+      "status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "approved_latex": null,
+      "corrected_bbox": null,
+      "notes": null
+    },
+    {
+      "id": "eq-045",
+      "status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "approved_latex": null,
+      "corrected_bbox": null,
+      "notes": null
+    },
+    {
+      "id": "eq-047",
+      "status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "approved_latex": null,
+      "corrected_bbox": null,
+      "notes": null
+    },
+    {
+      "id": "eq-054",
+      "status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "approved_latex": null,
+      "corrected_bbox": null,
+      "notes": null
+    },
+    {
+      "id": "eq-063",
+      "status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "approved_latex": null,
+      "corrected_bbox": null,
+      "notes": null
+    },
+    {
+      "id": "eq-079",
+      "status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "approved_latex": null,
+      "corrected_bbox": null,
+      "notes": null
+    },
+    {
+      "id": "eq-083",
+      "status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "approved_latex": null,
+      "corrected_bbox": null,
+      "notes": null
+    },
+    {
+      "id": "eq-084",
+      "status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "approved_latex": null,
+      "corrected_bbox": null,
+      "notes": null
+    }
+  ]
+}

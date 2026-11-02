@@ -34,6 +34,7 @@ export function CourseReader({
     page: number | null;
     documentId: string;
     href: string;
+    cropHref?: string;
   } | null>(null);
   const article = useRef<HTMLElement>(null);
   const seen = useRef(new Set<string>());
@@ -43,11 +44,11 @@ export function CourseReader({
   );
 
   function onSource(
-    block: Extract<LessonBlockV2, { type: "paragraph" | "list" | "quote" | "table" | "callout" }>,
+    block: Extract<LessonBlockV2, { type: "paragraph" | "list" | "quote" | "table" | "callout" | "math" }>,
   ) {
-    const match = document.sections
+    const match = block.provenance?.[0] || document.sections
       .flatMap((section) => section.evidence)
-      .find((item) => block.evidence.includes(item.chunkId));
+      .find((item) => block.evidence?.includes(item.chunkId));
     if (!match) return;
     const source = document.sources.find(
       (item) => item.documentId === match.documentId,
@@ -56,6 +57,7 @@ export function CourseReader({
       setSourceTarget({
         documentId: source.documentId,
         page: match.pageNumber,
+        ...(block.type === 'math' && block.sourceMeta?.regionId ? {cropHref:`/api/v1/study/courses/${document.courseId}/revisions/${document.revisionId}/sources/${source.documentId}/regions/${block.sourceMeta.regionId}`} : {}),
         href: `${source.href}${match.pageNumber ? `#page=${match.pageNumber}` : ""}`,
       });
   }
@@ -85,6 +87,10 @@ export function CourseReader({
     title: document.title,
     revisionId: document.revisionId,
     onSource,
+    mathCropHref: (block) => {
+      const source = document.sources.find((item) => item.documentId === block.provenance?.[0]?.documentId);
+      return source && block.sourceMeta?.regionId ? `/api/v1/study/courses/${document.courseId}/revisions/${document.revisionId}/sources/${source.documentId}/regions/${block.sourceMeta.regionId}` : undefined;
+    },
     mappings: new Map(document.canonical.mappings.map((mapping) => [mapping.chunkId, mapping])),
   };
   const activeTitle = sectionTitles.get(activeSectionId) || "Course overview";
@@ -178,7 +184,7 @@ export function CourseReader({
                   <span className="rounded-full border px-2 py-0.5 text-[10px] normal-case tracking-normal">Outline only</span>
                 ) : null}
                 {section.evidence.length > 0 && (
-                  <span className="normal-case tracking-normal">· {section.evidence.length} verified passages</span>
+                  <span className="normal-case tracking-normal">· {section.evidence.length} source-linked passages</span>
                 )}
               </div>
               <h2 id={`${section.id}-title`} className="font-heading text-2xl font-semibold tracking-tight">
@@ -187,7 +193,7 @@ export function CourseReader({
               {section.id === "course-source" ? (
                 <details className="group mt-5 rounded-xl border bg-muted/15">
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 text-sm font-medium">
-                    <span>Read the complete verified source</span>
+                    <span>Read the complete original source</span>
                     <span className="text-xs font-normal text-muted-foreground">
                       {section.evidence.length} {section.evidence.length === 1 ? "passage" : "passages"}
                     </span>
@@ -214,7 +220,7 @@ export function CourseReader({
             <section key={section.id} id={section.id} data-reader-section className="scroll-mt-24 border-b py-8">
               <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">Source audit</p>
               <h2 className="font-heading text-2xl font-semibold tracking-tight">{section.title}</h2>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">Original extracted passages, preserved for verification.</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">Revision-bound source passages, including any labelled instructor-reviewed representations, preserved for inspection.</p>
               <details className="group mt-5 rounded-xl border bg-muted/15">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3 text-sm font-medium">
                   <span>Open the extracted source</span>
@@ -298,9 +304,9 @@ export function CourseReader({
       {sourceTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" onMouseDown={(event) => { if (event.currentTarget === event.target) setSourceTarget(null); }}>
           <div role="dialog" aria-modal="true" aria-labelledby="source-preview-title" className="w-full max-w-xl rounded-2xl border bg-card p-6 shadow-xl">
-            <div className="flex items-start justify-between gap-4"><div><h2 id="source-preview-title" className="font-heading text-xl font-semibold">Source reference</h2><p className="mt-1 text-sm text-muted-foreground">This passage comes from the verified course material.</p></div><Button size="icon-sm" variant="ghost" onClick={() => setSourceTarget(null)} aria-label="Close source reference"><X /></Button></div>
+            <div className="flex items-start justify-between gap-4"><div><h2 id="source-preview-title" className="font-heading text-xl font-semibold">Source reference</h2><p className="mt-1 text-sm text-muted-foreground">Source provenance is linked to the preserved document. Extraction fidelity and mathematical correctness are not independently verified.</p></div><Button size="icon-sm" variant="ghost" onClick={() => setSourceTarget(null)} aria-label="Close source reference"><X /></Button></div>
             <p className="mt-5 text-sm leading-6">{sourceTarget.page ? `Page ${sourceTarget.page} of the original document.` : "Text source; the original has no page number."}</p>
-            <div className="mt-5 flex flex-wrap gap-2"><Button asChild><a href={sourceTarget.href} target="_blank" rel="noreferrer"><FileText data-icon="inline-start" /> Open original</a></Button><Button variant="outline" onClick={() => setSourceTarget(null)}>Back to reading</Button></div>
+            <div className="mt-4">{sourceTarget.cropHref && <img className="max-h-80 max-w-full rounded border bg-white object-contain" src={sourceTarget.cropHref} alt="Original PDF formula region" />}</div><div className="mt-5 flex flex-wrap gap-2"><Button asChild><a href={sourceTarget.href} target="_blank" rel="noreferrer"><FileText data-icon="inline-start" /> Open original</a></Button><Button variant="outline" onClick={() => setSourceTarget(null)}>Back to reading</Button></div>
           </div>
         </div>
       )}

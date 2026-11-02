@@ -149,6 +149,7 @@ def build_subtopics(sections):
                     if block.get("type") == "table"
                 ],
                 "source_spans": list(sec.get("source_spans", [])),
+                "source_regions": list(sec.get("source_regions", [])),
                 "structured_blocks": list(sec.get("blocks", [])),
                 "difficulty_estimate": round(difficulty, 2),
                 "tokenized_chunks": [],  # will be filled in tokenization
@@ -175,6 +176,9 @@ def build_subtopics(sections):
             )[:10]
             merged_subtopics[-1]["source_spans"].extend(
                 subtopic.get("source_spans", [])
+            )
+            merged_subtopics[-1]["source_regions"].extend(
+                subtopic.get("source_regions", [])
             )
             merged_subtopics[-1]["structured_blocks"].extend(
                 subtopic.get("structured_blocks", [])

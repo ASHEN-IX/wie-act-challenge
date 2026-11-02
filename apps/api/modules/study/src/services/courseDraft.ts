@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { Types } from 'mongoose';
 import { Course, CourseRevision } from '../models';
 import { captureActivitySources } from './activityResolution';
 import { canManageCourse } from './resourceAccess';
@@ -51,6 +52,42 @@ export interface UpdateCourseDraftInput {
   topics: DraftTopicInput[];
   summary?: string;
   isInstructorReviewed?: boolean;
+  extractionReviewAcknowledged?: boolean;
+}
+
+function extractionReviewRequired(contentDocument: unknown): boolean {
+  if (!contentDocument || typeof contentDocument !== 'object' || Array.isArray(contentDocument)) return false;
+  const quality = (contentDocument as { quality?: { publicationState?: unknown } }).quality;
+  return quality?.publicationState === 'review_required';
+}
+
+async function authoritativeCanonicalDocument(
+  courseId: Types.ObjectId,
+  revisionTag: string,
+  fallback: unknown
+): Promise<unknown> {
+  const durable = await CourseRevision.findOne({ courseId, revisionTag })
+    .select({ contentDocument: 1 })
+    .lean();
+  return durable?.contentDocument ?? fallback;
+}
+
+export function canonicalHasReviewableRegions(value: unknown): boolean {
+  return extractionReviewRequired(value);
+}
+
+export function withExtractionReview(
+  value: unknown,
+  acknowledgedAt: Date = new Date()
+): unknown {
+  if (!extractionReviewRequired(value) || !value || typeof value !== 'object') return value;
+  return {
+    ...(value as Record<string, unknown>),
+    extractionReview: {
+      acknowledged: true,
+      acknowledgedAt: acknowledgedAt.toISOString()
+    }
+  };
 }
 
 export class DraftForbiddenError extends Error {
@@ -93,11 +130,11 @@ function computeTopicsHash(topics: unknown): string {
 
 /** Select a usable editable revision without letting stale retry shells mask
  * the most recent ingested or reviewed content. */
-async function findEditableDraft(courseId: string) {
+export async function findEditableDraft(courseId: string) {
   const drafts = await CourseRevision.find({ courseId, status: 'draft' });
   return (
     drafts
-      .filter((draft) => Boolean(draft.topics?.length))
+      .filter((draft) => Boolean(draft.topics?.length) && draft.activationState !== 'prepared' && !draft.revokedAt && !draft.formulaPublication?.sourceDraftId)
       .sort(
         (a, b) =>
           Number(Boolean(b.contentDocument)) - Number(Boolean(a.contentDocument)) ||
@@ -142,6 +179,8 @@ export async function getCourseDraft(actorUserId: string, courseId: string) {
         }).lean()
       : null;
     if (active?.topics?.length) {
+      const originalCanonical = active.contentDocument ? JSON.parse(JSON.stringify(active.contentDocument)) : undefined;
+      if (originalCanonical) for (const c of originalCanonical.chapters || []) for (const l of c.lessons || []) for (const b of l.blocks || []) delete b.reviewedFormula;
       draft = await CourseRevision.create({
         courseId: course._id,
         revisionTag: `rev_${crypto.randomUUID().replace(/-/g, '')}`,
@@ -152,8 +191,8 @@ export async function getCourseDraft(actorUserId: string, courseId: string) {
         summary: active.summary,
         ...(active.contentDocument
           ? {
-              contentDocument: active.contentDocument,
-              contentDocumentHash: active.contentDocumentHash
+              contentDocument: originalCanonical,
+              contentDocumentHash: activityDigest(originalCanonical)
             }
           : {}),
         sourceManifest: active.sourceManifest || []
@@ -211,6 +250,26 @@ export async function updateCourseDraft(
   if (!input.expectedRevisionTag || typeof input.expectedRevisionTag !== 'string') {
     throw new HierarchyValidationError(
       'expectedRevisionTag is required for optimistic concurrency check'
+    );
+  }
+
+  const sourceRevision = await findEditableDraft(course._id.toString());
+  const canonicalSource = sourceRevision
+    ? await authoritativeCanonicalDocument(
+        course._id,
+        sourceRevision.revisionTag,
+        sourceRevision.contentDocument
+      )
+    : null;
+  if (
+    sourceRevision &&
+    sourceRevision.revisionTag === input.expectedRevisionTag &&
+    extractionReviewRequired(canonicalSource) &&
+    input.isInstructorReviewed === true &&
+    input.extractionReviewAcknowledged !== true
+  ) {
+    throw new HierarchyValidationError(
+      'Review low-confidence source regions and acknowledge extraction review before marking this revision reviewed'
     );
   }
 
@@ -329,6 +388,14 @@ export async function updateCourseDraft(
 
   const newRevisionTag = `rev_${crypto.randomUUID().replace(/-/g, '')}`;
   const newContentHash = computeTopicsHash(sanitizedTopics);
+  const nextCanonical = canonicalSource
+    ? reanchorCanonicalDocument(
+        input.extractionReviewAcknowledged === true
+          ? withExtractionReview(canonicalSource)
+          : canonicalSource,
+        sanitizedTopics
+      )
+    : undefined;
 
   const changed = await CourseRevision.findOneAndUpdate(
     {
@@ -336,7 +403,8 @@ export async function updateCourseDraft(
       revisionTag: input.expectedRevisionTag,
       status: 'draft',
       __v: draft.__v,
-      activationState: { $ne: 'prepared' }
+      activationState: { $ne: 'prepared' },
+      'formulaPublication.sourceDraftId': { $exists: false }
     },
     {
       $set: {
@@ -345,12 +413,10 @@ export async function updateCourseDraft(
         topics: sanitizedTopics,
         // Canonical lesson bodies and source evidence belong to the immutable
         // uploaded census, not to the editable title/objective projection.
-        ...(draft.contentDocument
+        ...(nextCanonical
           ? {
-              contentDocument: reanchorCanonicalDocument(draft.contentDocument, sanitizedTopics),
-              contentDocumentHash: activityDigest(
-                reanchorCanonicalDocument(draft.contentDocument, sanitizedTopics)
-              )
+              contentDocument: nextCanonical,
+              contentDocumentHash: activityDigest(nextCanonical)
             }
           : {}),
         summary: typeof input.summary === 'string' ? input.summary : draft.summary,

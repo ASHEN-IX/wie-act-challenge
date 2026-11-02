@@ -1,0 +1,133 @@
+<!doctype html><meta charset="utf-8"><title>Detector V2 review</title><style>body{font:16px system-ui;margin:2rem;max-width:1200px}.pair{display:flex;gap:1rem;flex-wrap:wrap}figure{border:1px solid #ccc;padding:1rem}img{max-width:100%;height:auto}pre{white-space:pre-wrap;overflow-wrap:anywhere}</style><h1>Detector V1 / V2 — provisional review</h1><p>Compare both images against the full page. Do not treat valid geometry, model output, or provisional text as mathematical approval. Record qualified independent decisions in the linked template.</p><p><a href="census.html">All historical mathematics regions</a></p><section><h2>eq-000 — page 1</h2><p><a href="page-01.png">Original page</a> · <a href="../decisions.template.json">Independent review decisions</a></p><p>V1 region_22d55ef3c62c7aefa2da [263.76, 384.76, 322.23, 418.8]; V2 region_1e2aeb86289d9d44e7c0 [263.76, 384.24, 322.23, 418.8]</p><div class="pair"><figure><img src="region_22d55ef3c62c7aefa2da-v1.png"><figcaption>Historical detector bbox</figcaption></figure><figure><img src="region_22d55ef3c62c7aefa2da-v2.png"><figcaption>V2 detector bbox</figcaption></figure></div><pre>V1: ∑ up. Sn =
+p=0
+V2: n
+∑ up. Sn =
+p=0
+Provisional: S_n = \sum_{p=0}^{n} u_p
+Warnings: [&#x27;math_boundary_unverified&#x27;, &#x27;math_reading_order_unverified&#x27;]</pre><p>Assessment: requires qualified mathematical review; no reviewer or approval recorded.</p></section><section><h2>eq-001 — page 1</h2><p><a href="page-01.png">Original page</a> · <a href="../decisions.template.json">Independent review decisions</a></p><p>V1 region_42116d94dec3d2a81d58 [239.85, 451.26, 330.29, 485.3]; V2 region_2fdfbbe92bff6db427e9 [239.85, 450.51, 346.14, 485.3]</p><div class="pair"><figure><img src="region_42116d94dec3d2a81d58-v1.png"><figcaption>Historical detector bbox</figcaption></figure><figure><img src="region_42116d94dec3d2a81d58-v2.png"><figcaption>V2 detector bbox</figcaption></figure></div><pre>V1: ∑ un =
+n→+∞ n=0 p=0
+V2: +∞ lim up.
+n
+∑ un =
+n→+∞ n=0 p=0
+Provisional: \sum_{n=0}^{+\infty}u_n=\lim_{n\to+\infty}\sum_{p=0}^{n}u_p
+Warnings: [&#x27;math_boundary_unverified&#x27;, &#x27;math_reading_order_unverified&#x27;]</pre><p>Assessment: requires qualified mathematical review; no reviewer or approval recorded.</p></section><section><h2>eq-002 — page 1</h2><p><a href="page-01.png">Original page</a> · <a href="../decisions.template.json">Independent review decisions</a></p><p>V1 region_84094eabebe8648865da [170.97, 626.61, 415.02, 660.24]; V2 region_9e243500c8e6f9c9248c [170.97, 625.51, 415.02, 660.24]</p><div class="pair"><figure><img src="region_84094eabebe8648865da-v1.png"><figcaption>Historical detector bbox</figcaption></figure><figure><img src="region_84094eabebe8648865da-v2.png"><figcaption>V2 detector bbox</figcaption></figure></div><pre>V1: ∑ un| ≤ε. ∀ε &gt; 0, ∃Nε ∈N tel que q ≥p ≥Nε ⇒|
+n=p
+V2: q
+∑ un| ≤ε. ∀ε &gt; 0, ∃Nε ∈N tel que q ≥p ≥Nε ⇒|
+n=p
+Provisional: \forall\epsilon&gt;0,\exists N_\epsilon\in\mathbb N\;\text{tel que }q\ge p\ge N_\epsilon\Rightarrow|\sum_{n=p}^{q}u_n|\le\epsilon
+Warnings: [&#x27;math_boundary_unverified&#x27;, &#x27;math_reading_order_unverified&#x27;]</pre><p>Assessment: requires qualified mathematical review; no reviewer or approval recorded.</p></section><section><h2>eq-005 — page 2</h2><p><a href="page-02.png">Original page</a> · <a href="../decisions.template.json">Independent review decisions</a></p><p>V1 region_55f2693d71d63e914711 [261.59, 457.59, 318.23, 491.18]; V2 region_1c3432f3e02a0434da61 [261.59, 457.59, 318.23, 491.18]</p><div class="pair"><figure><img src="region_55f2693d71d63e914711-v1.png"><figcaption>Historical detector bbox</figcaption></figure><figure><img src="region_55f2693d71d63e914711-v2.png"><figcaption>V2 detector bbox</figcaption></figure></div><pre>V1: # f′ = f,
+f(0) = 1.
+V2: # f′ = f,
+f(0) = 1.
+Provisional: \begin{cases} f&#x27; = f, \\ f(0) = 1. \end{cases}
+Warnings: [&#x27;math_boundary_unverified&#x27;, &#x27;math_reading_order_unverified&#x27;]</pre><p>Assessment: requires qualified mathematical review; no reviewer or approval recorded.</p></section><section><h2>eq-006 — page 2</h2><p><a href="page-02.png">Original page</a> · <a href="../decisions.template.json">Independent review decisions</a></p><p>V1 region_bc2895a49f1eed51e9a2 [192.09, 552.73, 393.91, 588.19]; V2 region_d99837fbc5ac571a3bea [192.09, 552.73, 393.91, 588.19]</p><div class="pair"><figure><img src="region_bc2895a49f1eed51e9a2-v1.png"><figcaption>Historical detector bbox</figcaption></figure><figure><img src="region_bc2895a49f1eed51e9a2-v2.png"><figcaption>V2 detector bbox</figcaption></figure></div><pre>V1: ∫x f′(t)dt + f(0) = 1 + f(x) = f(t)dt.
+0
+0
+V2: ∫x f′(t)dt + f(0) = 1 + f(x) = f(t)dt.
+0
+0
+Provisional: f(x) = \int_0^x f&#x27;(t)dt + f(0) = 1 + \int_0^x f(t)dt
+Warnings: [&#x27;math_boundary_unverified&#x27;, &#x27;math_reading_order_unverified&#x27;]</pre><p>Assessment: requires qualified mathematical review; no reviewer or approval recorded.</p></section><section><h2>eq-008 — page 2</h2><p><a href="page-02.png">Original page</a> · <a href="../decisions.template.json">Independent review decisions</a></p><p>V1 region_281ea531f2651acd6607 [72.5, 675.38, 513.5, 713.2]; V2 region_5eec0dda924ab1511c85 [72.5, 675.38, 513.5, 713.2]</p><div class="pair"><figure><img src="region_281ea531f2651acd6607-v1.png"><figcaption>Historical detector bbox</figcaption></figure><figure><img src="region_281ea531f2651acd6607-v2.png"><figcaption>V2 detector bbox</figcaption></figure></div><pre>V1: S(x) = lim
+∫x lim n→+∞Sn+1(x) =
+∫x lim Sn−1(t)dt) = 1+ n→+∞(1+
+∫x S(t)dt. n→+∞Sn−1(t)dt = 1+ 0
+0
+0
+V2: S(x) = lim
+∫x lim n→+∞Sn+1(x) =
+∫x lim Sn−1(t)dt) = 1+ n→+∞(1+
+∫x S(t)dt. n→+∞Sn−1(t)dt = 1+ 0
+0
+0
+Provisional: S(x)=\lim_{n\to+\infty}S_{n+1}(x)=\lim_{n\to+\infty}(1+\int_0^x S_{n-1}(t)dt)=1+\int_0^x\lim_{n\to+\infty}S_{n-1}(t)dt=1+\int_0^x S(t)dt
+Warnings: [&#x27;math_boundary_unverified&#x27;, &#x27;math_reading_order_unverified&#x27;]</pre><p>Assessment: requires qualified mathematical review; no reviewer or approval recorded.</p></section><section><h2>eq-010 — page 3</h2><p><a href="page-03.png">Original page</a> · <a href="../decisions.template.json">Independent review decisions</a></p><p>V1 region_7540c5520d1dcb955310 [199.66, 119.5, 386.33, 246.57]; V2 region_ce710870b8c4d34f134a [199.66, 119.5, 386.33, 246.57]</p><div class="pair"><figure><img src="region_7540c5520d1dcb955310-v1.png"><figcaption>Historical detector bbox</figcaption></figure><figure><img src="region_7540c5520d1dcb955310-v2.png"><figcaption>V2 detector bbox</figcaption></figure></div><pre>V1: ∫x 1dt = 1 + x, S1(x) = 1 +
+0
+∫x (1 + t)dt = 1 + x + x2 S2(x) = 1 +
+2 ,
+0 ...
+∑ xp Sn(x) =
+n p! ·
+p=0
+V2: ∫x 1dt = 1 + x, S1(x) = 1 +
+0
+∫x (1 + t)dt = 1 + x + x2 S2(x) = 1 +
+2 ,
+0 ...
+∑ xp Sn(x) =
+n p! ·
+p=0
+Provisional: S_1(x)=1+\int_0^x1dt=1+x,\quad S_2(x)=1+\int_0^x(1+t)dt=1+x+\frac{x^2}{2},\quad\ldots,\quad S_n(x)=\sum_{p=0}^{n}\frac{x^p}{p!}
+Warnings: [&#x27;math_boundary_unverified&#x27;, &#x27;math_reading_order_unverified&#x27;]</pre><p>Assessment: requires qualified mathematical review; no reviewer or approval recorded.</p></section><section><h2>eq-017 — page 4</h2><p><a href="page-04.png">Original page</a> · <a href="../decisions.template.json">Independent review decisions</a></p><p>V1 region_76765c6249290c3b8651 [230.66, 173.09, 409.1, 206.71]; V2 region_434492347d5b2247384e [230.66, 173.09, 409.1, 206.71]</p><div class="pair"><figure><img src="region_76765c6249290c3b8651-v1.png"><figcaption>Historical detector bbox</figcaption></figure><figure><img src="region_76765c6249290c3b8651-v2.png"><figcaption>V2 detector bbox</figcaption></figure></div><pre>V1: = lim n + 1 = 0. n→+∞ ∑
+n→+∞ |un|
+V2: = lim n + 1 = 0. n→+∞ ∑
+n→+∞ |un|
+Provisional: \lim_{n\to+\infty} \frac{|u_{n+1}|}{|u_n|} = \lim_{n\to+\infty} \frac{|x|}{n+1} = 0
+Warnings: [&#x27;math_boundary_unverified&#x27;, &#x27;math_reading_order_unverified&#x27;]</pre><p>Assessment: requires qualified mathematical review; no reviewer or approval recorded.</p></section><section><h2>eq-039 — page 8</h2><p><a href="page-08.png">Original page</a> · <a href="../decisions.template.json">Independent review decisions</a></p><p>V1 region_02518de3d60c5cbe8f2e [207.45, 719.71, 378.54, 751.55]; V2 region_d396e67666d8945b7b06 [207.45, 719.71, 378.54, 751.55]</p><div class="pair"><figure><img src="region_02518de3d60c5cbe8f2e-v1.png"><figcaption>Historical detector bbox</figcaption></figure><figure><img src="region_02518de3d60c5cbe8f2e-v2.png"><figcaption>V2 detector bbox</figcaption></figure></div><pre>V1: R = 1 , où ℓ+ = lim sup
+ℓ+
+n→∞|an|1/n.
+V2: R = 1 , où ℓ+ = lim sup
+ℓ+
+n→∞|an|1/n.
+Provisional: R=\frac{1}{\ell_+}, \quad \ell_+=\limsup_{n\to\infty}|a_n|^{1/n}
+Warnings: [&#x27;math_boundary_unverified&#x27;, &#x27;math_reading_order_unverified&#x27;]</pre><p>Assessment: requires qualified mathematical review; no reviewer or approval recorded.</p></section><section><h2>eq-045 — page 11</h2><p><a href="page-11.png">Original page</a> · <a href="../decisions.template.json">Independent review decisions</a></p><p>V1 region_775beaf00828c96fe413 [244.34, 384.78, 341.65, 420.24]; V2 region_81784dc15cbac27213ca [244.34, 384.78, 341.65, 420.24]</p><div class="pair"><figure><img src="region_775beaf00828c96fe413-v1.png"><figcaption>Historical detector bbox</figcaption></figure><figure><img src="region_775beaf00828c96fe413-v2.png"><figcaption>V2 detector bbox</figcaption></figure></div><pre>V1: ∫b F(x) = f(x, t)dt,
+a
+V2: ∫b F(x) = f(x, t)dt,
+a
+Provisional: F(x)=\int_a^b f(x,t)dt
+Warnings: [&#x27;math_boundary_unverified&#x27;, &#x27;math_reading_order_unverified&#x27;]</pre><p>Assessment: requires qualified mathematical review; no reviewer or approval recorded.</p></section><section><h2>eq-047 — page 11</h2><p><a href="page-11.png">Original page</a> · <a href="../decisions.template.json">Independent review decisions</a></p><p>V1 region_d7b82f0fe9e36284cbe5 [125.17, 710.49, 460.82, 729.42]; V2 region_1a081a5378efba2c063e [125.17, 710.49, 460.82, 729.42]</p><div class="pair"><figure><img src="region_d7b82f0fe9e36284cbe5-v1.png"><figcaption>Historical detector bbox</figcaption></figure><figure><img src="region_d7b82f0fe9e36284cbe5-v2.png"><figcaption>V2 detector bbox</figcaption></figure></div><pre>V1: ∀ε &gt; 0, ∃α(ε) &gt; 0 tel que ∀x, y ∈I, |y −x| ≤α(ε) ⇒|φ(y) −φ(x)| ≤ε.
+V2: ∀ε &gt; 0, ∃α(ε) &gt; 0 tel que ∀x, y ∈I, |y −x| ≤α(ε) ⇒|φ(y) −φ(x)| ≤ε.
+Provisional: \forall\epsilon&gt;0, \exists\alpha(\epsilon)&gt;0\text{ tel que }\forall x,y\in I, |y-x|\le\alpha(\epsilon)\Rightarrow|\phi(y)-\phi(x)|\le\epsilon
+Warnings: [&#x27;math_boundary_unverified&#x27;, &#x27;math_reading_order_unverified&#x27;]</pre><p>Assessment: requires qualified mathematical review; no reviewer or approval recorded.</p></section><section><h2>eq-054 — page 13</h2><p><a href="page-13.png">Original page</a> · <a href="../decisions.template.json">Independent review decisions</a></p><p>V1 region_7743da15eb26e0241a44 [213.2, 519.55, 372.79, 556.51]; V2 region_3721f8492e6ff612221b [213.2, 519.55, 372.79, 556.51]</p><div class="pair"><figure><img src="region_7743da15eb26e0241a44-v1.png"><figcaption>Historical detector bbox</figcaption></figure><figure><img src="region_7743da15eb26e0241a44-v2.png"><figcaption>V2 detector bbox</figcaption></figure></div><pre>V1: &amp; &#x27;1 = 1 −cos x F(x) = ,
+−cos(tx) x
+x 0
+V2: &amp; &#x27;1 = 1 −cos x F(x) = ,
+−cos(tx) x
+x 0
+Provisional: F(x)=\left[-\frac{\cos(tx)}{x}\right]_0^1=\frac{1-\cos x}{x}
+Warnings: [&#x27;math_boundary_unverified&#x27;, &#x27;math_reading_order_unverified&#x27;]</pre><p>Assessment: requires qualified mathematical review; no reviewer or approval recorded.</p></section><section><h2>eq-063 — page 15</h2><p><a href="page-15.png">Original page</a> · <a href="../decisions.template.json">Independent review decisions</a></p><p>V1 region_5ca30cfdf0504e0e00de [238.63, 152.97, 347.37, 188.44]; V2 region_43d9fa3583e1890b41fa [238.63, 152.97, 347.37, 188.44]</p><div class="pair"><figure><img src="region_5ca30cfdf0504e0e00de-v1.png"><figcaption>Historical detector bbox</figcaption></figure><figure><img src="region_5ca30cfdf0504e0e00de-v2.png"><figcaption>V2 detector bbox</figcaption></figure></div><pre>V1: ∫+∞ F(x) = f(x, t)dt,
+0
+V2: ∫+∞ F(x) = f(x, t)dt,
+0
+Provisional: F(x)=\int_0^{+\infty}f(x,t)dt
+Warnings: [&#x27;math_boundary_unverified&#x27;, &#x27;math_reading_order_unverified&#x27;]</pre><p>Assessment: requires qualified mathematical review; no reviewer or approval recorded.</p></section><section><h2>eq-079 — page 18</h2><p><a href="page-18.png">Original page</a> · <a href="../decisions.template.json">Independent review decisions</a></p><p>V1 region_494b73067ee1aef37ae3 [72.5, 704.17, 513.49, 750.21]; V2 region_5489ab5c13c346e296e8 [72.5, 704.17, 513.49, 750.21]</p><div class="pair"><figure><img src="region_494b73067ee1aef37ae3-v1.png"><figcaption>Historical detector bbox</figcaption></figure><figure><img src="region_494b73067ee1aef37ae3-v2.png"><figcaption>V2 detector bbox</figcaption></figure></div><pre>V1: (indication : poser φ(x, u) = x cos(u)
+**∂2 ** sur des
+xφ(x, u) u2 + x2 , et majorer |φ(x, u)|, |∂xφ(x, u)|, et intervalles [a, b] ⊂]0, +∞[)
+V2: (indication : poser φ(x, u) = x cos(u)
+**∂2 ** sur des
+xφ(x, u) u2 + x2 , et majorer |φ(x, u)|, |∂xφ(x, u)|, et intervalles [a, b] ⊂]0, +∞[)
+Provisional: \phi(x,u)=\frac{x\cos(u)}{u^2+x^2}\quad\text{(partial: surrounding French instruction and derivatives require review)}
+Warnings: [&#x27;math_boundary_unverified&#x27;, &#x27;math_reading_order_unverified&#x27;]</pre><p>Assessment: requires qualified mathematical review; no reviewer or approval recorded.</p></section><section><h2>eq-083 — page 19</h2><p><a href="page-19.png">Original page</a> · <a href="../decisions.template.json">Independent review decisions</a></p><p>V1 region_16ed0cd2cef1f5d3b926 [91.05, 581.54, 494.94, 697.26]; V2 region_ea880ef1618d792a14f6 [91.05, 581.54, 494.94, 697.26]</p><div class="pair"><figure><img src="region_16ed0cd2cef1f5d3b926-v1.png"><figcaption>Historical detector bbox</figcaption></figure><figure><img src="region_16ed0cd2cef1f5d3b926-v2.png"><figcaption>V2 detector bbox</figcaption></figure></div><pre>V1: ∫+∞
+∫+∞ - x sin u x cos(u) 2xu F(x) =
+.+∞ = + u2 + x2 du (x2 + u2)2 du 0
+x2 + u2 0 0
+∫+∞ 2xu =
+(x2 + u2)2 du 0 - ∫+∞
+.+∞ 2xu 2x(x2 −3u2) = cos u du
++ (x2 + u2)3
+− (x2 + u2)2 cos u 0 0 =
+F ′′(x).
+V2: ∫+∞
+∫+∞ - x sin u x cos(u) 2xu F(x) =
+.+∞ = + u2 + x2 du (x2 + u2)2 du 0
+x2 + u2 0 0
+∫+∞ 2xu =
+(x2 + u2)2 du 0 - ∫+∞
+.+∞ 2xu 2x(x2 −3u2) = cos u du
++ (x2 + u2)3
+− (x2 + u2)2 cos u 0 0 =
+F ′′(x).
+Provisional: F(x)=\int_0^{+\infty}\frac{x\cos(u)}{u^2+x^2}\,du\quad\text{(partial: multi-line derivation requires review)}
+Warnings: [&#x27;math_boundary_unverified&#x27;, &#x27;math_reading_order_unverified&#x27;]</pre><p>Assessment: requires qualified mathematical review; no reviewer or approval recorded.</p></section><section><h2>eq-084 — page 20</h2><p><a href="page-20.png">Original page</a> · <a href="../decisions.template.json">Independent review decisions</a></p><p>V1 region_41d94453246492aa5bcc [72.5, 123.48, 398.12, 191.19]; V2 region_ee95da3ab4de584d81aa [72.5, 123.48, 398.12, 191.19]</p><div class="pair"><figure><img src="region_41d94453246492aa5bcc-v1.png"><figcaption>Historical detector bbox</figcaption></figure><figure><img src="region_41d94453246492aa5bcc-v2.png"><figcaption>V2 detector bbox</figcaption></figure></div><pre>V1: ∫+∞ 1 F(0) =
+= π 1 + t2 dt = [arctan(t)]+∞ 0
+0 2 ·
+On a donc, ﬁnalement, F(x) = π
+2 e−|x|.
+V2: ∫+∞ 1 F(0) =
+= π 1 + t2 dt = [arctan(t)]+∞ 0
+0 2 ·
+On a donc, ﬁnalement, F(x) = π
+2 e−|x|.
+Provisional: F(0)=\int_0^{+\infty}\frac{1}{1+t^2}dt=[\arctan(t)]_0^{+\infty}=\frac{\pi}{2}
+Warnings: [&#x27;math_boundary_unverified&#x27;, &#x27;math_reading_order_unverified&#x27;]</pre><p>Assessment: requires qualified mathematical review; no reviewer or approval recorded.</p></section>

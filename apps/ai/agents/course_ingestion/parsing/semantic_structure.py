@@ -22,7 +22,7 @@ _CHAPTER_NUMBER = re.compile(r"^(?:Chapitre|CHAPITRE|Chapter|CHAPTER)\s+([0-9IVX
 # A chapter can wrap over two short extracted lines. Prefer a complete title
 # over an ambiguous preface, while retaining a genuinely short preface.
 _CHAPTER_TITLE_MAX_LINES = 2
-_SECTION_NUMBER = re.compile(r"^\d+\.\d+(?:\.\d+)?$")
+_SECTION_NUMBER = re.compile(r"^\d+(?:\.\d+){0,2}$")
 
 
 def _source_section_title(title: str) -> bool:
@@ -48,12 +48,16 @@ def _running_header(line: str) -> bool:
     )
 
 
-def _numbered_section(line: str) -> bool:
+def _numbered_section(line: str, allow_top_level: bool = False) -> bool:
     """Recognize section prose, excluding equations and numbered exercises."""
     match = re.match(r"^(\d+)\.(\d+)(?:\.(\d+))?(?:\s+(.+))?$", line)
-    if not match or re.match(r"^\d+\.\d+\.\d+\.\d+", line):
+    top = re.match(r"^(\d+)\s+(.+)$", line) if allow_top_level else None
+    if top:
+        value = top.group(2).strip()
+    elif not match or re.match(r"^\d+\.\d+\.\d+\.\d+", line):
         return False
-    value = (match.group(4) or "").strip()
+    else:
+        value = (match.group(4) or "").strip()
     if not value:
         return True
     if value.endswith((".", ",", ";", ":")):
@@ -68,7 +72,7 @@ def _numbered_section(line: str) -> bool:
 
 
 def _leading_section_number(line: str) -> str:
-    match = re.match(r"^(\d+\.\d+(?:\.\d+)?)(?:\s+|$)", line)
+    match = re.match(r"^(\d+(?:\.\d+){0,2})(?:\s+|$)", line)
     return match.group(1) if match else ""
 
 
@@ -274,12 +278,22 @@ def detect_sections_with_sources(
             line = raw.strip()
             if not line:
                 continue
-            markdown = re.match(r"^(#{1,6})\s+\S", line)
+            # PDF mathematical glyphs may decode to a leading hash. Only
+            # treat Markdown syntax as structural when the layout extractor
+            # agrees, or when no region classification is available (TXT/MD).
+            region_type = meta.get("region_type")
+            markdown = (
+                re.match(r"^(#{1,6})\s+\S", line)
+                if not region_type or region_type == "heading"
+                else None
+            )
             chapter_heading = re.match(
                 r"^(?:Chapitre|CHAPITRE|Chapter|CHAPTER)\s+([0-9IVXLC]+)(?:\s*[-–—:.])?\s*(.*)$",
                 line,
             )
-            numbered_heading = _numbered_section(line)
+            numbered_heading = _numbered_section(line, allow_top_level=region_type == "heading") and (
+                not region_type or region_type == "heading"
+            )
             if pending_chapter_title is not None:
                 # A wrapped title ends at the next structural marker. Page
                 # numbers and repeated running heads never become its title.
@@ -358,10 +372,75 @@ def detect_sections_with_sources(
                     "pageNumber": meta.get("page_number"),
                     "lineStart": offset + 1,
                     "lineEnd": offset + 1,
+                    **(
+                        {
+                            "regionId": meta["region_id"],
+                            "bbox": meta["bbox"],
+                            "regionType": meta["region_type"],
+                            "extractionMethod": meta.get("extraction_method"),
+                        }
+                        if meta.get("region_id") and meta.get("bbox")
+                        else {}
+                    ),
                 }
             )
     append_current()
     finish_chapter_title()
+
+    # Attach every extracted region to the section that owns its exact
+    # source line. This keeps page geometry and review state on the canonical
+    # source block rather than synthesizing it later from chunk offsets.
+    passages_by_region = {
+        (meta["document_id"], meta.get("region_id")): (text, meta)
+        for text, meta in materialised
+        if meta.get("region_id")
+    }
+    for section in sections:
+        known_regions = set()
+        section["source_regions"] = []
+        for span in section["source_spans"]:
+            region_id = span.get("regionId")
+            passage = passages_by_region.get((span["documentId"], region_id))
+            if not region_id or not passage or region_id in known_regions:
+                continue
+            text, meta = passage
+            known_regions.add(region_id)
+            section["source_regions"].append(
+                {
+                    "id": region_id,
+                    "page": meta.get("page_number"),
+                    "bbox": span.get("bbox"),
+                    "type": span.get("regionType"),
+                    "text": text,
+                    "extractionMethod": span.get("extractionMethod"),
+                    "chunkId": meta["chunk_id"],
+                    "documentId": meta["document_id"],
+                    "readingOrder": meta.get("reading_order"),
+                    "confidence": meta.get("region_confidence"),
+                    "reviewRequired": meta.get("review_required", False),
+                    "issues": meta.get("region_issues", []),
+                }
+            )
+
+    # Empty-text figures are not searchable passages. Attach them to a nearby
+    # caption (or nearest source region), rather than the first lesson on a page.
+    media_items = {}
+    for _, meta in materialised:
+        for media in meta.get("source_media_regions") or []:
+            media_items[(meta["document_id"], media["id"])] = media
+    for (document_id, region_id), media in media_items.items():
+        candidates = [(section, r) for section in sections for r in section["source_regions"]
+                      if r.get("documentId") == document_id and r.get("page") == media.get("page") and r.get("bbox")]
+        if not candidates:
+            continue
+        captions = [(section,r) for section,r in candidates if r.get("type") == "figure_caption"
+                    and min(abs(r["bbox"][1]-media["bbox"][3]), abs(media["bbox"][1]-r["bbox"][3])) <= 100]
+        section, anchor = min(captions or candidates, key=lambda item: abs((item[1]["bbox"][1]+item[1]["bbox"][3])-(media["bbox"][1]+media["bbox"][3])))
+        section["source_regions"].append({**media, "chunkId":anchor["chunkId"], "documentId":document_id})
+    document_order = {meta["document_id"]:i for i,(_,meta) in enumerate(materialised)}
+    for section in sections:
+        section["source_regions"].sort(key=lambda r: (document_order.get(r.get("documentId"),0), r.get("page") or 0,
+            (r.get("bbox") or [0,0])[1], (r.get("bbox") or [0])[0]))
 
     # Extract each chunk as a whole so fenced code and tables cannot lose their
     # internal boundaries. A block is attached only when every source line it

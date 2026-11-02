@@ -1,5 +1,7 @@
 import { parseCanonicalDocument } from '../../../../shared/ednova/canonicalDocument';
 import { canonicalUnitsForIndex } from '../services/revisionSources';
+import { withExtractionReview } from '../services/courseDraft';
+import { activityDigest } from '../services/activityIdentity';
 
 const span = {
   chunkId: 'chk_source',
@@ -51,6 +53,17 @@ function fixture() {
 }
 
 describe('canonical course document', () => {
+  test('accepts real region paragraphs and extraction metadata while rejecting event handlers', () => {
+    const document: any = fixture();
+    document.chapters[0].lessons[0].blocks.push({
+      id: 'blk_region', type: 'paragraph', text: 'Source paragraph', evidence: [span],
+      regionId: 'region_text', extractionMethod: 'text', confidence: 1,
+      bbox: [72, 72, 400, 100], page: 1, reviewRequired: false, issues: [],
+    });
+    expect(() => parseCanonicalDocument(document)).not.toThrow();
+    document.chapters[0].lessons[0].blocks[2].onclick = 'alert(1)';
+    expect(() => parseCanonicalDocument(document)).toThrow();
+  });
   test('preserves the complete body, blocks and spans', () => {
     const document = parseCanonicalDocument(fixture());
     const lesson = document.chapters[0].lessons[0];
@@ -77,6 +90,56 @@ describe('canonical course document', () => {
   test('is deterministic and leaves legacy documents additive', () => {
     expect(parseCanonicalDocument(fixture())).toEqual(parseCanonicalDocument(fixture()));
     expect(() => parseCanonicalDocument(null)).toThrow();
+  });
+
+  test('validates explicit extraction review and bounded table cells', () => {
+    const reviewed = {
+      ...fixture(),
+      quality: {
+        schemaVersion: '1.0.0',
+        sourceIntegrity: 'verified',
+        extractionCompleteness: 'partial',
+        structuralValidity: 'valid',
+        semanticFidelity: 'review_required',
+        humanReview: 'required',
+        publicationState: 'review_required',
+        reviewRegionIds: ['region_math'],
+        counts: { regions: 1, reviewRequired: 1, types: { math: 1 } },
+      },
+      extractionReview: {
+        acknowledged: true,
+        acknowledgedAt: '2026-11-02T12:00:00.000Z',
+      },
+    };
+    expect(parseCanonicalDocument(reviewed).extractionReview).toEqual(
+      reviewed.extractionReview,
+    );
+    const invalid: any = fixture();
+    invalid.chapters[0].lessons[0].blocks[1].rows = [['too', 'many', 'cells']];
+    expect(() => parseCanonicalDocument(invalid)).toThrow();
+  });
+
+  test('review acknowledgement changes the canonical digest deterministically', () => {
+    const canonical = {
+      ...fixture(),
+      quality: {
+        schemaVersion: '1.0.0',
+        sourceIntegrity: 'verified',
+        extractionCompleteness: 'partial',
+        structuralValidity: 'valid',
+        semanticFidelity: 'review_required',
+        humanReview: 'required',
+        publicationState: 'review_required',
+        reviewRegionIds: ['region_math'],
+        counts: { regions: 1, reviewRequired: 1, types: { math: 1 } },
+      },
+    };
+    const acknowledged = withExtractionReview(canonical, new Date('2026-11-02T12:00:00.000Z'));
+    expect(parseCanonicalDocument(acknowledged).extractionReview).toEqual({
+      acknowledged: true,
+      acknowledgedAt: '2026-11-02T12:00:00.000Z',
+    });
+    expect(activityDigest(acknowledged)).not.toBe(activityDigest(canonical));
   });
 
   test('derives review-stage retrieval units with canonical block links', () => {

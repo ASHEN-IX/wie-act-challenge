@@ -35,6 +35,8 @@ import {
   studioIngestStatus,
   controlStudioIngestion,
 } from "./studio-actions";
+import { approveStudioPublication } from "./formula-actions";
+import { FormulaReview } from "./formula-review";
 import { cn } from "@/lib/utils";
 
 interface CourseStudioProps {
@@ -58,7 +60,7 @@ export function CourseStudio({
     ReturnType<typeof loadStudio>
   > | null>(null);
   const [sourceChunkId, setSourceChunkId] = useState("");
-  const [sourceSectionId, setSourceSectionId] = useState("");
+  const sourceSectionId = "";
   const [generationLanguage, setGenerationLanguage] = useState<
     "en" | "fr" | "ar" | "ary"
   >("en");
@@ -93,6 +95,12 @@ export function CourseStudio({
       .then(setSourceState)
       .catch((e) => setErrorMsg(e.message));
   }, [courseId]);
+
+  useEffect(() => {
+    setExtractionReviewAcknowledged(
+      sourceState?.extractionReview?.acknowledged === true,
+    );
+  }, [sourceState?.draft.revisionTag, sourceState?.extractionReview?.acknowledged]);
 
   // Uploading starts a server-owned job. While it runs, refresh the draft so
   // the instructor sees the real outline without hunting for a status button.
@@ -139,6 +147,8 @@ export function CourseStudio({
   const [isInstructorReviewed, setIsInstructorReviewed] = useState(
     initialDraft.isInstructorReviewed,
   );
+  const [extractionReviewAcknowledged, setExtractionReviewAcknowledged] =
+    useState(false);
 
   const [activeObjective, setActiveObjective] =
     useState<DraftLearningObjective | null>(null);
@@ -218,6 +228,10 @@ export function CourseStudio({
       form.set("topicsJson", JSON.stringify(topics));
       form.set("summary", summary);
       form.set("isInstructorReviewed", isInstructorReviewed ? "true" : "false");
+      form.set(
+        "extractionReviewAcknowledged",
+        extractionReviewAcknowledged ? "true" : "false",
+      );
 
       const res = await updateDraftAction({}, form);
       if (res.error) {
@@ -242,6 +256,16 @@ export function CourseStudio({
   const handlePrepareAndPublish = () => {
     setErrorMsg(null);
     setSuccessMsg(null);
+    if (
+      sourceState?.extractionReview?.required &&
+      !extractionReviewAcknowledged &&
+      !sourceState.extractionReview.acknowledged
+    ) {
+      setErrorMsg(
+        "Open Source tools and audit and acknowledge the flagged extraction regions before publishing.",
+      );
+      return;
+    }
     startTransition(async () => {
       try {
         const reviewForm = new FormData();
@@ -250,9 +274,15 @@ export function CourseStudio({
         reviewForm.set("topicsJson", JSON.stringify(topics));
         reviewForm.set("summary", summary);
         reviewForm.set("isInstructorReviewed", "true");
-        const saved = await updateDraftAction({}, reviewForm);
-        if (saved.error) throw new Error(saved.error);
+        reviewForm.set(
+          "extractionReviewAcknowledged",
+          extractionReviewAcknowledged ? "true" : "false",
+        );
+        if (dirty) { const saved = await updateDraftAction({}, reviewForm); if (saved.error) throw new Error(saved.error); }
         const state = await refreshStudio();
+        const approved = await approveStudioPublication(courseId,state.draft.revisionTag,extractionReviewAcknowledged);
+        if (!approved.ok) throw new Error(approved.error);
+        setIsInstructorReviewed(true);
         const prepared = await prepareStudio(courseId, state.draft.revisionTag);
         setSourceState(prepared);
         const publishForm = new FormData();
@@ -260,7 +290,7 @@ export function CourseStudio({
         publishForm.set("expectedRevisionTag", state.draft.revisionTag);
         const publishedRevision = await publishRevisionAction({}, publishForm);
         if (publishedRevision.error) throw new Error(publishedRevision.error);
-        setPublished(state.draft.revisionTag);
+        setPublished(publishedRevision.publishedRevisionTag || state.draft.revisionTag);
         setStep(3);
         setSuccessMsg("Revision reviewed, source verified, and published.");
       } catch (error) {
@@ -391,12 +421,15 @@ export function CourseStudio({
             {isPending ? "Saving..." : "Save Draft"}
           </Button>
           <Button
-            onClick={() => {
-              setIsInstructorReviewed(true);
-              handlePrepareAndPublish();
-            }}
+            onClick={handlePrepareAndPublish}
             disabled={isPending || !!published || !topics.length}
-            title="Review the current edit, verify the exact source and publish it"
+            title={
+              sourceState?.extractionReview?.required &&
+              !extractionReviewAcknowledged &&
+              !sourceState.extractionReview.acknowledged
+                ? "Open Source tools and audit to acknowledge the flagged extraction regions"
+                : "Review the current edit, verify the exact source and publish it"
+            }
           >
             {isPending ? "Preparing…" : "Review & Publish"}
           </Button>
@@ -490,9 +523,10 @@ export function CourseStudio({
           Open committed immutable revision
         </a>
       )}
+      <FormulaReview courseId={courseId} revisionTag={draft.revisionTag} disabled={dirty || isPending || !!published} />
       <details className="rounded-xl border bg-card">
         <summary className="cursor-pointer px-6 py-4 text-sm font-semibold">
-          Advanced source tools
+          Source tools and audit
         </summary>
         <div className="border-t px-6 pb-6">
       <Card className="border-0 shadow-none">
@@ -644,52 +678,26 @@ export function CourseStudio({
             </Button>
             <p>{sourceState?.readiness || "Source readiness unavailable"}</p>
             <label className="block">
-              Source section
+              Source passage
+              <span className="block text-xs text-muted-foreground">
+                {sourceState?.sources.length || 0} extracted regions · choose
+                one to inspect
+              </span>
               <select
-                aria-label="Source section"
-                className="block w-full border p-2"
-                value={sourceSectionId}
-                onChange={(e) => {
-                  setSourceSectionId(e.target.value);
-                  setSourceChunkId("");
-                  setActivityProposal(null);
-                  setCandidateReviewed(false);
-                }}
-              >
-                <option value="">All verified sections</option>
-                {[
-                  ...new Set(
-                    sourceState?.sources
-                      .map((p) => p.sectionId)
-                      .filter(Boolean),
-                  ),
-                ].map((id) => (
-                  <option key={id} value={id}>
-                    {id}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              Verified source passage{" "}
-              <select
-                aria-label="Verified source passage"
+                aria-label="Source passage"
                 className="block w-full border p-2"
                 value={sourceChunkId}
                 onChange={(e) => {
                   setSourceChunkId(e.target.value);
                   setActivityProposal(null);
+                  setCandidateReviewed(false);
                 }}
               >
-                <option value="">Select a verified passage</option>
-                {sourceState?.sources
-                  .filter(
-                    (p) => !sourceSectionId || p.sectionId === sourceSectionId,
-                  )
-                  .map((p) => (
+                <option value="">Choose a passage to inspect</option>
+                {sourceState?.sources.map((p) => (
                     <option key={p.chunkId} value={p.chunkId}>
                       {p.pageNumber ? "Page " + p.pageNumber : "Text"}:{" "}
-                      {p.text.slice(0, 120)}
+                      {p.text.replace(/\s+/g, " ").slice(0, 100)}
                     </option>
                   ))}
               </select>
@@ -698,6 +706,11 @@ export function CourseStudio({
               .filter((p) => p.chunkId === sourceChunkId)
               .map((p) => (
                 <div key={p.chunkId}>
+                  {p.reviewRequired && (
+                    <p role="status" className="text-sm text-amber-700">
+                      This passage needs comparison with the original source.
+                    </p>
+                  )}
                   {p.extractionMethod === "ocr" && (
                     <p role="status">
                       Scanned page: English OCR confidence{" "}
@@ -709,16 +722,51 @@ export function CourseStudio({
                       publication.
                     </p>
                   )}
-                  <blockquote className="border-l-2 pl-4 whitespace-pre-wrap">
+                  <blockquote className="max-h-72 overflow-auto rounded-lg border bg-muted/20 p-4 whitespace-pre-wrap">
                     {p.text}
                   </blockquote>
                 </div>
               ))}
+            {!sourceChunkId && (
+              <p className="text-sm text-muted-foreground">
+                Passage text is loaded only for the passage you select. Keep
+                the original PDF open when checking equations, figures or
+                tables.
+              </p>
+            )}
             <p>
               Registered in this draft:{" "}
               {sourceState?.activities.map((a) => a.title).join(", ") || "None"}
             </p>
           </details>
+            {!!sourceState?.extractionReview?.required && (
+              <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-4">
+                <p className="text-sm font-medium">
+                  {sourceState.extractionReview.reviewRegionCount} source
+                  region{sourceState.extractionReview.reviewRegionCount === 1
+                    ? ""
+                    : "s"}{" "}
+                  need fidelity review
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Unreviewed formulas retain source text and equation images. Check equations, figures
+                  and tables against the original before acknowledging review.
+                </p>
+                <label className="mt-3 flex items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={extractionReviewAcknowledged}
+                    onChange={(event) => {
+                      setExtractionReviewAcknowledged(event.target.checked);
+                    }}
+                    className="mt-0.5 size-4 rounded border-gray-300"
+                  />
+                  <span>
+                    I reviewed the flagged source regions against the original.
+                  </span>
+                </label>
+              </div>
+            )}
         </CardContent>
       </Card>
         </div>

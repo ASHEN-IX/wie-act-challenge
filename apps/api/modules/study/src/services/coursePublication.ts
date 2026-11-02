@@ -1,3 +1,4 @@
+import { reviewedPublication } from './formulaPublication';
 import { verifyRevisionArtifact } from './revisionSources';
 import { Course, CourseRevision, ActivityRecord } from '../models';
 import { canPublishCourse, canReadCourse } from './resourceAccess';
@@ -118,6 +119,7 @@ export async function publishCourseRevision(
       publishedAt: draft.publishedAt!.toISOString()
     };
   }
+  if (draft.formulaPublication?.targetTag) return publishCourseRevision(actorUserId, courseId, await reviewedPublication(actorUserId,draft) || undefined);
   if (draft.status !== 'draft') throw new PublicationConflictError();
   if (!draft.isInstructorReviewed) throw new PublicationReviewRequiredError();
   if (!draft.topics?.length) throw new PublicationValidationError('Reviewed objectives required');
@@ -128,6 +130,19 @@ export async function publishCourseRevision(
     draft.contentDocumentHash !== activityDigest(draft.contentDocument)
   )
     throw new PublicationValidationError('Canonical content checksum mismatch');
+  const canonical = (draft.contentDocument || draft.get?.('contentDocument')) as
+    | { quality?: { publicationState?: unknown }; extractionReview?: { acknowledged?: unknown } }
+    | undefined;
+  if (
+    canonical?.quality?.publicationState === 'review_required' &&
+    canonical.extractionReview?.acknowledged !== true
+  ) {
+    throw new PublicationValidationError(
+      'Extraction review acknowledgement required before publishing low-confidence source regions'
+    );
+  }
+  const formulaTarget = await reviewedPublication(actorUserId, draft);
+  if (formulaTarget) return publishCourseRevision(actorUserId, courseId, formulaTarget);
   const artifact = await verifyRevisionArtifact(draft);
   const activities = await ActivityRecord.find({ courseId, revisionId: draft.revisionTag }).lean();
   const approvedActivities = activities.map((a) => ({

@@ -230,6 +230,8 @@ export async function updateDraftAction(
     const topicsRaw = optionalText(form, "topicsJson");
     const summary = optionalText(form, "summary");
     const isInstructorReviewed = form.get("isInstructorReviewed") === "true";
+    const extractionReviewAcknowledged =
+      form.get("extractionReviewAcknowledged") === "true";
 
     const topics = topicsRaw ? JSON.parse(topicsRaw) : [];
 
@@ -240,6 +242,7 @@ export async function updateDraftAction(
         topics,
         summary,
         isInstructorReviewed,
+        extractionReviewAcknowledged,
       }),
     });
 
@@ -264,14 +267,14 @@ export async function publishRevisionAction(
     const courseId = text(form, "courseId", 50);
     const expectedRevisionTag = text(form, "expectedRevisionTag", 100);
 
-    await api(`/api/v1/study/courses/${segment(courseId)}/publish`, {
+    const publication = await api<{publishedRevisionTag:string}>(`/api/v1/study/courses/${segment(courseId)}/publish`, {
       method: "POST",
       body: JSON.stringify({ expectedRevisionTag }),
     });
 
     revalidatePath(`/courses/${segment(courseId)}/studio`);
     revalidatePath(`/courses/${segment(courseId)}`);
-    return { success: "Course revision published successfully." };
+    return { success: "Course revision published successfully.", publishedRevisionTag: publication.publishedRevisionTag };
   } catch (error) {
     unstable_rethrow(error);
     return {

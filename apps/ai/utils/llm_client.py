@@ -86,16 +86,19 @@ _execution_records: Dict[str, dict] = {}
 def _approval(agent):
     try:
         approval = json.loads(os.getenv("LLM_APPROVALS_JSON", "{}")).get(agent, {})
-        cfg = agent_config(agent)
+        # The research alias is deliberately not an ask() agent. Its dedicated
+        # adapter still uses this same approval and durable-budget machinery.
+        model = (_deployment(agent)["model"] if agent == "course_multimodal_prototype"
+                 else agent_config(agent).model)
         if (
             not isinstance(approval.get("approvalId"), str)
             or not 1 <= len(approval["approvalId"]) <= 200
-            or approval.get("model") != cfg.model
+            or approval.get("model") != model
             or approval.get("task") != agent
             or float(approval.get("expiresAt", 0)) <= time.time()
             or type(approval.get("maxRequests")) is not int
             or approval["maxRequests"] < 1
-            or _provider_of(cfg.model) not in PROVIDER_KEY_ENV
+            or _provider_of(model) not in PROVIDER_KEY_ENV
         ):
             return None
         if "maxTokens" in approval and (not isinstance(approval["maxTokens"], int) or approval["maxTokens"] < 1):

@@ -1,0 +1,21 @@
+[
+  {
+    "name": "prose",
+    "lines": ["A closed system conserves energy during a physical process.", "Les élèves étudient la matière et les échanges de chaleur.", "A model states its assumptions before making a prediction."],
+    "expectedType": "paragraph",
+    "expectedText": "Les élèves étudient"
+  },
+  {
+    "name": "table",
+    "lines": ["| Material | Density |", "| --- | --- |", "| Water | 1000 |", "| Steel | 7850 |", "| Air | 1.2 |"],
+    "expectedType": "table",
+    "expectedColumns": ["Material", "Density"],
+    "expectedRows": [["Water", "1000"], ["Steel", "7850"], ["Air", "1.2"]]
+  },
+  {
+    "name": "programming",
+    "lines": ["```python", "def increment(value):", "    return value + 1", "```"],
+    "expectedType": "code",
+    "expectedText": "return value + 1"
+  }
+]

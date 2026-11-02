@@ -16,6 +16,11 @@ export default function MathContent({
   const [rendered, setRendered] = useState(false);
   useEffect(() => {
     if (!target.current) return;
+    if (notation !== "latex") {
+      target.current.textContent = "";
+      setRendered(false);
+      return;
+    }
     try {
       katex.render(expression, target.current, {
         displayMode: true,
@@ -35,9 +40,9 @@ export default function MathContent({
       <span
         ref={target}
         aria-label={notation === "latex" ? "Mathematical formula" : "Formula"}
-        className={rendered ? "inline-block max-w-full" : "hidden"}
+        className={notation === "latex" && rendered ? "inline-block max-w-full" : "hidden"}
       />
-      {!rendered && (
+      {(notation !== "latex" || !rendered) && (
         <code dir="ltr" className="whitespace-pre-wrap break-words text-sm">
           {expression}
         </code>

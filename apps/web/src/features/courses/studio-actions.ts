@@ -8,6 +8,13 @@ export async function loadStudio(courseId: string) {
     draft: CourseDraft;
     ready: boolean;
     readiness: string;
+    extractionReview?: {
+      required: boolean;
+      acknowledged: boolean;
+      acknowledgedAt: string | null;
+      reviewRegionCount: number;
+      publicationState: string | null;
+    };
     sources: Array<{
       documentId: string;
       chunkId: string;

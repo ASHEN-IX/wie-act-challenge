@@ -128,6 +128,67 @@ describe('universal learning source adapter', () => {
     ).not.toThrow();
   });
 
+  it('projects source regions and authorized media without duplicating source prose', () => {
+    const meta = {
+      regionId: 'region_' + 'a'.repeat(20),
+      page: 2,
+      bbox: [122.92, 105.72, 463.08, 392.31],
+      extractionMethod: 'vector' as const,
+      confidence: 0,
+      reviewRequired: true,
+      issues: [],
+    };
+    const blocks = canonicalBlocks([
+      {
+        id: 'source-lesson',
+        type: 'source_lesson',
+        text: 'The same source paragraph must not render twice.',
+        evidence: [{ chunkId: 'chunk-1', documentId: 'doc_1', pageNumber: 2, lineStart: 1, lineEnd: 1 }],
+      },
+      {
+        id: 'paragraph',
+        type: 'paragraph',
+        text: 'The same source paragraph must not render twice.',
+        evidence: [{ chunkId: 'chunk-1', documentId: 'doc_1', pageNumber: 2, lineStart: 1, lineEnd: 1 }],
+        regionId: meta.regionId,
+        page: meta.page,
+        bbox: meta.bbox,
+        extractionMethod: meta.extractionMethod,
+        confidence: meta.confidence,
+        reviewRequired: meta.reviewRequired,
+        issues: meta.issues,
+      },
+      {
+        id: 'definition',
+        type: 'definition',
+        title: 'Definition',
+        text: 'A definition from the source.',
+        evidence: [{ chunkId: 'chunk-2', documentId: 'doc_1', pageNumber: 3, lineStart: 1, lineEnd: 1 }],
+        ...meta,
+        regionId: 'region_' + 'b'.repeat(20),
+      },
+      {
+        id: 'figure',
+        type: 'media',
+        mediaType: 'image',
+        alt: 'Figure on page 2',
+        sourceRegionId: meta.regionId,
+        evidence: [{ chunkId: 'chunk-1', documentId: 'doc_1', pageNumber: 2, lineStart: 1, lineEnd: 1 }],
+        ...meta,
+      },
+    ],
+    { courseId: 'a'.repeat(24), revisionId: 'rev_test' });
+    expect(blocks.map((block) => block.type)).toEqual(['paragraph', 'callout', 'media']);
+    expect(blocks[0]).toMatchObject({ sourceMeta: meta });
+    expect(blocks[0].provenance).toEqual([
+      { chunkId: 'chunk-1', documentId: 'doc_1', pageNumber: 2, lineStart: 1, lineEnd: 1 },
+    ]);
+    expect(blocks[2]).toMatchObject({
+      type: 'media',
+      src: `/api/v1/study/courses/${'a'.repeat(24)}/revisions/rev_test/sources/doc_1/regions/${meta.regionId}`,
+    });
+  });
+
   it('rejects executable fields rather than stripping them', () => {
     const valid = {
       schemaVersion: '1.0.0',
@@ -157,5 +218,12 @@ describe('universal learning source adapter', () => {
       warnings: [],
     };
     expect(() => parseLearningDocument(valid)).toThrow();
+  });
+});
+
+describe('immutable reviewed formula projection', () => {
+  it('renders the frozen correction while keeping original extraction and proposal separate', () => {
+    const blocks = canonicalBlocks([{id:'math',type:'math',regionId:'region_x',page:1,bbox:[1,2,30,40],expression:'source',notation:'plain',evidence:[{chunkId:'chunk',documentId:'doc',pageNumber:1,lineStart:1,lineEnd:1}],reviewedFormula:{expression:'x^{2}',state:'corrected',originalModelLatex:'x_2',reviewer:'instructor'}}]);
+    expect(blocks[0]).toMatchObject({type:'math',notation:'latex',expression:'x^{2}',review:{state:'corrected',originalExpression:'source',modelExpression:'x_2',reviewer:'instructor'}});
   });
 });

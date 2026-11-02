@@ -15,6 +15,7 @@ node_modules/
 .env.ai
 
 .next/
+**/.next-*/
 __pycache__/
 *.pyc
 
@@ -31,6 +32,7 @@ __pycache__/
 # Local immutable source originals and revision indexes created by dev setup.
 /var/dev-uploads/
 /var/dev-faiss/
+/var/
 **/.venv/
 **/.pytest_cache/
 **/.mypy_cache/

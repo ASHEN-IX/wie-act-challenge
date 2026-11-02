@@ -21,9 +21,19 @@ const MathContent = lazy(() => import("./math-content"));
 export type ReaderContext = {
   title: string;
   revisionId: string;
-  onSource?: (block: Extract<LessonBlockV2, { type: "paragraph" | "list" | "quote" | "table" | "callout" }>) => void;
+  onSource?: (block: Extract<LessonBlockV2, { type: "paragraph" | "list" | "quote" | "table" | "callout" | "math" }>) => void;
+  mathCropHref?: (block: Extract<LessonBlockV2, { type: "math" }>) => string | undefined;
   mappings?: Map<string, { status: "exact" | "inferred_review_required" | "unmapped"; topicId: string | null }>;
 };
+
+function FormulaSourceFallback({ block, href }: { block: Extract<LessonBlockV2, { type: "math" }>; href?: string }) {
+  const [failed, setFailed] = useState(false);
+  return <figure className="space-y-3 rounded-lg border p-4">
+    <figcaption className="text-sm text-muted-foreground">Original equation image. Automatic transcription is unverified. The crop may omit nearby material; inspect the original PDF.</figcaption>
+    {href && !failed ? <img src={href} alt={`Original equation from PDF${block.sourceMeta?.page ? `, page ${block.sourceMeta.page}` : ""}. Extracted text is available below.`} loading="lazy" className="max-h-96 max-w-full rounded bg-white object-contain" onError={() => setFailed(true)} /> : <p role="status" className="text-sm">Equation image unavailable. Inspect the original document or the extracted text below.</p>}
+    <details><summary className="cursor-pointer text-sm">Original extracted text (unverified)</summary><pre className="mt-2 whitespace-pre-wrap break-words text-sm">{block.expression}</pre></details>
+  </figure>;
+}
 
 function LoadingBlock() {
   return (
@@ -62,6 +72,17 @@ function SourceAction({
   onSource?: ReaderContext["onSource"];
   block: Extract<LessonBlockV2, { type: "paragraph" | "list" | "quote" | "table" | "callout" }>;
 }) {
+  if (block.sourceMeta?.reviewRequired)
+    return (
+      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-amber-700 dark:text-amber-300">
+        <span>Source extraction needs review{block.sourceMeta.page ? ` · page ${block.sourceMeta.page}` : ""}.</span>
+        {evidence.length > 0 && onSource && (
+          <Button type="button" variant="ghost" size="xs" onClick={() => onSource(block)}>
+            Inspect source
+          </Button>
+        )}
+      </div>
+    );
   if (!evidence.length || !onSource) return null;
   return (
     <Button
@@ -325,7 +346,20 @@ export function LearningBlockView({ block, context }: { block: LessonBlockV2; co
       <BlockBoundary>
         {isMath ? (
           <Suspense fallback={<LoadingBlock />}>
-            <MathContent expression={block.expression} notation={block.notation} caption={block.caption} />
+            <div className="space-y-2">
+              {!block.review && block.notation === "plain" ? <FormulaSourceFallback block={block} href={context.mathCropHref?.(block)} /> : <MathContent expression={block.expression} notation={block.notation} caption={block.review ? `Instructor-approved ${block.review.state} representation; not independently verified.` : block.caption} />}
+              {block.review && <details className="rounded border p-3 text-sm"><summary className="cursor-pointer">Formula review and original extraction</summary><p>Reviewer: {block.review.reviewer}</p><p>Original extraction:</p><pre className="whitespace-pre-wrap break-words">{block.review.originalExpression}</pre><p>Model proposal:</p><pre className="whitespace-pre-wrap break-words">{block.review.modelExpression}</pre></details>}
+              {(block.sourceMeta?.reviewRequired || block.review || block.provenance?.length) && (
+                <p role="status" className="text-center text-xs text-amber-700 dark:text-amber-300">
+                  Original source evidence{block.sourceMeta?.page ? ` · page ${block.sourceMeta.page}` : ""}.
+                  {block.provenance?.length && context.onSource ? (
+                    <Button type="button" variant="ghost" size="xs" onClick={() => context.onSource?.(block)}>
+                      Inspect formula source
+                    </Button>
+                  ) : null}
+                </p>
+              )}
+            </div>
           </Suspense>
         ) : Object.hasOwn(registry, block.type) ? (
           // The registry is the only trusted component source; the id is for

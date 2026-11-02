@@ -33,7 +33,13 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
+    ".next/dev/types/**/*.ts",
+    ".next-final-e2e/types/**/*.ts",
+    ".next-final-e2e/dev/types/**/*.ts",
+    ".next-final-build/types/**/*.ts",
+    ".next-final-build/dev/types/**/*.ts",
+    ".next-formula-e2e/types/**/*.ts",
+    ".next-formula-e2e/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

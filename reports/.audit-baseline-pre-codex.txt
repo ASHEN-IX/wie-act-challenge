@@ -1,0 +1,392 @@
+# Baseline captured 2026-11-02T03:27:03+01:00 — before Codex changes
+## HEAD
+7286dd154f3b7a7334ad199ae608e81fe77b06f0
+## Tracked changes (M/A/D)
+ M .env.ai.example
+ M .env.example
+ M apps/ai/Dockerfile
+ M apps/ai/README.md
+ M apps/ai/agents/coach/services/course_repository.py
+ M apps/ai/agents/coach/services/planner_repository.py
+ M apps/ai/agents/course_ingestion/enrichment/llm_enricher.py
+ M apps/ai/agents/course_ingestion/enrichment/objective_extractor.py
+ M apps/ai/agents/course_ingestion/normalization/normalizer.py
+ M apps/ai/agents/course_ingestion/normalization/schema.py
+ M apps/ai/agents/course_ingestion/parsing/section_builder.py
+ M apps/ai/agents/course_ingestion/services/database_service.py
+ M apps/ai/agents/planner/rag/index_store.py
+ M apps/ai/agents/planner/rag/prompt_builder.py
+ M apps/ai/agents/reflection/src/config/settings.py
+ M apps/ai/agents/scheduler/services/schedule_updater.py
+ M apps/ai/agents/search/services/search_repository.py
+ M apps/ai/agents/test_system.py
+ M apps/ai/bloom/taxonomy.py
+ M apps/ai/messaging/envelope.py
+ M apps/ai/messaging/failures.py
+ M apps/ai/messaging/topology.py
+ M apps/ai/models/learning_objective.py
+ M apps/ai/pyproject.toml
+ M apps/ai/services/__init__.py
+ M apps/ai/services/api/deps.py
+ M apps/ai/services/api/main.py
+ M apps/ai/services/database.py
+ M apps/ai/services/schedule_orchestrator/orchestrator.py
+ M apps/ai/services/signal_processing_service/repository.py
+ M apps/ai/services/vector_store/adapter.py
+ M apps/ai/test_coach_manual.py
+ M apps/ai/test_coach_scheduler_integration.py
+ M apps/ai/tests/test_bloom_taxonomy_parity.py
+ M apps/ai/tests/test_ingestion_retry.py
+ M apps/ai/tests/test_ingestion_worker.py
+ M apps/ai/tests/test_learning_objective.py
+ M apps/ai/tests/test_objective_extractor.py
+ M apps/ai/utils/logger.py
+ M apps/ai/workers/ingestion_worker.py
+ M apps/ai/workers/schemas.py
+ M apps/api/.env.example
+ M apps/api/README.md
+ M apps/api/modules/ai-orchestrator/package.json
+ M apps/api/modules/ai-orchestrator/src/app.ts
+ M apps/api/modules/ai-orchestrator/src/routes/ai.ts
+ M apps/api/modules/ai-orchestrator/src/routes/eval.ts
+ M apps/api/modules/ai-orchestrator/src/routes/jobs.ts
+ M apps/api/modules/ai-orchestrator/src/routes/search.ts
+ M apps/api/modules/ai-orchestrator/src/services/agentService.ts
+ M apps/api/modules/ai-orchestrator/src/services/jobResultConsumer.ts
+ M apps/api/modules/ai-orchestrator/src/tests/ai-orchestrator.test.ts
+ M apps/api/modules/ai-orchestrator/src/tests/coach.test.ts
+ M apps/api/modules/ai-orchestrator/src/tests/eval-routes.test.ts
+ M apps/api/modules/ai-orchestrator/src/tests/proxy-error-boundary.test.ts
+ M apps/api/modules/ai-orchestrator/src/tests/search-routes.test.ts
+ M apps/api/modules/ai-orchestrator/src/tests/sec12-ai-isolation.test.ts
+ M apps/api/modules/ai-orchestrator/src/utils/proxyBuilder.ts
+ M apps/api/modules/analytics/package.json
+ M apps/api/modules/analytics/src/app.ts
+ M apps/api/modules/analytics/src/routes/analytics.ts
+ M apps/api/modules/analytics/src/tests/analytics.test.ts
+ M apps/api/modules/auth/package.json
+ M apps/api/modules/auth/src/app.ts
+ M apps/api/modules/auth/src/routes/admin.ts
+ M apps/api/modules/auth/src/routes/auth.ts
+ M apps/api/modules/auth/src/routes/stripe.ts
+ M apps/api/modules/auth/src/services/emailService.ts
+ M apps/api/modules/auth/src/tests/admin-redos.test.ts
+ M apps/api/modules/notification/package.json
+ M apps/api/modules/notification/src/app.ts
+ M apps/api/modules/notification/src/realtime.ts
+ M apps/api/modules/notification/src/routes/chat.ts
+ M apps/api/modules/notification/src/routes/notifications.ts
+ M apps/api/modules/notification/src/routes/voice.ts
+ M apps/api/modules/notification/src/services/chatService.ts
+ M apps/api/modules/notification/src/services/emailService.ts
+ M apps/api/modules/notification/src/services/voiceService.ts
+ M apps/api/modules/notification/src/templates/emailTemplates.ts
+ M apps/api/modules/notification/src/tests/notification.test.ts
+ M apps/api/modules/notification/src/tests/sec12-chat-authn.test.ts
+ M apps/api/modules/notification/src/utils/session-access.ts
+ M apps/api/modules/notification/src/websocket-handlers/chat-handler.ts
+ M apps/api/modules/signal-processing/package.json
+ M apps/api/modules/signal-processing/src/app.ts
+ M apps/api/modules/signal-processing/src/routes/focus.ts
+ M apps/api/modules/signal-processing/src/tests/signal-processing.test.ts
+ M apps/api/modules/signal-processing/src/tests/signals.test.ts
+ M apps/api/modules/study/package.json
+ M apps/api/modules/study/src/app.ts
+ M apps/api/modules/study/src/models/CourseIngestionOperation.ts
+ M apps/api/modules/study/src/models/CourseRevision.ts
+ M apps/api/modules/study/src/models/index.ts
+ M apps/api/modules/study/src/routes/challengeSessions.ts
+ M apps/api/modules/study/src/routes/coach.ts
+ M apps/api/modules/study/src/routes/competencies.ts
+ M apps/api/modules/study/src/routes/coreSessions.ts
+ M apps/api/modules/study/src/routes/courses.ts
+ M apps/api/modules/study/src/routes/enrollments.ts
+ M apps/api/modules/study/src/routes/institutions.ts
+ M apps/api/modules/study/src/routes/learning.ts
+ M apps/api/modules/study/src/routes/learningObjectives.ts
+ M apps/api/modules/study/src/routes/plans.ts
+ M apps/api/modules/study/src/routes/rooms.ts
+ M apps/api/modules/study/src/routes/sessionTasks.ts
+ M apps/api/modules/study/src/routes/sessions.ts
+ M apps/api/modules/study/src/routes/subjects.ts
+ M apps/api/modules/study/src/routes/tasks.ts
+ M apps/api/modules/study/src/routes/teamSessions.ts
+ M apps/api/modules/study/src/routes/topics.ts
+ M apps/api/modules/study/src/services/activityAttempt.ts
+ M apps/api/modules/study/src/services/competency.ts
+ M apps/api/modules/study/src/services/competencyQueries.ts
+ M apps/api/modules/study/src/services/coursePublication.ts
+ M apps/api/modules/study/src/services/ingestStatus.ts
+ M apps/api/modules/study/src/services/ingestionControl.ts
+ M apps/api/modules/study/src/services/ingestionJob.ts
+ M apps/api/modules/study/src/tests/coach.test.ts
+ M apps/api/modules/study/src/tests/completionRewards.test.ts
+ M apps/api/modules/study/src/tests/course-upload-validation.test.ts
+ M apps/api/modules/study/src/tests/ingest-status.test.ts
+ M apps/api/modules/study/src/tests/mass-assignment.test.ts
+ M apps/api/modules/study/src/tests/objectives.test.ts
+ M apps/api/modules/study/src/tests/plansRoutes.test.ts
+ M apps/api/modules/study/src/tests/sec12-authn.test.ts
+ M apps/api/modules/study/src/tests/sec12-authz.test.ts
+ M apps/api/modules/study/src/tests/study.test.ts
+ M apps/api/modules/study/src/utils/gamificationService.ts
+ M apps/api/modules/study/src/utils/sessionHelpers.ts
+ M apps/api/modules/study/src/utils/sessionStats.ts
+ M apps/api/modules/study/src/validators/learningObjective.ts
+ M apps/api/modules/user-profile/package.json
+ M apps/api/modules/user-profile/src/app.ts
+ M apps/api/modules/user-profile/src/routes/availability.ts
+ M apps/api/modules/user-profile/src/routes/friends.ts
+ M apps/api/modules/user-profile/src/routes/gamification.ts
+ M apps/api/modules/user-profile/src/routes/learningRewards.ts
+ M apps/api/modules/user-profile/src/routes/profile.ts
+ M apps/api/modules/user-profile/src/routes/quests.ts
+ M apps/api/modules/user-profile/src/routes/ranking.ts
+ M apps/api/modules/user-profile/src/scripts/backfillGamificationStats.ts
+ M apps/api/modules/user-profile/src/scripts/migrateXpToKnowledgePoints.ts
+ M apps/api/modules/user-profile/src/tests/profile.test.ts
+ M apps/api/modules/user-profile/src/tests/ranking.test.ts
+ M apps/api/modules/user-profile/src/tests/sec05-internal-auth.test.ts
+ M apps/api/modules/user-profile/src/tests/sec06-env.test.ts
+ M apps/api/modules/user-profile/src/tests/sec12-user-lockdown.test.ts
+ M apps/api/package.json
+ M apps/api/scripts/backup.sh
+ M apps/api/scripts/restore.sh
+ M apps/api/seeds/analytics-demo.seed.ts
+ M apps/api/seeds/complete-demo.seed.ts
+ M apps/api/seeds/demo-users.seed.ts
+ M apps/api/seeds/rank-badges.seed.ts
+ M apps/api/seeds/seed-analytics.ts
+ M apps/api/shared/ai-messaging/envelope.ts
+ M apps/api/shared/ai-messaging/payloadSchemas.ts
+ M apps/api/shared/ai-messaging/topology.ts
+ M apps/api/shared/betterAuth.ts
+ M apps/api/shared/bloom/taxonomy.ts
+ M apps/api/shared/database.ts
+ M apps/api/shared/ednova/contracts.ts
+ M apps/api/shared/env.ts
+ M apps/api/shared/logger.ts
+ M apps/api/shared/middleware.ts
+ M apps/api/shared/moduleClient.ts
+ M apps/api/shared/package.json
+ M apps/api/shared/processHandlers.ts
+ M apps/api/shared/uploadValidation.ts
+ M apps/api/src/app.ts
+ M apps/api/src/framework/domains/study.module.ts
+ M apps/api/src/framework/infrastructure.controller.ts
+ M apps/api/src/main.ts
+ M apps/api/src/openapi.ts
+ M apps/api/tests/architecture/ai-boundary.test.ts
+ M apps/api/tests/architecture/module-contracts.test.ts
+ M apps/api/tests/architecture/websocket.test.ts
+ M apps/api/tests/better-auth.lifecycle.ts
+ M apps/api/tests/gateway/gateway.test.ts
+ M apps/api/tests/integration/ai-jobs.integration.test.ts
+ M apps/api/tests/integration/api-integration.test.ts
+ M apps/api/tests/integration/bloom-loop.integration.test.ts
+ M apps/api/tests/integration/challenge-session-routes.integration.test.ts
+ M apps/api/tests/integration/gateway.integration.test.ts
+ M apps/api/tests/integration/m07-course-draft-objectives.node.test.ts
+ M apps/api/tests/integration/m08-course-publication.node.test.ts
+ M apps/api/tests/integration/m09-source-grounded-tutor.node.test.ts
+ M apps/api/tests/integration/m10-activity-attempts-idempotency.node.test.ts
+ M apps/api/tests/integration/m14-studio-activity-generation.node.test.ts
+ M apps/api/tests/integration/m17-room-synchronized-activity.node.test.ts
+ M apps/api/tests/integration/m18-capacity-degraded-operation.node.test.ts
+ M apps/api/tests/integration/m20-private-checks-debrief.node.test.ts
+ M apps/api/tests/integration/m21-privacy-isolation-audit.node.test.ts
+ M apps/api/tests/integration/m22-master-evaluation-scenario.node.test.ts
+ M apps/api/tests/integration/step10-learning-closure.node.test.ts
+ M apps/api/tests/integration/team-session-rewards.integration.test.ts
+ M apps/api/tests/sessionFixtures.ts
+ M apps/api/tests/setup.ts
+ M apps/api/tests/shared/ai-progress-envelope.test.ts
+ M apps/api/tests/shared/bloom-taxonomy-parity.test.ts
+ M apps/api/tests/shared/payload-schemas.test.ts
+ M apps/api/tests/shared/upload-validation.test.ts
+ M apps/web/.env.example
+ M apps/web/e2e/p0r3-integrated-learning.test.ts
+ M apps/web/e2e/test-study-together-e2e.ts
+ M apps/web/next.config.mjs
+ M apps/web/package.json
+ M apps/web/src/app/(workspace)/courses/[courseId]/learn/page.tsx
+ M apps/web/src/app/(workspace)/courses/[courseId]/page.tsx
+ M apps/web/src/app/(workspace)/courses/new/page.tsx
+ M apps/web/src/app/(workspace)/courses/page.tsx
+ M apps/web/src/app/(workspace)/planner/page.tsx
+ M apps/web/src/app/(workspace)/sessions/page.tsx
+ M apps/web/src/app/(workspace)/study-together/page.tsx
+ M apps/web/src/app/api/auth/[...all]/route.ts
+ M apps/web/src/app/layout.tsx
+ M apps/web/src/components/layout/workspace-shell.tsx
+ M apps/web/src/features/auth/actions.ts
+ M apps/web/src/features/auth/auth-form.tsx
+ M apps/web/src/features/collaboration/learning-actions.ts
+ M apps/web/src/features/courses/actions.ts
+ M apps/web/src/features/courses/course-list.tsx
+ M apps/web/src/features/courses/course-studio.test.tsx
+ M apps/web/src/features/courses/course-studio.tsx
+ M apps/web/src/features/courses/types.ts
+ M apps/web/src/features/courses/upload-form.tsx
+ M apps/web/src/features/learning/journey-actions.ts
+ M apps/web/src/features/visualization/binary-search.test.tsx
+ M apps/web/src/features/visualization/binary-search.tsx
+ M apps/web/src/features/visualization/room-actions.ts
+ M apps/web/src/features/visualization/room-visualizer.tsx
+ M apps/web/src/lib/action-state.ts
+ M apps/web/src/lib/activity-contracts.ts
+ M apps/web/src/server/identity.ts
+ M deploy/compose.test.yml
+ M docker-compose.ai.yml
+ M docker-compose.yml
+ M pnpm-lock.yaml
+ M scripts/setup.mjs
+## Untracked (excluding build output)
+?? .bash_profile
+?? .bashrc
+?? .claude/
+?? .gitconfig
+?? .gitmodules
+?? .idea
+?? .mcp.json
+?? .profile
+?? .ripgreprc
+?? .zprofile
+?? .zshrc
+?? apps/ai/agents/course_ingestion/parsing/semantic_structure.py
+?? apps/ai/agents/course_ingestion/tests/test_semantic_structure.py
+?? apps/api/fixtures/
+?? apps/api/modules/study/src/services/courseReader.ts
+?? apps/api/modules/study/src/tests/course-reader.test.ts
+?? apps/api/modules/study/src/tests/semantic-content.test.ts
+?? apps/api/modules/study/src/tests/subject-creation.test.ts
+?? apps/api/seeds/ednova-phase2-demo.seed.ts
+?? apps/api/shared/ednova/experiencePlanner.ts
+?? apps/api/shared/ednova/learningDocument.ts
+?? apps/api/shared/ednova/learningDocumentV2.ts
+?? apps/api/shared/ednova/learningDocumentV2Serializer.ts
+?? apps/api/shared/ednova/semanticContent.ts
+?? apps/web/public/ednova-mark.svg
+?? apps/web/src/features/courses/lifecycle.test.ts
+?? apps/web/src/features/courses/lifecycle.ts
+?? apps/web/src/features/courses/theme-control.tsx
+?? apps/web/src/features/reader/
+?? docs/ednova-universal-learning-audit.md
+?? docs/submission/evidence/
+?? docs/submission/screenshots/ednova-course-review.png
+?? docs/submission/screenshots/ednova-phase2-before-desktop.png
+?? docs/submission/screenshots/ednova-phase2-before-mobile.png
+?? docs/submission/screenshots/ednova-phase2-reader-dark.png
+?? docs/submission/screenshots/ednova-phase2-reader-desktop.png
+?? docs/submission/screenshots/ednova-phase2-reader-full.png
+?? docs/submission/screenshots/ednova-phase2-reader-mobile.png
+?? docs/submission/screenshots/ednova-reader-dark.png
+?? docs/submission/screenshots/ednova-reader-desktop.png
+?? docs/submission/screenshots/ednova-reader-mobile.png
+?? docs/submission/screenshots/ednova-studio-review.png
+?? docs/submission/screenshots/ednova-switch-subject.png
+?? docs/submission/screenshots/ednova-upload-complete.png
+?? docs/submission/screenshots/ednova-upload-drag-drop.png
+?? docs/submission/screenshots/ednova-upload-mobile.png
+?? reports/EDNOVA-COURSE-PIPELINE-FORENSIC-AUDIT.md
+## Content hashes of pipeline files under review
+0e0a7e128b804a38cd5801a7c1fc2140c612cc83ba259c451645d3ad1a39b870  apps/ai/agents/course_ingestion/agent.py
+d41e2917f51f48c650790d258d7ef3b21b99a2059128961e1b5115d3ccb47f27  apps/ai/agents/course_ingestion/enrichment/chunk_embedder.py
+8c47fe940d9d10b90d0be863c53bbd42634cd012b009587d5a81898590071ca5  apps/ai/agents/course_ingestion/enrichment/deduplicator.py
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  apps/ai/agents/course_ingestion/enrichment/__init__.py
+50c5126ca99ba7a4303f5841b1134d8dee173553536b8fcd9d1054b1db627936  apps/ai/agents/course_ingestion/enrichment/llm_enricher.py
+b98c97e86922e9c87aea444b0bfa221325a7718e7be8540f614aa4a643f607d6  apps/ai/agents/course_ingestion/enrichment/objective_extractor.py
+46c76ea8b07931d548bffd214fad21ad3e874768ca81a4c2cc35068210b9695d  apps/ai/agents/course_ingestion/enrichment/output_schema.py
+08e86474772aff6bb047b624df52a966418c02df4b9af92a4a47b3816881c7fa  apps/ai/agents/course_ingestion/enrichment/task_generator.py
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  apps/ai/agents/course_ingestion/extraction/__init__.py
+4ffba54e588cb4dafaa4f5a8dbd8e5ebc14a71f94f87516fdf01bcc333500079  apps/ai/agents/course_ingestion/extraction/ocr.py
+bbb40421cfc3158b2bf91f47499c65403f8554b3af272f21c930e962978e0529  apps/ai/agents/course_ingestion/extraction/pdf_loader.py
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  apps/ai/agents/course_ingestion/__init__.py
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  apps/ai/agents/course_ingestion/normalization/__init__.py
+8b58e111387084722d60909b747a6d85545dfbfd4d57d55855499b3e948cc8d0  apps/ai/agents/course_ingestion/normalization/normalizer.py
+7e9e3430ac088579a26099c1ab87ea67d559f85fac4b5fbebd368a026cd5257d  apps/ai/agents/course_ingestion/normalization/schema.py
+620673d6af7eddaff1fe8572dcb68477af1e3d4ae28a72bb27a2891620632155  apps/ai/agents/course_ingestion/normalization/tokenizer.py
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  apps/ai/agents/course_ingestion/parsing/__init__.py
+caf8549f30591c9cf1e8c6a9b4bf75376a8571c0c6d5dc4b9c8b828030bbfea5  apps/ai/agents/course_ingestion/parsing/layout_parser.py
+8a069ef393933fe798f3cd0e0125e7dfe25b9a3412db89877950ca84f73af176  apps/ai/agents/course_ingestion/parsing/section_builder.py
+3f3ab0974b302956089203a8c6829f425425341a118a8ee0832cf6d4d9570bd1  apps/ai/agents/course_ingestion/parsing/semantic_structure.py
+58a942366183a574856e9e8eb23f0678d543df83a3a8ad747452dc288d5aa111  apps/ai/agents/course_ingestion/services/database_service.py
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  apps/ai/agents/course_ingestion/services/__init__.py
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  apps/ai/agents/course_ingestion/tests/__init__.py
+1d215d4ac674874bdc549a72f2272d1c004a668733ac96e2ef6b633ba8470984  apps/ai/agents/course_ingestion/tests/test_embedder.py
+7ce129d867706442836059ef8f86dddded9c45e0b5629d7bf8daa2045a9348ac  apps/ai/agents/course_ingestion/tests/test_ingestion.py
+f4f373a69e65733f9694a873a72adf3d52f8897b2ca3c1609ad3161d9c912f3a  apps/ai/agents/course_ingestion/tests/test_ocr_sandbox.py
+d5c7ce07490fdebd1b35e9b00f7160e9144d667fdfc3379864d569f47fecac26  apps/ai/agents/course_ingestion/tests/test_pdf_sandbox.py
+97f53457a6f28fb9b9a6277da5578db6e1172f2680ba92e14ecb331b0801526b  apps/ai/agents/course_ingestion/tests/test_semantic_structure.py
+d32b044cfaa2934c7c6e0cc55fb6529b443b71ba2f72d877930d4528ad4a429c  apps/ai/services/vector_store/adapter.py
+564328c6d156ebcacbb74ca3e6a531f5d8f8ca7ba2f0252e8b086654cd958f8e  apps/ai/services/vector_store/embedder.py
+2bb73de4eaa1a2615a6b397f143fae5efd21df18276f7e957687f826ddd771cb  apps/ai/services/vector_store/__init__.py
+8944c0031c80befa44a36219c43455c4bb3982c42486575996a134a8646b5090  apps/ai/services/vector_store/revision_artifacts.py
+dc97e1f70673341945cb22c24eec9365b4914f9acc9f63583c3fc6aafa07b99e  apps/ai/workers/base.py
+f5c76ffb6aa75b111ec0e9f23f53dd996138a14a6ace00e63d1b65aada7933f9  apps/ai/workers/coach_worker.py
+406fde870c1c9bd72e7dfe2182d4f9e073ee183666a4d2765983083caabfe059  apps/ai/workers/evaluator_worker.py
+21226d0f437207250005b55ad1040a3d228861bcd69bd3002d7dc23bcfe60549  apps/ai/workers/idempotency.py
+1255132ecba11cbb8f07e2aa1a81e03c3f968091c369c8ac1e377374f88ddcc5  apps/ai/workers/ingestion_worker.py
+aa1fc4e0f377aef67f93fcb2acceaf9139c41e248a6f813be65e0c36d1237d2f  apps/ai/workers/__init__.py
+9ef6d658d03c9a385d1e1b075b78df7e1bd521ffa14d5b49f67369a48d2ace87  apps/ai/workers/planner_worker.py
+732861c89015a3a9dfb3af311f0e1ea8826c025372eaca18a40ad5c2b1311cf0  apps/ai/workers/schedule_worker.py
+fe922fe33be4513fd59d10deb095dd158b3a4dfa9195bc02b8b5c55649afc1fc  apps/ai/workers/schemas.py
+cee6542b8b9c7fa3ca651ccca2382571783d7cf35c31fd106cd0fb6fec9caa3e  apps/ai/workers/search_cache.py
+5d20d44cfde0b475641e8334e5f45a23e5d9d39cb97d102c84cf6c3d1267dfe0  apps/ai/workers/search_worker.py
+bbd0d91067534c95323853c84614480ea981d2c70546316fe90612d250dd19c6  apps/ai/workers/session_store.py
+ae797c3c6339f0e7401c2f1f5fe4f3edab1d1c20894a5aab5ebc170d29f46d28  apps/api/modules/study/src/models/ActivityRecord.ts
+55c785c35e101c3f154b59a96d08c4ccba9f737ab759eb43c97916f6166b9bdf  apps/api/modules/study/src/models/CourseEnrollment.ts
+4429fa2cd24508dda5a28d25e4b72f633519b26010d8325336824dda507fb4dd  apps/api/modules/study/src/models/CourseIngestionOperation.ts
+7629a8bd09f4dd7a46ae2fdf10b111b3e09f3d0d32b8ee00fd2df587d884848d  apps/api/modules/study/src/models/CourseInvitation.ts
+0e72ddb45ea5d737674e093dbb062f6a1cf4d0b0dc1269f187af090d0b154da6  apps/api/modules/study/src/models/CourseRevision.ts
+d22609a1c22e223b9806b9f44ca57faa204fc32bcd492de0a1df6d8113704810  apps/api/modules/study/src/models/FacilitatorIntervention.ts
+b63583b3889552aa7f81d2240a289d5af81e813729a94c4e9cdf42a2cf964c72  apps/api/modules/study/src/models/index.ts
+589da28e19565fe1cbd9885923dd5ef29b8491df1abacf66f62634f930001ffe  apps/api/modules/study/src/models/Institution.ts
+b25089c36f217156278c6dfe3b12b0a95308bed9355c398339e431a1c86a27e6  apps/api/modules/study/src/models/LearningEvidence.ts
+179e30057114897f87c355fd0417c1822f5805c61d1d56c107afabea7e7d2034  apps/api/modules/study/src/models/StudentAttempt.ts
+53ef08a5ae22df9fb8a8033027d1444dd1b2b1fe60c5efb935028da1cff5bad9  apps/api/modules/study/src/models/StudyRoom.ts
+9ff42bba8b47304743358b71a8acd0235159437160ccdb5ab37830b5c4e981cb  apps/api/modules/study/src/services/activityAttempt.ts
+e28e618bbd5d693c18164b15c7a852eb3a95e3a0190abe60ac3c64a2fee2df86  apps/api/modules/study/src/services/activityEvaluation.ts
+8acaab686d90ae57e0ae7979f1c908d17b15274eda37830c6fc96107f57aabe1  apps/api/modules/study/src/services/activityIdentity.ts
+19d53c3fbae4cac7f533efca070160cfdc1b119e5293a799ff6e3997269f5961  apps/api/modules/study/src/services/activityResolution.ts
+73421583eb62f016eaed8452da2400c8a000a37f0f7565a3d4d7b5f4553e8b02  apps/api/modules/study/src/services/adaptiveLearning.ts
+90a284c5035dd4432dbb14603e0326ff6796fc321a97e0d4101da4f08aee3435  apps/api/modules/study/src/services/competencyQueries.ts
+83fce81f6099a2748fc5cdc29b1b584d67bd6a7ad4ca747d67a8e372199d10b2  apps/api/modules/study/src/services/competency.ts
+1e5c0417a09363f53d259b5321420f94a55601fae23d46a3f96cb1b757a340e6  apps/api/modules/study/src/services/competencyUpdater.ts
+a604adc4d77da71de7c5538342e672d86c070c127c248589cdc5d09e49de6c37  apps/api/modules/study/src/services/confusionSignals.ts
+447528dfbe43b468c91ba5c69c9938981e48e187a5ec25a61489de4f1ca7d6b4  apps/api/modules/study/src/services/courseDraft.ts
+f3e74c2cd79bc7d22e1388e08ff0f14f22db3c64f0c34aaa14426ac3e2565b9b  apps/api/modules/study/src/services/coursePublication.ts
+2835f4af8e1bd9ae820c7c89403594be19abae5f02a4e51be8c8d19c5896d4c5  apps/api/modules/study/src/services/courseReader.ts
+bb6aae5d41543546a3286f0a3c7bd4278b4dff72662daa714585fd7eb00787d8  apps/api/modules/study/src/services/courseStudio.ts
+8e35ce3ed1a65fa4f9d0113f9e2fe21689d658895e5765237c081a2d179a1cc4  apps/api/modules/study/src/services/enrollments.ts
+6fc0b99e1f56fe96e1ed1768f516b7db193f68a79e2400a1ac21357d054d55ac  apps/api/modules/study/src/services/ingestionControl.ts
+22d8a3a8cb1072506479f6e8fa7abd7ab3f564971ff211a70202eece2fd00a19  apps/api/modules/study/src/services/ingestionJob.ts
+895fda02bb373a238e7c03d6abf97a534f59db16eda28390af95b9420e56fb80  apps/api/modules/study/src/services/ingestStatus.ts
+46e2a54b7da08a97bf19f6725b796fea6f97d53822f41c1c48655d8c0d0cb01c  apps/api/modules/study/src/services/institutions.ts
+6bb81274abe3f561da1624ddfbc0313f33845b5e88b11cba17089d8c9316e011  apps/api/modules/study/src/services/instructorAnalytics.ts
+e87e4557b5af5019455653d5e850e236daa3721faeace7c4b16d42c22ff2b2e5  apps/api/modules/study/src/services/learningJourney.ts
+652b64ddeef72cc4bbf33d8edf2f5adcef9d45650a8d128b6b332fdb981aa90e  apps/api/modules/study/src/services/learningStyleProbe.ts
+d7157cff2702e431103cea08d3f4527b1e50bb5ade47cca1c96e93a7a5768f24  apps/api/modules/study/src/services/learningStyle.ts
+89d9f619380b3195b9c28a1c51ca18e2c452c33923deab9e0234625942eb112f  apps/api/modules/study/src/services/learningSupport.ts
+ca4b70458d0228050cff0ea29b9a009afa38e233a668f925636af29e9fc1d0e8  apps/api/modules/study/src/services/livekitControl.ts
+879dcb5690d38427b767255409cbf783868854e09bd16c015495ecc4a7fe0e9e  apps/api/modules/study/src/services/objectives.ts
+736d110fba03d5adafec2baadb8a76ec734d9ba2feb3c3502912c26f4b1f1837  apps/api/modules/study/src/services/privateRoomHelp.ts
+9da77bf1de63de63c8ea65e36e43eed61d80f12054ea1b5745414fb07daceca2  apps/api/modules/study/src/services/resourceAccess.ts
+a6c98a1ed09bcfdd36f973eb60e94506ca47f87509c5cc35c3776086a40db673  apps/api/modules/study/src/services/revisionSources.ts
+49544ba2fd54200dfb40f97b9dde3dad9ff2798facd364fba9a8e0a490847739  apps/api/modules/study/src/services/roomActivity.ts
+d9695d41b62e637d664798d46175b197fae8b519b008a3cd163dda50880c2aa8  apps/api/modules/study/src/services/roomCommands.ts
+377ebdb1ea29c9d07c7bcf5e214259f4754f3d10fb8e431977920d5bc79027e3  apps/api/modules/study/src/services/roomLearning.ts
+9b4cb629f4d0dec0630bf2b7aded91f5808f97d87f23d7e8d4cb6453ed4719e6  apps/api/modules/study/src/services/roomVisualization.ts
+0b3474e77144bd1b09b763458db9992bec8c0dfa397cfaee45daabde4799e95f  apps/api/modules/study/src/services/tutorGrounding.ts
+4d348cfc2d8ee4e2547aa950388b01935fb61f8d18602399587e15470bd69a03  apps/api/shared/ednova/boundary.ts
+f6015b2778dca43be09a485632a00ada6b6dd3e85d78c28d62c78a0d62fa259a  apps/api/shared/ednova/contracts.ts
+f711b1a7c741c0a1a50aaf01cf55aeb75596322656793aa5ff3059a90222dbc1  apps/api/shared/ednova/experiencePlanner.ts
+08eeae8f1edc3de0ab84f2e561d3786ccb0485a0669e1b48cdf974944843d058  apps/api/shared/ednova/learningDocument.ts
+005762bb2fce01f14ce2971081aa69219a702ea5a60ca998b8af138c50bb04bd  apps/api/shared/ednova/learningDocumentV2Serializer.ts
+352e8d9f3d38ecb843e758b86ef3eaaa06871bfec41859672760ffa72879dd75  apps/api/shared/ednova/learningDocumentV2.ts
+259ef4ea4c9cf147d81b0c29313c05c452fbfc5964dddbd3e9ef6d1fde6af726  apps/api/shared/ednova/semanticContent.ts
+6ab56f3b119773bb8112e74db7d3b3f8aef754502224b4d9347b1dc1a998fa94  apps/web/src/features/reader/code-highlight.ts
+8e912b644e707b02db6cc953b7d3d514172a32fd2fe43aa45d0867a5fa0c2d22  apps/web/src/features/reader/course-reader.tsx
+459da677b4ce15212b241aa181c3da6d4e5fd26cabcc3670f49fa5e7907b5383  apps/web/src/features/reader/math-content.tsx
+17c09573f25aac5ffc89f6be0fa073b3ef95c6bd3a28e625f2014bd47037d1cf  apps/web/src/features/reader/registry.test.tsx
+085be741ba37473f9570941752943a242daf35fa2211cbfc0ae584d9953e3a41  apps/web/src/features/reader/registry.tsx

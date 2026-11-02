@@ -20,9 +20,9 @@ def real_pdf(tmp_path):
 
 def test_real_pages_and_text(real_pdf):
     pages = pdf_loader.extract_pages_from_pdf_sandboxed(real_pdf)
-    assert [number for number, _ in pages] == [1, 2]
-    assert "First page evidence" in pages[0][1]
-    assert "Second page evidence" in pages[1][1]
+    assert [page["page_number"] for page in pages] == [1, 2]
+    assert "First page evidence" in pages[0]["text"]
+    assert "Second page evidence" in pages[1]["text"]
     assert "Second page evidence" in pdf_loader.extract_text_from_pdf_sandboxed(
         real_pdf
     )

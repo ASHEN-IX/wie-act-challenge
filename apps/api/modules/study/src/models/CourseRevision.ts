@@ -41,6 +41,7 @@ export interface ICourseRevision {
   }>;
   /** Canonical source-backed reading document. Optional for legacy revisions. */
   contentDocument?: unknown;
+  formulaPublication?: any;
   /** Hash of the canonical reading document, independent of draft metadata. */
   contentDocumentHash?: string;
   vectorIndexRef?: string;
@@ -109,6 +110,7 @@ const courseRevisionSchema = new Schema<ICourseRevision>(
       type: [Schema.Types.Mixed],
       default: []
     },
+    formulaPublication: { type: Schema.Types.Mixed, default: undefined },
     contentDocument: {
       type: Schema.Types.Mixed,
       default: undefined

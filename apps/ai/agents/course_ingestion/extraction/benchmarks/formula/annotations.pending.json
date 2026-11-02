@@ -1,0 +1,18 @@
+{
+  "status": "pending_review",
+  "reviewer": null,
+  "origin": "Assistant visual transcription of source crop; not independently checked",
+  "annotations": {
+    "eq-000": "S_n = \\sum_{p=0}^{n} u_p",
+    "eq-005": "\\begin{cases} f' = f, \\\\ f(0) = 1. \\end{cases}",
+    "eq-006": "f(x) = \\int_0^x f'(t)dt + f(0) = 1 + \\int_0^x f(t)dt",
+    "eq-017": "\\lim_{n\\to+\\infty} \\frac{|u_{n+1}|}{|u_n|} = \\lim_{n\\to+\\infty} \\frac{|x|}{n+1} = 0",
+    "eq-039": "R=\\frac{1}{\\ell_+}, \\quad \\ell_+=\\limsup_{n\\to\\infty}|a_n|^{1/n}",
+    "eq-045": "F(x)=\\int_a^b f(x,t)dt",
+    "eq-047": "\\forall\\epsilon>0, \\exists\\alpha(\\epsilon)>0\\text{ tel que }\\forall x,y\\in I, |y-x|\\le\\alpha(\\epsilon)\\Rightarrow|\\phi(y)-\\phi(x)|\\le\\epsilon",
+    "eq-054": "F(x)=\\left[-\\frac{\\cos(tx)}{x}\\right]_0^1=\\frac{1-\\cos x}{x}",
+    "eq-063": "F(x)=\\int_0^{+\\infty}f(x,t)dt",
+    "eq-084": "F(0)=\\int_0^{+\\infty}\\frac{1}{1+t^2}dt=[\\arctan(t)]_0^{+\\infty}=\\frac{\\pi}{2}"
+  },
+  "notes": {"eq-001":"region clips the final summand; expected transcription intentionally withheld", "eq-002":"mixed prose and equation; annotation pending", "eq-010":"multi-line crop; annotation pending", "eq-079":"mixed text and math; annotation pending", "eq-083":"multi-line derivation; annotation pending", "eq-084":"crop also includes following prose/formula; annotation covers first equation only"}
+}
