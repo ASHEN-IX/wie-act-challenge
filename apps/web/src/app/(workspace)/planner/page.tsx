@@ -20,8 +20,8 @@ export default async function Planner() {
   return (
     <>
       <PageHeader
-        title="A plan you can work with"
-        description="Start with your goal and the time you have available."
+        title="Study plan"
+        description="Say what you want to learn and how much time you have. You get a plan for one of your courses."
       />
       <DataError message={courses.error} />
       <div className="max-w-2xl">

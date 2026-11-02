@@ -18,12 +18,28 @@ describe('Single API module routes', () => {
     '/api/v1/analytics/summary',
     '/api/v1/notifications',
     '/api/v1/ai/jobs',
-    '/api/v1/signals/focus'
+    '/api/v1/signals/focus',
+    '/api/v1/study/visual-lab',
+    '/api/v1/study/visual-lab/discover',
+    '/api/v1/study/visual-lab/capabilities',
+    '/api/v1/study/visual-lab/plan'
   ])('%s retains authentication', async (path) => {
     expect((await request(app).get(path)).status).toBe(401);
   });
   test('character routes stay removed', async () => {
     expect((await request(app).get('/api/v1/characters/base')).status).toBe(404);
+  });
+  test('Visual Learning Lab documents its own operations', async () => {
+    const body = (await request(app).get('/api/v1/docs/openapi.json')).body;
+    for (const path of [
+      '/api/v1/study/visual-lab/plan',
+      '/api/v1/study/visual-lab',
+      '/api/v1/study/visual-lab/discover',
+      '/api/v1/study/visual-lab/{labId}',
+      '/api/v1/study/visual-lab/{labId}/guide',
+      '/api/v1/study/visual-lab/{labId}/check'
+    ])
+      expect([path, Boolean(body.paths[path])]).toEqual([path, true]);
   });
   test('OpenAPI endpoint stays public', async () => {
     expect((await request(app).get('/api/v1/docs/openapi.json')).body.openapi).toBe('3.0.3');

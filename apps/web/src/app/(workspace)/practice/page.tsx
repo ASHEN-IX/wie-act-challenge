@@ -9,8 +9,8 @@ export default function Practice() {
   return (
     <>
       <PageHeader
-        title="Show your thinking"
-        description="Work through a question and get private feedback on your explanation."
+        title="Practice"
+        description="Write a question and your explanation. You get private feedback you can check against your sources."
       />
       <div className="max-w-2xl">
         <JobForm action={submitPractice} kind="eval" submit="Get feedback">
@@ -35,8 +35,7 @@ export default function Practice() {
           </FieldGroup>
         </JobForm>
         <p className="mt-8 text-xs leading-6 text-muted-foreground">
-          Feedback depends on the evaluation worker and your account’s access.
-          AI feedback can be mistaken; check it against your course sources.
+          AI feedback can be mistaken. Check it against your course sources.
         </p>
       </div>
     </>

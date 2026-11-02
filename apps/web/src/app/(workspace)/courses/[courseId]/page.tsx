@@ -34,6 +34,11 @@ export default async function CoursePage({
                 Open published learning
               </Link>
             </Button>
+            <Button variant="outline" asChild>
+              <Link href={`/visual-lab?courseId=${course.id}`}>
+                Explore visually
+              </Link>
+            </Button>
           </div>
         }
       />

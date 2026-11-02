@@ -47,6 +47,10 @@ AGENT_GROUPS = (
     "course_ingestion",
     "evaluator",
     "facilitator",
+    # Visual Learning Lab: selection is a bounded classification (compact), while
+    # scenario planning must reason about the concept (capable).
+    "visual_lab_selector",
+    "visual_lab_planner",
 )
 
 
@@ -75,6 +79,8 @@ AGENT_TIERS: Dict[str, ModelTier] = {
     "reflection": ModelTier.CAPABLE,
     # Peer-first interventions weigh several learners' dialogue at once (synthesis).
     "facilitator": ModelTier.CAPABLE,
+    "visual_lab_selector": ModelTier.COMPACT,
+    "visual_lab_planner": ModelTier.CAPABLE,
 }
 
 

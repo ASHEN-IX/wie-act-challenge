@@ -8,8 +8,8 @@ export default function Search() {
   return (
     <>
       <PageHeader
-        title="Follow your curiosity"
-        description="Find supporting sources for a question you’re exploring."
+        title="Explore sources"
+        description="Search the web for sources on a question."
       />
       <div className="max-w-2xl">
         <JobForm action={searchSources} kind="search" submit="Find sources">

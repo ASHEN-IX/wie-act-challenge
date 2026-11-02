@@ -25,6 +25,8 @@ const coachRoutes = require('./routes/coach');
 const roomRoutes = require('./routes/rooms');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const institutionRoutes = require('./routes/institutions');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const visualLabRoutes = require('./routes/visualLab');
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const {
@@ -84,6 +86,7 @@ app.use('/api/v1/competencies', authenticate, competencyRoutes);
 app.use('/api/v1/coach', authenticate, coachRoutes);
 app.use('/api/v1/study/rooms', authenticate, roomRoutes);
 app.use('/api/v1/study/institutions', authenticate, institutionRoutes);
+app.use('/api/v1/study/visual-lab', authenticate, visualLabRoutes);
 // Error handler (must be last)
 app.use(errorHandler);
 

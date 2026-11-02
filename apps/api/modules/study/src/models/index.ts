@@ -1029,6 +1029,7 @@ export {
 export { StudentAttempt, IStudentAttempt } from './StudentAttempt';
 export { LearningEvidence, ILearningEvidence } from './LearningEvidence';
 export { ActivityRecord, IActivityRecord } from './ActivityRecord';
+export { VisualLab, IVisualLab } from './VisualLab';
 
 module.exports = {
   StudySession,
@@ -1043,6 +1044,7 @@ module.exports = {
   StudentAttempt: require('./StudentAttempt').StudentAttempt,
   LearningEvidence: require('./LearningEvidence').LearningEvidence,
   ActivityRecord: require('./ActivityRecord').ActivityRecord,
+  VisualLab: require('./VisualLab').VisualLab,
   Task,
   Topic,
   Subject,

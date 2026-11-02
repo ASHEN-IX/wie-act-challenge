@@ -109,16 +109,19 @@ export function RoomLearningPanel({
       className="space-y-4 rounded-lg border p-4"
       data-testid="room-learning"
     >
-      <h2 className="font-semibold">Shared activity and private checks</h2>
+      <h2 className="font-semibold">Activity</h2>
       <RoomVisualizer
         roomId={room.roomId}
         seq={room.seq}
         presenter={presenter}
       />
-      <p>
-        Revision: {room.revisionId || "No source context"} · Round:{" "}
-        {room.activityRound || "None"}
-      </p>
+      {(room.revisionId || room.activityRound) && (
+        <p className="text-xs text-muted-foreground">
+          {room.revisionId ? `Course revision ${room.revisionId}` : ""}
+          {room.revisionId && room.activityRound ? " · " : ""}
+          {room.activityRound ? `Round ${room.activityRound}` : ""}
+        </p>
+      )}
       {error && (
         <p role="alert" className="text-destructive">
           {error}
