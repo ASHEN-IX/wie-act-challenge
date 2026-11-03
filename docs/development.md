@@ -78,3 +78,9 @@ Keep authored verification reports in `reports/*.md` in Git. Raw command logs, g
 Preserve contract/controller registration, security checks, AI message topology parity, correlation/idempotency and rollback mechanisms. Do not remove legacy apps/routes/helpers based solely on new architecture diagrams. Runtime changes, role additions and schema evolution belong to future backlog tasks. Maintain one active [backlog](sprint-backlog.md); add executed evidence before marking DONE.
 
 M01 continuation results and reproducible broker fixture instructions are recorded in [the continuation verification](../reports/EDNOVA-M01-CONTINUATION-VERIFICATION.md). API lint passes. The [final runtime verification](../reports/EDNOVA-M01-FINAL-RUNTIME-VERIFICATION.md) closes the full locked Python/AI image gate: 818 Python tests pass with five documented existing manual-fixture skips, and actual image health/native imports plus broker worker transport pass. This is local baseline evidence, not approved inference, GPU/media or downstream feature acceptance.
+
+### Student background actions
+
+After starting the local infrastructure, run `pnpm dev:workers` to start the ingestion, feedback, planning, search, scheduling and coaching workers. This command derives the database and broker virtual host from `apps/api/.env`, so workers use the same local queues as Node rather than settings from a different root environment. It recreates only the AI HTTP/worker containers; it does not remove data volumes. Model-backed operations still require their configured provider authorization.
+
+Feedback, search and plan pages keep the current job in the page URL. Refreshing or returning to that URL resumes status checks; the API still checks job ownership. Use **Check status** after a temporary connection failure.

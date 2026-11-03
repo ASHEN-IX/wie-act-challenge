@@ -23,6 +23,9 @@ async function login(page: any) {
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page).toHaveURL(/dashboard/);
   await page.goto("/courses/bbbbbbbbbbbbbbbbbbbbbbbb/studio");
+  await page
+    .getByText("Check individual equations (optional)", { exact: true })
+    .click();
 }
 
 test("instructor recognizes, reviews and reloads persisted formulas in Studio", async ({
@@ -36,6 +39,9 @@ test("instructor recognizes, reviews and reloads persisted formulas in Studio", 
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page).toHaveURL(/dashboard/);
   await page.goto("/courses/bbbbbbbbbbbbbbbbbbbbbbbb/studio");
+  await page
+    .getByText("Check individual equations (optional)", { exact: true })
+    .click();
   const workspace = page.getByRole("region", { name: "Formula review" });
   await expect(workspace.getByLabel("Mathematical source region")).toBeVisible({
     timeout: 30000,
@@ -86,6 +92,9 @@ test("instructor recognizes, reviews and reloads persisted formulas in Studio", 
     ).toBeVisible();
   }
   await page.reload();
+  await page
+    .getByText("Check individual equations (optional)", { exact: true })
+    .click();
   await expect(
     workspace.getByLabel("Mathematical source region"),
   ).toBeVisible();
@@ -156,6 +165,9 @@ test("unavailability and terminal jobs retain source inspection; stale reviews r
     await db.collection("formularecognitionjobs").deleteMany({});
   });
   await page.reload();
+  await page
+    .getByText("Check individual equations (optional)", { exact: true })
+    .click();
   await workspace
     .getByRole("button", { name: "Request Gemini recognition", exact: true })
     .click();
@@ -201,6 +213,9 @@ test("unavailability and terminal jobs retain source inspection; stale reviews r
         .updateMany({}, { $set: { state, error: "TEST_" + state } });
     });
     await page.reload();
+    await page
+      .getByText("Check individual equations (optional)", { exact: true })
+      .click();
     await expect(
       workspace.getByText(`Job: ${state} · TEST_${state}`, { exact: true }),
     ).toBeVisible();
@@ -214,16 +229,12 @@ test("unauthorized course users cannot access formula controls", async ({
   page,
 }) => {
   await database(async (db) => {
-    await db
-      .collection("courses")
-      .updateOne(
-        {
-          _id: new (await import("mongodb")).ObjectId(
-            "bbbbbbbbbbbbbbbbbbbbbbbb",
-          ),
-        },
-        { $set: { ownerUserId: "other", userId: "other" } },
-      );
+    await db.collection("courses").updateOne(
+      {
+        _id: new (await import("mongodb")).ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
+      },
+      { $set: { ownerUserId: "other", userId: "other" } },
+    );
   });
   await login(page);
   await expect(
@@ -240,34 +251,28 @@ test("assigned instructors inspect sources but cannot grant owner consent", asyn
   await database(async (db) => {
     const { ObjectId } = await import("mongodb");
     const institutionId = new ObjectId("cccccccccccccccccccccccc");
-    await db
-      .collection("institutions")
-      .insertOne({
-        _id: institutionId,
-        name: "Fixture institution",
-        slug: "fixture",
-        status: "active",
-      });
-    await db
-      .collection("institution_memberships")
-      .insertOne({
-        institutionId,
-        userId: "aaaaaaaaaaaaaaaaaaaaaaaa",
-        role: "instructor",
-        status: "active",
-      });
-    await db
-      .collection("courses")
-      .updateOne(
-        { _id: new ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb") },
-        {
-          $set: {
-            scope: "institutional",
-            institutionId,
-            assignedInstructorIds: ["aaaaaaaaaaaaaaaaaaaaaaaa"],
-          },
+    await db.collection("institutions").insertOne({
+      _id: institutionId,
+      name: "Fixture institution",
+      slug: "fixture",
+      status: "active",
+    });
+    await db.collection("institution_memberships").insertOne({
+      institutionId,
+      userId: "aaaaaaaaaaaaaaaaaaaaaaaa",
+      role: "instructor",
+      status: "active",
+    });
+    await db.collection("courses").updateOne(
+      { _id: new ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb") },
+      {
+        $set: {
+          scope: "institutional",
+          institutionId,
+          assignedInstructorIds: ["aaaaaaaaaaaaaaaaaaaaaaaa"],
         },
-      );
+      },
+    );
   });
   await login(page);
   const workspace = page.getByRole("region", { name: "Formula review" });

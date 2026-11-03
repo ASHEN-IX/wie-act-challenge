@@ -26,6 +26,12 @@ for (const service of ['ai-service', 'ingestion-worker']) {
 if (!main.services.redis.command.includes('--appendonly') ||
     !main.services.redis.volumes?.some((v) => v.target === '/data'))
   throw new Error('Worker Redis must retain completion markers on a persistent volume');
+for (const name of ['evaluator', 'planner', 'search', 'schedule', 'coach']) {
+  const worker = main.services[`${name}-worker`];
+  if (!worker || worker.command.join(' ') !== `python -m workers.${name}_worker` ||
+      worker.environment.RABBITMQ_URL !== main.services['ai-service'].environment.RABBITMQ_URL ||
+      worker.ports?.length) throw new Error(`${name} worker must share the broker without publishing HTTP ports`);
+}
 for (const name of ['development', 'test']) {
   const config = resolveCompose(path.join('deploy', `compose.${name}.yml`));
   if (!config.services.mongodb || !config.services.mailpit)

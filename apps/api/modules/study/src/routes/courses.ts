@@ -36,7 +36,7 @@ import {
   CourseRevision,
   CourseEnrollment
 } from '../models';
-import { canReadCourse, canManageCourse } from '../services/resourceAccess';
+import { canReadCourse, canManageCourse, canAuthorCourse } from '../services/resourceAccess';
 import {
   getCourseDraft,
   withExtractionReview,
@@ -318,11 +318,10 @@ router.get(
   '/:courseId/files/:filename',
   async (req: DomainRequest, res: Response, next: NextFunction) => {
     try {
-      if (!(await canReadCourse(req.user!.userId, String(req.params.courseId))))
+      if (!(await canAuthorCourse(req.user!.userId, String(req.params.courseId))))
         return res.status(404).json({ error: 'Source file not found' });
       const course = await Course.findOne({
-        _id: req.params.courseId,
-        userId: req.user!.userId
+        _id: req.params.courseId
       }).lean();
       const filename = req.params.filename;
       if (
@@ -339,7 +338,7 @@ router.get(
       const target = await fs.promises.realpath(path.join(root, filename));
       if (!target.startsWith(root + path.sep))
         return res.status(404).json({ error: 'Source file not found' });
-      if (!(await canReadCourse(req.user!.userId, String(req.params.courseId))))
+      if (!(await canAuthorCourse(req.user!.userId, String(req.params.courseId))))
         return res.status(404).json({ error: 'Source file not found' });
       res.setHeader('Cache-Control', 'private, no-store');
       res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'");

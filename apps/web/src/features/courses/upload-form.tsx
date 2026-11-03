@@ -321,22 +321,25 @@ function CourseUploader({
                 </p>
               </Field>
               <Field>
-                <FieldLabel htmlFor="institutionId">Course scope</FieldLabel>
+                <FieldLabel htmlFor="institutionId">Who is this course for?</FieldLabel>
                 <NativeSelect
                   id="institutionId"
                   name="institutionId"
+                  defaultValue={institutions[0]?.id || ""}
                   className="w-full"
                 >
-                  <NativeSelectOption value="">Personal</NativeSelectOption>
+                  <NativeSelectOption value="">Private study — only me</NativeSelectOption>
                   {institutions.map((institution) => (
                     <NativeSelectOption
                       key={institution.id}
                       value={institution.id}
                     >
-                      {institution.name}
+                      Students at {institution.name}
                     </NativeSelectOption>
                   ))}
                 </NativeSelect>
+                <p className="text-xs text-muted-foreground">Choose your institution to invite students after publishing. Private material cannot be shared with a class.</p>
+                {institutions.length === 0 && <p className="text-xs text-muted-foreground">Teaching a class? Ask your institution administrator to add you as an instructor first.</p>}
               </Field>
             </div>
             <LongField

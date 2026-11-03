@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Upload, Key } from "lucide-react";
+import { hasTeachingAccess } from "@/server/teaching";
+import { Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared/page-header";
 import { DataError } from "@/components/shared/states";
@@ -23,6 +24,7 @@ export default async function Courses({
   }>;
 }) {
   const query = await searchParams;
+  const teaching = await hasTeachingAccess();
   const [courses, subjects, instContexts] = await Promise.all([
     getCourses(query.institution_id),
     getSubjects(),
@@ -44,13 +46,18 @@ export default async function Courses({
     <>
       <PageHeader
         title="Your courses"
-        description="A little progress, every day."
+        description={
+          teaching
+            ? "Upload, review and publish your course material."
+            : "Join a teacher’s course, then open it here to start learning."
+        }
         action={
           <div className="flex gap-2">
-            <Button asChild>
+            {!teaching && <Button asChild><a href="#join-course">Join a course</a></Button>}
+            <Button asChild variant={teaching ? "default" : "outline"}>
               <Link href="/courses/new">
                 <Upload data-icon="inline-start" />
-                Upload course
+                {teaching ? "Upload course" : "Add my own material"}
               </Link>
             </Button>
           </div>
@@ -62,7 +69,7 @@ export default async function Courses({
       {institutions.length > 0 && (
         <div className="mb-6 flex flex-wrap items-center gap-2 border-b pb-4">
           <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mr-2">
-            Context:
+            Institution:
           </span>
           <Link
             href="/courses"
@@ -72,7 +79,7 @@ export default async function Courses({
                 : "bg-muted text-muted-foreground hover:bg-muted/80"
             }`}
           >
-            All authorized courses
+            All my courses
           </Link>
           {institutions.map((ctx) => (
             <Link
@@ -84,29 +91,25 @@ export default async function Courses({
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               }`}
             >
-              {ctx.institution.name} ({ctx.membership.role})
+              {ctx.institution.name}
             </Link>
           ))}
         </div>
       )}
 
       {/* Course Enrollment Capability */}
-      <details className="mb-6 rounded-lg border bg-card p-4 text-card-foreground">
-        <summary className="cursor-pointer text-sm font-medium flex items-center gap-2">
-          <Key className="h-4 w-4" />
-          Enroll in a course with an invite code
-        </summary>
-        <div className="mt-3 max-w-md">
-          <ActionForm action={acceptCourseInvitationAction} submit="Enroll now">
-            <TextField
-              label="Course Invitation Token"
-              name="token"
-              placeholder="Paste the course invite token..."
-              required
-            />
-          </ActionForm>
-        </div>
-      </details>
+      {!teaching && (
+        <section id="join-course" aria-labelledby="join-course-title" className="mb-8 scroll-mt-24 rounded-lg border bg-card p-5">
+          <h2 id="join-course-title" className="text-lg font-semibold">Join your teacher’s course</h2>
+          <p className="mt-1 mb-4 text-sm text-muted-foreground">Ask your teacher for an invitation code. You must already be a member of their institution.</p>
+          <div className="max-w-xl">
+            <ActionForm action={acceptCourseInvitationAction} submit="Join course">
+              <TextField label="Course invitation code" name="token" placeholder="Paste the code from your teacher" required />
+            </ActionForm>
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">Each code is for one student. If it has expired or was used, ask your teacher for a new one. For institution access, contact your institution administrator.</p>
+        </section>
+      )}
 
       <nav
         aria-label="Course filters"
@@ -144,7 +147,11 @@ export default async function Courses({
         </Link>
       </nav>
 
-      <CourseList courses={visible} subjects={subjects.data?.subjects || []} />
+      <CourseList
+        teaching={teaching}
+        courses={visible}
+        subjects={subjects.data?.subjects || []}
+      />
     </>
   );
 }

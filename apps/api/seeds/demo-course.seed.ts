@@ -63,6 +63,10 @@ async function userIdFor(email: string): Promise<string> {
 }
 
 async function main() {
+  if (process.env.ALLOW_DEMO_COURSES !== "1") {
+    console.log("Demo data is disabled. Upload your own course, or explicitly set ALLOW_DEMO_COURSES=1 in a disposable development database.");
+    return;
+  }
   const uri = process.env.MONGODB_URI;
   if (!uri || !['localhost', '127.0.0.1', '[::1]'].includes(new URL(uri).hostname))
     throw new Error('Demo course seeding requires a loopback MongoDB URI');

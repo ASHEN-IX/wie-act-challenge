@@ -1,6 +1,7 @@
+import { hasTeachingAccess } from "@/server/teaching";
 import { plural } from "@/lib/utils";
 import Link from "next/link";
-import { randomUUID } from 'node:crypto';
+import { randomUUID } from "node:crypto";
 import { load } from "@/lib/api";
 import { getCourses } from "@/features/courses/queries";
 import { createRoom, joinRoom } from "@/features/collaboration/actions";
@@ -32,6 +33,7 @@ export default async function Rooms({
 }: {
   searchParams: Promise<{ courseId?: string }>;
 }) {
+  const teaching = await hasTeachingAccess();
   const { courseId: requestedCourseId } = await searchParams;
   const [courses, sessions, studyRooms] = await Promise.all([
     getCourses(),
@@ -56,8 +58,12 @@ export default async function Rooms({
   return (
     <>
       <PageHeader
-        title="Study Together"
-        description="Study with up to six peers in a shared room. Create one or join with a code."
+        title={teaching ? "Sessions" : "Study Together"}
+        description={
+          teaching
+            ? "Create a room for your students, or join using an invitation code from a student."
+            : "Study with up to six peers in a shared room. Create one or join with a code."
+        }
       />
       <DataError message={courses.error || sessions.error} />
       <div className="mb-10 grid max-w-4xl gap-8 md:grid-cols-2">
@@ -82,13 +88,11 @@ export default async function Rooms({
                   <NativeSelectOption value="">
                     Start without a course
                   </NativeSelectOption>
-                  {courses.data?.courses
-                    .filter(isCourseReady)
-                    .map((c) => (
-                      <NativeSelectOption key={c.id} value={c.id}>
-                        {c.title}
-                      </NativeSelectOption>
-                    ))}
+                  {courses.data?.courses.filter(isCourseReady).map((c) => (
+                    <NativeSelectOption key={c.id} value={c.id}>
+                      {c.title}
+                    </NativeSelectOption>
+                  ))}
                 </NativeSelect>
               </Field>
             </FieldGroup>

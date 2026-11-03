@@ -33,7 +33,7 @@ import crypto from 'crypto';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const moduleClient = require('@ednova/shared/moduleClient');
 import Joi from 'joi';
-import { StudyRoom, FacilitatorIntervention, Course, StudentAttempt } from '../models';
+import { StudyRoom, FacilitatorIntervention, Course, StudentAttempt, InstitutionMembership } from '../models';
 import { buildInternalHeaders } from '../utils/sessionHelpers';
 import { logger } from '@ednova/shared';
 import { runRoomCommand } from '../services/roomCommands';
@@ -557,9 +557,15 @@ router.post(
 // command ID retain their original behavior, but cannot claim durable replay.
 function durableRoomCommand(kind: Parameters<typeof runRoomCommand>[0]): DomainMiddleware {
   return async (req, res, next) => {
-    if (!Object.prototype.hasOwnProperty.call(req.body || {}, 'commandId')) return next();
     const actor = req.user;
     if (!actor?.userId) return res.status(401).json({ error: 'Unauthorized' });
+    if (kind === 'create' || kind === 'join') {
+      const teaching = actor.role === 'instructor' || actor.role === 'admin' || await InstitutionMembership.exists({
+        userId: actor.userId, status: 'active', role: { $in: ['instructor', 'university_admin'] }
+      });
+      if (teaching) return res.status(403).json({ error: 'Peer study rooms are for students. Use your teaching workspace to manage courses.' });
+    }
+    if (!Object.prototype.hasOwnProperty.call(req.body || {}, 'commandId')) return next();
     const result = await runRoomCommand(
       kind,
       { userId: actor.userId, name: typeof actor.name === 'string' ? actor.name : undefined },

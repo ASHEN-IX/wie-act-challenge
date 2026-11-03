@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { hasTeachingAccess } from "@/server/teaching";
 import { load, segment } from "@/lib/api";
 import { PageHeader } from "@/components/shared/page-header";
 import { DataError, EmptyState } from "@/components/shared/states";
@@ -10,6 +12,7 @@ export default async function InstructorInsightsPage({
 }: {
   searchParams: Promise<{ courseId?: string }>;
 }) {
+  if (!(await hasTeachingAccess())) redirect("/dashboard");
   const query = await searchParams;
   const courses = await load<{
     courses: Array<{ courseId: string; title: string }>;

@@ -43,6 +43,7 @@ export function LearningWorkspace({
   const [objectiveId, setObjective] = useState(
     objectives[0]?.objectiveId || "",
   );
+  const hasReviewedPractice = activities.some((a) => a.objectiveId === objectiveId);
   const [activityType, setType] = useState(""),
     [intent, setIntent] = useState("practice");
   const [activity, setActivity] = useState<ActivityDefinition | null>(null),
@@ -303,13 +304,7 @@ export function LearningWorkspace({
     >
       <div className="flex flex-wrap items-center justify-between gap-4 border-b pb-4">
         <div>
-          <h1 className="text-2xl font-bold">Learn: {context.title}</h1>
-          <p className="text-sm">
-            Immutable revision:{" "}
-            <span dir="ltr" className="font-mono">
-              {context.revisionId}
-            </span>
-          </p>
+          <h2 className="text-xl font-semibold">Practice</h2>
         </div>
         <div className="flex items-center gap-2">
           <label htmlFor="learning-lang-select" className="text-xs font-medium">
@@ -380,17 +375,10 @@ export function LearningWorkspace({
         </label>
         <div className="flex flex-wrap gap-2">
           <Button
-            disabled={busy || !objectiveId}
+            disabled={busy || !objectiveId || !hasReviewedPractice}
             onClick={() => startActivity("practice")}
           >
             {t.startPractice}
-          </Button>
-          <Button
-            variant="outline"
-            disabled={busy || !objectiveId}
-            onClick={() => startActivity("check")}
-          >
-            {t.checkMine}
           </Button>
           <Button
             variant="outline"
@@ -407,7 +395,7 @@ export function LearningWorkspace({
           </p>
         )}
         <p role="status" className="text-sm">
-          {message}
+          {!hasReviewedPractice ? t.noActivity : message}
         </p>
         {rationale && (
           <details className="text-xs text-muted-foreground">
@@ -465,7 +453,7 @@ export function LearningWorkspace({
             </label>
             <Button
               variant="outline"
-              disabled={busy || !objectiveId}
+              disabled={busy || !objectiveId || !hasReviewedPractice}
               onClick={() => startActivity(intent)}
             >
               {t.select}

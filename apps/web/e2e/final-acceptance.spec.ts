@@ -23,6 +23,25 @@ test("real reference upload, Python ingestion/index, SDK replay, instructor publ
   const db = client.db();
   try {
     await login(page, "final-instructor@example.test");
+    await expect(
+      page.getByRole("heading", { name: "Teaching workspace" }),
+    ).toBeVisible();
+    const navigation = page
+      .getByRole("navigation", { name: "Workspace navigation" })
+      .first();
+    await expect(
+      navigation.getByRole("link", { name: "My courses", exact: true }),
+    ).toBeVisible();
+    await expect(
+      navigation.getByRole("link", { name: "My Learning", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      navigation.getByRole("link", { name: "Study Together", exact: true }),
+    ).toHaveCount(0);
+    await page.goto("/study-together");
+    await expect(page).toHaveURL(/dashboard$/);
+    const peerRoom = await page.request.post("/api/v1/study/rooms", { data: {} });
+    expect(peerRoom.status()).toBe(403);
     // Internal AI routes require a service credential, not a browser session.
     const denied = await page.request.post(
       "http://127.0.0.1:5362/api/ai/sources/recognition-preflight",
@@ -75,16 +94,32 @@ test("real reference upload, Python ingestion/index, SDK replay, instructor publ
     expect(
       "sha256:" + crypto.createHash("sha256").update(bytes).digest("hex"),
     ).toBe(draft.sourceManifest[0].contentHash);
-    await db
-      .collection("course_enrollments")
-      .insertOne({
-        courseId: new ObjectId(courseId),
-        institutionId: new ObjectId("eeeeeeeeeeeeeeeeeeeeeeee"),
-        userId: "cccccccccccccccccccccccc",
-        status: "active",
-        enrolledAt: new Date(),
-      });
-    await page.goto(`/courses/${courseId}/studio`);
+    await db.collection("course_enrollments").insertOne({
+      courseId: new ObjectId(courseId),
+      institutionId: new ObjectId("eeeeeeeeeeeeeeeeeeeeeeee"),
+      userId: "cccccccccccccccccccccccc",
+      status: "active",
+      enrolledAt: new Date(),
+    });
+    await page.goto(`/courses/${courseId}`);
+    await expect(page).toHaveURL(new RegExp(`/courses/${courseId}/studio$`));
+    const sourceLink = page.getByRole("link", {
+      name: "Open reference-course.pdf",
+    });
+    await expect(sourceLink).toBeVisible();
+    const sourceResponse = await page.request.get(
+      (await sourceLink.getAttribute("href"))!,
+    );
+    expect(sourceResponse.status()).toBe(200);
+    expect(await sourceResponse.body()).toEqual(bytes);
+    await expect(
+      page.getByLabel(
+        "I reviewed the flagged source regions against the original.",
+      ),
+    ).toBeVisible();
+    await page
+      .getByText("Check individual equations (optional)", { exact: true })
+      .click();
     const workspace = page.getByRole("region", { name: "Formula review" });
     await expect(
       workspace.getByLabel("Mathematical source region"),
@@ -164,7 +199,7 @@ test("real reference upload, Python ingestion/index, SDK replay, instructor publ
       )?.used,
     ).toBe(3);
     // Acknowledge source extraction quality through the existing Studio policy.
-    await page.getByText("Source tools and audit", { exact: true }).click();
+
     const acknowledgement = page.getByRole("checkbox", {
       name: /reviewed.*flagged|acknowledge|inspected/i,
     });
@@ -172,10 +207,10 @@ test("real reference upload, Python ingestion/index, SDK replay, instructor publ
     await acknowledgement.check();
     await expect(acknowledgement).toBeChecked();
     await page
-      .getByRole("button", { name: "Review & Publish", exact: true })
+      .getByRole("button", { name: "Publish course", exact: true })
       .click();
     const published = page.getByRole("link", {
-      name: "Open committed immutable revision",
+      name: "View published course",
     });
     await expect(published).toBeVisible({ timeout: 90000 });
     const href = (await published.getAttribute("href"))!;
@@ -189,21 +224,36 @@ test("real reference upload, Python ingestion/index, SDK replay, instructor publ
     await studentPage.goto(href);
     // The earlier clipped summand must be visible through the authorized
     // published-reader context crop, while the region identity stays stable.
-    const eq001 = "region_" + crypto.createHash("sha256")
-      .update(draft.sourceManifest[0].documentId + "\x1f" + "region_66ae1f964f8407b30376")
-      .digest("hex").slice(0, 20);
+    const eq001 =
+      "region_" +
+      crypto
+        .createHash("sha256")
+        .update(
+          draft.sourceManifest[0].documentId +
+            "\x1f" +
+            "region_66ae1f964f8407b30376",
+        )
+        .digest("hex")
+        .slice(0, 20);
     const expandedCrop = await studentPage.request.get(
       `/api/v1/study/courses/${courseId}/revisions/${revision.revisionTag}/sources/${draft.sourceManifest[0].documentId}/regions/${eq001}`,
     );
     expect(expandedCrop.status()).toBe(200);
     const expandedBytes = await expandedCrop.body();
-    expect(expandedBytes.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
+    expect(expandedBytes.subarray(0, 8).toString("hex")).toBe(
+      "89504e470d0a1a0a",
+    );
     expect(expandedBytes.readUInt32BE(16)).toBeGreaterThanOrEqual(210);
     await expect(
       studentPage.locator('[data-block-type="math"] .katex'),
     ).toHaveCount(2);
-    await studentPage.locator('[data-block-type="math"] .katex').first().scrollIntoViewIfNeeded();
-    await studentPage.screenshot({path:path.join(evidence,'student-reviewed-formula.png')});
+    await studentPage
+      .locator('[data-block-type="math"] .katex')
+      .first()
+      .scrollIntoViewIfNeeded();
+    await studentPage.screenshot({
+      path: path.join(evidence, "student-reviewed-formula.png"),
+    });
     await expect(
       studentPage
         .getByText("Automatic transcription is unverified.", { exact: false })
@@ -222,7 +272,11 @@ test("real reference upload, Python ingestion/index, SDK replay, instructor publ
     const rejected = studentPage.locator(`img[src*="${selected[2]}"]`);
     await expect(rejected).toHaveCount(1);
     await rejected.scrollIntoViewIfNeeded();
-    await expect.poll(() => rejected.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+    await expect
+      .poll(() =>
+        rejected.evaluate((img: HTMLImageElement) => img.naturalWidth),
+      )
+      .toBeGreaterThan(0);
     expect(await image.getAttribute("src")).not.toContain(selected[2]);
     await fallback
       .getByRole("button", { name: "Inspect formula source" })
@@ -276,13 +330,21 @@ test("real reference upload, Python ingestion/index, SDK replay, instructor publ
       "partially_reviewed",
     );
     await expect(
-      presentation.getByText("not semantically verified", { exact: false }).first(),
+      presentation
+        .getByText("not semantically verified", { exact: false })
+        .first(),
     ).toBeVisible();
-    await expect(presentation.locator("[data-presentation-lesson]").first()).toBeVisible();
     await expect(
-      presentation.locator('[data-presentation-policy="source_faithful"]').first(),
+      presentation.locator("[data-presentation-lesson]").first(),
     ).toBeVisible();
-    await expect(presentation.locator('[data-block-type="math"] .katex')).toHaveCount(2, {
+    await expect(
+      presentation
+        .locator('[data-presentation-policy="source_faithful"]')
+        .first(),
+    ).toBeVisible();
+    await expect(
+      presentation.locator('[data-block-type="math"] .katex'),
+    ).toHaveCount(2, {
       timeout: 30000,
     });
     const presentationFallback = presentation.getByRole("link", {
@@ -307,7 +369,9 @@ test("real reference upload, Python ingestion/index, SDK replay, instructor publ
     expect(presentationBody.schemaVersion).toBe("1.0.0");
     expect(presentationBody.verification.status).toBe("partially_reviewed");
     expect(presentationBody.verification.math.reviewed).toBe(2);
-    expect(presentationBody.verification.math.sourceFallback).toBeGreaterThan(0);
+    expect(presentationBody.verification.math.sourceFallback).toBeGreaterThan(
+      0,
+    );
 
     const outsider = await browser.newContext();
     const outsiderPage = await outsider.newPage();
@@ -373,6 +437,21 @@ test("representative networking PDF preserves code, table, caption and diagram t
   const db = client.db();
   try {
     await login(page, "final-instructor@example.test");
+    await expect(
+      page.getByRole("heading", { name: "Teaching workspace" }),
+    ).toBeVisible();
+    const navigation = page
+      .getByRole("navigation", { name: "Workspace navigation" })
+      .first();
+    await expect(
+      navigation.getByRole("link", { name: "My courses", exact: true }),
+    ).toBeVisible();
+    await expect(
+      navigation.getByRole("link", { name: "My Learning", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      navigation.getByRole("link", { name: "Study Together", exact: true }),
+    ).toHaveCount(0);
     const bytes = await fs.readFile(
       path.resolve(
         "../ai/agents/course_ingestion/extraction/benchmarks/networking-qa.pdf",
@@ -426,15 +505,6 @@ test("representative networking PDF preserves code, table, caption and diagram t
     expect(blocks.findIndex((b: any) => b.type === "media")).toBeGreaterThan(
       blocks.findIndex((b: any) => b.type === "table"),
     );
-    await db
-      .collection("course_enrollments")
-      .insertOne({
-        courseId: new ObjectId(courseId),
-        institutionId: new ObjectId("eeeeeeeeeeeeeeeeeeeeeeee"),
-        userId: "cccccccccccccccccccccccc",
-        status: "active",
-        enrolledAt: new Date(),
-      });
     // Exercise the same authenticated approval/prepare/publication endpoints used by Studio.
     const approve = await page.request.post(
       `/api/v1/study/courses/${courseId}/drafts/${draft.revisionTag}/approve`,
@@ -452,9 +522,38 @@ test("representative networking PDF preserves code, table, caption and diagram t
     );
     expect(publication.status(), await publication.text()).toBe(200);
     const published = await publication.json();
+    await page.goto(`/courses/${courseId}/students`);
+    await expect(page.getByRole("heading", { name: "Invite students", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Create student invitation", exact: true }).click();
+    const codeField = page.getByLabel("Student invitation code", { exact: true });
+    await expect(codeField).toBeVisible({ timeout: 20000 });
+    await page.screenshot({ path: "/tmp/ednova-teacher-invite.png", fullPage: true });
+    const invitationCode = await codeField.inputValue();
+    expect(invitationCode).toMatch(/^[a-f0-9]{64}$/);
     const ctx = await browser.newContext();
     const student = await ctx.newPage();
     await login(student, "final-student@example.test");
+    await student.goto("/courses");
+    await student.setViewportSize({ width: 390, height: 844 });
+    await student.getByRole("heading", { name: "Join your teacher’s course", exact: true }).waitFor();
+    await student.screenshot({ path: "/tmp/ednova-student-join.png", fullPage: true });
+    expect(await student.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await student.setViewportSize({ width: 1280, height: 900 });
+    await student.getByLabel("Course invitation code", { exact: true }).fill(invitationCode);
+    await student.getByRole("button", { name: "Join course", exact: true }).click();
+    await expect(student.getByRole("link", { name: "Open my course", exact: true })).toBeVisible();
+    await student.getByRole("link", { name: "Open my course", exact: true }).click();
+    await expect(student).toHaveURL(new RegExp(`/courses/${courseId}/learn$`));
+    await page.reload();
+    await expect(page.getByText("1 student has joined this course.", { exact: true })).toBeVisible();
+    const outsiderContext = await browser.newContext();
+    const outsiderStudent = await outsiderContext.newPage();
+    await login(outsiderStudent, "final-outsider@example.test");
+    await outsiderStudent.goto("/courses");
+    await outsiderStudent.getByLabel("Course invitation code", { exact: true }).fill(invitationCode);
+    await outsiderStudent.getByRole("button", { name: "Join course", exact: true }).click();
+    await expect(outsiderStudent.getByRole("alert").filter({ hasText: "already been accepted" })).toBeVisible();
+    await outsiderContext.close();
     await student.goto(
       `/courses/${courseId}/learn?revisionId=${published.publishedRevisionTag}`,
     );

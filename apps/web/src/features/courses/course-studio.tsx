@@ -44,6 +44,7 @@ interface CourseStudioProps {
   courseTitle: string;
   initialDraft: CourseDraft;
   currentUserId: string;
+  originalFiles?: Array<{ filename: string; originalName?: string }>;
 }
 
 const LESSONS_PER_PAGE = 8;
@@ -53,6 +54,7 @@ export function CourseStudio({
   courseTitle,
   initialDraft,
   currentUserId,
+  originalFiles = [],
 }: CourseStudioProps) {
   const [dirty, setDirty] = useState(false);
   const [draft, setDraft] = useState(initialDraft);
@@ -82,11 +84,7 @@ export function CourseStudio({
       : "Choose a source to begin.",
   );
   const [step, setStep] = useState<1 | 2 | 3>(
-    initialDraft.topics?.length
-      ? initialDraft.isInstructorReviewed
-        ? 3
-        : 2
-      : 1,
+    initialDraft.topics?.length ? 2 : 1,
   );
   const [candidateReviewed, setCandidateReviewed] = useState(false);
   const [published, setPublished] = useState<string | null>(null);
@@ -100,7 +98,10 @@ export function CourseStudio({
     setExtractionReviewAcknowledged(
       sourceState?.extractionReview?.acknowledged === true,
     );
-  }, [sourceState?.draft.revisionTag, sourceState?.extractionReview?.acknowledged]);
+  }, [
+    sourceState?.draft.revisionTag,
+    sourceState?.extractionReview?.acknowledged,
+  ]);
 
   // Uploading starts a server-owned job. While it runs, refresh the draft so
   // the instructor sees the real outline without hunting for a status button.
@@ -121,7 +122,7 @@ export function CourseStudio({
             setStep(2);
           }
         })
-        .catch(() => undefined);
+        .catch(() => setErrorMsg("We could not check processing. Check your connection and reload to try again."));
     }, 2500);
     return () => window.clearInterval(timer);
     // refreshStudio closes over the latest render; only restart on a new job.
@@ -262,7 +263,7 @@ export function CourseStudio({
       !sourceState.extractionReview.acknowledged
     ) {
       setErrorMsg(
-        "Open Source tools and audit and acknowledge the flagged extraction regions before publishing.",
+        "Check the original source, then confirm the source review above before publishing.",
       );
       return;
     }
@@ -278,9 +279,16 @@ export function CourseStudio({
           "extractionReviewAcknowledged",
           extractionReviewAcknowledged ? "true" : "false",
         );
-        if (dirty) { const saved = await updateDraftAction({}, reviewForm); if (saved.error) throw new Error(saved.error); }
+        if (dirty) {
+          const saved = await updateDraftAction({}, reviewForm);
+          if (saved.error) throw new Error(saved.error);
+        }
         const state = await refreshStudio();
-        const approved = await approveStudioPublication(courseId,state.draft.revisionTag,extractionReviewAcknowledged);
+        const approved = await approveStudioPublication(
+          courseId,
+          state.draft.revisionTag,
+          extractionReviewAcknowledged,
+        );
         if (!approved.ok) throw new Error(approved.error);
         setIsInstructorReviewed(true);
         const prepared = await prepareStudio(courseId, state.draft.revisionTag);
@@ -290,9 +298,11 @@ export function CourseStudio({
         publishForm.set("expectedRevisionTag", state.draft.revisionTag);
         const publishedRevision = await publishRevisionAction({}, publishForm);
         if (publishedRevision.error) throw new Error(publishedRevision.error);
-        setPublished(publishedRevision.publishedRevisionTag || state.draft.revisionTag);
+        setPublished(
+          publishedRevision.publishedRevisionTag || state.draft.revisionTag,
+        );
         setStep(3);
-        setSuccessMsg("Revision reviewed, source verified, and published.");
+        setSuccessMsg("Course published. Students can now open this revision.");
       } catch (error) {
         setErrorMsg(
           error instanceof Error ? error.message : "Review and publish failed",
@@ -422,16 +432,16 @@ export function CourseStudio({
           </Button>
           <Button
             onClick={handlePrepareAndPublish}
-            disabled={isPending || !!published || !topics.length}
+            disabled={isPending || !!published || !topics.length || !sourceState}
             title={
               sourceState?.extractionReview?.required &&
               !extractionReviewAcknowledged &&
               !sourceState.extractionReview.acknowledged
-                ? "Open Source tools and audit to acknowledge the flagged extraction regions"
+                ? "Confirm the source review below before publishing"
                 : "Review the current edit, verify the exact source and publish it"
             }
           >
-            {isPending ? "Preparing…" : "Review & Publish"}
+            {isPending ? "Preparing…" : "Publish course"}
           </Button>
         </div>
       </div>
@@ -476,36 +486,83 @@ export function CourseStudio({
       </ol>
 
       {dirty && (
-        <p role="status">
-          Unsaved changes. Save the draft, then prepare its exact revision.
-        </p>
+        <p role="status">Unsaved changes. Publishing also saves your changes.</p>
+      )}
+      {originalFiles.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border p-4">
+          <span className="text-sm font-medium">Original material</span>
+          {originalFiles.map((file) => (
+            <a
+              key={file.filename}
+              className="text-sm underline underline-offset-4"
+              href={`/api/v1/study/courses/${encodeURIComponent(courseId)}/files/${encodeURIComponent(file.filename)}?inline=1`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open {file.originalName || file.filename}
+            </a>
+          ))}
+        </div>
+      )}
+      {!!sourceState?.extractionReview?.required && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-4">
+          <p className="text-sm font-medium">
+            {sourceState.extractionReview.reviewRegionCount} source region
+            {sourceState.extractionReview.reviewRegionCount === 1 ? "" : "s"}{" "}
+            need checking against the original
+          </p>
+          <a className="mt-2 inline-block text-sm underline" href="#source-review" onClick={() => {
+            const inspector = document.getElementById("source-review") as HTMLDetailsElement | null;
+            if (inspector) inspector.open = true;
+          }}>Review source issues</a>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Unreviewed formulas retain source text and equation images. Check
+            equations, figures and tables against the original before
+            acknowledging review.
+          </p>
+          <label className="mt-3 flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={extractionReviewAcknowledged}
+              onChange={(event) => {
+                setExtractionReviewAcknowledged(event.target.checked);
+              }}
+              className="mt-0.5 size-4 rounded border-gray-300"
+            />
+            <span>
+              I reviewed the flagged source regions against the original.
+            </span>
+          </label>
+        </div>
       )}
       {/* Global Alerts */}
       {errorMsg && (
         <Alert variant="destructive">
           <AlertTitle>Action Failed</AlertTitle>
           <AlertDescription>{errorMsg}</AlertDescription>
-          <Button
-            variant="outline"
-            disabled={isPending}
-            onClick={() => {
-              startTransition(async () => {
-                try {
-                  await refreshStudio();
-                  setActivityProposal(null);
-                  setSourceChunkId("");
-                  setCandidateReviewed(false);
-                  setErrorMsg(null);
-                } catch (error) {
-                  setErrorMsg(
-                    error instanceof Error ? error.message : "Reload failed",
-                  );
-                }
-              });
-            }}
-          >
-            Load latest draft and discard local edits
-          </Button>
+          {/stale|changed|conflict|reload/i.test(errorMsg) && (
+            <Button
+              variant="outline"
+              disabled={isPending}
+              onClick={() => {
+                startTransition(async () => {
+                  try {
+                    await refreshStudio();
+                    setActivityProposal(null);
+                    setSourceChunkId("");
+                    setCandidateReviewed(false);
+                    setErrorMsg(null);
+                  } catch (error) {
+                    setErrorMsg(
+                      error instanceof Error ? error.message : "Reload failed",
+                    );
+                  }
+                });
+              }}
+            >
+              Load latest draft and discard local edits
+            </Button>
+          )}
         </Alert>
       )}
       {successMsg && (
@@ -516,259 +573,255 @@ export function CourseStudio({
       )}
 
       {published && (
+        <div className="flex flex-wrap gap-4">
         <a
           className="underline"
           href={`/courses/${courseId}/learn?revisionId=${encodeURIComponent(published)}`}
         >
-          Open committed immutable revision
+          View published course
         </a>
+        <a className="underline" href={`/courses/${courseId}/students`}>Next: invite students</a>
+        </div>
       )}
-      <FormulaReview courseId={courseId} revisionTag={draft.revisionTag} disabled={dirty || isPending || !!published} />
-      <details className="rounded-xl border bg-card">
+      <details className="rounded-lg border bg-card p-4">
+        <summary className="cursor-pointer font-medium">
+          Check individual equations (optional)
+        </summary>
+        <div className="mt-4">
+          <FormulaReview
+            courseId={courseId}
+            revisionTag={draft.revisionTag}
+            disabled={dirty || isPending || !!published}
+          />
+        </div>
+      </details>
+      <details id="source-review" className="rounded-xl border bg-card">
         <summary className="cursor-pointer px-6 py-4 text-sm font-semibold">
-          Source tools and audit
+          Source review and advanced tools
         </summary>
         <div className="border-t px-6 pb-6">
-      <Card className="border-0 shadow-none">
-        <CardHeader>
-          <CardTitle>Upload a source</CardTitle>
-          <CardDescription>
-            The Studio reads the course and builds chapters and lessons. Large
-            documents may take a minute.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              const form = new FormData(e.currentTarget);
-              setErrorMsg(null);
-              startTransition(async () => {
-                try {
-                  await uploadStudioSource(courseId, form);
-                  setIngestion("Reading the source…");
-                  setIngestionStatus({ status: "processing" });
-                  setStep(1);
-                  setSourceState(null);
-                  setActivityProposal(null);
-                } catch (e) {
-                  setErrorMsg(e instanceof Error ? e.message : "Upload failed");
-                }
-              });
-            }}
-          >
-            <label className="block text-sm font-medium">
-              Original source{" "}
-              <input
-                name="files"
-                type="file"
-                accept=".pdf,.txt,.md"
-                required
-                className="mt-2 block w-full rounded-lg border bg-background p-2 text-sm"
-              />
-            </label>
-            <Button disabled={isPending} className="mt-3">
-              {isPending ? "Uploading…" : "Upload source"}
-            </Button>
-          </form>
-          <p role="status" className="text-sm text-muted-foreground">
-            {ingestion}
-          </p>
-          <details className="rounded-lg border p-4">
-            <summary className="cursor-pointer text-sm font-medium">
-              Advanced: verify source and recover an interrupted upload
-            </summary>
-            <Button
-              variant="outline"
-              className="mt-3 w-full sm:w-auto"
-              disabled={isPending}
-              onClick={() =>
-                startTransition(async () => {
-                  try {
-                    const status = await studioIngestStatus(courseId);
-                    setIngestionStatus(status);
-                    setIngestion(
-                      [status.stage, status.detail]
-                        .filter(Boolean)
-                        .join(" · ") || "No ingestion details",
-                    );
-                    if (status.status === "completed") await refreshStudio();
-                  } catch (e) {
-                    setErrorMsg(
-                      e instanceof Error ? e.message : "Status unavailable",
-                    );
-                  }
-                })
-              }
-            >
-              Check processing status
-            </Button>
-            {typeof ingestionStatus?.jobId === "string" && (
-              <div
-                className="flex flex-wrap gap-2"
-                aria-label="Ingestion recovery controls"
-              >
-                {(["reconcile", "retry", "cancel"] as const).map((action) => (
-                  <Button
-                    key={action}
-                    variant="outline"
-                    disabled={isPending}
-                    onClick={() =>
-                      startTransition(async () => {
-                        try {
-                          await controlStudioIngestion(
-                            courseId,
-                            action,
-                            String(ingestionStatus.jobId),
-                          );
-                          const status = await studioIngestStatus(courseId);
-                          setIngestionStatus(status);
-                          setIngestion(
-                            String(status.status) +
-                              ": " +
-                              String(status.detail || ""),
-                          );
-                        } catch (e) {
-                          setErrorMsg(
-                            e instanceof Error
-                              ? e.message
-                              : "Recovery unavailable",
-                          );
-                        }
-                      })
-                    }
-                  >
-                    {action === "reconcile"
-                      ? "Reconcile same operation"
-                      : action === "retry"
-                        ? "Retry failed ingestion"
-                        : "Cancel ingestion"}
-                  </Button>
-                ))}
-              </div>
-            )}
-
-            <Button
-              className="mt-3"
-              disabled={isPending}
-              onClick={() =>
-                startTransition(async () => {
+          <Card className="border-0 shadow-none">
+            <CardHeader>
+              <CardTitle>Upload a source</CardTitle>
+              <CardDescription>
+                The Studio reads the course and builds chapters and lessons.
+                Large documents may take a minute.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const form = new FormData(e.currentTarget);
                   setErrorMsg(null);
-                  try {
-                    const state = await prepareStudio(
-                      courseId,
-                      draft.revisionTag,
-                    );
-                    setSourceState(state);
-                    setSuccessMsg(
-                      "Exact source revision prepared and verified.",
-                    );
-                  } catch (e) {
-                    setSourceState(null);
-                    setErrorMsg(
-                      e instanceof Error
-                        ? e.message
-                        : "Source preparation unavailable",
-                    );
-                  }
-                })
-              }
-            >
-              Prepare exact source revision
-            </Button>
-            <p>{sourceState?.readiness || "Source readiness unavailable"}</p>
-            <label className="block">
-              Source passage
-              <span className="block text-xs text-muted-foreground">
-                {sourceState?.sources.length || 0} extracted regions · choose
-                one to inspect
-              </span>
-              <select
-                aria-label="Source passage"
-                className="block w-full border p-2"
-                value={sourceChunkId}
-                onChange={(e) => {
-                  setSourceChunkId(e.target.value);
-                  setActivityProposal(null);
-                  setCandidateReviewed(false);
+                  startTransition(async () => {
+                    try {
+                      await uploadStudioSource(courseId, form);
+                      setIngestion("Reading the source…");
+                      setIngestionStatus({ status: "processing" });
+                      setStep(1);
+                      setSourceState(null);
+                      setActivityProposal(null);
+                    } catch (e) {
+                      setErrorMsg(
+                        e instanceof Error ? e.message : "Upload failed",
+                      );
+                    }
+                  });
                 }}
               >
-                <option value="">Choose a passage to inspect</option>
-                {sourceState?.sources.map((p) => (
-                    <option key={p.chunkId} value={p.chunkId}>
-                      {p.pageNumber ? "Page " + p.pageNumber : "Text"}:{" "}
-                      {p.text.replace(/\s+/g, " ").slice(0, 100)}
-                    </option>
-                  ))}
-              </select>
-            </label>
-            {sourceState?.sources
-              .filter((p) => p.chunkId === sourceChunkId)
-              .map((p) => (
-                <div key={p.chunkId}>
-                  {p.reviewRequired && (
-                    <p role="status" className="text-sm text-amber-700">
-                      This passage needs comparison with the original source.
-                    </p>
-                  )}
-                  {p.extractionMethod === "ocr" && (
-                    <p role="status">
-                      Scanned page: English OCR confidence{" "}
-                      {p.ocrConfidence ?? "unknown"}%.
-                      {p.extractionWarning === "ocr_low_confidence"
-                        ? " Low confidence."
-                        : ""}{" "}
-                      Check the original and correct the draft before
-                      publication.
-                    </p>
-                  )}
-                  <blockquote className="max-h-72 overflow-auto rounded-lg border bg-muted/20 p-4 whitespace-pre-wrap">
-                    {p.text}
-                  </blockquote>
-                </div>
-              ))}
-            {!sourceChunkId && (
-              <p className="text-sm text-muted-foreground">
-                Passage text is loaded only for the passage you select. Keep
-                the original PDF open when checking equations, figures or
-                tables.
-              </p>
-            )}
-            <p>
-              Registered in this draft:{" "}
-              {sourceState?.activities.map((a) => a.title).join(", ") || "None"}
-            </p>
-          </details>
-            {!!sourceState?.extractionReview?.required && (
-              <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-4">
-                <p className="text-sm font-medium">
-                  {sourceState.extractionReview.reviewRegionCount} source
-                  region{sourceState.extractionReview.reviewRegionCount === 1
-                    ? ""
-                    : "s"}{" "}
-                  need fidelity review
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Unreviewed formulas retain source text and equation images. Check equations, figures
-                  and tables against the original before acknowledging review.
-                </p>
-                <label className="mt-3 flex items-start gap-2 text-sm">
+                <label className="block text-sm font-medium">
+                  Original source{" "}
                   <input
-                    type="checkbox"
-                    checked={extractionReviewAcknowledged}
-                    onChange={(event) => {
-                      setExtractionReviewAcknowledged(event.target.checked);
-                    }}
-                    className="mt-0.5 size-4 rounded border-gray-300"
+                    name="files"
+                    type="file"
+                    accept=".pdf,.txt,.md"
+                    required
+                    className="mt-2 block w-full rounded-lg border bg-background p-2 text-sm"
                   />
-                  <span>
-                    I reviewed the flagged source regions against the original.
-                  </span>
                 </label>
-              </div>
-            )}
-        </CardContent>
-      </Card>
+                <Button disabled={isPending} className="mt-3">
+                  {isPending ? "Uploading…" : "Upload source"}
+                </Button>
+              </form>
+              <p role="status" className="text-sm text-muted-foreground">
+                {ingestion}
+              </p>
+              <details className="rounded-lg border p-4">
+                <summary className="cursor-pointer text-sm font-medium">
+                  Advanced: verify source and recover an interrupted upload
+                </summary>
+                <Button
+                  variant="outline"
+                  className="mt-3 w-full sm:w-auto"
+                  disabled={isPending}
+                  onClick={() =>
+                    startTransition(async () => {
+                      try {
+                        const status = await studioIngestStatus(courseId);
+                        setIngestionStatus(status);
+                        setIngestion(
+                          [status.stage, status.detail]
+                            .filter(Boolean)
+                            .join(" · ") || "No ingestion details",
+                        );
+                        if (status.status === "completed")
+                          await refreshStudio();
+                      } catch (e) {
+                        setErrorMsg(
+                          e instanceof Error ? e.message : "Status unavailable",
+                        );
+                      }
+                    })
+                  }
+                >
+                  Check processing status
+                </Button>
+                {typeof ingestionStatus?.jobId === "string" && (
+                  <div
+                    className="flex flex-wrap gap-2"
+                    aria-label="Ingestion recovery controls"
+                  >
+                    {(["reconcile", "retry", "cancel"] as const).map(
+                      (action) => (
+                        <Button
+                          key={action}
+                          variant="outline"
+                          disabled={isPending}
+                          onClick={() =>
+                            startTransition(async () => {
+                              try {
+                                await controlStudioIngestion(
+                                  courseId,
+                                  action,
+                                  String(ingestionStatus.jobId),
+                                );
+                                const status =
+                                  await studioIngestStatus(courseId);
+                                setIngestionStatus(status);
+                                setIngestion(
+                                  String(status.status) +
+                                    ": " +
+                                    String(status.detail || ""),
+                                );
+                              } catch (e) {
+                                setErrorMsg(
+                                  e instanceof Error
+                                    ? e.message
+                                    : "Recovery unavailable",
+                                );
+                              }
+                            })
+                          }
+                        >
+                          {action === "reconcile"
+                            ? "Reconcile same operation"
+                            : action === "retry"
+                              ? "Retry failed ingestion"
+                              : "Cancel ingestion"}
+                        </Button>
+                      ),
+                    )}
+                  </div>
+                )}
+
+                <Button
+                  className="mt-3"
+                  disabled={isPending}
+                  onClick={() =>
+                    startTransition(async () => {
+                      setErrorMsg(null);
+                      try {
+                        const state = await prepareStudio(
+                          courseId,
+                          draft.revisionTag,
+                        );
+                        setSourceState(state);
+                        setSuccessMsg(
+                          "Exact source revision prepared and verified.",
+                        );
+                      } catch (e) {
+                        setSourceState(null);
+                        setErrorMsg(
+                          e instanceof Error
+                            ? e.message
+                            : "Source preparation unavailable",
+                        );
+                      }
+                    })
+                  }
+                >
+                  Prepare exact source revision
+                </Button>
+                <p>
+                  {sourceState?.readiness || "Source readiness unavailable"}
+                </p>
+                <label className="block">
+                  Source passage
+                  <span className="block text-xs text-muted-foreground">
+                    {sourceState?.sources.length || 0} extracted regions ·
+                    choose one to inspect
+                  </span>
+                  <select
+                    aria-label="Source passage"
+                    className="block w-full border p-2"
+                    value={sourceChunkId}
+                    onChange={(e) => {
+                      setSourceChunkId(e.target.value);
+                      setActivityProposal(null);
+                      setCandidateReviewed(false);
+                    }}
+                  >
+                    <option value="">Choose a passage to inspect</option>
+                    {sourceState?.sources.map((p) => (
+                      <option key={p.chunkId} value={p.chunkId}>
+                        {p.pageNumber ? "Page " + p.pageNumber : "Text"}:{" "}
+                        {p.text.replace(/\s+/g, " ").slice(0, 100)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {sourceState?.sources
+                  .filter((p) => p.chunkId === sourceChunkId)
+                  .map((p) => (
+                    <div key={p.chunkId}>
+                      {p.reviewRequired && (
+                        <p role="status" className="text-sm text-amber-700">
+                          This passage needs comparison with the original
+                          source.
+                        </p>
+                      )}
+                      {p.extractionMethod === "ocr" && (
+                        <p role="status">
+                          Scanned page: English OCR confidence{" "}
+                          {p.ocrConfidence ?? "unknown"}%.
+                          {p.extractionWarning === "ocr_low_confidence"
+                            ? " Low confidence."
+                            : ""}{" "}
+                          Check the original and correct the draft before
+                          publication.
+                        </p>
+                      )}
+                      <blockquote className="max-h-72 overflow-auto rounded-lg border bg-muted/20 p-4 whitespace-pre-wrap">
+                        {p.text}
+                      </blockquote>
+                    </div>
+                  ))}
+                {!sourceChunkId && (
+                  <p className="text-sm text-muted-foreground">
+                    Passage text is loaded only for the passage you select. Keep
+                    the original PDF open when checking equations, figures or
+                    tables.
+                  </p>
+                )}
+                <p>
+                  Registered in this draft:{" "}
+                  {sourceState?.activities.map((a) => a.title).join(", ") ||
+                    "None"}
+                </p>
+              </details>
+            </CardContent>
+          </Card>
         </div>
       </details>
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
@@ -816,28 +869,13 @@ export function CourseStudio({
                   rows={2}
                 />
               </label>
-              <div className="flex flex-col justify-end gap-2 rounded-lg border bg-muted/20 p-3">
-                <label className="flex items-start gap-2 text-xs leading-5">
-                  <input
-                    type="checkbox"
-                    id="reviewed-checkbox"
-                    checked={isInstructorReviewed}
-                    onChange={(e) => {
-                      setIsInstructorReviewed(e.target.checked);
-                      setDirty(true);
-                      if (e.target.checked) setStep(3);
-                    }}
-                    className="mt-0.5 size-4 rounded border-gray-300"
-                  />
-                  <span>Mark this curriculum revision as reviewed</span>
-                </label>
-              </div>
+
             </div>
 
             <div className="flex flex-wrap items-end gap-2 rounded-lg border bg-muted/20 p-3">
               <label className="min-w-0 flex-1">
                 <span className="text-xs font-medium text-muted-foreground">
-                  Add a learning objective
+                  Add an objective to the selected lesson
                 </span>
                 <Input
                   aria-label="Manual learning objective"
@@ -850,7 +888,7 @@ export function CourseStudio({
               <Button
                 variant="outline"
                 className="w-full sm:w-auto"
-                disabled={!manualObjective.trim()}
+                disabled={!manualObjective.trim() || !topics[selectedChapter]?.subtopics?.length}
                 onClick={() => {
                   const suffix = crypto
                     .randomUUID()
@@ -858,31 +896,21 @@ export function CourseStudio({
                     .slice(0, 12);
                   setDirty(true);
                   setIsInstructorReviewed(false);
-                  setTopics([
-                    ...topics,
-                    {
-                      id: "topic_" + suffix,
-                      title: "Instructor reviewed objective",
-                      subtopics: [
-                        {
-                          id: "sub_" + suffix,
-                          title: "Source study",
-                          provenance: "manual",
-                          learning_objectives: [
-                            {
-                              id: "obj_" + suffix,
-                              statement: manualObjective,
-                              text: manualObjective,
-                              bloomLevel: "understand",
-                              provenance: "manual",
-                            },
-                          ],
-                        },
-                      ],
-                    },
-                  ]);
-                  setSelectedChapter(topics.length);
-                  setSelectedLesson(0);
+                  const lessonIndex = selectedLesson >= 0 ? selectedLesson : 0;
+                  setTopics(topics.map((topic, index) => index !== selectedChapter ? topic : {
+                    ...topic,
+                    subtopics: topic.subtopics?.map((lesson, index) => index !== lessonIndex ? lesson : {
+                      ...lesson,
+                      learning_objectives: [...(lesson.learning_objectives || []), {
+                        id: "obj_" + suffix,
+                        statement: manualObjective.trim(),
+                        text: manualObjective.trim(),
+                        bloomLevel: "understand",
+                        provenance: "manual",
+                      }],
+                    }),
+                  }));
+                  setSelectedLesson(lessonIndex);
                   setShowAllLessons(false);
                   setManualObjective("");
                   setActivityProposal(null);
@@ -1050,6 +1078,21 @@ export function CourseStudio({
                                   {topic.subtopics?.length || 0}
                                 </p>
                               </div>
+                              {sub.summary && (
+                                <div className="space-y-2">
+                                  <p className="text-sm font-medium">
+                                    Extracted lesson preview
+                                  </p>
+                                  <p className="max-h-56 overflow-y-auto whitespace-pre-wrap rounded-md border bg-background p-3 text-sm leading-relaxed">
+                                    {sub.summary}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Compare this extraction with the original
+                                    material above. Equations may need the
+                                    original image to be readable.
+                                  </p>
+                                </div>
+                              )}
                               <label className="grid gap-1.5">
                                 <span className="text-xs font-medium text-muted-foreground">
                                   Section heading {tIdx + 1}.{sIdx + 1}
@@ -1174,281 +1217,287 @@ export function CourseStudio({
             Build student practice (optional)
           </summary>
           <div className="border-t px-5 pb-5">
-          <Card className="border-0 shadow-none">
-            <CardHeader>
-              <CardTitle className="text-lg">Add student practice</CardTitle>
-              <CardDescription>
-                Optional: choose an objective to draft a source-backed practice
-                activity. Review it before adding it to the course.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              <p className="text-sm text-muted-foreground">
-                Activity Proposal Studio · Source review remains separate from
-                the draft.
-              </p>
-              {isPending && (
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    generationSerial.current += 1;
-                    setActivityProposal(null);
-                    setCandidateReviewed(false);
-                  }}
-                >
-                  Discard pending candidate
-                </Button>
-              )}
-              <details className="rounded-lg border p-3">
-                <summary className="cursor-pointer text-xs font-medium">
-                  Settings
-                </summary>
-                <fieldset
-                  className="mt-3 grid gap-3"
-                  onChange={() => {
-                    setActivityProposal(null);
-                    setCandidateReviewed(false);
-                  }}
-                >
-                  <legend>Offline quotation settings</legend>
-                  <label>
-                    Prompt language
-                    <select
-                      aria-label="Prompt language"
-                      value={generationLanguage}
-                      onChange={(e) =>
-                        setGenerationLanguage(
-                          e.target.value as typeof generationLanguage,
-                        )
-                      }
-                      className="block w-full border p-2"
-                    >
-                      <option value="en">English</option>
-                      <option value="fr">Français</option>
-                      <option value="ar">العربية</option>
-                      <option value="ary">تونسي</option>
-                    </select>
-                  </label>
-                  <label>
-                    Quotation difficulty
-                    <select
-                      aria-label="Quotation difficulty"
-                      value={generationDifficulty}
-                      onChange={(e) =>
-                        setGenerationDifficulty(
-                          e.target.value as typeof generationDifficulty,
-                        )
-                      }
-                      className="block w-full border p-2"
-                    >
-                      <option value="beginner">
-                        Beginner: 2 choices / 1 blank
-                      </option>
-                      <option value="standard">
-                        Standard: 4 choices / 2 blanks
-                      </option>
-                      <option value="advanced">
-                        Advanced: 6 choices / 3 blanks
-                      </option>
-                    </select>
-                  </label>
-                  <label>
-                    Hint depth
-                    <select
-                      aria-label="Hint depth"
-                      value={hintDepth}
-                      onChange={(e) =>
-                        setHintDepth(e.target.value as typeof hintDepth)
-                      }
-                      className="block w-full border p-2"
-                    >
-                      <option value="none">No cue</option>
-                      <option value="cue">First letter</option>
-                      <option value="context">
-                        First letter and word length
-                      </option>
-                    </select>
-                  </label>
-                  <p className="text-sm">
-                    Source quotations remain in their original language. Prompt
-                    translations need human review. Difficulty changes quotation
-                    complexity, not an academic level estimate.
-                  </p>
-                </fieldset>
-              </details>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-medium">Activity type</span>
-                <Button
-                  size="sm"
-                  variant={
-                    selectedActivityType === "InteractiveQuiz"
-                      ? "default"
-                      : "outline"
-                  }
-                  onClick={() => {
-                    setSelectedActivityType("InteractiveQuiz");
-                    setActivityProposal(null);
-                    setCandidateReviewed(false);
-                  }}
-                >
-                  InteractiveQuiz
-                </Button>
-                <Button
-                  size="sm"
-                  variant={
-                    selectedActivityType === "GuidedProblem"
-                      ? "default"
-                      : "outline"
-                  }
-                  onClick={() => {
-                    setSelectedActivityType("GuidedProblem");
-                    setActivityProposal(null);
-                    setCandidateReviewed(false);
-                  }}
-                >
-                  GuidedProblem
-                </Button>
-              </div>
-
-              {activeObjective ? (
-                <div className="rounded-lg border bg-muted/20 p-4">
-                  <span className="text-xs font-semibold text-muted-foreground">
-                    Target Objective:
-                  </span>
-                  <p className="mt-1 text-sm font-medium">
-                    {activeObjective.statement || activeObjective.text}
-                  </p>
-                </div>
-              ) : (
-                <p className="text-sm italic text-muted-foreground">
-                  Select &quot;Generate Proposal&quot; on any learning objective
-                  on the left.
+            <Card className="border-0 shadow-none">
+              <CardHeader>
+                <CardTitle className="text-lg">Add student practice</CardTitle>
+                <CardDescription>
+                  Optional: choose an objective to draft a source-backed
+                  practice activity. Review it before adding it to the course.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
+                <p className="text-sm text-muted-foreground">
+                  Activity Proposal Studio · Source review remains separate from
+                  the draft.
                 </p>
-              )}
-
-              {registrationSuccess && (
-                <Alert className="border-emerald-500 text-emerald-700">
-                  <AlertTitle>Registered</AlertTitle>
-                  <AlertDescription>{registrationSuccess}</AlertDescription>
-                </Alert>
-              )}
-
-              {activityProposal && (
-                <div className="flex flex-col gap-4 pt-4 border-t">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-semibold">Candidate Preview</h4>
-                    <Button
-                      size="sm"
-                      onClick={handleRegisterActivity}
-                      disabled={
-                        isPending ||
-                        dirty ||
-                        !candidateReviewed ||
-                        activityProposal.draftRevisionTag !== draft.revisionTag
-                      }
-                    >
-                      {isPending ? "Registering..." : "Approve & Register"}
-                    </Button>
-                  </div>
-
-                  <p>
-                    DETERMINISTIC_FALLBACK — quotation completion only. Manual
-                    instructor review required.
-                  </p>
-                  {!!activityProposal.warnings?.length && (
-                    <div role="status">
-                      <p>
-                        Review flags: {activityProposal.warnings.join(", ")}
-                      </p>
-                      <p>
-                        Exact quotation support only; conceptual alignment to
-                        the objective is unverified. Unknown source locations
-                        remain unknown.
-                      </p>
-                    </div>
-                  )}
-                  {activityProposal.evidencePreview && (
-                    <details>
-                      <summary>Candidate source evidence</summary>
-                      <p>
-                        {activityProposal.evidencePreview.sectionId} ·{" "}
-                        {activityProposal.evidencePreview.pageNumber
-                          ? `Page ${activityProposal.evidencePreview.pageNumber}`
-                          : "Location unknown"}
-                      </p>
-                      <blockquote className="whitespace-pre-wrap">
-                        {activityProposal.evidencePreview.text}
-                      </blockquote>
-                    </details>
-                  )}
-                  <label>
-                    Candidate title
-                    <Input
-                      aria-label="Candidate title"
-                      value={String(
-                        activityProposal.candidateActivity.title || "",
-                      )}
-                      onChange={(e) => {
-                        setCandidateReviewed(false);
-                        setActivityProposal({
-                          ...activityProposal,
-                          candidateActivity: {
-                            ...activityProposal.candidateActivity,
-                            title: e.target.value,
-                          },
-                        });
-                      }}
-                    />
-                  </label>
-                  <label>
-                    Candidate instructions
-                    <Textarea
-                      aria-label="Candidate instructions"
-                      value={String(
-                        activityProposal.candidateActivity.instructions || "",
-                      )}
-                      onChange={(e) => {
-                        setCandidateReviewed(false);
-                        setActivityProposal({
-                          ...activityProposal,
-                          candidateActivity: {
-                            ...activityProposal.candidateActivity,
-                            instructions: e.target.value,
-                          },
-                        });
-                      }}
-                    />
-                  </label>
-                  <details>
-                    <summary>Private instructor evaluation definition</summary>
-                    <pre className="overflow-auto text-xs">
-                      {JSON.stringify(
-                        activityProposal.candidateEvaluation,
-                        null,
-                        2,
-                      )}
-                    </pre>
-                  </details>
-                  <label className="block">
-                    <input
-                      type="checkbox"
-                      checked={candidateReviewed}
-                      onChange={(e) => setCandidateReviewed(e.target.checked)}
-                    />{" "}
-                    I reviewed the source, candidate and private evaluation key.
-                  </label>
-                  {/* Trusted Renderer in Preview Mode */}
-                  <ActivityRenderer
-                    activity={
-                      activityProposal.candidateActivity as unknown as ActivityDefinition
+                {isPending && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      generationSerial.current += 1;
+                      setActivityProposal(null);
+                      setCandidateReviewed(false);
+                    }}
+                  >
+                    Discard pending candidate
+                  </Button>
+                )}
+                <details className="rounded-lg border p-3">
+                  <summary className="cursor-pointer text-xs font-medium">
+                    Settings
+                  </summary>
+                  <fieldset
+                    className="mt-3 grid gap-3"
+                    onChange={() => {
+                      setActivityProposal(null);
+                      setCandidateReviewed(false);
+                    }}
+                  >
+                    <legend>Offline quotation settings</legend>
+                    <label>
+                      Prompt language
+                      <select
+                        aria-label="Prompt language"
+                        value={generationLanguage}
+                        onChange={(e) =>
+                          setGenerationLanguage(
+                            e.target.value as typeof generationLanguage,
+                          )
+                        }
+                        className="block w-full border p-2"
+                      >
+                        <option value="en">English</option>
+                        <option value="fr">Français</option>
+                        <option value="ar">العربية</option>
+                        <option value="ary">تونسي</option>
+                      </select>
+                    </label>
+                    <label>
+                      Quotation difficulty
+                      <select
+                        aria-label="Quotation difficulty"
+                        value={generationDifficulty}
+                        onChange={(e) =>
+                          setGenerationDifficulty(
+                            e.target.value as typeof generationDifficulty,
+                          )
+                        }
+                        className="block w-full border p-2"
+                      >
+                        <option value="beginner">
+                          Beginner: 2 choices / 1 blank
+                        </option>
+                        <option value="standard">
+                          Standard: 4 choices / 2 blanks
+                        </option>
+                        <option value="advanced">
+                          Advanced: 6 choices / 3 blanks
+                        </option>
+                      </select>
+                    </label>
+                    <label>
+                      Hint depth
+                      <select
+                        aria-label="Hint depth"
+                        value={hintDepth}
+                        onChange={(e) =>
+                          setHintDepth(e.target.value as typeof hintDepth)
+                        }
+                        className="block w-full border p-2"
+                      >
+                        <option value="none">No cue</option>
+                        <option value="cue">First letter</option>
+                        <option value="context">
+                          First letter and word length
+                        </option>
+                      </select>
+                    </label>
+                    <p className="text-sm">
+                      Source quotations remain in their original language.
+                      Prompt translations need human review. Difficulty changes
+                      quotation complexity, not an academic level estimate.
+                    </p>
+                  </fieldset>
+                </details>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-medium">Activity type</span>
+                  <Button
+                    size="sm"
+                    variant={
+                      selectedActivityType === "InteractiveQuiz"
+                        ? "default"
+                        : "outline"
                     }
-                    authenticatedUserId={currentUserId}
-                    mode="preview"
-                  />
+                    onClick={() => {
+                      setSelectedActivityType("InteractiveQuiz");
+                      setActivityProposal(null);
+                      setCandidateReviewed(false);
+                    }}
+                  >
+                    InteractiveQuiz
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={
+                      selectedActivityType === "GuidedProblem"
+                        ? "default"
+                        : "outline"
+                    }
+                    onClick={() => {
+                      setSelectedActivityType("GuidedProblem");
+                      setActivityProposal(null);
+                      setCandidateReviewed(false);
+                    }}
+                  >
+                    GuidedProblem
+                  </Button>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+
+                {activeObjective ? (
+                  <div className="rounded-lg border bg-muted/20 p-4">
+                    <span className="text-xs font-semibold text-muted-foreground">
+                      Target Objective:
+                    </span>
+                    <p className="mt-1 text-sm font-medium">
+                      {activeObjective.statement || activeObjective.text}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm italic text-muted-foreground">
+                    Select &quot;Generate Proposal&quot; on any learning
+                    objective on the left.
+                  </p>
+                )}
+
+                {registrationSuccess && (
+                  <Alert className="border-emerald-500 text-emerald-700">
+                    <AlertTitle>Registered</AlertTitle>
+                    <AlertDescription>{registrationSuccess}</AlertDescription>
+                  </Alert>
+                )}
+
+                {activityProposal && (
+                  <div className="flex flex-col gap-4 pt-4 border-t">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-semibold">
+                        Candidate Preview
+                      </h4>
+                      <Button
+                        size="sm"
+                        onClick={handleRegisterActivity}
+                        disabled={
+                          isPending ||
+                          dirty ||
+                          !candidateReviewed ||
+                          activityProposal.draftRevisionTag !==
+                            draft.revisionTag
+                        }
+                      >
+                        {isPending ? "Registering..." : "Approve & Register"}
+                      </Button>
+                    </div>
+
+                    <p>
+                      DETERMINISTIC_FALLBACK — quotation completion only. Manual
+                      instructor review required.
+                    </p>
+                    {!!activityProposal.warnings?.length && (
+                      <div role="status">
+                        <p>
+                          Review flags: {activityProposal.warnings.join(", ")}
+                        </p>
+                        <p>
+                          Exact quotation support only; conceptual alignment to
+                          the objective is unverified. Unknown source locations
+                          remain unknown.
+                        </p>
+                      </div>
+                    )}
+                    {activityProposal.evidencePreview && (
+                      <details>
+                        <summary>Candidate source evidence</summary>
+                        <p>
+                          {activityProposal.evidencePreview.sectionId} ·{" "}
+                          {activityProposal.evidencePreview.pageNumber
+                            ? `Page ${activityProposal.evidencePreview.pageNumber}`
+                            : "Location unknown"}
+                        </p>
+                        <blockquote className="whitespace-pre-wrap">
+                          {activityProposal.evidencePreview.text}
+                        </blockquote>
+                      </details>
+                    )}
+                    <label>
+                      Candidate title
+                      <Input
+                        aria-label="Candidate title"
+                        value={String(
+                          activityProposal.candidateActivity.title || "",
+                        )}
+                        onChange={(e) => {
+                          setCandidateReviewed(false);
+                          setActivityProposal({
+                            ...activityProposal,
+                            candidateActivity: {
+                              ...activityProposal.candidateActivity,
+                              title: e.target.value,
+                            },
+                          });
+                        }}
+                      />
+                    </label>
+                    <label>
+                      Candidate instructions
+                      <Textarea
+                        aria-label="Candidate instructions"
+                        value={String(
+                          activityProposal.candidateActivity.instructions || "",
+                        )}
+                        onChange={(e) => {
+                          setCandidateReviewed(false);
+                          setActivityProposal({
+                            ...activityProposal,
+                            candidateActivity: {
+                              ...activityProposal.candidateActivity,
+                              instructions: e.target.value,
+                            },
+                          });
+                        }}
+                      />
+                    </label>
+                    <details>
+                      <summary>
+                        Private instructor evaluation definition
+                      </summary>
+                      <pre className="overflow-auto text-xs">
+                        {JSON.stringify(
+                          activityProposal.candidateEvaluation,
+                          null,
+                          2,
+                        )}
+                      </pre>
+                    </details>
+                    <label className="block">
+                      <input
+                        type="checkbox"
+                        checked={candidateReviewed}
+                        onChange={(e) => setCandidateReviewed(e.target.checked)}
+                      />{" "}
+                      I reviewed the source, candidate and private evaluation
+                      key.
+                    </label>
+                    {/* Trusted Renderer in Preview Mode */}
+                    <ActivityRenderer
+                      activity={
+                        activityProposal.candidateActivity as unknown as ActivityDefinition
+                      }
+                      authenticatedUserId={currentUserId}
+                      mode="preview"
+                    />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </details>
       </div>

@@ -119,7 +119,7 @@ export function CourseReader({
               <Badge variant="secondary" className="gap-1.5">
                 <BookOpen className="size-3" /> Course reader
               </Badge>
-              <Badge variant="outline">Revision {document.revisionId}</Badge>
+
             </div>
             <h1 className="mt-4 max-w-3xl font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
               {document.title}

@@ -123,15 +123,25 @@ export async function acceptCourseInvitationAction(
   await requireIdentity();
   try {
     const token = text(form, "token", 200);
-    if (!token.trim())
-      return { error: "Enter a valid course invitation token." };
+    if (!/^[a-f0-9]{64}$/i.test(token.trim()))
+      return { error: "Paste the full invitation code from your teacher." };
 
-    await api("/api/v1/study/courses/invitations/accept", {
+    const joined = await api<{ courseId: string; role?: string }>("/api/v1/study/courses/invitations/accept", {
       method: "POST",
       body: JSON.stringify({ token: token.trim() }),
     });
     revalidatePath("/courses");
-    return { success: "Course invitation accepted. You are now enrolled!" };
+    revalidatePath("/dashboard");
+    let destination = `/courses/${segment(joined.courseId)}`;
+    try {
+      const details = await api<{ course: { activeRevisionId?: string } }>(destination.replace("/courses/", "/api/v1/study/courses/"));
+      if (details.course.activeRevisionId && joined.role !== "instructor") destination += "/learn";
+    } catch (error) { unstable_rethrow(error); /* Enrollment succeeded; keep the course link if details are temporarily unavailable. */ }
+    return {
+      success: joined.role === "instructor" ? "Course assignment accepted." : "You joined the course. It is now in My Learning.",
+      destination,
+      destinationLabel: "Open my course",
+    };
   } catch (error) {
     unstable_rethrow(error);
     return {
@@ -150,8 +160,8 @@ export async function issueCourseInvitationAction(
   await requireIdentity();
   try {
     const courseId = text(form, "courseId", 50);
-    const role = optionalText(form, "role") || "student";
-    const expiresInHours = Number(form.get("expiresInHours")) || 168;
+    const role = "student";
+    const expiresInHours = 168;
 
     const res = await api<{ token: string; expiresAt: string }>(
       `/api/v1/study/courses/${segment(courseId)}/invitations`,
@@ -160,7 +170,7 @@ export async function issueCourseInvitationAction(
         body: JSON.stringify({ role, expiresInHours }),
       },
     );
-    return { success: `Invitation token created: ${res.token}` };
+    return { success: "Invitation ready. Copy the code and send it to one student.", invitation: res };
   } catch (error) {
     unstable_rethrow(error);
     return {

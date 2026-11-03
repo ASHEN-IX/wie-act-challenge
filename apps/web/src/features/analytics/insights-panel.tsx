@@ -21,13 +21,13 @@ export function InstructorInsightsPanel({
       </p>
       {insights.suppressed || !insights.summary ? (
         <div role="status" className="rounded-lg border border-dashed p-6">
-          <h3 className="font-medium">Course aggregates are suppressed</h3>
+          <h3 className="font-medium">Insights are not available yet</h3>
           <p className="mt-2 text-sm text-muted-foreground">
             {insights.suppressionReason === "policy_pending"
-              ? "The cohort privacy policy is not configured. No counts are disclosed."
+              ? "Your institution needs to configure its learner privacy policy before insights can be shown."
               : insights.suppressionReason === "small_cohort"
-                ? "The active enrolled cohort is below the configured privacy threshold. No counts are disclosed."
-                : "A committed reviewed source revision is required before evidence can be aggregated."}
+                ? "There are not enough enrolled students to show results while protecting their privacy. Results will appear when the minimum group size is reached."
+                : "Publish this course first. Insights will then reflect student practice on the published course."}
           </p>
         </div>
       ) : (

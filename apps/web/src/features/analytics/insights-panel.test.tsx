@@ -23,7 +23,7 @@ describe("Instructor aggregate privacy states", () => {
       <InstructorInsightsPanel insights={insights} />,
     );
     expect(html).toContain('role="status"');
-    expect(html).toContain("No counts are disclosed");
+    expect(html).toContain("configure its learner privacy policy");
     expect(html).not.toContain("<table");
     expect(html).not.toContain("Learners with accepted objective evidence");
   });
@@ -38,7 +38,7 @@ describe("Instructor aggregate privacy states", () => {
         }}
       />,
     );
-    expect(html).toContain("below the configured privacy threshold");
+    expect(html).toContain("minimum group size");
     expect(html).not.toContain("Active enrolled learners");
   });
 

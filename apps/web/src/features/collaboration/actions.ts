@@ -1,5 +1,6 @@
 "use server";
 import { unstable_rethrow } from "next/navigation";
+import { hasTeachingAccess } from "@/server/teaching";
 import { requireIdentity } from "@/server/identity";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -23,6 +24,7 @@ export async function createRoom(
   form: FormData,
 ): Promise<ActionState> {
   await requireIdentity();
+  if (await hasTeachingAccess()) redirect("/dashboard");
   let id: string;
   try {
     const courseId = optionalText(form, "courseId", 64);
@@ -77,6 +79,7 @@ export async function joinRoom(
   form: FormData,
 ): Promise<ActionState> {
   await requireIdentity();
+  if (await hasTeachingAccess()) redirect("/dashboard");
   let id: string;
   try {
     const inviteCode = text(form, "code", 12).toUpperCase();
@@ -121,6 +124,7 @@ export async function startRoom(
   form: FormData,
 ): Promise<ActionState> {
   await requireIdentity();
+  if (await hasTeachingAccess()) redirect("/dashboard");
   try {
     const id = segment(text(form, "id"));
     try {
@@ -150,6 +154,7 @@ export async function leaveRoom(
   form: FormData,
 ): Promise<ActionState> {
   await requireIdentity();
+  if (await hasTeachingAccess()) redirect("/dashboard");
   try {
     const id = segment(text(form, "id"));
     try {
@@ -175,6 +180,7 @@ export async function endRoom(
   form: FormData,
 ): Promise<ActionState> {
   await requireIdentity();
+  if (await hasTeachingAccess()) redirect("/dashboard");
   try {
     const id = segment(text(form, "id"));
     try {
@@ -202,6 +208,7 @@ export async function setRoomPhase(
   form: FormData,
 ): Promise<ActionState & { retryable?: boolean }> {
   await requireIdentity();
+  if (await hasTeachingAccess()) redirect("/dashboard");
   try {
     const id = segment(text(form, "id"));
     const currentPhase = text(form, "phase", 32);
@@ -230,6 +237,7 @@ export async function submitActivityFlag(
   form: FormData,
 ): Promise<ActionState> {
   await requireIdentity();
+  if (await hasTeachingAccess()) redirect("/dashboard");
   try {
     const id = segment(text(form, "id"));
     await api(`/api/v1/study/rooms/${id}/submit-flag`, {
@@ -250,6 +258,7 @@ export async function askRoom(
   form: FormData,
 ): Promise<ActionState> {
   await requireIdentity();
+  if (await hasTeachingAccess()) redirect("/dashboard");
   try {
     const id = segment(text(form, "id"));
     await api(`/api/v1/session-chat/${id}/query`, {
@@ -272,6 +281,7 @@ export async function askFacilitator(
   form: FormData,
 ): Promise<ActionState> {
   await requireIdentity();
+  if (await hasTeachingAccess()) redirect("/dashboard");
   try {
     const id = segment(text(form, "id"));
     const prompt = text(form, "prompt", 1000);
@@ -298,6 +308,7 @@ export async function requestFacilitatorHint(
   form: FormData,
 ): Promise<ActionState> {
   await requireIdentity();
+  if (await hasTeachingAccess()) redirect("/dashboard");
   try {
     const id = segment(text(form, "id"));
     const hintLevel = parseInt(optionalText(form, "hintLevel", 2) || "1", 10);
@@ -320,6 +331,7 @@ export async function declineFacilitatorPrompt(
   form: FormData,
 ): Promise<ActionState> {
   await requireIdentity();
+  if (await hasTeachingAccess()) redirect("/dashboard");
   try {
     const id = segment(text(form, "id"));
     const interventionId = text(form, "interventionId", 64);
@@ -382,6 +394,7 @@ export async function getPeerHistory(roomId: string, afterSeq: number) {
 
 export async function getActivityDefinition(activityId: string) {
   await requireIdentity();
+  if (await hasTeachingAccess()) redirect("/dashboard");
   try {
     const data = await api<
       import("@/lib/activity-contracts").ActivityDefinition
@@ -413,6 +426,7 @@ export async function submitRoomAttempt(
   },
 ) {
   await requireIdentity();
+  if (await hasTeachingAccess()) redirect("/dashboard");
   try {
     const data = await api<
       import("@/features/learning/activity-renderer").AssessmentResultView

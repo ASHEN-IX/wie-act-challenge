@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { hasTeachingAccess } from "@/server/teaching";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -28,6 +30,13 @@ export default async function CoursePage({
     identity.role === "admin" ||
     course.scope !== "institutional" ||
     (course.assignedInstructorIds ?? []).includes(identity.userId);
+  if (
+    canAuthor &&
+    stage !== "processing" &&
+    stage !== "failed" &&
+    (await hasTeachingAccess())
+  )
+    redirect(`/courses/${courseId}/studio`);
   return (
     <>
       <PageHeader

@@ -137,3 +137,22 @@ test("room creation and invite-code joining work across two separate users", asy
   ).toHaveCount(0);
   await peerContext.close();
 });
+
+test("student pages exclude instructor insights and resume feedback tracking after reload", async ({ page }) => {
+  await account(page);
+  await page.goto("/instructor-insights");
+  await expect(page).toHaveURL(/\/dashboard$/);
+  const insights = await page.request.get("/api/v1/study/insights/courses");
+  expect(insights.status()).toBe(403);
+  await page.goto("/progress");
+  await expect(page.getByRole("heading", { name: "Progress", exact: true })).toBeVisible();
+  // A missing/foreign job must remain unavailable, never produce a passing score.
+  await page.goto("/practice?job=job_missing_review_fixture&jobKind=eval");
+  await expect(page.getByRole("heading", { name: "Your feedback" })).toBeVisible();
+  await expect(page.getByText("Unable to check this job. Try again later.")).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Your feedback" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Check status", exact: true })).toBeVisible();
+  await expect(page.getByText("Unable to check this job. Try again later.")).toBeVisible();
+  await expect(page.getByText("Assessment verified.", { exact: false })).toHaveCount(0);
+});

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { hasTeachingAccess } from "@/server/teaching";
 import {
   ArrowRight,
   BookOpen,
@@ -45,6 +46,50 @@ const QUICK_ACTIONS = [
 ] as const;
 
 export default async function Dashboard() {
+  if (await hasTeachingAccess()) {
+    const courses = await getCourses();
+    return (
+      <div className="space-y-8">
+        <PageHeader
+          title="Teaching workspace"
+          description="Upload your material, review the course, then publish it for your students."
+          action={
+            <Button asChild>
+              <Link href="/courses/new">Upload course</Link>
+            </Button>
+          }
+        />
+        <DataError message={courses.error} />
+        <section aria-label="Your courses" className="space-y-3">
+          <h2 className="text-lg font-semibold">Your courses</h2>
+          {courses.data?.courses.length ? (
+            courses.data.courses.map((course) => (
+              <Link
+                key={course.id}
+                href={`/courses/${course.id}`}
+                className="flex items-center justify-between gap-4 rounded-lg border p-5 hover:bg-muted/40"
+              >
+                <span className="font-medium">{course.title}</span>
+                <span className="text-sm text-muted-foreground">
+                  Open course →
+                </span>
+              </Link>
+            ))
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Upload your first course to get started.
+            </p>
+          )}
+        </section>
+        <nav
+          aria-label="Teaching tools"
+          className="flex flex-wrap gap-5 text-sm underline underline-offset-4"
+        >
+          <Link href="/instructor-insights">View instructor insights</Link>
+        </nav>
+      </div>
+    );
+  }
   const [courses, tasks, rewards] = await Promise.all([
     getCourses(),
     load<{ tasks: Task[] }>("/api/v1/study/tasks"),
@@ -60,7 +105,8 @@ export default async function Dashboard() {
     <div className="space-y-10">
       <PageHeader
         title="Overview"
-        description="Pick up where you left off, or start something new."
+        description="Pick up where you left off, or join your teacher’s course."
+        action={<Button asChild variant="outline"><Link href="/courses#join-course">Join a course</Link></Button>}
       />
 
       <DataError message={courses.error || tasks.error} />

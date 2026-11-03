@@ -11,7 +11,7 @@ import { ThemeControl } from "@/features/courses/theme-control";
 export function WorkspaceShell({
   email,
   admin,
-  instructor = true,
+  instructor = false,
   children,
 }: {
   email: string;
@@ -126,17 +126,19 @@ export function WorkspaceShell({
               className="h-9 pl-9 text-xs sm:text-sm"
             />
           </form>
-          <Button
-            asChild
-            size="sm"
-            variant="default"
-            className="hidden sm:inline-flex gap-1.5 shadow-xs"
-          >
-            <Link href="/practice">
-              <Sparkles className="size-3.5" />
-              <span>Practice</span>
-            </Link>
-          </Button>
+          {!instructor && !admin && (
+            <Button
+              asChild
+              size="sm"
+              variant="default"
+              className="hidden sm:inline-flex gap-1.5 shadow-xs"
+            >
+              <Link href="/practice">
+                <Sparkles className="size-3.5" />
+                <span>Practice</span>
+              </Link>
+            </Button>
+          )}
         </div>
       </header>
       <main

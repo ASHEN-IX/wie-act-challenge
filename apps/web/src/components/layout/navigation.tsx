@@ -33,7 +33,7 @@ interface NavSection {
 
 export function Navigation({
   admin = false,
-  instructor = true,
+  instructor = false,
 }: {
   admin?: boolean;
   instructor?: boolean;
@@ -42,32 +42,51 @@ export function Navigation({
 
   // Learn something, study with others, track what you've learned. Everything
   // else stays reachable under "More tools" so existing bookmarks keep working.
+  const teaching = instructor || admin;
   const sections: NavSection[] = [
     {
       items: [
         { href: "/dashboard", label: "Home", icon: LayoutDashboard },
-        { href: "/courses", label: "My Learning", icon: BookOpen },
-        { href: "/study-together", label: "Study Together", icon: Users, badge: "Live" },
-        { href: "/progress", label: "Progress", icon: ChartNoAxesCombined },
+        {
+          href: "/courses",
+          label: teaching ? "My courses" : "My Learning",
+          icon: BookOpen,
+        },
+        ...(!teaching ? [{ href: "/study-together", label: "Study Together", icon: Users }] : []),
+        ...(!teaching
+          ? [
+              {
+                href: "/progress",
+                label: "Progress",
+                icon: ChartNoAxesCombined,
+              },
+            ]
+          : []),
       ],
     },
   ];
 
-  const moreItems: NavItem[] = [
-    { href: "/visual-lab", label: "Visual Lab", icon: FlaskConical },
-    { href: "/practice", label: "Practice", icon: PencilLine },
-    { href: "/visualizer", label: "Binary search demo", icon: Sparkles },
-    { href: "/tasks", label: "Tasks", icon: ListTodo },
-    { href: "/planner", label: "Study plan", icon: CalendarDays },
-    { href: "/search", label: "Explore sources", icon: Search },
-  ];
+  const moreItems: NavItem[] = teaching
+    ? []
+    : [
+        { href: "/visual-lab", label: "Visual Lab", icon: FlaskConical },
+        { href: "/practice", label: "Practice", icon: PencilLine },
+        { href: "/visualizer", label: "Binary search demo", icon: Sparkles },
+        { href: "/tasks", label: "Tasks", icon: ListTodo },
+        { href: "/planner", label: "Study plan", icon: CalendarDays },
+        { href: "/search", label: "Explore sources", icon: Search },
+      ];
 
   if (instructor || admin) {
     sections.push({
       title: "Teaching Studio",
       items: [
         { href: "/courses/new", label: "Course Studio", icon: GraduationCap },
-        { href: "/instructor-insights", label: "Instructor insights", icon: ChartNoAxesCombined },
+        {
+          href: "/instructor-insights",
+          label: "Instructor insights",
+          icon: ChartNoAxesCombined,
+        },
       ],
     });
   }
@@ -85,7 +104,10 @@ export function Navigation({
   const isActiveHref = (href: string) => {
     if (href === "/dashboard") return pathname === "/dashboard";
     // Course Studio lives under /courses/new but is a teaching tool, not My Learning.
-    if (href === "/courses") return pathname.startsWith("/courses") && !pathname.startsWith("/courses/new");
+    if (href === "/courses")
+      return (
+        pathname.startsWith("/courses") && !pathname.startsWith("/courses/new")
+      );
     return pathname.startsWith(href);
   };
 
@@ -100,14 +122,14 @@ export function Navigation({
           "group flex items-center justify-between rounded-lg px-3 py-2 font-medium transition-all duration-150 focus-visible:outline-2 focus-visible:outline-ring",
           isActive
             ? "bg-accent/80 text-primary font-semibold shadow-xs"
-            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            : "text-muted-foreground hover:bg-muted hover:text-foreground",
         )}
       >
         <div className="flex items-center gap-2.5 truncate">
           <Icon
             className={cn(
               "size-[18px] shrink-0 transition-transform group-hover:scale-105",
-              isActive ? "text-primary" : "text-muted-foreground"
+              isActive ? "text-primary" : "text-muted-foreground",
             )}
           />
           <span className="truncate">{label}</span>
@@ -122,7 +144,10 @@ export function Navigation({
   };
 
   return (
-    <nav aria-label="Workspace navigation" className="flex flex-col gap-5 text-sm">
+    <nav
+      aria-label="Workspace navigation"
+      className="flex flex-col gap-5 text-sm"
+    >
       {sections.map((section, sIdx) => (
         <div key={section.title || sIdx} className="flex flex-col gap-1">
           {section.title && (
@@ -133,15 +158,19 @@ export function Navigation({
           {section.items.map(renderItem)}
         </div>
       ))}
-      <details
-        className="group/more flex flex-col gap-1"
-        open={moreItems.some((item) => isActiveHref(item.href))}
-      >
-        <summary className="cursor-pointer list-none rounded-lg px-3 py-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">
-          More tools
-        </summary>
-        <div className="mt-1 flex flex-col gap-1">{moreItems.map(renderItem)}</div>
-      </details>
+      {moreItems.length > 0 && (
+        <details
+          className="group/more flex flex-col gap-1"
+          open={moreItems.some((item) => isActiveHref(item.href))}
+        >
+          <summary className="cursor-pointer list-none rounded-lg px-3 py-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">
+            More tools
+          </summary>
+          <div className="mt-1 flex flex-col gap-1">
+            {moreItems.map(renderItem)}
+          </div>
+        </details>
+      )}
       <div className="border-t pt-3 mt-1">
         <Link
           href="/profile"
@@ -149,7 +178,7 @@ export function Navigation({
             "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-muted hover:text-foreground",
             pathname.startsWith("/profile")
               ? "bg-accent/80 text-primary font-semibold"
-              : "text-muted-foreground"
+              : "text-muted-foreground",
           )}
         >
           <Settings className="size-[18px] text-muted-foreground" />

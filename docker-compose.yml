@@ -62,6 +62,32 @@ services:
     healthcheck:
       disable: true
     command: python -m workers.ingestion_worker
+  evaluator-worker:
+    extends:
+      service: ingestion-worker
+    container_name: ednova-evaluator-worker
+    command: python -m workers.evaluator_worker
+  planner-worker:
+    extends:
+      service: ingestion-worker
+    container_name: ednova-planner-worker
+    command: python -m workers.planner_worker
+  search-worker:
+    extends:
+      service: ingestion-worker
+    container_name: ednova-search-worker
+    command: python -m workers.search_worker
+  schedule-worker:
+    extends:
+      service: ingestion-worker
+    container_name: ednova-schedule-worker
+    command: python -m workers.schedule_worker
+  coach-worker:
+    extends:
+      service: ingestion-worker
+    container_name: ednova-coach-worker
+    command: python -m workers.coach_worker
+
   mongodb:
     image: mongo:7
     restart: unless-stopped

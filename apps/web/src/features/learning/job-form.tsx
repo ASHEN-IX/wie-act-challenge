@@ -4,7 +4,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ActionForm, SubmitButton } from "@/components/shared/action-form";
 import { AiWaitStatus } from "@/features/ai-status/ai-status-view";
 import { readJob } from "./actions";
-import type { FormAction } from "@/lib/action-state";
+import type { ActionState, FormAction } from "@/lib/action-state";
 const JOB_STATUS_LABELS: Record<string, string> = {
   completed: "Done",
   succeeded: "Done",
@@ -124,6 +124,26 @@ export function JobForm({
   submit: string;
 }) {
   const [state, formAction] = useActionState(action, {});
+  const [resumed, setResumed] = useState<ActionState>({});
+  const [pollVersion, setPollVersion] = useState(0);
+  const jobId = state.jobId || resumed.jobId;
+  const correlationId = state.jobId ? state.correlationId : resumed.correlationId;
+  useEffect(() => {
+    const params = new URL(window.location.href).searchParams;
+    if (params.get("jobKind") === kind) setResumed({
+      jobId: params.get("job") || undefined,
+      correlationId: params.get("correlation") || undefined,
+    });
+  }, [kind]);
+  useEffect(() => {
+    if (!state.jobId) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("job", state.jobId);
+    url.searchParams.set("jobKind", kind);
+    if (state.correlationId) url.searchParams.set("correlation", state.correlationId);
+    else url.searchParams.delete("correlation");
+    window.history.replaceState(window.history.state, "", url);
+  }, [state.jobId, state.correlationId, kind]);
   const [job, setJob] = useState<{
     status: string;
     result?: unknown;
@@ -131,13 +151,13 @@ export function JobForm({
     fallbackUsed?: boolean;
   }>();
   useEffect(() => {
-    if (!state.jobId) return;
+    if (!jobId) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
     let count = 0;
     const poll = async () => {
       try {
-        const result = await readJob(kind, state.jobId!);
+        const result = await readJob(kind, jobId);
         if (cancelled) return;
         const status = result.status.toLowerCase();
         setJob({
@@ -152,7 +172,7 @@ export function JobForm({
           setJob({
             status: "pending",
             error:
-              "Still waiting. Your job remains queued; refresh later rather than resubmitting.",
+              "Still waiting. Your request is saved. Use Check status or return to this page later.",
           });
           return;
         }
@@ -171,7 +191,7 @@ export function JobForm({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [state.jobId, kind]);
+  }, [jobId, kind, pollVersion]);
   return (
     <div className="flex flex-col gap-8">
       <form action={formAction} className="flex flex-col gap-5">
@@ -201,6 +221,7 @@ export function JobForm({
               {job.fallbackUsed ? " · Built-in guidance was used" : ""}
             </p>
           )}
+          <button type="button" className="self-start text-sm underline underline-offset-4" onClick={() => setPollVersion((value) => value + 1)}>Check status</button>
           {job.error && <p className="text-sm text-destructive">{job.error}</p>}
           {job.result != null &&
             (kind === "eval" ? (
@@ -209,13 +230,13 @@ export function JobForm({
               <ResultContent value={job.result} />
             ))}
           {finalize &&
-            state.correlationId &&
+            correlationId &&
             job.status.toLowerCase() === "completed" && (
               <ActionForm action={finalize} submit="Save plan and tasks">
                 <input
                   type="hidden"
                   name="correlationId"
-                  value={state.correlationId}
+                  value={correlationId}
                 />
               </ActionForm>
             )}

@@ -12,6 +12,9 @@ test("reviewed formulas publish into an immutable reader snapshot and original s
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page).toHaveURL(/dashboard/);
   await page.goto("/courses/bbbbbbbbbbbbbbbbbbbbbbbb/studio");
+  await page
+    .getByText("Check individual equations (optional)", { exact: true })
+    .click();
   const workspace = page.getByRole("region", { name: "Formula review" });
   await expect(
     workspace.getByLabel("Mathematical source region"),
@@ -53,10 +56,10 @@ test("reviewed formulas publish into an immutable reader snapshot and original s
     workspace.getByLabel("Formula publication readiness"),
   ).toContainText("accepted: 1");
   await page
-    .getByRole("button", { name: "Review & Publish", exact: true })
+    .getByRole("button", { name: "Publish course", exact: true })
     .click();
   const link = page.getByRole("link", {
-    name: "Open committed immutable revision",
+    name: "View published course",
   });
   await expect(link).toBeVisible({ timeout: 30000 });
   const href = await link.getAttribute("href");
@@ -125,18 +128,16 @@ test("reviewed formulas publish into an immutable reader snapshot and original s
       "sha256:" + crypto.createHash("sha256").update(bytes).digest("hex"),
     ).toBe(revision!.sourceManifest[0].contentHash);
     const before = JSON.stringify(revision!.contentDocument);
-    await db
-      .collection("formulaproposals")
-      .updateMany(
-        {},
-        {
-          $set: {
-            reviewedLatex: "tampered",
-            latex: "tampered",
-            state: "rejected",
-          },
+    await db.collection("formulaproposals").updateMany(
+      {},
+      {
+        $set: {
+          reviewedLatex: "tampered",
+          latex: "tampered",
+          state: "rejected",
         },
-      );
+      },
+    );
     await page.reload();
     await expect(page.locator('[data-block-type="math"] .katex')).toHaveCount(
       2,
@@ -149,11 +150,9 @@ test("reviewed formulas publish into an immutable reader snapshot and original s
       ),
     ).toBe(before);
     expect(
-      (await db
-        .collection("course_revisions")
-        .findOne({
-          revisionTag: "rev_browser",
-        }))!.contentDocument.chapters[0].lessons[0].blocks.every(
+      (await db.collection("course_revisions").findOne({
+        revisionTag: "rev_browser",
+      }))!.contentDocument.chapters[0].lessons[0].blocks.every(
         (b: any) => !b.reviewedFormula,
       ),
     ).toBe(true);

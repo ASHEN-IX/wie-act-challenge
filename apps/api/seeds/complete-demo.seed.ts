@@ -178,6 +178,10 @@ function toBadgeKey(rank: any): string {
 }
 
 async function main() {
+  if (process.env.ALLOW_DEMO_COURSES !== "1") {
+    console.log("Demo data is disabled. Upload your own course, or explicitly set ALLOW_DEMO_COURSES=1 in a disposable development database.");
+    return;
+  }
   const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/ednova';
   const password = process.env.DEMO_USER_PASSWORD || 'EdNovaDemo!2026';
 

@@ -12,8 +12,8 @@ export default async function NewCourse() {
   return (
     <>
       <PageHeader
-        title="Bring your course material"
-        description="Add the sources you already have. EdNova organizes them by subject and prepares your course in the background."
+        title="Upload course material"
+        description="Choose who the course is for, add your files, then review and publish. For a class course, you can invite students after publishing."
       />
       <DataError message={subjects.error} />
       <div className="max-w-2xl">
