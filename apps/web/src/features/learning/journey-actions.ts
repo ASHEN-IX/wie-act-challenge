@@ -15,6 +15,7 @@ import {
   parseReadingDocumentV2,
   migrateReadingDocumentV1,
 } from "@ednova/shared/ednova/learningDocumentV2";
+import { parsePublishedPresentation } from "@ednova/shared/ednova/presentationDocument";
 export async function learningCatalog(courseId: string, revisionId?: string) {
   await requireIdentity();
   const data = await api<{
@@ -37,6 +38,15 @@ export async function learningDocument(courseId: string, revisionId?: string) {
   )
     return parseReadingDocumentV2(payload);
   return migrateReadingDocumentV1(parseLearningDocument(payload));
+}
+export async function publishedPresentation(courseId: string, revisionId?: string) {
+  await requireIdentity();
+  const payload = await api<unknown>(
+    `/api/v1/study/learning/courses/${segment(courseId)}/presentation${revisionId !== undefined ? "?revisionId=" + encodeURIComponent(revisionId) : ""}`,
+  );
+  // Strict browser-boundary parse: an unknown version, extra key or
+  // inconsistent render policy is a projection failure, never a partial render.
+  return parsePublishedPresentation(payload);
 }
 export async function learningProgress(courseId: string, revisionId: string) {
   await requireIdentity();

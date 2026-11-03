@@ -8,6 +8,7 @@ import {
 } from '../../../../shared/ednova/learningDocument';
 import {
   parseReadingDocumentV2,
+  type CanonicalDocumentV1,
   type EvidenceSpan,
   type LessonBlockV2,
   type ReadingDocumentV2,
@@ -513,11 +514,24 @@ function legacySections(artifact: Awaited<ReturnType<typeof verifyRevisionArtifa
   return sections;
 }
 
-export async function getLearningDocument(
+export type PublishedReadingBundle = {
+  context: Awaited<ReturnType<typeof getPublishedCourseContext>>;
+  revision: any;
+  artifact: Awaited<ReturnType<typeof verifyRevisionArtifact>>;
+  canonical: CanonicalDocumentV1 | null;
+};
+
+/**
+ * Single authorization and provenance boundary for every published reading
+ * projection. Presentation, reading and any later learner surface must load
+ * through this function so revision pinning, checksum and formula-projection
+ * guarantees cannot drift between surfaces.
+ */
+export async function loadPublishedReading(
   actor: string,
   courseId: string,
   revisionId?: string,
-): Promise<ReadingDocumentV2> {
+): Promise<PublishedReadingBundle> {
   const context = await getPublishedCourseContext(actor, courseId, revisionId);
   const revision = await CourseRevision.findOne({
     courseId,
@@ -528,8 +542,6 @@ export async function getLearningDocument(
   }).lean();
   if (!revision) throw new LearningDocumentVersionError('Published revision unavailable');
   const artifact = await verifyRevisionArtifact(revision);
-  const passages = artifact.passages;
-  const topics = (revision.topics || []) as TopicRecord[];
   const storedCanonical = revision.contentDocument
     ? parseCanonicalDocument(revision.contentDocument)
     : null;
@@ -540,6 +552,18 @@ export async function getLearningDocument(
     throw new LearningDocumentVersionError('Canonical content checksum mismatch');
   if (storedCanonical && revision.formulaPublication?.sourceDraftId && revision.contentDocumentHash!==revision.formulaPublication.projectionHash) throw new LearningDocumentVersionError('Frozen reviewed representation checksum mismatch');
   if (storedCanonical && !revision.formulaPublication?.sourceDraftId) for (const c of storedCanonical.chapters) for (const l of c.lessons) for (const b of l.blocks) delete (b as any).reviewedFormula;
+  return { context, revision, artifact, canonical: storedCanonical };
+}
+
+export async function getLearningDocument(
+  actor: string,
+  courseId: string,
+  revisionId?: string,
+): Promise<ReadingDocumentV2> {
+  const { context, revision, artifact, canonical: storedCanonical } =
+    await loadPublishedReading(actor, courseId, revisionId);
+  const passages = artifact.passages;
+  const topics = (revision.topics || []) as TopicRecord[];
   const generatedSummary = compact(
     revision.summary || topics.map((topic) => topic.description).filter(Boolean).join(' '),
     2_000,

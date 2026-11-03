@@ -8,6 +8,7 @@ import { Course, CourseRevision } from '../models';
 import { FormulaProposal } from '../models/FormulaProposal';
 import { getCourseDraft } from '../services/courseDraft';
 import { getLearningDocument } from '../services/courseReader';
+import { getPublishedPresentation } from '../services/presentationReader';
 import { publishCourseRevision } from '../services/coursePublication';
 import { activityDigest } from '../services/activityIdentity';
 import {
@@ -240,6 +241,42 @@ it('freezes accepted/corrected expressions, leaves rejected/pending source, and 
   const math: any[] = reader.sections.flatMap((s) => s.blocks).filter((b) => b.type === 'math');
   expect(math.map((b) => b.expression)).toEqual(['s_1', 's_2^{2}', 'x3', 'x4']);
   expect(math[0].review.state).toBe('accepted');
+
+  const presentation = await getPublishedPresentation(
+    'owner',
+    String(course._id),
+    published.revisionTag
+  );
+  expect(presentation.courseId).toBe(String(course._id));
+  expect(presentation.revisionId).toBe(published.revisionTag);
+  // The context formats the stored source hash; the canonical hash is the
+  // checksum actually re-verified before projection.
+  expect(presentation.contentHash).toBe('sha256:' + published.contentHash);
+  expect(presentation.canonicalContentHash).toBe(published.contentDocumentHash);
+  expect(presentation.chapters[0].lessons[0].title).toBe('Lesson');
+  const projected = presentation.chapters
+    .flatMap((chapter) => chapter.lessons)
+    .flatMap((lesson) => lesson.blocks);
+  expect(projected.map((entry) => entry.block.id)).toEqual(['block0', 'block1', 'block2', 'block3']);
+  expect(projected.map((entry) => entry.reason)).toEqual([
+    'reviewed_formula',
+    'reviewed_formula',
+    'unreviewed_formula',
+    'unreviewed_formula'
+  ]);
+  expect(projected.map((entry) => entry.render)).toEqual([
+    'primary',
+    'primary',
+    'source_faithful',
+    'source_faithful'
+  ]);
+  expect(presentation.verification).toEqual({
+    status: 'partially_reviewed',
+    math: { total: 4, reviewed: 2, sourceFallback: 2 },
+    disclosure: expect.stringContaining('not semantically verified')
+  });
+  // No internal review payload or server path leaks through the projection.
+  expect(JSON.stringify(presentation)).not.toMatch(/reviewedFormula|sourceDraftId|\/tmp\//);
   const original = JSON.stringify(published);
   await FormulaProposal.updateMany(
     { courseId: course._id },

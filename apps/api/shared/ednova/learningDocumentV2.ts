@@ -293,6 +293,13 @@ const objective = (value: unknown) => {
   return { objectiveId: str(v.objectiveId, 128), statement: str(v.statement, 2000), bloomLevel: str(v.bloomLevel, 40) };
 };
 
+/** Validate one reading block at a projection boundary. Exported so downstream
+ * presentation contracts reuse exactly the same block vocabulary and limits
+ * instead of maintaining a second, weaker block validator. */
+export function parseLessonBlock(value: unknown): LessonBlockV2 {
+  return block(value);
+}
+
 export function parseReadingDocumentV2(value: unknown): ReadingDocumentV2 {
   const v = exact(value, ['schemaVersion', 'courseId', 'revisionId', 'contentHash', 'title', 'canonical', 'generated', 'sections', 'sources', 'warnings']);
   if (v.schemaVersion !== '2.0.0') fail();

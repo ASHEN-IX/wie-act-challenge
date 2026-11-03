@@ -24,6 +24,7 @@ import {
 } from '../services/learningStyle';
 import UserProfile from '../../../user-profile/src/models/UserProfile';
 import { getLearningDocument } from '../services/courseReader';
+import { getPublishedPresentation } from '../services/presentationReader';
 
 // Interface languages the learning workspace can actually render. Keep this list
 // in step with the translations in the web workspace; a persisted value outside
@@ -68,6 +69,12 @@ router.get(
   '/courses/:courseId/document',
   operation((r) =>
     getLearningDocument(r.user!.userId, String(r.params.courseId), revision(r))
+  )
+);
+router.get(
+  '/courses/:courseId/presentation',
+  operation((r) =>
+    getPublishedPresentation(r.user!.userId, String(r.params.courseId), revision(r))
   )
 );
 router.get(

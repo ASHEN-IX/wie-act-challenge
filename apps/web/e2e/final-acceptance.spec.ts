@@ -263,6 +263,52 @@ test("real reference upload, Python ingestion/index, SDK replay, instructor publ
       path: path.join(evidence, "student-mobile.png"),
     });
     await studentPage.getByRole("button", { name: "Close outline" }).click();
+    await studentPage.setViewportSize({ width: 1280, height: 900 });
+    // Milestone 3.1: the same published revision through the versioned
+    // presentation contract, with unreviewed formulas staying source-faithful.
+    await studentPage.goto(
+      `/courses/${courseId}/present?revisionId=${encodeURIComponent(revision.revisionTag)}`,
+    );
+    const presentation = studentPage.locator("[data-presentation-view]");
+    await expect(presentation).toBeVisible({ timeout: 30000 });
+    await expect(presentation).toHaveAttribute(
+      "data-presentation-status",
+      "partially_reviewed",
+    );
+    await expect(
+      presentation.getByText("not semantically verified", { exact: false }).first(),
+    ).toBeVisible();
+    await expect(presentation.locator("[data-presentation-lesson]").first()).toBeVisible();
+    await expect(
+      presentation.locator('[data-presentation-policy="source_faithful"]').first(),
+    ).toBeVisible();
+    await expect(presentation.locator('[data-block-type="math"] .katex')).toHaveCount(2, {
+      timeout: 30000,
+    });
+    const presentationFallback = presentation.getByRole("link", {
+      name: "Deterministic source-faithful reader",
+    });
+    await expect(presentationFallback).toHaveAttribute(
+      "href",
+      `/courses/${courseId}/learn?revisionId=${revision.revisionTag}`,
+    );
+    await presentation
+      .getByText("Automatic transcription is unverified.", { exact: false })
+      .first()
+      .scrollIntoViewIfNeeded();
+    await studentPage.screenshot({
+      path: path.join(evidence, "student-presentation.png"),
+    });
+    const presentationApi = await studentPage.request.get(
+      `/api/v1/study/learning/courses/${courseId}/presentation?revisionId=${encodeURIComponent(revision.revisionTag)}`,
+    );
+    expect(presentationApi.status()).toBe(200);
+    const presentationBody: any = await presentationApi.json();
+    expect(presentationBody.schemaVersion).toBe("1.0.0");
+    expect(presentationBody.verification.status).toBe("partially_reviewed");
+    expect(presentationBody.verification.math.reviewed).toBe(2);
+    expect(presentationBody.verification.math.sourceFallback).toBeGreaterThan(0);
+
     const outsider = await browser.newContext();
     const outsiderPage = await outsider.newPage();
     await login(outsiderPage, "final-outsider@example.test");
@@ -298,6 +344,12 @@ test("real reference upload, Python ingestion/index, SDK replay, instructor publ
           ),
           serviceBoundary:
             "real Node/Python HTTP; only Gemini SDK replay mocked",
+          presentation: {
+            schemaVersion: presentationBody.schemaVersion,
+            status: presentationBody.verification.status,
+            math: presentationBody.verification.math,
+            fallbackHref: presentationBody.fallback.readerHref,
+          },
           independentMathApproval: false,
         },
         null,
