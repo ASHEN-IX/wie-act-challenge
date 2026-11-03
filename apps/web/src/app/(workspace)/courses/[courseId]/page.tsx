@@ -8,6 +8,7 @@ import { ActionForm } from "@/components/shared/action-form";
 import { TextField } from "@/components/shared/form-field";
 import { getCourse } from "@/features/courses/queries";
 import { deleteCourse } from "@/features/courses/actions";
+import { requireIdentity } from "@/server/identity";
 import { courseStage, courseStageLabel } from "@/features/courses/lifecycle";
 export default async function CoursePage({
   params,
@@ -20,6 +21,13 @@ export default async function CoursePage({
   if (!course)
     return <DataError message={result.error || "Course not found."} />;
   const stage = courseStage(course);
+  // Presentation only: the API enforces who may author or delete. Learners on an
+  // institutional course they do not teach should not be offered those actions.
+  const identity = await requireIdentity();
+  const canAuthor =
+    identity.role === "admin" ||
+    course.scope !== "institutional" ||
+    (course.assignedInstructorIds ?? []).includes(identity.userId);
   return (
     <>
       <PageHeader
@@ -29,9 +37,11 @@ export default async function CoursePage({
         }
         action={
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" asChild>
-              <Link href={`/courses/${course.id}/studio`}>Course Studio</Link>
-            </Button>
+            {canAuthor && (
+              <Button variant="outline" asChild>
+                <Link href={`/courses/${course.id}/studio`}>Course Studio</Link>
+              </Button>
+            )}
             {stage === "ready" && (
               <>
                 <Button asChild>
@@ -68,7 +78,7 @@ export default async function CoursePage({
           </AlertDescription>
         </Alert>
       )}
-      {stage === "review" && (
+      {canAuthor && stage === "review" && (
         <Alert className="mt-5 border-amber-500/40 bg-amber-500/10">
           <AlertTitle>Course material is ready for your review</AlertTitle>
           <AlertDescription>
@@ -78,7 +88,7 @@ export default async function CoursePage({
           </AlertDescription>
         </Alert>
       )}
-      {stage === "failed" && (
+      {canAuthor && stage === "failed" && (
         <Alert variant="destructive" className="mt-5">
           <AlertTitle>Course processing failed</AlertTitle>
           <AlertDescription>
@@ -135,26 +145,28 @@ export default async function CoursePage({
               {file.originalName || file.filename}
             </a>
           ))}
-          <details className="mt-8 border-t pt-5">
-            <summary className="cursor-pointer text-sm text-destructive">
-              Delete course
-            </summary>
-            <div className="mt-4">
-              <ActionForm
-                action={deleteCourse}
-                submit="Delete permanently"
-                variant="destructive"
-              >
-                <input type="hidden" name="id" value={course.id} />
-                <TextField
-                  label="Type DELETE to confirm"
-                  name="confirmation"
-                  required
-                  pattern="DELETE"
-                />
-              </ActionForm>
-            </div>
-          </details>
+          {canAuthor && (
+            <details className="mt-8 border-t pt-5">
+              <summary className="cursor-pointer text-sm text-destructive">
+                Delete course
+              </summary>
+              <div className="mt-4">
+                <ActionForm
+                  action={deleteCourse}
+                  submit="Delete permanently"
+                  variant="destructive"
+                >
+                  <input type="hidden" name="id" value={course.id} />
+                  <TextField
+                    label="Type DELETE to confirm"
+                    name="confirmation"
+                    required
+                    pattern="DELETE"
+                  />
+                </ActionForm>
+              </div>
+            </details>
+          )}
         </aside>
       </div>
     </>
