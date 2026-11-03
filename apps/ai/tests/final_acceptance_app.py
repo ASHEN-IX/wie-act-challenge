@@ -20,7 +20,7 @@ by_region = {o['proposal']['source']['region_id']: o['proposal']['response'] for
 # versioned detector identities used by newly ingested QA revisions.
 for old_id, new_id in {
     'region_22d55ef3c62c7aefa2da': 'region_1e2aeb86289d9d44e7c0',
-    'region_76765c6249290c3b8651': 'region_434492347d5b2247384e',
+    'region_76765c6249290c3b8651': 'region_aec9301c4a673be7a909',
     'region_5ca30cfdf0504e0e00de': 'region_43d9fa3583e1890b41fa',
 }.items():
     by_region[new_id] = by_region[old_id]

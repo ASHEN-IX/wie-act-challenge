@@ -45,6 +45,17 @@ _COMBINING_ACCENTS = {
     "~": "\u0303",
 }
 _MATH_FONTS = re.compile(r"(?:CM(?:MI|SY|EX|MS|BSY|EUF)|STIX|Math|CambriaMath|Asana|LatinModernMath)", re.I)
+# V2-only glyph classification. The historical V1 constant stays untouched so
+# legacy extractions remain reproducible. MSBM carries blackboard symbols and
+# Symbol is the base-14 math symbol font, used by synthetic regression pages.
+_V2_MATH_FONTS = re.compile(
+    r"(?:CM(?:MI|SY|EX|MS|BSY|EUF)|MSBM|STIX|Math|CambriaMath|Symbol|Asana|LatinModernMath)",
+    re.I,
+)
+_V2_LEXICAL_WORD = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ]{2,}")
+_V2_MATH_TEXT_EVIDENCE = re.compile(
+    r"[=+∫∑∏∞<>≤≥−\uf8ff]|\blim\b|\bd[ut]\b|^[0-9+\u2212\uf8ff.\u00b7,\s]+$"
+)
 _SENTENCE_END = re.compile(r"[.!?;:]$|(?:[.!?;:]\s*[)'\"”’]*)$")
 _SYMBOL_CUE = re.compile(r"[=<>∑∏∫√±≤≥∈∀∃⇒⇐→↦∂∞]")
 _SEMANTIC_LABEL = re.compile(
@@ -450,6 +461,7 @@ def _append_math_band(regions, candidates):
             "bbox": _union([item["bbox"] for item in ordered]),
             "kind": "math",
             "lines": ordered,
+            "rows": list(ordered),
         }
     )
 
@@ -591,13 +603,18 @@ def _merge_math_fragments(regions):
     return output
 
 
-def _page_regions(page):
+def _page_regions(page, keep_lines=False):
     """Group visual lines into bounded source regions.
 
     A prose region can only contain contiguous text lines from the same visual
     flow. Display formulas are grouped by their shared horizontal extent and
     short vertical gaps. The PDF's own image and vector regions are retained
     as media candidates; no text is invented for a drawing.
+
+    ``keep_lines`` is a V2-only additive request that returns each region's
+    constituent visual rows beside the projected text, so the V2 grouping pass
+    can split and re-join rows without re-parsing the page. V1 output is
+    unchanged; the extra key is never present in V1 records.
     """
     lines = _text_lines(page)
     if not lines:
@@ -639,6 +656,7 @@ def _page_regions(page):
                     previous["text"] += " " + line["text"]
                     previous["bbox"] = _union([pbox, line["bbox"]])
                     previous["lines"].extend(line.get("parts", [line]))
+                    previous.setdefault("rows", []).append(line)
                     index += 1
                     continue
             result.append(
@@ -651,6 +669,7 @@ def _page_regions(page):
                         else kind
                     ),
                     "lines": list(line.get("parts", [line])),
+                    "rows": [line],
                 }
             )
             index += 1
@@ -672,6 +691,7 @@ def _page_regions(page):
                 "extraction_method": "text",
                 "region_type": region["kind"],
                 "line_count": len(region["lines"]),
+                **({"rows": region.get("rows") or []} if keep_lines else {}),
             }
         )
     candidates, image_keys = _figure_candidates(page, [r["bbox"] for r in clean if r["region_type"] == "figure_caption"])
@@ -692,47 +712,319 @@ def _page_regions(page):
     return clean
 
 
+def _v2_word_count(text):
+    return len(_V2_LEXICAL_WORD.findall(text))
+
+
+def _v2_math_evidence(text):
+    """Short scripts, limit rows and math-glyph content — never lexically full prose."""
+    stripped = text.strip()
+    if _V2_MATH_TEXT_EVIDENCE.search(stripped):
+        return True
+    return len(stripped) <= 3
+
+
+def _v2_math_glyph_boxes(page):
+    """Collect math-font glyph boxes for bounded display-band growth."""
+    import fitz
+
+    boxes = []
+    for block in page.get_text("rawdict", sort=True).get("blocks", []):
+        if block.get("type") != 0:
+            continue
+        for line in block.get("lines", []):
+            for span in line.get("spans", []):
+                if not _V2_MATH_FONTS.search(str(span.get("font") or "")):
+                    continue
+                for char in span.get("chars", []):
+                    if not str(char.get("c") or "").strip():
+                        continue
+                    box = [float(value) for value in (char.get("bbox") or [])]
+                    if len(box) == 4 and box[2] > box[0] and box[3] > box[1]:
+                        boxes.append(box)
+    return boxes
+
+
+def _v2_vertical_share(box, band):
+    height = max(1.0, box[3] - box[1])
+    return max(0.0, min(box[3], band[3]) - max(box[1], band[1])) / height
+
+
+def _v2_expand_over_math_glyphs(band, glyphs):
+    """Grow a display band over continuation math-font glyphs, never prose.
+
+    Integral integrands, radicands and limit rows are frequently emitted half
+    inside a neighbouring prose visual row. Only boxes whose fonts match the
+    V2 math-font evidence and whose vertical share of the band reaches 40% may
+    extend an edge, one bounded hop (14pt) at a time. Total growth per side is
+    capped relative to the band size, edges never cross the page, and any
+    meaningful extension is reported as an explicit issue by the caller.
+    """
+    inside = [box for box in glyphs if _v2_vertical_share(box, band) >= 0.4]
+    original = [band[0], band[1], band[2], band[3]]
+    limit = max(56.0, min(120.0, max(1.0, original[2] - original[0]) * 0.75))
+    grew = False
+    for _ in range(24):
+        candidates = [box for box in inside if box[2] > band[2] and 0.0 <= box[0] - band[2] <= 14.0]
+        if not candidates:
+            break
+        best = min(candidates, key=lambda box: box[0])
+        if best[2] - original[2] > limit:
+            break
+        band[2] = max(band[2], best[2])
+        inside.remove(best)
+        grew = True
+    for _ in range(24):
+        candidates = [box for box in inside if box[0] < band[0] and 0.0 <= band[0] - box[2] <= 14.0]
+        if not candidates:
+            break
+        best = max(candidates, key=lambda box: box[2])
+        if original[0] - best[0] > limit:
+            break
+        band[0] = min(band[0], best[0])
+        inside.remove(best)
+        grew = True
+    return grew
+
+
+def _v2_row_is_prose(row, left, right, previous_prose=False):
+    """A visual row inside a display band starts real prose, not a limit.
+
+    Bound rows, radicand rows and denominator fragments are rarely classified
+    as math by row fonts, so prose requires sentence-shaped lexical evidence:
+    a sentence-ending run, a wide flowing run, or a left-margin sentence
+    start. A very short row trailing prose is the sentence continuation.
+    """
+    column_width = max(1.0, right - left)
+    text = row["text"].strip()
+    words = _v2_word_count(text)
+    if _line_kind(row, left, right) == "math" and row.get("math_ratio", 0) >= 0.5:
+        return False
+    if _prose_line(row, column_width, start=False):
+        return True
+    if words >= 3 and row["bbox"][0] <= left + column_width * 0.04:
+        return True
+    if previous_prose and words <= 2 and row["bbox"][0] >= (previous_prose["bbox"][0]) and (
+        row["bbox"][0] <= previous_prose["bbox"][2] + 40
+    ):
+        return True
+    return False
+
+
+def _v2_segment_region(kind, rows):
+    return {
+        "text": ("\n".join(row["text"] for row in rows) if kind == "math"
+                 else " ".join(row["text"] for row in rows)),
+        "bbox": _union([row["bbox"] for row in rows]),
+        "extraction_method": "text",
+        "region_type": kind,
+        "line_count": len(rows),
+        "rows": list(rows),
+        "split_from_math": True,
+    }
+
+
+def _v2_split_math_bands(regions, left, right):
+    """Separate display-math rows from prose rows sharing one source band.
+
+    A wrapped display equation and the explanatory sentence that follows it
+    are frequently one candidate band. Prose rows split into their own source
+    regions in original reading order; the display rows keep their geometry.
+    Single-row losses are not introduced: every row text survives.
+    """
+    output = []
+    for region in regions:
+        rows = region.get("rows") or []
+        if region.get("region_type") != "math" or len(rows) < 2:
+            output.append(region)
+            continue
+        segments = []
+        last_prose = False
+        for row in rows:
+            label = "prose" if _v2_row_is_prose(row, left, right, last_prose) else "math"
+            if label == "prose":
+                last_prose = row
+            if segments and segments[-1][0] == label:
+                segments[-1][1].append(row)
+            else:
+                segments.append((label, [row]))
+        if len(segments) <= 1 or not any(label == "prose" for label, _ in segments):
+            output.append(region)
+            continue
+        for label, segment_rows in segments:
+            if label == "math":
+                piece = _v2_segment_region("math", segment_rows)
+                piece["region_issues"] = ["math_band_split"]
+            else:
+                piece = _v2_segment_region("paragraph", segment_rows)
+                joined = " ".join(row["text"] for row in segment_rows)
+                if _v2_math_evidence(joined) or re.search(_SYMBOL_CUE, joined):
+                    piece["region_issues"] = ["math_inline_mixed"]
+            output.append(piece)
+    return output
+
+
+def _v2_absorbs_script_row(band, candidate):
+    """Decide whether a short paragraph row belongs to a display band.
+
+    Subscripts, superscripts, integral and summation limit rows and stray
+    continuation glyphs arrive as separate small rows. They join a band only
+    with math-text evidence, containment-limited horizontal reach and no
+    sentence-shaped content. Growth beyond 24pt per side is never allowed.
+    """
+    a, b = band["bbox"], candidate["bbox"]
+    ptext = str(candidate.get("text") or "")
+    if len(ptext) > 32 or _v2_word_count(ptext) > 2:
+        return False
+    if re.search(r"[.!?]\s*$", ptext) and _v2_word_count(ptext) >= 2:
+        # A dot can terminate a limit-notation fragment just as often as a
+        # sentence (``lim up.``). Real prose never opens with a math run.
+        if not re.search(r"^[0-9+\u2212\s.]*[∫∑∏∞±≤≥<>=]|\blim\b", ptext):
+            return False
+    if not _v2_math_evidence(ptext):
+        return False
+    overlap_y = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    height_a, height_b = max(1.0, a[3] - a[1]), max(1.0, b[3] - b[1])
+    if overlap_y < 0.5 * min(height_a, height_b):
+        gap_below = b[1] - a[3]
+        gap_above = a[1] - b[3]
+        if gap_below > 3 or gap_above > 3:
+            return False
+        if max(0.0, min(a[2], b[2]) - max(a[0], b[0])) < 0.5 * (b[2] - b[0]):
+            return False
+    centre = (b[0] + b[2]) / 2
+    if centre < a[0] - 24 or centre > a[2] + 24 or b[0] < a[0] - 24 or b[2] > a[2] + 24:
+        return False
+    return True
+
+
+def _v2_grouping_label(band, rows):
+    """Structural grouping label; never a semantic or correctness claim."""
+    bases = [row for row in rows if row.get("role") != "absorbed"]
+    if any(_v2_word_count(row["text"]) >= 4 for row in bases):
+        return "mixed_prose", ["math_prose_contamination"]
+    ambiguous = False
+    for first, second in zip(bases, bases[1:]):
+        centre_a = (first["bbox"][1] + first["bbox"][3]) / 2
+        centre_b = (second["bbox"][1] + second["bbox"][3]) / 2
+        if abs(centre_a - centre_b) <= 4:
+            # Same visual baseline but separate row boxes: reading order is
+            # unverifiable, fully nested limit runs and partial overlaps alike.
+            ambiguous = True
+    if ambiguous:
+        return "structurally_ambiguous", ["math_grouping_ambiguous"]
+    if len(bases) >= 2:
+        return "multiline_derivation", []
+    if any(row.get("role") == "absorbed" for row in rows):
+        return "single_expression", ["math_absorbed_fragment"]
+    return "single_expression", []
+
+
 def _page_regions_v2(page):
     """Group overlapping short mathematical fragments conservatively.
 
     V2 is explicitly selected: V1 remains reproducible for historical
     artifacts. The text of absorbed fragments is retained verbatim; its
     mathematical reading order is not inferred or certified.
+
+    General pipeline on page-visual evidence only:
+    1. split display bands where prose rows share the same band;
+    2. rejoin script/limit/continuation rows near a display band;
+    3. grow band edges over math-font glyph chains inside the band envelope;
+    4. attach explicit grouping labels, boundary and uncertainty issues.
     """
-    regions = _page_regions(page)
-    used = set()
-    for index, target in enumerate(regions):
-        if target.get("region_type") != "math":
+    regions = [row for row in _page_regions(page, keep_lines=True)]
+    for region in regions:
+        for row in region.get("rows") or []:
+            row.setdefault("role", "own")
+    glyphs = _v2_math_glyph_boxes(page)
+    page_rect = page.rect
+    text_regions = [region for region in regions if region.get("region_type") != "figure"]
+    if text_regions:
+        left = min(region["bbox"][0] for region in text_regions)
+        right = max(region["bbox"][2] for region in text_regions)
+    else:
+        left, right = page_rect.x0, page_rect.x1
+    regions = _v2_split_math_bands(regions, left, right)
+
+    # Split-off prose rows must not be re-absorbed as scripts.
+    split_prose = {id(region) for region in regions
+                   if region.get("split_from_math") and region.get("region_type") == "paragraph"}
+    consumed = set()
+    for index, band in enumerate(regions):
+        if band.get("region_type") != "math":
             continue
-        a = target["bbox"]
-        fragments = []
-        for n, other in enumerate(regions):
-            if n == index or n in used or other.get("region_type") != "paragraph":
+        rows = band.get("rows") or []
+        if not rows:
+            continue
+        base_bbox = list(band["bbox"])
+        absorbed = 0
+        for other_index, candidate in enumerate(regions):
+            if other_index in consumed or other_index == index:
                 continue
-            text = str(other.get("text") or "").strip()
-            b = other["bbox"]
-            overlap_y = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
-            overlap_x = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
-            words = re.findall(r"[A-Za-zÀ-ÖØ-öø-ÿ]{2,}", text)
-            if (len(text) > 30 or len(words) > 2 or
-                overlap_y < 0.6 * max(1.0, min(a[3]-a[1], b[3]-b[1])) or
-                overlap_x < 0.5 * max(1.0, min(a[2]-a[0], b[2]-b[0])) or
-                b[0] < a[0]-24 or b[2] > a[2]+24):
+            if candidate.get("region_type") != "paragraph" or id(candidate) in split_prose:
                 continue
-            # Require math-like evidence or a short script wholly inside the
-            # envelope; sentence-like prose is never absorbed.
-            if len(text) > 2 and not re.search(r"[=+−∑∫∞<>]|\blim\b", text):
+            if not _v2_absorbs_script_row({"bbox": base_bbox}, candidate):
                 continue
-            if re.search(r"[.!?]$", text) and len(words) >= 2 and "lim" not in text:
-                continue
-            fragments.append((n, other))
-        if fragments:
-            target["bbox"] = _union([a] + [other["bbox"] for _, other in fragments])
-            target["text"] = "\n".join([str(other["text"]) for _, other in fragments] + [target["text"]])
-            target["line_count"] = int(target.get("line_count") or 0) + sum(int(other.get("line_count") or 0) for _, other in fragments)
-            used.update(n for n, _ in fragments)
-        target["region_issues"] = ["math_boundary_unverified", "math_reading_order_unverified"]
-    return [region for n, region in enumerate(regions) if n not in used]
+            row = (candidate.get("rows") or [{}])[0].copy()
+            row["text"] = str(candidate.get("text") or "")
+            row["bbox"] = list(candidate["bbox"])
+            row["role"] = "absorbed"
+            rows.append(row)
+            absorbed += 1
+            consumed.add(other_index)
+        if absorbed:
+            rows.sort(key=lambda row: ((row["bbox"][1] + row["bbox"][3]) / 2, row["bbox"][0]))
+            band["rows"] = rows
+            band["text"] = "\n".join(row["text"] for row in rows)
+            band["bbox"] = _union([row["bbox"] for row in rows])
+            band["region_issues"] = list(dict.fromkeys(
+                [*(band.get("region_issues") or []), "math_absorbed_fragment"]))
+    processed = []
+    for index, region in enumerate(regions):
+        if index in consumed:
+            continue
+        if region.get("region_type") == "math" and region.get("rows"):
+            band = [region["bbox"][0], region["bbox"][1], region["bbox"][2], region["bbox"][3]]
+            grew = _v2_expand_over_math_glyphs(band, glyphs)
+            grew = grew and (
+                band[0] < region["bbox"][0] - 2 or band[2] > region["bbox"][2] + 2
+            )
+            if grew:
+                band[0] = min(band[0], region["bbox"][0])
+                band[2] = max(band[2], region["bbox"][2])
+                region["bbox"] = [
+                    round(band[0], 2),
+                    round(max(page_rect.y0, band[1]), 2),
+                    round(min(page_rect.x1, band[2]), 2),
+                    round(min(page_rect.y1, max(page_rect.y0, band[3])), 2),
+                ]
+                region.setdefault("region_issues", []).append("math_boundary_extended")
+            else:
+                region["bbox"] = [
+                    round(min(page_rect.x1, max(page_rect.x0, region["bbox"][0])), 2),
+                    round(max(page_rect.y0, region["bbox"][1]), 2),
+                    round(min(page_rect.x1, region["bbox"][2]), 2),
+                    round(min(page_rect.y1, region["bbox"][3]), 2),
+                ]
+        processed.append(region)
+    regions = processed
+    for region in regions:
+        issues = list(region.get("region_issues") or [])
+        if region.get("region_type") == "math" and region.get("rows"):
+            grouping, extra = _v2_grouping_label(region, region["rows"])
+            region["math_grouping"] = grouping
+            issues = list(dict.fromkeys([*issues, *extra]))
+        if region.get("region_type") == "math":
+            issues = list(dict.fromkeys([
+                "math_boundary_unverified", "math_reading_order_unverified", *issues
+            ]))
+        if issues:
+            region["region_issues"] = issues
+        region.pop("split_from_math", None)
+    return [region for region in regions if region.get("region_type") != "figure"] + [
+        region for region in regions if region.get("region_type") == "figure"
+    ]
 
 
 def _extract_pages(pdf_path: str, extraction_version="1.0"):

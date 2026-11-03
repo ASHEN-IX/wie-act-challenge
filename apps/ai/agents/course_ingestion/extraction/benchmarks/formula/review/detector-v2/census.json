@@ -1,6 +1,38 @@
 {
+  "schema_version": "2.0",
+  "source_sha256": "sha256:ff83040269166027d02937563af93b6686ba9a02a0fd449c93a74747003faa02",
+  "extraction_versions": {
+    "historical": "1.0",
+    "updated": "2.0"
+  },
   "legacy_math": 85,
-  "v2_math": 84,
+  "v2_math": 85,
+  "grouping_census": {
+    "single_expression": 28,
+    "multiline_derivation": 36,
+    "structurally_ambiguous": 13,
+    "mixed_prose": 8
+  },
+  "assessment_census": {
+    "complete": 63,
+    "clipped": 0,
+    "mixed": 9,
+    "ambiguous": 13,
+    "review": 0
+  },
+  "unmapped_v2_math": [
+    {
+      "id": "region_af54b2c790cfed87f8d7",
+      "page": 14,
+      "bbox": [
+        135.68,
+        491.2,
+        450.31,
+        510.13
+      ],
+      "text": "∀t ∈[a, b], ∀x ∈I, |x −x0| ≤α(ε) ⇒|g(x, t) −g(x0, t)| ≤ε|x −x0|."
+    }
+  ],
   "regions": [
     {
       "historical_id": "region_22d55ef3c62c7aefa2da",
@@ -20,12 +52,20 @@
         418.8
       ],
       "new_text": "n\n∑ up. Sn =\np=0",
+      "math_grouping": "single_expression",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_absorbed_fragment"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": true,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_42116d94dec3d2a81d58",
@@ -37,20 +77,28 @@
         485.3
       ],
       "old_text": "∑ un =\nn→+∞ n=0 p=0",
-      "v2_id": "region_2fdfbbe92bff6db427e9",
+      "v2_id": "region_66ae1f964f8407b30376",
       "new_bbox": [
         239.85,
         450.51,
         346.14,
         485.3
       ],
-      "new_text": "+∞ lim up.\nn\n∑ un =\nn→+∞ n=0 p=0",
+      "new_text": "n\n+∞ lim up.\n∑ un =\nn→+∞ n=0 p=0",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_absorbed_fragment"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": true,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_84094eabebe8648865da",
@@ -70,12 +118,20 @@
         660.24
       ],
       "new_text": "q\n∑ un| ≤ε. ∀ε > 0, ∃Nε ∈N tel que q ≥p ≥Nε ⇒|\nn=p",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_absorbed_fragment"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": true,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_b6c3ffacfa824de49e8d",
@@ -95,12 +151,19 @@
         147.09
       ],
       "new_text": "n≥0",
+      "math_grouping": "single_expression",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_cd73fcad46957fbfeb6c",
@@ -120,12 +183,20 @@
         353.13
       ],
       "new_text": "n≥0 converge.\nn≥0",
+      "math_grouping": "structurally_ambiguous",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_grouping_ambiguous"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "ambiguous",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_55f2693d71d63e914711",
@@ -145,12 +216,19 @@
         491.18
       ],
       "new_text": "# f′ = f,\nf(0) = 1.",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_bc2895a49f1eed51e9a2",
@@ -170,12 +248,20 @@
         588.19
       ],
       "new_text": "∫x f′(t)dt + f(0) = 1 + f(x) = f(t)dt.\n0\n0",
+      "math_grouping": "structurally_ambiguous",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_grouping_ambiguous"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "ambiguous",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_5ee6e94efa4f017d7727",
@@ -195,12 +281,19 @@
         659.68
       ],
       "new_text": "S0 : x ↦→1 et\n∫x Sn−1(t)dt. Sn+1 : x ↦→1 +\n0",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_281ea531f2651acd6607",
@@ -220,12 +313,20 @@
         713.2
       ],
       "new_text": "S(x) = lim\n∫x lim n→+∞Sn+1(x) =\n∫x lim Sn−1(t)dt) = 1+ n→+∞(1+\n∫x S(t)dt. n→+∞Sn−1(t)dt = 1+ 0\n0\n0",
+      "math_grouping": "structurally_ambiguous",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_grouping_ambiguous"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "ambiguous",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_addb7d379bc5d9e92179",
@@ -245,12 +346,19 @@
         742.46
       ],
       "new_text": "S(x) = ex.",
+      "math_grouping": "single_expression",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_7540c5520d1dcb955310",
@@ -270,12 +378,19 @@
         246.57
       ],
       "new_text": "∫x 1dt = 1 + x, S1(x) = 1 +\n0\n∫x (1 + t)dt = 1 + x + x2 S2(x) = 1 +\n2 ,\n0 ...\n∑ xp Sn(x) =\nn p! ·\np=0",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_011561db94c99245f7aa",
@@ -295,12 +410,19 @@
         296.98
       ],
       "new_text": "général fn : x ↦→xn\nn! ·",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_283a8011a0e31e17f904",
@@ -320,12 +442,20 @@
         371.91
       ],
       "new_text": "n\n∑ Sn(x) = fp(x).",
+      "math_grouping": "single_expression",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_absorbed_fragment"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": true,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_9f0a5f720f84ae637b57",
@@ -345,12 +475,19 @@
         383.23
       ],
       "new_text": "p=0",
+      "math_grouping": "single_expression",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_a2c761c4f0d40563dade",
@@ -370,12 +507,19 @@
         423.56
       ],
       "new_text": "n≥0",
+      "math_grouping": "single_expression",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_b297ac237cf887a2ffde",
@@ -395,12 +539,19 @@
         672.65
       ],
       "new_text": "pour x ∈I,\n∑ +∞ fn(x). n→+∞Sn(x) =\nS(x) = lim n=0",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_45954ff1afedc3917047",
@@ -420,12 +571,19 @@
         750.39
       ],
       "new_text": "n! sur I = R. n≥0",
+      "math_grouping": "single_expression",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_76765c6249290c3b8651",
@@ -437,20 +595,29 @@
         206.71
       ],
       "old_text": "= lim n + 1 = 0. n→+∞ ∑\nn→+∞ |un|",
-      "v2_id": "region_434492347d5b2247384e",
+      "v2_id": "region_aec9301c4a673be7a909",
       "new_bbox": [
         230.66,
-        173.09,
+        165.43,
         409.1,
         206.71
       ],
-      "new_text": "= lim n + 1 = 0. n→+∞ ∑\nn→+∞ |un|",
+      "new_text": "|un+1| |x| lim\nn→+∞ |un|\n= lim n + 1 = 0. n→+∞ ∑",
+      "math_grouping": "structurally_ambiguous",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_absorbed_fragment",
+        "math_grouping_ambiguous"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "ambiguous",
+      "content_preserved": true,
+      "changed": true,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_c26e77453eb9f049be21",
@@ -462,7 +629,7 @@
         267.0
       ],
       "old_text": "∑ xn série de fonctions\nn≥0 n! converge simplement sur R. n≥0",
-      "v2_id": "region_4fac99ea32971bb25671",
+      "v2_id": "region_c1f02fc391cad6156e8b",
       "new_bbox": [
         105.23,
         221.83,
@@ -470,12 +637,20 @@
         267.0
       ],
       "new_text": "∑ xn série de fonctions\nn≥0 n! converge simplement sur R. n≥0",
+      "math_grouping": "mixed_prose",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_prose_contamination"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "mixed",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_7afd2bc694b3d8d37950",
@@ -487,7 +662,7 @@
         320.0
       ],
       "old_text": "∑ xn |S −Sn|∞= sup\n| n! |, x∈R\np≥n+1",
-      "v2_id": "region_c584c796c17ef397032f",
+      "v2_id": "region_291adb9568b4b4a48004",
       "new_bbox": [
         242.07,
         280.15,
@@ -495,12 +670,19 @@
         320.0
       ],
       "new_text": "∑ xn |S −Sn|∞= sup\n| n! |, x∈R\np≥n+1",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_b80175765a38d6a9423b",
@@ -512,7 +694,7 @@
         489.56
       ],
       "old_text": "i) Pour tout n ∈N, |fn|∞≤an,",
-      "v2_id": "region_38772705b3c03decd8f5",
+      "v2_id": "region_3d83d3cb34b0e4c6debb",
       "new_bbox": [
         101.86,
         470.64,
@@ -520,12 +702,20 @@
         489.56
       ],
       "new_text": "i) Pour tout n ∈N, |fn|∞≤an,",
+      "math_grouping": "mixed_prose",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_prose_contamination"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "mixed",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_97d6f1f2e7121d6e93a2",
@@ -537,7 +727,7 @@
         518.91
       ],
       "old_text": "n≥0",
-      "v2_id": "region_2737cca1e3f3be5877c4",
+      "v2_id": "region_437e6beef5c9de92b300",
       "new_bbox": [
         200.8,
         505.09,
@@ -545,12 +735,19 @@
         518.91
       ],
       "new_text": "n≥0",
+      "math_grouping": "single_expression",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_2a2246edcf60c40ffecd",
@@ -562,7 +759,7 @@
         607.86
       ],
       "old_text": "n≥0\nformément sur I.",
-      "v2_id": "region_34912453c993f87ff22c",
+      "v2_id": "region_8e55dae5990425fab5ed",
       "new_bbox": [
         82.96,
         587.91,
@@ -570,12 +767,19 @@
         607.86
       ],
       "new_text": "n≥0\nformément sur I.",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_c50c4f9d23a439d7b133",
@@ -587,7 +791,7 @@
         735.21
       ],
       "old_text": "∑ ∑ ∑ an| ≤ε.\nan = | q ≥p ≥Nε ⇒0 ≤ an −\nn=p+1 n=0 n=0",
-      "v2_id": "region_e33a77aadd1f12db27d3",
+      "v2_id": "region_74126d564ff6904ff039",
       "new_bbox": [
         170.18,
         701.17,
@@ -595,12 +799,19 @@
         735.21
       ],
       "new_text": "∑ ∑ ∑ an| ≤ε.\nan = | q ≥p ≥Nε ⇒0 ≤ an −\nn=p+1 n=0 n=0",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_10ca1a3f2d2237f71378",
@@ -620,12 +831,21 @@
         153.28
       ],
       "new_text": "q\nq\n∑ |Sq(x) −Sp(x)| ≤ n=p+1\n∑ an, |fn(x)| ≤ n=p+1",
+      "math_grouping": "structurally_ambiguous",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_absorbed_fragment",
+        "math_grouping_ambiguous"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "ambiguous",
+      "content_preserved": true,
+      "changed": true,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_edaea00d0a25d78afb52",
@@ -645,12 +865,19 @@
         194.51
       ],
       "new_text": "q ≥p ≥Nε ⇒|Sq −Sp|∞≤ε.",
+      "math_grouping": "single_expression",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_941c933c5cd02e661704",
@@ -662,20 +889,28 @@
         362.2
       ],
       "old_text": "n! | ≤an,\npuisque xn",
-      "v2_id": "region_cf30bd7c5bb5029bd2fe",
+      "v2_id": "region_955b2dd8eaa234ad727f",
       "new_bbox": [
         72.5,
-        321.9,
+        313.04,
         317.64,
         362.2
       ],
-      "new_text": "n! | ≤an,\npuisque xn",
+      "new_text": "|xn\nn! | ≤an,\npuisque xn",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_absorbed_fragment"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": true,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_d000540fd3ac6d635a3e",
@@ -687,7 +922,7 @@
         439.54
       ],
       "old_text": "|xn n! ·\nn! | ≤An\n∑ An Or",
-      "v2_id": "region_94a6cc7a7133fdc9c6fe",
+      "v2_id": "region_86740a5ebe61c25c756c",
       "new_bbox": [
         72.5,
         385.22,
@@ -695,12 +930,20 @@
         439.54
       ],
       "new_text": "|xn n! ·\nn! | ≤An\n∑ An Or",
+      "math_grouping": "structurally_ambiguous",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_grouping_ambiguous"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "ambiguous",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_53ef16a1bef7361e1761",
@@ -720,12 +963,19 @@
         289.11
       ],
       "new_text": "(ﬁnies !) Sn = ∑n\np=0 fp.",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_04152ca4c3281ac8e68b",
@@ -745,12 +995,19 @@
         449.48
       ],
       "new_text": "∑ xn",
+      "math_grouping": "single_expression",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_4d7892cf8b041b1ca740",
@@ -770,12 +1027,20 @@
         602.04
       ],
       "new_text": "∫b ∑\n∫b ∑ fn(x)dx = fn(x)dx. a\na\nn≥0 n≥0",
+      "math_grouping": "mixed_prose",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_prose_contamination"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "mixed",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_f7af1ad5db3a8f8c34ce",
@@ -795,12 +1060,19 @@
         720.84
       ],
       "new_text": "n≥0 f′",
+      "math_grouping": "single_expression",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_e3b59ad87bd7ce5aa4ce",
@@ -820,12 +1092,19 @@
         178.94
       ],
       "new_text": "∑ d\n∑ d fn(x) = S′(x) = σ(x) = dx\ndxfn(x). n≥0\nn≥0",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_90a261b057698293a6d1",
@@ -845,12 +1124,19 @@
         291.05
       ],
       "new_text": "S′(x) = ∑ n≥0 f′\nn(x) pour tout x ∈I.",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_4e094f6b3b6ad6f8f883",
@@ -870,12 +1156,19 @@
         388.8
       ],
       "new_text": "quand n →+∞[,\nn |fn+1(x)|\n= |x| n + 1 →|x| < 1. |fn(x)|",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_75b481f3da6a5d833699",
@@ -895,12 +1188,20 @@
         470.88
       ],
       "new_text": "S′(x) = f′ n≥0\nxn = n(x) = 1 −x· n≥0",
+      "math_grouping": "structurally_ambiguous",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_grouping_ambiguous"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "ambiguous",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_c8cb92fea5fd19b214d7",
@@ -912,20 +1213,28 @@
         530.56
       ],
       "old_text": "∑ xn+1\nn + 1 = S(x) = S(x) −S(0) = 0 n≥0",
-      "v2_id": "region_d949e225f6d3d01a2634",
+      "v2_id": "region_7a37fb7d812ca41a08d1",
       "new_bbox": [
         146.76,
         490.71,
-        324.86,
+        368.76,
         530.56
       ],
       "new_text": "∑ xn+1\nn + 1 = S(x) = S(x) −S(0) = 0 n≥0",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_boundary_extended"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": true,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_b49922e456faadf71fbd",
@@ -945,12 +1254,19 @@
         192.91
       ],
       "new_text": "et 1/∞= 0).",
+      "math_grouping": "single_expression",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_5b8717234e9e125a3b4e",
@@ -962,20 +1278,28 @@
         609.07
       ],
       "old_text": "ℓ+ := lim",
-      "v2_id": "region_2c7e898f1c897044b8bb",
+      "v2_id": "region_d52c75e51770aa807dfe",
       "new_bbox": [
         194.18,
         596.52,
-        241.99,
+        260.66,
         609.07
       ],
       "new_text": "ℓ+ := lim",
+      "math_grouping": "single_expression",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_boundary_extended"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": true,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_02518de3d60c5cbe8f2e",
@@ -995,12 +1319,20 @@
         751.55
       ],
       "new_text": "R = 1 , où ℓ+ = lim sup\nℓ+\nn→∞|an|1/n.",
+      "math_grouping": "structurally_ambiguous",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_grouping_ambiguous"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "ambiguous",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_c5fca41b6a2e308e4726",
@@ -1020,12 +1352,19 @@
         483.3
       ],
       "new_text": "fn(x) = xe−nx ·\nnx",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_0034a6dfe09c476e4027",
@@ -1045,12 +1384,19 @@
         637.9
       ],
       "new_text": "n≥0",
+      "math_grouping": "single_expression",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_be46fbfe15dea91c93e0",
@@ -1062,20 +1408,28 @@
         214.19
       ],
       "old_text": "0 ≤fn(x) ≤C",
-      "v2_id": "region_1cd1e688d844d2084e88",
+      "v2_id": "region_96995d9f5f1106aff2e5",
       "new_bbox": [
         254.53,
         188.16,
-        325.11,
+        331.46,
         214.19
       ],
       "new_text": "0 ≤fn(x) ≤C",
+      "math_grouping": "single_expression",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_boundary_extended"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": true,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_9dbc248c9177dfffdf11",
@@ -1095,12 +1449,19 @@
         363.41
       ],
       "new_text": "2en, an ≥dn ≥",
+      "math_grouping": "single_expression",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_0bf4bb5f19849fb4e418",
@@ -1120,12 +1481,19 @@
         495.29
       ],
       "new_text": "x∈[a,+∞[",
+      "math_grouping": "single_expression",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_775beaf00828c96fe413",
@@ -1145,12 +1513,19 @@
         420.24
       ],
       "new_text": "∫b F(x) = f(x, t)dt,\na",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_788f381e36f3f3c5b90a",
@@ -1170,12 +1545,19 @@
         604.84
       ],
       "new_text": "∀x ∈I, ∀ε > 0, ∃α(ε, x) > 0 tel que |y −x| ≤α(ε, x) ⇒|φ(y) −φ(x)| ≤ε.",
+      "math_grouping": "single_expression",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_d7b82f0fe9e36284cbe5",
@@ -1195,12 +1577,19 @@
         729.42
       ],
       "new_text": "∀ε > 0, ∃α(ε) > 0 tel que ∀x, y ∈I, |y −x| ≤α(ε) ⇒|φ(y) −φ(x)| ≤ε.",
+      "math_grouping": "single_expression",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_b8db48187ba214213641",
@@ -1220,12 +1609,19 @@
         188.48
       ],
       "new_text": "∀x, y ∈R+, |x −y| ≤α =⇒|x2 −y2| ≤1.",
+      "math_grouping": "single_expression",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_a8d96e5d941c23feaac4",
@@ -1245,12 +1641,19 @@
         230.26
       ],
       "new_text": "|x2 −y2| = (x + y)|x −y| = α(2y + α),",
+      "math_grouping": "single_expression",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_65ef032bbef3beea2fae",
@@ -1262,20 +1665,28 @@
         401.93
       ],
       "old_text": "∀(t, x) ∈I × J, ∀ε > 0, ∃α(ε, t, x) > 0 tel que\n|(s, y) −(t, x)| ≤α(ε, t, x) ⇒|f(s, y) −f(t, x)| ≤ε.\n— uniformément continue sur I × J lorsque\n∀ε > 0, ∃α(ε) > 0 tel que\n∀(t, x) ∈I × J, |(s, y) −(t, x)| ≤α(ε) ⇒|f(s, y) −f(t, x)| ≤ε.",
-      "v2_id": "region_9b5938a01c58794040f4",
+      "v2_id": "region_c59a1fa28bb336f81273",
       "new_bbox": [
-        88.86,
+        134.21,
         308.15,
         484.51,
-        401.93
+        343.62
       ],
-      "new_text": "∀(t, x) ∈I × J, ∀ε > 0, ∃α(ε, t, x) > 0 tel que\n|(s, y) −(t, x)| ≤α(ε, t, x) ⇒|f(s, y) −f(t, x)| ≤ε.\n— uniformément continue sur I × J lorsque\n∀ε > 0, ∃α(ε) > 0 tel que\n∀(t, x) ∈I × J, |(s, y) −(t, x)| ≤α(ε) ⇒|f(s, y) −f(t, x)| ≤ε.",
+      "new_text": "∀(t, x) ∈I × J, ∀ε > 0, ∃α(ε, t, x) > 0 tel que\n|(s, y) −(t, x)| ≤α(ε, t, x) ⇒|f(s, y) −f(t, x)| ≤ε.",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_band_split"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": false,
+      "changed": true,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_781144a608edf49409dc",
@@ -1295,12 +1706,19 @@
         184.38
       ],
       "new_text": "∫b F(x) = f(x, t)dt,\na",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_6f763c6b16f5f6374d6a",
@@ -1320,12 +1738,19 @@
         348.26
       ],
       "new_text": "ε ∀(x, t) ∈I × [a, b], |x −x0| ≤α(ε) ⇒|f(x, t) −f(x0, t)| ≤\nb −a·",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_c958a6428f775e4ff1c9",
@@ -1345,12 +1770,19 @@
         401.18
       ],
       "new_text": "∫b |F(x) −F(x0)| ≤ |f(x, t) −f(x0, t)|dt ≤ε,\na",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_7743da15eb26e0241a44",
@@ -1370,12 +1802,19 @@
         556.51
       ],
       "new_text": "& '1 = 1 −cos x F(x) = ,\n−cos(tx) x\nx 0",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_b740853948669b20b1c7",
@@ -1395,12 +1834,19 @@
         679.89
       ],
       "new_text": "∫b F(x) = f(x, t)dt\na",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_4d71704f09a529f8cabc",
@@ -1420,12 +1866,19 @@
         198.54
       ],
       "new_text": "∫b ∂xf(x, t)dt. F ′(x) =\na",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_966e44b2051e21ee7375",
@@ -1437,20 +1890,29 @@
         323.23
       ],
       "old_text": "x→x0\na x −x0\nOr\n∫b\n∫b ∂xf(x, t)dt = F(x) −F(x0) −(x −x0) f(x, t) −f(x0, t) −(x −x0)∂xf(x, t)dt",
-      "v2_id": "region_0985c41e1f39e5d1dbeb",
+      "v2_id": "region_30367b0a77608627ada7",
       "new_bbox": [
         72.5,
         261.26,
         491.81,
         355.75
       ],
-      "new_text": "a\na\nx→x0\na x −x0\nOr\n∫b\n∫b ∂xf(x, t)dt = F(x) −F(x0) −(x −x0) f(x, t) −f(x0, t) −(x −x0)∂xf(x, t)dt\n∫b = g(x, t) −g(x0, t)dt,\na",
+      "new_text": "x→x0\na x −x0\nOr\n∫b\n∫b ∂xf(x, t)dt = F(x) −F(x0) −(x −x0) f(x, t) −f(x0, t) −(x −x0)∂xf(x, t)dt\na\na\n∫b = g(x, t) −g(x0, t)dt,\na",
+      "math_grouping": "mixed_prose",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_absorbed_fragment",
+        "math_prose_contamination"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "mixed",
+      "content_preserved": true,
+      "changed": true,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_da0103f7e8181c793dbe",
@@ -1462,20 +1924,29 @@
         355.75
       ],
       "old_text": "∫b = g(x, t) −g(x0, t)dt,\na",
-      "v2_id": "region_0985c41e1f39e5d1dbeb",
+      "v2_id": "region_30367b0a77608627ada7",
       "new_bbox": [
         72.5,
         261.26,
         491.81,
         355.75
       ],
-      "new_text": "a\na\nx→x0\na x −x0\nOr\n∫b\n∫b ∂xf(x, t)dt = F(x) −F(x0) −(x −x0) f(x, t) −f(x0, t) −(x −x0)∂xf(x, t)dt\n∫b = g(x, t) −g(x0, t)dt,\na",
+      "new_text": "x→x0\na x −x0\nOr\n∫b\n∫b ∂xf(x, t)dt = F(x) −F(x0) −(x −x0) f(x, t) −f(x0, t) −(x −x0)∂xf(x, t)dt\na\na\n∫b = g(x, t) −g(x0, t)dt,\na",
+      "math_grouping": "mixed_prose",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_absorbed_fragment",
+        "math_prose_contamination"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "mixed",
+      "content_preserved": true,
+      "changed": true,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_16928d0c0c81482edb17",
@@ -1495,12 +1966,19 @@
         469.07
       ],
       "new_text": "∀t ∈[a, b], ∀x ∈I, |x −x0| ≤α(ε) ⇒|∂xg(x, t)| = |∂xf(x, t) −∂xf(x0, t)| ≤ε",
+      "math_grouping": "single_expression",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_40dcacee49a46f3b3498",
@@ -1512,20 +1990,28 @@
         557.27
       ],
       "old_text": "∀t ∈[a, b], ∀x ∈I, |x −x0| ≤α(ε) ⇒|g(x, t) −g(x0, t)| ≤ε|x −x0|.\nFinalement on obtient\n∫b |F(x) −F(x0) −(x −x0) ∂xf(x, t)dt| ≤ε(b −a)|x −x0|,\na",
-      "v2_id": "region_1d07c5df30037794078f",
+      "v2_id": "region_5ceb382dab9cc9db9fd8",
       "new_bbox": [
-        72.5,
-        491.2,
-        450.31,
+        151.4,
+        521.81,
+        434.6,
         557.27
       ],
-      "new_text": "∀t ∈[a, b], ∀x ∈I, |x −x0| ≤α(ε) ⇒|g(x, t) −g(x0, t)| ≤ε|x −x0|.\nFinalement on obtient\n∫b |F(x) −F(x0) −(x −x0) ∂xf(x, t)dt| ≤ε(b −a)|x −x0|,\na",
+      "new_text": "∫b |F(x) −F(x0) −(x −x0) ∂xf(x, t)dt| ≤ε(b −a)|x −x0|,\na",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_band_split"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": false,
+      "changed": true,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_3d97e2451f39c8f5e43c",
@@ -1537,7 +2023,7 @@
         673.74
       ],
       "old_text": "∂x(sin(tx)) = g(t, x),",
-      "v2_id": "region_b83717c63dc5d455e118",
+      "v2_id": "region_5bfd9a9a579c85a0f116",
       "new_bbox": [
         243.86,
         661.93,
@@ -1545,12 +2031,19 @@
         673.74
       ],
       "new_text": "∂x(sin(tx)) = g(t, x),",
+      "math_grouping": "single_expression",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_454b35a352564109c0d8",
@@ -1562,7 +2055,7 @@
         741.73
       ],
       "old_text": "G(x) = 0\nx2",
-      "v2_id": "region_b9c0c3b7337da34656d6",
+      "v2_id": "region_33dd15761a7f106d3b27",
       "new_bbox": [
         168.61,
         721.66,
@@ -1570,12 +2063,20 @@
         741.73
       ],
       "new_text": "G(x) = 0\nx2",
+      "math_grouping": "structurally_ambiguous",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_grouping_ambiguous"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "ambiguous",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_5ca30cfdf0504e0e00de",
@@ -1595,12 +2096,19 @@
         188.44
       ],
       "new_text": "∫+∞ F(x) = f(x, t)dt,\n0",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_c08e5f5403d87a1256a4",
@@ -1620,12 +2128,19 @@
         284.97
       ],
       "new_text": "F(x) −F(x0) = f(x, t) −f(x0, t)dt\n0",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_55319b1ebd80167dcea9",
@@ -1645,12 +2160,20 @@
         341.49
       ],
       "new_text": "∫A F(x) −F(x0) =\n∫+∞ f(x, t) −f(x0, t)dt + f(x, t) −f(x0, t)dt, 0\nA",
+      "math_grouping": "structurally_ambiguous",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_grouping_ambiguous"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "ambiguous",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_ba3eae7375c9e82fcacd",
@@ -1670,12 +2193,19 @@
         711.19
       ],
       "new_text": "∫un f(x, t)dt Fn : x ↦→",
+      "math_grouping": "single_expression",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_3b28aa3ede0da905981c",
@@ -1695,12 +2225,19 @@
         159.17
       ],
       "new_text": "∫+∞ f(x, t)dt| ≤ε pour tout x ∈I. A ≥Aε ⇒|\nA",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_127aac7632a8862fb609",
@@ -1720,12 +2257,19 @@
         219.45
       ],
       "new_text": "∫+∞ ∀x ∈I, |F(x) −Fn(x)| ≤| f(x, t)dt| ≤ε,\nun",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_396ebf140466b86f8f63",
@@ -1745,12 +2289,19 @@
         408.15
       ],
       "new_text": "∫+∞ F(x) = f(x, t)dt\n0",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_897532d1435856c92978",
@@ -1770,12 +2321,20 @@
         658.92
       ],
       "new_text": "∫+∞ φ(x) = ∂xf(x, t)dt\n0 est uniformément convergente sur I,",
+      "math_grouping": "mixed_prose",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_prose_contamination"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "mixed",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_cd999cffe3f38d3a4526",
@@ -1795,12 +2354,20 @@
         716.69
       ],
       "new_text": ") (∫+∞ ∫+∞ d\nf(x, t)dt = ∂xf(x, t)dt dx\n0\n0",
+      "math_grouping": "mixed_prose",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_prose_contamination"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "mixed",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_9819547d03311b8bd152",
@@ -1820,12 +2387,19 @@
         231.08
       ],
       "new_text": "n≥0 f′",
+      "math_grouping": "single_expression",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_1d25fbaa39d3d236393e",
@@ -1837,20 +2411,28 @@
         377.56
       ],
       "old_text": "∫+∞ F(x) =",
-      "v2_id": "region_045477fef5ef16cd37b1",
+      "v2_id": "region_f02a12958947197eaa91",
       "new_bbox": [
         81.86,
         351.26,
-        145.62,
+        199.55,
         377.56
       ],
       "new_text": "∫+∞ F(x) =",
+      "math_grouping": "single_expression",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_boundary_extended"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": true,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_a344f22b995b0f8a4e48",
@@ -1870,12 +2452,19 @@
         628.47
       ],
       "new_text": "∫+∞",
+      "math_grouping": "single_expression",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_f9f50f8ff6a60af50618",
@@ -1895,12 +2484,19 @@
         235.07
       ],
       "new_text": "∫+∞ F(x) = f(x, t)dt\n0",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_c357f4ccd5b915205f34",
@@ -1920,12 +2516,19 @@
         463.66
       ],
       "new_text": "∫+∞ ∂xf(x, t)dt F ′(x) =\n0",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_4f2ceff848d48e9bcabb",
@@ -1945,12 +2548,21 @@
         610.12
       ],
       "new_text": "f(x, t) = cos(tx)\nt2 + 1 · ∫+∞ 1. Montrer que la fonction F(x) =",
+      "math_grouping": "mixed_prose",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_absorbed_fragment",
+        "math_prose_contamination"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "mixed",
+      "content_preserved": true,
+      "changed": true,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_57fb1aef95f4c5c4f3cf",
@@ -1970,12 +2582,19 @@
         672.42
       ],
       "new_text": "F(x) = u2 + x2 du.\n0",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_494b73067ee1aef37ae3",
@@ -1987,20 +2606,29 @@
         750.21
       ],
       "old_text": "(indication : poser φ(x, u) = x cos(u)\n**∂2 ** sur des\nxφ(x, u) u2 + x2 , et majorer |φ(x, u)|, |∂xφ(x, u)|, et intervalles [a, b] ⊂]0, +∞[)",
-      "v2_id": "region_5489ab5c13c346e296e8",
+      "v2_id": "region_f2e391722b9d020e3cd7",
       "new_bbox": [
         72.5,
         704.17,
         513.49,
         750.21
       ],
-      "new_text": "(indication : poser φ(x, u) = x cos(u)\n**∂2 ** sur des\nxφ(x, u) u2 + x2 , et majorer |φ(x, u)|, |∂xφ(x, u)|, et intervalles [a, b] ⊂]0, +∞[)",
+      "new_text": "**∂2 ** sur des\nxφ(x, u) u2 + x2 , et majorer |φ(x, u)|, |∂xφ(x, u)|, et intervalles [a, b] ⊂]0, +∞[)",
+      "math_grouping": "mixed_prose",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_band_split",
+        "math_prose_contamination"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "mixed",
+      "content_preserved": false,
+      "changed": true,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_2866ae5d7f5d27ac41b5",
@@ -2012,20 +2640,28 @@
         210.23
       ],
       "old_text": "∫+∞ cos(tx) 1 ****\nt2 + 1 0 0",
-      "v2_id": "region_2ec8d9d9eaa28757a58d",
+      "v2_id": "region_58543dd347e232862d94",
       "new_bbox": [
-        198.11,
+        192.05,
         173.8,
-        335.17,
+        390.92,
         210.23
       ],
       "new_text": "∫+∞ cos(tx) 1 ****\nt2 + 1 0 0",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_boundary_extended"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": true,
+      "changed": true,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_914b1fde8db71729c28b",
@@ -2045,12 +2681,20 @@
         277.34
       ],
       "new_text": "1 |f(x, t)| ≤g(t) :=\n1 + t2 ,",
+      "math_grouping": "structurally_ambiguous",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_grouping_ambiguous"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "ambiguous",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_c8a0c2aa0296fe46ae63",
@@ -2070,12 +2714,19 @@
         510.47
       ],
       "new_text": "b |φ(x, u)| ≤ +\na2 + u2 := g0(u), ***** ≤ (a2 + u2)2 := g1(u),\n∂φ cos (u) **** **** **** = (u2 + x2)2 (u2 + x2)2\nb2 + u2 −u2 + x2, **** = *****−cos (u) u2 + x2 −2 x2 cos (u) ∂x et\n∂2φ **** **** = ****−6 cos (u) x (u2 + x2)3\n+ −3 u2 + x2, *****2 cos (u) x **** = ***** ≤2b(b2 + 3u2) (u2 + x2)2 + 8 x3 cos (u) := g2(u). ∂x2\n(a2 + u2)3 (u2 + x2)3",
+      "math_grouping": "structurally_ambiguous",
       "new_issues": [
         "math_boundary_unverified",
         "math_reading_order_unverified"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "ambiguous",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_16ed0cd2cef1f5d3b926",
@@ -2095,12 +2746,20 @@
         697.26
       ],
       "new_text": "∫+∞\n∫+∞ - x sin u x cos(u) 2xu F(x) =\n.+∞ = + u2 + x2 du (x2 + u2)2 du 0\nx2 + u2 0 0\n∫+∞ 2xu =\n(x2 + u2)2 du 0 - ∫+∞\n.+∞ 2xu 2x(x2 −3u2) = cos u du\n+ (x2 + u2)3\n− (x2 + u2)2 cos u 0 0 =\nF ′′(x).",
+      "math_grouping": "structurally_ambiguous",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_grouping_ambiguous"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "ambiguous",
+      "content_preserved": true,
+      "changed": false,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     },
     {
       "historical_id": "region_41d94453246492aa5bcc",
@@ -2112,20 +2771,28 @@
         191.19
       ],
       "old_text": "∫+∞ 1 F(0) =\n= π 1 + t2 dt = [arctan(t)]+∞ 0\n0 2 ·\nOn a donc, ﬁnalement, F(x) = π\n2 e−|x|.",
-      "v2_id": "region_ee95da3ab4de584d81aa",
+      "v2_id": "region_59f2779ec7deb53bbe9e",
       "new_bbox": [
-        72.5,
+        187.87,
         123.48,
         398.12,
-        191.19
+        165.02
       ],
-      "new_text": "∫+∞ 1 F(0) =\n= π 1 + t2 dt = [arctan(t)]+∞ 0\n0 2 ·\nOn a donc, ﬁnalement, F(x) = π\n2 e−|x|.",
+      "new_text": "∫+∞ 1 F(0) =\n= π 1 + t2 dt = [arctan(t)]+∞ 0\n0 2 ·",
+      "math_grouping": "multiline_derivation",
       "new_issues": [
         "math_boundary_unverified",
-        "math_reading_order_unverified"
+        "math_reading_order_unverified",
+        "math_band_split"
       ],
-      "assessment": "requires qualified mathematical review",
-      "reviewer": null
+      "assessment": "complete",
+      "content_preserved": false,
+      "changed": true,
+      "review_status": "pending_review",
+      "reviewer": null,
+      "reviewed_at": null,
+      "decision": null,
+      "notes": null
     }
   ]
 }

@@ -155,6 +155,11 @@ def regions_from_pages(pages: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
                     "issues": list(dict.fromkeys([*_suspicion(text), *(raw.get("region_issues") or [])])),
                     **({"extractionVersion": "2.0"} if version == "2.0" else {}),
                     "lineCount": int(raw.get("line_count") or 0),
+                    **(
+                        {"mathGrouping": str(raw["math_grouping"])}
+                        if version == "2.0" and raw.get("math_grouping")
+                        else {}
+                    ),
                 }
             )
     return _merge_table_fragments(_merge_math_fragments(regions))
@@ -213,6 +218,20 @@ def _merge_table_fragments(
     return merged
 
 
+def _combine_math_grouping(*values):
+    """Preserve the weakest structural grouping when math regions merge.
+
+    V2-only. Merging two labelled groups keeps the label at the top of the
+    uncertainty order so no merged region presents stronger structure than its
+    parts.
+    """
+    order = ["structurally_ambiguous", "mixed_prose", "multiline_derivation", "single_expression"]
+    present = [value for value in values if value in order]
+    if not present:
+        return next(iter(values), None)
+    return min(present, key=order.index)
+
+
 def _merge_math_fragments(
     regions: Sequence[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
@@ -247,6 +266,12 @@ def _merge_math_fragments(
                 previous["text"] = (
                     previous["text"].rstrip() + "\n" + region["text"].lstrip()
                 )
+                if previous.get("mathGrouping") or region.get("mathGrouping"):
+                    previous["mathGrouping"] = _combine_math_grouping(
+                        previous.get("mathGrouping"), region.get("mathGrouping")
+                    )
+                    if not previous["mathGrouping"]:
+                        previous.pop("mathGrouping", None)
                 continue
         merged.append(region)
     # Inline code should not be split into three visible regions by delimiter

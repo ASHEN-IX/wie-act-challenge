@@ -91,7 +91,7 @@ test("real reference upload, Python ingestion/index, SDK replay, instructor publ
     ).toBeVisible({ timeout: 30000 });
     const selected = [
       "region_1e2aeb86289d9d44e7c0",
-      "region_434492347d5b2247384e",
+      "region_aec9301c4a673be7a909",
       "region_43d9fa3583e1890b41fa",
     ].map(
       (raw) =>
@@ -190,7 +190,7 @@ test("real reference upload, Python ingestion/index, SDK replay, instructor publ
     // The earlier clipped summand must be visible through the authorized
     // published-reader context crop, while the region identity stays stable.
     const eq001 = "region_" + crypto.createHash("sha256")
-      .update(draft.sourceManifest[0].documentId + "\x1f" + "region_2fdfbbe92bff6db427e9")
+      .update(draft.sourceManifest[0].documentId + "\x1f" + "region_66ae1f964f8407b30376")
       .digest("hex").slice(0, 20);
     const expandedCrop = await studentPage.request.get(
       `/api/v1/study/courses/${courseId}/revisions/${revision.revisionTag}/sources/${draft.sourceManifest[0].documentId}/regions/${eq001}`,
