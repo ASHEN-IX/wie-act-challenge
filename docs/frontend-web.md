@@ -24,6 +24,10 @@ src/lib/                  Server API gateway, bounded form validation and utilit
 src/server/identity.ts    Request-scoped identity resolution
 ```
 
+## Navigation
+
+Primary navigation is four items: **Home** (`/dashboard`), **My Learning** (`/courses`), **Study Together** and **Progress**. Visual Lab, Practice, the binary-search demo, Tasks, Study plan and Explore sources sit under a collapsed **More tools** group that opens on those routes; Visual Lab is also reached from a published course ("Explore visually"). Teaching Studio and Institution sections remain role-gated by the workspace layout. No routes were removed, so existing bookmarks keep working.
+
 Pages read through the server-only gateway in `src/lib/api.ts`. It forwards the current cookie to the configured Nest backend, disables shared caching, bounds requests and preserves backend authorization. Server Actions authenticate independently, select fixed operations, validate fields, preserve Next redirect/error control flow and revalidate affected pages. No service keys or raw database/domain records are passed to the browser.
 
 Client components are limited to interactive navigation, form submission/pending feedback, asynchronous job polling and room WebSockets. React `useActionState` handles form feedback; no global client auth/data store is required. Use `next/link` and `next/navigation` directly. Independent reads use `Promise.all`.
@@ -42,4 +46,4 @@ Rebuilt working surfaces: authentication, overview, course/subject creation, PDF
 
 The simplification retires the old cosmetic wallpaper/video shops, billing/coupon management, standalone social/ranking dashboards and duplicated analytics/calendar/review screens. Their backend contracts/assets remain available; this rebuild does not delete user data. Voice controls/camera telemetry and the old elaborate planner/calendar UI are not carried into the new shell. Voice, richer scheduling, instructor Studio editing/publication, trusted quizzes/guided problems and peer facilitation remain explicit backlog work; do not mark those tasks DONE because this foundation exists.
 
-Run `pnpm --filter study-partner-web build`, `typecheck`, `lint`, `test`; `pnpm test:e2e` covers auth, native workspace mutations, responsive layout and two-user room membership. See [preparation results](audit/cleanup.md) for exact executed coverage and limits. Browser testing uses Playwright because no Browser plugin skill is available in this session.
+Run `pnpm --filter web build`, `typecheck`, `lint`, `test`; `pnpm test:e2e` covers auth, native workspace mutations, responsive layout and two-user room membership. See [preparation results](audit/cleanup.md) for exact executed coverage and limits. Browser testing uses Playwright because no Browser plugin skill is available in this session.

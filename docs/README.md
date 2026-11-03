@@ -16,6 +16,7 @@ One documentation folder, one task register. Start with the team plan and backlo
 | [Data model](data-model.md) / [Workflows](workflows.md) | Storage ownership, schemas and 8 end-to-end Mermaid journeys (A through H) |
 | [AI specification](ai-specification.md) / [LLM configuration](llm-config.md) | Domain AI behavior, contracts and safe fallback |
 | [Frontend](frontend-web.md) / [Backend](backend-api.md) / [AI service](ai-service.md) | Implementation entrypoints and package operations |
+| [Visual Learning Lab](visual-learning-lab.md) | Interactive graph/parameter experiments: architecture, API, engines, extension guide |
 | [Testing plan](testing-plan.md) | Functional, isolation, learning and capacity scenarios |
 | [Hackathon delivery](hackathon-delivery.md) | Organizer requirements and submission artifacts |
 | [Deployment](deployment.md) / [Security](security.md) | Deployment and security guidance |

@@ -22,6 +22,8 @@
   },
   "dependencies": {
     "@ednova/shared": "workspace:*",
+    "@react-three/drei": "10.0.1",
+    "@react-three/fiber": "9.0.4",
     "@tailwindcss/postcss": "^4.3.3",
     "better-auth": "^1.7.7",
     "class-variance-authority": "^0.7.1",
@@ -36,6 +38,7 @@
     "set-cookie-parser": "^3.1.4",
     "shadcn": "^4.22.0",
     "tailwind-merge": "^3.4.0",
+    "three": "0.171.0",
     "tw-animate-css": "^1.4.0"
   },
   "devDependencies": {
@@ -45,6 +48,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/set-cookie-parser": "^2.4.10",
+    "@types/three": "0.171.0",
     "@typescript-eslint/eslint-plugin": "^8.71.1",
     "@typescript-eslint/parser": "^8.71.1",
     "@vitest/coverage-v8": "^3.2.1",

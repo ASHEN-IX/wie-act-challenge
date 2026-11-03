@@ -4,7 +4,7 @@
 
 ## CURRENT enforcement
 
-`study-partner-api/modules/auth/src/models/User.ts` and `shared/auth.ts` define global `student` and `admin`. Better Auth resolves a Mongo session and domain user; `SessionGuard` authenticates, then domain handlers/tier policy apply. Admin/internal checks grant some privileged operations. AI operations enforce actor/resource ownership through `shared/operationPolicy.ts`. Paid/trial tiers affect access and expiry; independent signup is not unrestricted free AI access.
+`apps/api/modules/auth/src/models/User.ts` and `shared/auth.ts` define global `student` and `admin`. Better Auth resolves a Mongo session and domain user; `SessionGuard` authenticates, then domain handlers/tier policy apply. Admin/internal checks grant some privileged operations. AI operations enforce actor/resource ownership through `shared/operationPolicy.ts`. Paid/trial tiers affect access and expiry; independent signup is not unrestricted free AI access.
 
 The frontend `src/utils/permissions.ts` includes `teacher`, but neither its presence nor a visible screen implements an instructor role. Course routes generally use `{_id, userId}`; M04-A adds Institution, InstitutionMembership and invitation context, but no CourseEnrollment model or course-scoped grant exists. Team membership grants session participation, not a defined license to another user's course. Session-chat/voice HTTP handlers need explicit resource checks; static upload routes and team creation course lookup need isolation tests. Do not claim all retained legacy paths satisfy the TARGET matrix.
 

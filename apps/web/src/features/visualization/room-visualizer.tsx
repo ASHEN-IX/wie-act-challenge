@@ -84,7 +84,7 @@ export function RoomVisualizer({
   }
   return (
     <section data-testid="room-visualization" className="space-y-3">
-      <h2 className="font-semibold">Shared deterministic illustration</h2>
+      <h2 className="font-semibold">Shared example</h2>
       {error && (
         <p role="alert" className="text-destructive">
           {error}
@@ -98,7 +98,7 @@ export function RoomVisualizer({
           onChange={submit}
         />
       ) : (
-        <p role="status">No authorized shared illustration loaded.</p>
+        <p role="status">No shared example yet.</p>
       )}
       <Button
         variant="outline"
@@ -115,7 +115,7 @@ export function RoomVisualizer({
           }
         }}
       >
-        Recover shared illustration
+        Reload example
       </Button>
     </section>
   );

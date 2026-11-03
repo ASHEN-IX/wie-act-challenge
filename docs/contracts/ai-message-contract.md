@@ -4,8 +4,8 @@
 **Transport:** RabbitMQ, vhost `mindflow`, persistent work queues + result events
 **Sources of truth:**
 
-- Node: `study-partner-api/shared/ai-messaging/envelope.js`
-- Python: `study-partner-ai/messaging/envelope.py`
+- Node: `apps/api/shared/ai-messaging/envelope.js`
+- Python: `apps/ai/messaging/envelope.py`
 
 Both sides validate every message **on publish and on consume**. Invalid
 messages are rejected before entering business logic. Any schema change must be

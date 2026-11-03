@@ -52,7 +52,7 @@ Separate EdNova into three distinct, non-overlapping logical execution planes:
 Microservice network overhead, distributed transactions, and multiple HTTP gateways introduce unnecessary operational burden for a fast-paced hackathon delivery.
 
 ### Decision
-Preserve the existing **NestJS modular monolith** (`study-partner-api`).
+Preserve the existing **NestJS modular monolith** (`apps/api`).
 - Keep 7 bounded in-process domain modules: `auth`, `user-profile`, `study`, `ai-orchestrator`, `signal-processing`, `analytics`, `notification`.
 - Maintain the internal `module://` protocol dispatched via `shared/moduleClient.ts` to pass request contexts without HTTP overhead.
 - Future refactoring to native NestJS application service injection is permitted post-hackathon, but the `module://` abstraction remains intact during current sprints.
@@ -73,7 +73,7 @@ Retain **Next.js 16 App Router** with **React 19 Server Components (RSC)**, **Ta
 - Server Components query the backend directly through `src/lib/api.ts` with forwarded session cookies.
 - Mutations use validated native **Server Actions** in `src/features/*`.
 - Client components are restricted to lightweight interactive elements (forms, status pills, room media clients).
-- Security headers and strict CSP nonces are enforced on every request via `study-partner-web/src/proxy.ts`.
+- Security headers and strict CSP nonces are enforced on every request via `apps/web/src/proxy.ts`.
 
 ### Consequences
 - Zero sensitive business logic or API keys leak to the client browser.
@@ -198,7 +198,7 @@ Use **LiteLLM** in the Python AI service to abstract provider APIs (OpenAI, Anth
 Course materials must be retrieved with low latency and zero external SaaS dependencies.
 
 ### Decision
-Retain the existing **FAISS disk-mounted vector indexing** pipeline in `study-partner-ai`.
+Retain the existing **FAISS disk-mounted vector indexing** pipeline in `apps/ai`.
 - Documents are parsed into 512-token chunks with 64-token overlaps.
 - Embeddings are generated using standard models (`text-embedding-3-small` or local `all-MiniLM-L6-v2`).
 - Target indexes are serialized to disk mounted on shared Docker volumes as `faiss/<courseId>/<revisionTag>.faiss`, with metadata at `faiss/<courseId>/<revisionTag>.meta.json`. The current adapter still writes course-scoped artifacts; migration to revision-aware reads/writes, chunk keys and caches is a later designated mission.

@@ -117,6 +117,7 @@ export function RoomView({
     );
   const [hintLevel, setHintLevel] = useState<number>(1);
   const [customQuestion, setCustomQuestion] = useState<string>("");
+  const [tab, setTab] = useState<"chat" | "help" | "voice">("chat");
   const [isPending, startTransition] = useTransition();
   const [isFacilitatorPending, startFacilitatorTransition] = useTransition();
 
@@ -333,303 +334,166 @@ export function RoomView({
     debrief: "Group Debrief",
   };
 
+  const phaseHint =
+    room.currentPhase === "idle"
+      ? isPresenter
+        ? "Start the discussion when your group is ready."
+        : "Waiting for the presenter to start."
+      : room.currentPhase === "peer_discussion"
+        ? "Talk it through together. The AI helps if a misconception appears."
+        : room.currentPhase === "individual_attempt"
+          ? "Answer on your own first. Others cannot see your answer yet."
+          : "Compare answers and discuss what you learned.";
+  const connectionDot =
+    connectionStatus === "connected"
+      ? "bg-emerald-500"
+      : connectionStatus === "reconnecting"
+        ? "bg-amber-500 animate-pulse"
+        : "bg-rose-500";
+  const tabs = [
+    { id: "chat", label: "Chat" },
+    { id: "help", label: "Help" },
+    { id: "voice", label: "Voice" },
+  ] as const;
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
       {actionError && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-sm text-destructive lg:col-span-2">
           {actionError}
         </p>
       )}
-      {/* Top Authoritative State Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
-        <div className="flex items-center gap-3">
-          <Badge
-            variant={
-              room.currentPhase === "peer_discussion"
-                ? "default"
-                : room.currentPhase === "individual_attempt"
-                  ? "secondary"
-                  : "outline"
-            }
-            className="text-xs font-semibold capitalize"
-          >
-            {phaseLabels[room.currentPhase] || room.currentPhase}
-          </Badge>
 
-          <span className="text-xs text-muted-foreground">Seq #{room.seq}</span>
-
-          {room.inviteCode && (
-            <span className="text-xs text-muted-foreground">
-              Invite:{" "}
-              <code className="font-mono font-bold text-foreground">
-                {room.inviteCode}
-              </code>
-            </span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span
-            className={`inline-block h-2 w-2 rounded-full ${
-              connectionStatus === "connected"
-                ? "bg-emerald-500"
-                : connectionStatus === "reconnecting"
-                  ? "bg-amber-500 animate-pulse"
-                  : "bg-rose-500"
-            }`}
-          />
-          <span className="text-xs capitalize text-muted-foreground">
-            {connectionStatus}
-          </span>
-        </div>
-      </div>
-
-      {/* Phase Guidance Banner */}
-      <div className="rounded-lg border border-border/80 bg-muted/40 p-4">
-        {room.currentPhase === "idle" && (
-          <p className="text-sm text-muted-foreground">
-            {isPresenter
-              ? "You are the presenter. Click 'Start Peer Discussion' when your team is ready."
-              : "Waiting for the presenter to start the collaboration session."}
-          </p>
-        )}
-        {room.currentPhase === "peer_discussion" && (
-          <p className="text-sm leading-6">
-            <strong>Peer Discussion:</strong> Discuss the concept with your
-            peers. The AI facilitator is attentive and will prompt questions if
-            misconceptions arise.
-          </p>
-        )}
-        <RoomLearningPanel room={room} userId={currentUserId} />
-        <PrivateHelpPanel roomId={room.roomId} />
-      </div>
-
-      {/* ED-09: Pedagogical AI Facilitator Card */}
-      <div className="rounded-lg border border-indigo-500/30 bg-gradient-to-r from-indigo-500/5 via-purple-500/5 to-transparent p-4 shadow-sm">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-500/10 text-xs font-bold text-indigo-600">
-              AI
-            </span>
-            <span className="text-sm font-semibold text-foreground">
-              Pedagogical Facilitator
-            </span>
+      {/* Main: one clear thing to do */}
+      <section className="flex min-w-0 flex-col gap-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-col gap-1">
             <Badge
-              variant="outline"
-              className="text-[10px] uppercase tracking-wider text-muted-foreground"
+              variant={
+                room.currentPhase === "peer_discussion"
+                  ? "default"
+                  : "secondary"
+              }
+              className="w-fit"
             >
-              Peer-First
+              {phaseLabels[room.currentPhase] || room.currentPhase}
             </Badge>
+            <p className="text-sm text-muted-foreground">{phaseHint}</p>
           </div>
-
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              className="text-xs h-7 px-2.5"
-              onClick={handleRequestHint}
-              disabled={isFacilitatorPending}
-            >
-              {isFacilitatorPending
-                ? "Thinking..."
-                : `Request Hint (L${hintLevel})`}
-            </Button>
+          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            {room.inviteCode && (
+              <span>
+                Invite code{" "}
+                <code
+                  data-testid="invite-code"
+                  className="rounded bg-muted px-1.5 py-0.5 font-mono text-sm font-semibold text-foreground"
+                >
+                  {room.inviteCode}
+                </code>
+              </span>
+            )}
+            <span className="flex items-center gap-1.5 capitalize">
+              <span
+                className={`inline-block h-2 w-2 rounded-full ${connectionDot}`}
+                aria-hidden
+              />
+              {connectionStatus}
+            </span>
           </div>
         </div>
 
-        {activeIntervention && (
-          <div className="mb-4 rounded-md border border-indigo-200/60 bg-background/80 p-3.5 text-sm dark:border-indigo-900/60">
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Badge
-                  variant={
-                    strategyLabels[activeIntervention.strategy]?.variant ||
-                    "default"
-                  }
-                  className="text-[11px]"
-                >
-                  {strategyLabels[activeIntervention.strategy]?.label ||
-                    activeIntervention.strategy}
-                </Badge>
-                {activeIntervention.targetSpeakerName && (
-                  <span className="text-xs font-medium text-muted-foreground">
-                    Addressed to:{" "}
-                    <strong className="text-foreground">
-                      {activeIntervention.targetSpeakerName}
-                    </strong>
-                  </span>
-                )}
-              </div>
-
-              {isTargetedToMe && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-xs text-muted-foreground hover:text-foreground h-6 px-2"
-                  onClick={handleDeclinePrompt}
-                  disabled={isFacilitatorPending}
-                >
-                  Pass / Decline
-                </Button>
-              )}
-            </div>
-
-            <p className="whitespace-pre-wrap leading-relaxed text-foreground">
-              {activeIntervention.message}
-            </p>
-
-            {isPresenter &&
-              activeIntervention.proposedUICommand?.targetPhase && (
-                <div className="mt-3 flex items-center gap-2 pt-2 border-t border-border/50">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="text-xs h-7"
-                    onClick={handleAcceptCommand}
-                    disabled={isPending}
-                  >
-                    Accept Suggestion: Move to{" "}
-                    {
-                      phaseLabels[
-                        activeIntervention.proposedUICommand.targetPhase
-                      ]
-                    }
-                  </Button>
-                </div>
-              )}
-          </div>
-        )}
-
-        {/* Inline Facilitator Query */}
-        <form onSubmit={handleAskFacilitator} className="flex gap-2">
-          <input
-            type="text"
-            value={customQuestion}
-            onChange={(e) => setCustomQuestion(e.target.value)}
-            placeholder="Ask facilitator a concept question or request peer challenge..."
-            className="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            maxLength={1000}
-            disabled={isFacilitatorPending}
-          />
-          <Button
-            type="submit"
-            size="sm"
-            className="text-xs h-8 px-3"
-            disabled={isFacilitatorPending || !customQuestion.trim()}
+        {isPresenter && (
+          <div
+            role="group"
+            aria-label="Presenter Controls"
+            className="flex flex-wrap items-center gap-2"
           >
-            {isFacilitatorPending ? "Submitting..." : "Ask AI"}
-          </Button>
-        </form>
-      </div>
-
-      {/* Presenter Controls (Authority check: only presenter can trigger) */}
-      {isPresenter && (
-        <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-primary">
+            <span className="mr-1 text-xs font-medium text-muted-foreground">
               Presenter Controls
             </span>
-            <span className="text-xs text-muted-foreground">
-              You control the synchronized room phase
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              variant={
-                room.currentPhase === "peer_discussion" ? "default" : "outline"
-              }
-              onClick={() => handlePhaseChange("peer_discussion")}
-              disabled={isPending || room.currentPhase === "peer_discussion"}
-            >
-              Start Peer Discussion
-            </Button>
-            <Button
-              size="sm"
-              variant={
-                room.currentPhase === "individual_attempt"
-                  ? "default"
-                  : "outline"
-              }
-              onClick={() => handlePhaseChange("individual_attempt")}
-              disabled={isPending || room.currentPhase === "individual_attempt"}
-            >
-              Open Individual Attempt
-            </Button>
-            <Button
-              size="sm"
-              variant={room.currentPhase === "debrief" ? "default" : "outline"}
-              onClick={() => handlePhaseChange("debrief")}
-              disabled={isPending || room.currentPhase === "debrief"}
-            >
-              Move to Debrief
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* LiveKit Voice Discussion & AI Moderator Controls (ED-17, ED-25) */}
-      <VoiceModeratorControls
-        roomId={room.roomId}
-        initialVoiceConsent={
-          participants.find((p) => p.userId === currentUserId)?.hasVoiceConsent ?? false
-        }
-        isPresenterOrHost={isPresenter}
-      />
-
-      <PeerChat chat={chat} connected={connectionStatus === "connected"} />
-
-      {/* Participants Roster with Submission & Online Status */}
-      <div className="rounded-lg border p-4">
-        <h3 className="mb-3 text-sm font-semibold">
-          Room Members ({participants.length})
-        </h3>
-        <div className="flex flex-col divide-y text-sm">
-          {participants.map((p) => {
-            const isMe = p.userId === currentUserId;
-            const isThisPresenter = p.userId === room.presenterUserId;
-
-            return (
-              <div
-                key={p.userId}
-                data-testid={`participant-${p.userId}`}
-                className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0"
+            {(
+              [
+                ["peer_discussion", "Start Peer Discussion"],
+                ["individual_attempt", "Open Individual Attempt"],
+                ["debrief", "Move to Debrief"],
+              ] as const
+            ).map(([phase, label]) => (
+              <Button
+                key={phase}
+                size="sm"
+                variant={room.currentPhase === phase ? "default" : "outline"}
+                onClick={() => handlePhaseChange(phase)}
+                disabled={isPending || room.currentPhase === phase}
               >
-                <div className="flex items-center gap-2.5">
-                  <span
-                    aria-label={
-                      !presenceEpoch || connectionStatus !== "connected"
-                        ? "Presence unknown"
-                        : p.isOnline
-                          ? "Online"
-                          : "Offline"
-                    }
-                    className={`inline-block h-2 w-2 rounded-full ${
-                      presenceEpoch &&
-                      connectionStatus === "connected" &&
-                      p.isOnline
-                        ? "bg-emerald-500"
-                        : "bg-zinc-400"
-                    }`}
-                  />
-                  <span className="font-medium">
-                    {p.name || "Student"} {isMe && "(You)"}
-                  </span>
-                  {isThisPresenter && (
-                    <Badge
-                      variant="outline"
-                      className="text-[10px] px-1.5 py-0"
-                    >
-                      Presenter
-                    </Badge>
-                  )}
-                </div>
+                {label}
+              </Button>
+            ))}
+          </div>
+        )}
 
-                <div className="flex items-center gap-2">
+        <RoomLearningPanel room={room} userId={currentUserId} />
+
+        <div className="flex justify-end">
+          <ActionForm action={leaveRoom} submit="Leave room" variant="outline">
+            <input type="hidden" name="id" value={roomId} />
+            {leaveCommand.current && (
+              <input
+                type="hidden"
+                name="commandId"
+                value={leaveCommand.current}
+              />
+            )}
+            <input type="hidden" name="expectedSeq" value={room.seq} />
+          </ActionForm>
+        </div>
+      </section>
+
+      {/* Side: people, then one tool at a time */}
+      <aside className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-24 lg:self-start">
+        <div>
+          <h3 className="mb-2 text-sm font-semibold">
+            Room Members ({participants.length})
+          </h3>
+          <ul className="flex flex-col divide-y text-sm">
+            {participants.map((p) => {
+              const isMe = p.userId === currentUserId;
+              const online =
+                presenceEpoch && connectionStatus === "connected" && p.isOnline;
+              return (
+                <li
+                  key={p.userId}
+                  data-testid={`participant-${p.userId}`}
+                  className="flex items-center justify-between gap-2 py-2"
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span
+                      aria-label={
+                        !presenceEpoch || connectionStatus !== "connected"
+                          ? "Presence unknown"
+                          : p.isOnline
+                            ? "Online"
+                            : "Offline"
+                      }
+                      className={`inline-block h-2 w-2 shrink-0 rounded-full ${
+                        online ? "bg-emerald-500" : "bg-zinc-400"
+                      }`}
+                    />
+                    <span className="truncate font-medium">
+                      {p.name || "Student"} {isMe && "(You)"}
+                    </span>
+                    {p.userId === room.presenterUserId && (
+                      <Badge
+                        variant="outline"
+                        className="px-1.5 py-0 text-[10px]"
+                      >
+                        Presenter
+                      </Badge>
+                    )}
+                  </span>
                   {room.currentPhase === "individual_attempt" && (
-                    <span className="text-xs text-muted-foreground">
+                    <span className="shrink-0 text-xs text-muted-foreground">
                       {p.hasSubmitted ? (
-                        <span className="text-emerald-600 font-medium">
+                        <span className="font-medium text-emerald-600">
                           ✓ Submitted
                         </span>
                       ) : (
@@ -637,30 +501,171 @@ export function RoomView({
                       )}
                     </span>
                   )}
-                  <span className="text-xs capitalize text-muted-foreground">
-                    {p.role}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
+                </li>
+              );
+            })}
+          </ul>
         </div>
-      </div>
 
-      {/* Leave Room Action */}
-      <div className="flex justify-end pt-2">
-        <ActionForm action={leaveRoom} submit="Leave room" variant="outline">
-          <input type="hidden" name="id" value={roomId} />
-          {leaveCommand.current && (
-            <input
-              type="hidden"
-              name="commandId"
-              value={leaveCommand.current}
+        <div className="flex flex-col gap-3 rounded-xl border p-3">
+          <div role="tablist" aria-label="Room tools" className="flex gap-1">
+            {tabs.map((t) => (
+              <button
+                key={t.id}
+                role="tab"
+                type="button"
+                id={`room-tab-${t.id}`}
+                aria-selected={tab === t.id}
+                aria-controls={`room-panel-${t.id}`}
+                onClick={() => setTab(t.id)}
+                className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  tab === t.id
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Panels stay mounted so chat history, voice and drafts survive tab changes. */}
+          <div
+            role="tabpanel"
+            id="room-panel-chat"
+            aria-labelledby="room-tab-chat"
+            hidden={tab !== "chat"}
+          >
+            <PeerChat
+              chat={chat}
+              connected={connectionStatus === "connected"}
             />
-          )}
-          <input type="hidden" name="expectedSeq" value={room.seq} />
-        </ActionForm>
-      </div>
+          </div>
+
+          <div
+            role="tabpanel"
+            id="room-panel-help"
+            aria-labelledby="room-tab-help"
+            hidden={tab !== "help"}
+            className="flex flex-col gap-4"
+          >
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-semibold">
+                  Ask the AI facilitator
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-2.5 text-xs"
+                  onClick={handleRequestHint}
+                  disabled={isFacilitatorPending}
+                >
+                  {isFacilitatorPending
+                    ? "Thinking..."
+                    : `Request Hint (L${hintLevel})`}
+                </Button>
+              </div>
+
+              {activeIntervention && (
+                <div className="rounded-md border bg-muted/40 p-3 text-sm">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <Badge
+                        variant={
+                          strategyLabels[activeIntervention.strategy]
+                            ?.variant || "default"
+                        }
+                        className="text-[11px]"
+                      >
+                        {strategyLabels[activeIntervention.strategy]?.label ||
+                          activeIntervention.strategy}
+                      </Badge>
+                      {activeIntervention.targetSpeakerName && (
+                        <span className="text-xs text-muted-foreground">
+                          For{" "}
+                          <strong className="text-foreground">
+                            {activeIntervention.targetSpeakerName}
+                          </strong>
+                        </span>
+                      )}
+                    </span>
+                    {isTargetedToMe && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 px-2 text-xs"
+                        onClick={handleDeclinePrompt}
+                        disabled={isFacilitatorPending}
+                      >
+                        Pass / Decline
+                      </Button>
+                    )}
+                  </div>
+                  <p className="whitespace-pre-wrap leading-relaxed">
+                    {activeIntervention.message}
+                  </p>
+                  {isPresenter &&
+                    activeIntervention.proposedUICommand?.targetPhase && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="mt-3 h-7 text-xs"
+                        onClick={handleAcceptCommand}
+                        disabled={isPending}
+                      >
+                        Accept Suggestion: Move to{" "}
+                        {
+                          phaseLabels[
+                            activeIntervention.proposedUICommand.targetPhase
+                          ]
+                        }
+                      </Button>
+                    )}
+                </div>
+              )}
+
+              <form onSubmit={handleAskFacilitator} className="flex gap-2">
+                <input
+                  type="text"
+                  value={customQuestion}
+                  onChange={(e) => setCustomQuestion(e.target.value)}
+                  placeholder="Ask a concept question or request a peer challenge…"
+                  aria-label="Ask the AI facilitator"
+                  className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  maxLength={1000}
+                  disabled={isFacilitatorPending}
+                />
+                <Button
+                  type="submit"
+                  size="sm"
+                  className="h-8 px-3 text-xs"
+                  disabled={isFacilitatorPending || !customQuestion.trim()}
+                >
+                  {isFacilitatorPending ? "Submitting..." : "Ask AI"}
+                </Button>
+              </form>
+            </div>
+            <PrivateHelpPanel roomId={room.roomId} />
+          </div>
+
+          <div
+            role="tabpanel"
+            id="room-panel-voice"
+            aria-labelledby="room-tab-voice"
+            hidden={tab !== "voice"}
+          >
+            <VoiceModeratorControls
+              roomId={room.roomId}
+              initialVoiceConsent={
+                participants.find((p) => p.userId === currentUserId)
+                  ?.hasVoiceConsent ?? false
+              }
+              isPresenterOrHost={isPresenter}
+            />
+          </div>
+        </div>
+      </aside>
     </div>
   );
 }

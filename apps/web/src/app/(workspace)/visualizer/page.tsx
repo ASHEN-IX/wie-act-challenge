@@ -6,8 +6,8 @@ export default function VisualizerPage() {
   return (
     <>
       <PageHeader
-        title="Explore binary search"
-        description="Step through a deterministic example. Demonstration controls do not assess your learning."
+        title="Binary search, step by step"
+        description="Step through one worked example. This demo is practice only and is not graded."
       />
       <BinarySearchVisualizer />
     </>
