@@ -41,7 +41,7 @@ Instead, **all three team members own an entire product domain end-to-end**:
      - Document extraction worker: PyPDF/Tesseract parsing, Bloom Taxonomy classification (`docs/contracts/bloom-fixture.json`), and FAISS dense vector chunking.
      - Provenance tracking: Every learning objective stores `{ documentId, pageNumber, charStart, charEnd, sourceExcerpt }`.
   2. **Course Studio (Authoring UI & Immutability)**:
-     - Next.js Course Studio interface (`study-partner-web/src/features/courses/studio`): Hierarchical tree editor (Chapters -> Topics -> Learning Objectives).
+     - Next.js Course Studio interface (`apps/web/src/features/courses/studio`): Hierarchical tree editor (Chapters -> Topics -> Learning Objectives).
      - Instructor review workflow: Edit statements, assign Bloom levels, reorder topics, or discard AI proposals.
      - Immutable Publication Gate: Publishing computes a SHA-256 content hash, creates an immutable `CourseRevision` record, and freezes the version for student enrollment.
   3. **Access Control & Permissions**:
@@ -53,7 +53,7 @@ Instead, **all three team members own an entire product domain end-to-end**:
 ### 2.2. Tasnim — Individual Learning, Socratic Tutoring & Evidence Engine
 * **Primary Scope**:
   1. **Intelligent Interactive UI**:
-     - Pre-compiled React activity registry (`study-partner-web/src/features/learning/activity-renderer.tsx`):
+     - Pre-compiled React activity registry (`apps/web/src/features/learning/activity-renderer.tsx`):
        - `InteractiveQuiz` (multiple-choice / multi-select with server validation).
        - `GuidedProblem` (step-by-step Socratic reasoning).
        - `StepByStepVisualizer` (state-driven algorithmic progression).

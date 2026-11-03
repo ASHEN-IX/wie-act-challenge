@@ -69,7 +69,8 @@ export async function selectLearning(
   input: {
     revisionId: string;
     objectiveId: string;
-    activityType: string;
+    // Omitted when the learner has not chosen a type, so the adaptive policy picks.
+    activityType?: string;
     intent: string;
   },
 ) {

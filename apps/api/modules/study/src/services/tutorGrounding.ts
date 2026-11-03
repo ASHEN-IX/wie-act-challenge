@@ -11,6 +11,7 @@
 import { CourseRevision } from '../models';
 import { verifyRevisionArtifact } from './revisionSources';
 import aiClient from '../../../../shared/aiClient';
+import logger from '../../../../shared/logger';
 import { canReadCourse } from './resourceAccess';
 import { parseContract } from '../../../../shared/ednova/contracts';
 import {
@@ -299,13 +300,22 @@ export async function askGroundedTutor(
   } catch (err: unknown) {
     const errorObj = err as { response?: { status?: number; data?: unknown }; message?: string };
     if (errorObj?.response?.status === 401 || errorObj?.response?.status === 403) {
+      logger.warn('tutor_ask_failed', { courseId, upstreamStatus: errorObj.response.status });
       throw new TutorServiceUnavailableError('AI service authentication failed');
     }
     if (errorObj?.response?.status === 503) {
       throw new TutorServiceUnavailableError('AI service currently unavailable');
     }
-    if (err instanceof PublicationForbiddenError || err instanceof TutorServiceUnavailableError)
+    if (err instanceof PublicationForbiddenError || err instanceof TutorServiceUnavailableError) {
+      if (err instanceof TutorServiceUnavailableError)
+        logger.warn('tutor_ask_rejected', { courseId, reason: err.message });
       throw err;
+    }
+    logger.warn('tutor_ask_failed', {
+      courseId,
+      upstreamStatus: errorObj?.response?.status,
+      reason: errorObj?.message
+    });
     throw new TutorServiceUnavailableError();
   }
 }

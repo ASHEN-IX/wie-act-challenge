@@ -1,5 +1,6 @@
 """Internal service-authenticated explicit revision indexing; no provider calls."""
 
+import logging
 from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from typing import Annotated, Literal
@@ -16,6 +17,7 @@ from services.vector_store.revision_artifacts import (
 from services.vector_store.adapter import get_vector_store
 from services.vector_store.embedder import get_embedder
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/ai/sources", tags=["sources"])
 
 IndexId = Annotated[str, StringConstraints(min_length=1, max_length=128)]
@@ -199,4 +201,5 @@ def index_sources(req: IndexRequest):
             "indexHash": meta["indexHash"],
         }
     except Exception as exc:
+        logger.exception("source_indexing_failed")
         raise HTTPException(503, "Exact source indexing unavailable") from exc

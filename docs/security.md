@@ -89,7 +89,7 @@ This document outlines the security architecture, controls, threat mitigations, 
   - Responds with HTTP `403 Untrusted request origin`.
 
 ### 4.2. Content Security Policy (CSP)
-- The Next.js edge proxy (`study-partner-web/proxy.js`) issues a dynamic per-request cryptographic nonce:
+- The Next.js edge proxy (`apps/web/proxy.js`) issues a dynamic per-request cryptographic nonce:
   ```
   default-src 'self';
   script-src 'self' 'nonce-<UUID>' 'strict-dynamic';
@@ -141,7 +141,7 @@ File uploads (`/api/v1/study/courses`, `/api/v1/study/courses/:id/files`, `/uplo
 ## 7. Secrets Management & Environment Isolation
 
 - **Client vs. Server Isolation**:
-  - `study-partner-web` environment variables expose NO sensitive credentials.
+  - `apps/web` environment variables expose NO sensitive credentials.
   - Variables prefixed with `NEXT_PUBLIC_*` contain only safe public settings (such as app title or public URLs).
   - Secrets (`BETTER_AUTH_SECRET`, `INTERNAL_API_SECRET`, `MONGODB_URI`, `STRIPE_SECRET_KEY`, `RABBITMQ_PASS`) are strictly isolated to server-side environments.
 - **Internal API Calls**:

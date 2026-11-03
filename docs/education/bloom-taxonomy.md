@@ -44,7 +44,7 @@ Ordered low → high. This is the "thinking" axis.
 | 5 | `evaluate` | Higher-order thinking |
 | 6 | `create` | Higher-order thinking |
 
-The canonical ordered tuple, as implemented in [`bloom/taxonomy.py`](../../study-partner-ai/bloom/taxonomy.py) (Python) and mirrored in `study-partner-api/shared/bloom/taxonomy.ts` (Node):
+The canonical ordered tuple, as implemented in [`bloom/taxonomy.py`](../../apps/ai/bloom/taxonomy.py) (Python) and mirrored in `apps/api/shared/bloom/taxonomy.ts` (Node):
 
 ```text
 remember, understand, apply, analyze, evaluate, create
@@ -242,11 +242,11 @@ A `procedural` `apply` score and a `metacognitive` `apply` score are different c
 
 | Concern | Location |
 |---|---|
-| Shared taxonomy constants (levels/types/verb map/unlock) | `bloom/taxonomy.py` · `study-partner-api/shared/bloom/taxonomy.ts` |
+| Shared taxonomy constants (levels/types/verb map/unlock) | `bloom/taxonomy.py` · `apps/api/shared/bloom/taxonomy.ts` |
 | Objective classification | `bloom/classifier.py` |
 | Objective extraction | `objective_extractor.py`, `learning_objective.py` |
-| Competency estimator (EWMA) | `study-partner-api/services/study/src/services/competency.js` |
+| Competency estimator (EWMA) | `apps/api/services/study/src/services/competency.js` |
 | Competency profile store | `CompetencyProfile` model (`services/study/src/models`) |
 | Planner weakest-first targeting | BLOOM-10 (Python planner + Node plan service) |
-| Frontend competency radar | BLOOM-11 (`study-partner-web` Competency Map) |
+| Frontend competency radar | BLOOM-11 (`apps/web` Competency Map) |
 | E2E validation | BLOOM-12 |

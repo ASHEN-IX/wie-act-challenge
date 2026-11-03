@@ -45,8 +45,8 @@ export default async function Progress() {
   return (
     <>
       <PageHeader
-        title="Progress, with perspective"
-        description="Review your learning evidence. XP reflects activity, not mastery."
+        title="Progress"
+        description="Your verified learning evidence. XP counts activity, not mastery."
       />
       <DataError message={competency.error || rewards.error} />
       {rewards.data && <RewardSummary rewards={rewards.data} />}

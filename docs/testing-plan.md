@@ -55,7 +55,7 @@ From workspace root: `pnpm install --frozen-lockfile`, `pnpm lint`, `pnpm typech
 
 Dedicated Mongo/Mailpit: `pnpm test:infra:up` (27018, 1026/8026). Live broker roundtrip suites require **explicit isolated broker** and `RUN_AI_ROUNDTRIP=1`; normal integration skips do not establish those roundtrips. Auth tests use dedicated test databases; browser launcher supplies test env but cannot compensate for a failed Nest startup. Start/stop only test services created for validation, never unrelated persistent resources.
 
-Python: use compatible >=3.11,<3.15 plus Poetry project dependencies/dev tools. Run from `study-partner-ai`: `poetry run pytest tests agents -q`, with a reviewed selection of live/manual scripts; `conftest.py` excludes some manual tests, not all network dependencies. Full ingestion/RAG/ML tests require heavy libraries/model artifacts, and real service evaluation requires approved credentials. Habib lightweight temporary environment can run selected worker/state/schema tests, with its dependency subset and untested scope explicitly recorded.
+Python: use compatible >=3.11,<3.15 plus Poetry project dependencies/dev tools. Run from `apps/ai`: `poetry run pytest tests agents -q`, with a reviewed selection of live/manual scripts; `conftest.py` excludes some manual tests, not all network dependencies. Full ingestion/RAG/ML tests require heavy libraries/model artifacts, and real service evaluation requires approved credentials. Habib lightweight temporary environment can run selected worker/state/schema tests, with its dependency subset and untested scope explicitly recorded.
 
 ## Exit gate
 

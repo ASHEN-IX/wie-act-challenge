@@ -1,5 +1,5 @@
 import { load, segment } from "@/lib/api";
-import { randomUUID } from 'node:crypto';
+import { randomUUID } from "node:crypto";
 import { requireIdentity } from "@/server/identity";
 import { PageHeader } from "@/components/shared/page-header";
 import { DataError, EmptyState } from "@/components/shared/states";
@@ -51,61 +51,32 @@ export default async function Room({
       <>
         <PageHeader
           title={room.title || "Your study room"}
-          description="Work through the material in real-time with your peers and AI facilitation."
+          description="Study with your group in one shared room."
         />
-        <div className="grid gap-9 lg:grid-cols-[minmax(0,1fr)_340px]">
-          {/* Main Collaborative Room Experience */}
-          <section className="flex flex-col gap-6">
-            <RoomView
-              key={room.roomId}
-              roomId={room.roomId}
-              currentUserId={identity.userId}
-              leaveCommandId={randomUUID()}
-              initialRoom={room}
-              initialParticipants={participants}
-              initialInterventions={interventionsRes.data?.interventions || []}
-              wsUrl={
-                process.env.NEXT_PUBLIC_WS_URL ||
-                (process.env.BACKEND_URL
-                  ? process.env.BACKEND_URL.replace(/^http/, "ws")
-                  : undefined)
-              }
-            />
-
-
-          </section>
-
-          {/* Right Sidebar Information */}
-          <aside className="flex flex-col gap-6">
-            <div className="rounded-lg border p-5">
-              <h3 className="mb-2 text-sm font-semibold">Study Session Info</h3>
-              <p className="text-xs text-muted-foreground leading-5">
-                All participant presence, active activities, and submission counts
-                are synchronized authoritatively. Private question attempts remain isolated.
-              </p>
-              {room.inviteCode && (
-                <div className="mt-4 rounded border bg-muted/30 p-3">
-                  <span className="block text-xs text-muted-foreground">
-                    Invite Code:
-                  </span>
-                  <code
-                    data-testid="invite-code"
-                    className="mt-0.5 block font-mono text-base font-bold text-foreground"
-                  >
-                    {room.inviteCode}
-                  </code>
-                </div>
-              )}
-            </div>
-          </aside>
-        </div>
+        <RoomView
+          key={room.roomId}
+          roomId={room.roomId}
+          currentUserId={identity.userId}
+          leaveCommandId={randomUUID()}
+          initialRoom={room}
+          initialParticipants={participants}
+          initialInterventions={interventionsRes.data?.interventions || []}
+          wsUrl={
+            process.env.NEXT_PUBLIC_WS_URL ||
+            (process.env.BACKEND_URL
+              ? process.env.BACKEND_URL.replace(/^http/, "ws")
+              : undefined)
+          }
+        />
       </>
     );
   }
 
   // Dedicated rooms never downgrade a denied/revoked namespace to legacy access.
   if (sessionId.startsWith("room_")) {
-    return <DataError message={dedicatedRoom.error || "Room is unavailable."} />;
+    return (
+      <DataError message={dedicatedRoom.error || "Room is unavailable."} />
+    );
   }
 
   // 2. Fallback to legacy team session flow if room not found in dedicated collection

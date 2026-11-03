@@ -19,7 +19,7 @@ No room, model or publication feature is DONE merely because reusable code is pr
 
 ## Technical reading conventions
 
-All execution notes below are **TARGET recommendations, not changes performed**. Existing code references use repository-root aliases: `API/` = `study-partner-api/`, `WEB/` = `study-partner-web/`, `AI/` = `study-partner-ai/`. References were refreshed after the native frontend rebuild. They identify current extension anchors, not proof the old voice/interactive/reward UX was preserved; a new logical operation does not imply an endpoint/model already exists. Keep existing domain/validation patterns; exact proposed interfaces and architecture decisions are in [target architecture](target-architecture.md).
+All execution notes below are **TARGET recommendations, not changes performed**. Existing code references use repository-root aliases: `API/` = `apps/api/`, `WEB/` = `apps/web/`, `AI/` = `apps/ai/`. References were refreshed after the native frontend rebuild. They identify current extension anchors, not proof the old voice/interactive/reward UX was preserved; a new logical operation does not imply an endpoint/model already exists. Keep existing domain/validation patterns; exact proposed interfaces and architecture decisions are in [target architecture](target-architecture.md).
 
 ## Task index
 
@@ -375,7 +375,7 @@ All execution notes below are **TARGET recommendations, not changes performed**.
 - **Objective / related feature:** F10. LiveKit Cloud Media Plane & WebRTC Audio Integration.
 - **Approved architecture:** LiveKit Cloud SFU WebRTC audio transport, NestJS Control Plane token issuance (`Contract 11`), client audio controls (mute, deafen, speaking indicators).
 - **Existing implementation:** Legacy P2P WebRTC/STUN signaling; replaced by LiveKit Cloud media plane.
-- **Required changes:** Integrate `@livekit/components-react` and `livekit-server-sdk` into NestJS. Implement `POST /api/v1/study/rooms/:roomId/livekit-token` validating enrollment and voice consent before issuing short-lived LiveKit JWTs. Wire client audio room component in `study-partner-web/src/features/collaboration/voice-room.tsx`.
+- **Required changes:** Integrate `@livekit/components-react` and `livekit-server-sdk` into NestJS. Implement `POST /api/v1/study/rooms/:roomId/livekit-token` validating enrollment and voice consent before issuing short-lived LiveKit JWTs. Wire client audio room component in `apps/web/src/features/collaboration/voice-room.tsx`.
 - **Dependencies:** ED-02, ED-07, stable P0.
 - **Priority / complexity / status:** P1 / M / **PARTIAL**.
 - **Acceptance criteria:** Multi-user audio streams connect reliably via LiveKit Cloud; NestJS enforces room authorization and voice consent before token issuance; media disconnection/reconnection works without dropping the room session; student-to-student audio functions independently of AI agent availability.
@@ -520,7 +520,7 @@ All execution notes below are **TARGET recommendations, not changes performed**.
 - **Objective / related feature:** F10. Multi-Speaker Voice AI Moderator.
 - **Approved architecture:** Python LiveKit Agents SDK, Deepgram Nova-3 streaming STT, Cartesia Sonic 3.6 streaming TTS, LiteLLM reasoning, Peer-First facilitation policy.
 - **Existing implementation:** Text-based coach rules; upgraded to live voice participant agent in LiveKit rooms.
-- **Required changes:** Build Python LiveKit Agent worker in `study-partner-ai/agents/voice_moderator/`. Subscribe to individual participant audio tracks, perform server-side VAD, stream audio to Deepgram Nova-3 WebSocket, correlate speaker identity, feed utterances into facilitator policy, synthesize spoken nudges with Cartesia Sonic 3.6, and publish audio back to the LiveKit room. Enforce Guided, On-Demand, and Muted modes.
+- **Required changes:** Build Python LiveKit Agent worker in `apps/ai/agents/voice_moderator/`. Subscribe to individual participant audio tracks, perform server-side VAD, stream audio to Deepgram Nova-3 WebSocket, correlate speaker identity, feed utterances into facilitator policy, synthesize spoken nudges with Cartesia Sonic 3.6, and publish audio back to the LiveKit room. Enforce Guided, On-Demand, and Muted modes.
 - **Dependencies:** ED-17, ED-09, ED-13; stable P0.
 - **Priority / complexity / status:** P1 / L / **TODO**.
 - **Acceptance criteria:** Agent joins LiveKit room on dispatch; accurately attributes utterances to individual speakers; intervenes peer-first without spoiling answers; latency from speech pause to AI response onset is <1,500ms; muting or disconnection leaves peer audio intact; zero audio recorded to persistent disk.
@@ -528,7 +528,7 @@ All execution notes below are **TARGET recommendations, not changes performed**.
 
 ### ED-25 technical execution notes — TARGET
 
-- **Existing code to inspect/reuse:** `study-partner-ai/agents/coach/`; Contracts 12, 14, 15, 16 (`docs/contracts/technical-contracts.md`); LiveKit Python Agent SDK.
+- **Existing code to inspect/reuse:** `apps/ai/agents/coach/`; Contracts 12, 14, 15, 16 (`docs/contracts/technical-contracts.md`); LiveKit Python Agent SDK.
 - **Implementation sequence:** 1. Initialize `livekit-agents` worker connecting to LiveKit Cloud with agent identity `agent-ednova-moderator`. 2. Attach Deepgram Nova-3 streaming STT plugin and Cartesia Sonic 3.6 TTS plugin. 3. Implement turn-taking buffer with VAD end-of-speech detection (500ms pause threshold). 4. Forward speaker-attributed utterances to Aziz's facilitator reasoning engine (Contract 14). 5. If intervention is triggered (Contract 15), stream synthesized speech to room audio track. 6. If an AI-to-UI action is proposed (e.g. launching an activity), forward Contract 16 to NestJS Control Plane.
 - **Interface/data/architecture choices:** Speech audio flows purely through Media Plane (LiveKit) and Intelligence Plane (Python LiveKit Agent). The Control Plane (NestJS) manages room authorization and dispatch but never handles binary audio packets.
 - **Failure checks, handoff and review:** Test STT timeout, TTS synthesis failure, simultaneous overlapping speech, and participant microphone muting. Reviewer: Habib privacy and Tasnim pedagogical evidence. P1 deliverable.

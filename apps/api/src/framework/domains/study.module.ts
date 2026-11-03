@@ -1114,6 +1114,55 @@ export class StudyController {
   ): Promise<void> {
     return this.service.execute('POST /api/v1/study/private-help/:roomId', req, res);
   }
+  @Get('/api/v1/study/visual-lab/capabilities')
+  get_api_v1_study_visuallab_capabilities_7561df24(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('GET /api/v1/study/visual-lab/capabilities', req, res);
+  }
+  @Get('/api/v1/study/visual-lab')
+  get_api_v1_study_visuallab_list_3a91c07e(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('GET /api/v1/study/visual-lab', req, res);
+  }
+  @Get('/api/v1/study/visual-lab/discover')
+  get_api_v1_study_visuallab_discover_8d2e45b1(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('GET /api/v1/study/visual-lab/discover', req, res);
+  }
+  @Post('/api/v1/study/visual-lab/plan')
+  post_api_v1_study_visuallab_plan_2702fa64(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('POST /api/v1/study/visual-lab/plan', req, res);
+  }
+  @Get('/api/v1/study/visual-lab/:labId')
+  get_api_v1_study_visuallab_c5398080(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('GET /api/v1/study/visual-lab/:labId', req, res);
+  }
+  @Post('/api/v1/study/visual-lab/:labId/guide')
+  post_api_v1_study_visuallab_guide_6da500a2(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('POST /api/v1/study/visual-lab/:labId/guide', req, res);
+  }
+  @Post('/api/v1/study/visual-lab/:labId/check')
+  post_api_v1_study_visuallab_check_67e0b462(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('POST /api/v1/study/visual-lab/:labId/check', req, res);
+  }
 }
 @Module({
   controllers: [StudyController],
