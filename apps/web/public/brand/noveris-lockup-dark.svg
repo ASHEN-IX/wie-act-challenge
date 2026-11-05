@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 140" role="img" aria-label="Noveris">
+
+<svg x="0" y="5" width="128" height="128" viewBox="0 0 128 128">
+<defs><linearGradient id="n" x1="15" y1="14" x2="110" y2="101" gradientUnits="userSpaceOnUse"><stop stop-color="#BC96FF"/><stop offset=".43" stop-color="#7B3FF2"/><stop offset="1" stop-color="#06D6FF"/></linearGradient><linearGradient id="o" x1="17" y1="100" x2="118" y2="19" gradientUnits="userSpaceOnUse"><stop stop-color="#F6E9FF"/><stop offset=".5" stop-color="#9C81FF"/><stop offset="1" stop-color="#06D6FF"/></linearGradient></defs>
+<path d="M23 95 C29 78 40 44 49 32 C52 28 56 28 59 32 C67 43 77 74 84 79 C90 82 97 51 107 29" fill="none" stroke="url(#n)" stroke-width="17" stroke-linecap="round"/><path d="M14 90 C40 112 92 87 116 42" fill="none" stroke="url(#o)" stroke-width="3.3" stroke-linecap="round"/><path d="M107 10 L110.8 19.2 L120 23 L110.8 26.8 L107 36 L103.2 26.8 L94 23 L103.2 19.2Z" fill="#F7F9FF"/>
+</svg>
+<text x="138" y="90" fill="#F7F9FF" font-size="67" font-family="Arial, Helvetica, sans-serif" font-weight="700" letter-spacing="-3">Noveris</text>
+<text x="143" y="116" fill="#C2C9E5" font-size="14" font-family="Arial, Helvetica, sans-serif" font-weight="500" letter-spacing="1.5">LEARN TOGETHER. GROW FURTHER.</text>
+</svg>

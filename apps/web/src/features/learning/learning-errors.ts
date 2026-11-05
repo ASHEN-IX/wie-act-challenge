@@ -9,7 +9,7 @@ const FRIENDLY: Record<string, string> = {
   SOURCE_INTEGRITY_UNAVAILABLE:
     "The course sources could not be verified right now, so answers are paused. Try again in a moment.",
   "The service is unavailable. Please try again.":
-    "EdNova could not reach the learning service. Your work is kept; try again in a moment.",
+    "Noveris could not reach the learning service. Your work is kept; try again in a moment.",
 };
 
 /**

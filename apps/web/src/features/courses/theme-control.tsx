@@ -5,27 +5,27 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 type Theme = "light" | "dark";
-const THEME_KEY = "ednova-theme";
+const THEME_KEY = "noveris-theme";
 
-function applyTheme(theme: Theme) {
+export function applyTheme(theme: Theme) {
   document.documentElement.classList.toggle("dark", theme === "dark");
+  document.documentElement.classList.toggle("light", theme === "light");
   document.documentElement.style.colorScheme = theme;
+}
+
+function readStoredTheme(): Theme {
+  const stored = window.localStorage.getItem(THEME_KEY);
+  return stored === "light" || stored === "dark" ? stored : "dark";
 }
 
 /** Persisted, user-controlled appearance for the workspace and course reader. */
 export function ThemeControl() {
-  const [theme, setTheme] = useState<Theme>("light");
+  const [theme, setTheme] = useState<Theme>("dark");
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(THEME_KEY);
-    const preferred: Theme =
-      stored === "dark" || stored === "light"
-        ? stored
-        : window.matchMedia("(prefers-color-scheme: dark)").matches
-          ? "dark"
-          : "light";
-    setTheme(preferred);
-    applyTheme(preferred);
+    const stored = readStoredTheme();
+    setTheme(stored);
+    applyTheme(stored);
   }, []);
 
   function toggle() {

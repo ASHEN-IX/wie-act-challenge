@@ -8,7 +8,7 @@ test("unauthenticated workspace redirects to the native login page", async ({
     page.getByRole("heading", { name: "Welcome back" }),
   ).toBeVisible();
   await expect(page.getByLabel("Email", { exact: true })).toBeVisible();
-  await expect(page).toHaveTitle(/EdNova/);
+  await expect(page).toHaveTitle(/Noveris/);
 });
 test("registration and password reset links navigate", async ({ page }) => {
   await page.goto("/login");

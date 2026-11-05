@@ -81,7 +81,7 @@ export default async function CoursePage({
         <Alert className="mt-5">
           <AlertTitle>Preparing your course</AlertTitle>
           <AlertDescription>
-            EdNova is reading your sources and building the course outline. This
+            Noveris is reading your sources and building the course outline. This
             usually takes a few minutes; you can safely leave this page and
             check back later.
           </AlertDescription>
@@ -91,7 +91,7 @@ export default async function CoursePage({
         <Alert className="mt-5 border-amber-500/40 bg-amber-500/10">
           <AlertTitle>Course material is ready for your review</AlertTitle>
           <AlertDescription>
-            EdNova has processed your sources. Review the course outline in
+            Noveris has processed your sources. Review the course outline in
             Course Studio and publish the revision to make it available for
             learning.
           </AlertDescription>

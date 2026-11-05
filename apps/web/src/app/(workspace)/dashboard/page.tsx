@@ -15,7 +15,7 @@ import { load } from "@/lib/api";
 import { TaskList, type Task } from "@/features/tasks/task-list";
 import type { LearningRewards } from "@/features/rewards/types";
 
-export const metadata = { title: "Overview — EdNova" };
+export const metadata = { title: "Overview — Noveris" };
 
 // One line each: where it goes and what happens there.
 const QUICK_ACTIONS = [

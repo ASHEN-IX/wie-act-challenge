@@ -121,7 +121,7 @@ export function Navigation({
         className={cn(
           "group flex items-center justify-between rounded-lg px-3 py-2 font-medium transition-all duration-150 focus-visible:outline-2 focus-visible:outline-ring",
           isActive
-            ? "bg-accent/80 text-primary font-semibold shadow-xs"
+            ? "bg-brand-violet/16 font-semibold text-brand-violet-soft shadow-xs"
             : "text-muted-foreground hover:bg-muted hover:text-foreground",
         )}
       >
@@ -129,13 +129,13 @@ export function Navigation({
           <Icon
             className={cn(
               "size-[18px] shrink-0 transition-transform group-hover:scale-105",
-              isActive ? "text-primary" : "text-muted-foreground",
+              isActive ? "text-brand-violet-soft" : "text-muted-foreground",
             )}
           />
           <span className="truncate">{label}</span>
         </div>
         {badge && (
-          <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+          <span className="rounded-full bg-brand-cyan/15 px-2 py-0.5 text-[10px] font-semibold text-brand-cyan">
             {badge}
           </span>
         )}
@@ -171,13 +171,13 @@ export function Navigation({
           </div>
         </details>
       )}
-      <div className="border-t pt-3 mt-1">
+      <div className="mt-1 border-t border-sidebar-border pt-3">
         <Link
           href="/profile"
           className={cn(
             "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-muted hover:text-foreground",
             pathname.startsWith("/profile")
-              ? "bg-accent/80 text-primary font-semibold"
+              ? "bg-brand-violet/16 font-semibold text-brand-violet-soft"
               : "text-muted-foreground",
           )}
         >

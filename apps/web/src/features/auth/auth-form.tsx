@@ -18,7 +18,7 @@ const forms = {
   },
   register: {
     title: "A space for your next idea",
-    description: "Create your EdNova account to get started.",
+    description: "Create your Noveris account to get started.",
     submit: "Create account",
     action: register,
   },
@@ -53,23 +53,27 @@ export function AuthForm({
   const config = forms[mode];
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
-      <aside className="hidden w-[44%] flex-col justify-between bg-primary p-14 text-primary-foreground lg:flex">
-        <Link href="/" className="inline-flex items-center gap-3 text-3xl font-semibold tracking-tight">
-          <img src="/ednova-mark.svg" alt="" width="40" height="40" className="rounded-[11px]" />
-          EdNova
+      <aside className="relative hidden w-[44%] flex-col justify-between overflow-hidden bg-[radial-gradient(ellipse_at_20%_15%,#7b3ff2_0%,#2a1d63_45%,#0b1026_100%)] p-14 text-brand-white lg:flex">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 opacity-60 [background-image:radial-gradient(circle_at_19%_21%,#c3a2ff_1px,transparent_1.6px),radial-gradient(circle_at_73%_13%,#6cdfff_1px,transparent_1.8px),radial-gradient(circle_at_48%_43%,#ad8bfd_1px,transparent_2px),radial-gradient(circle_at_87%_71%,#e7daff_1px,transparent_1.6px)] [background-size:330px_277px,410px_348px,490px_320px,520px_305px]"
+        />
+        <Link href="/" className="relative inline-flex items-center gap-3 text-3xl font-semibold tracking-tight">
+          <img src="/brand/noveris-symbol.svg" alt="" width="40" height="40" />
+          Noveris
         </Link>
-        <div className="max-w-md">
+        <div className="relative max-w-md">
           <h2 className="text-5xl font-medium leading-tight tracking-tight">
-            Make room
+            Learn Together.
             <br />
-            for understanding.
+            <span className="text-gradient-brand">Grow Further.</span>
           </h2>
           <p className="mt-7 text-lg leading-8 opacity-80">
             Your courses. Your questions. A little progress, every day.
           </p>
         </div>
-        <p className="text-sm opacity-70">
-          Learn independently. Grow together.
+        <p className="relative text-sm opacity-70">
+          AI-powered peer learning for university students.
         </p>
       </aside>
       <main
@@ -81,8 +85,8 @@ export function AuthForm({
             href="/"
             className="mb-12 inline-flex items-center gap-2.5 text-2xl font-semibold lg:hidden"
           >
-            <img src="/ednova-mark.svg" alt="" width="32" height="32" className="rounded-lg" />
-            EdNova
+            <img src="/brand/noveris-symbol.svg" alt="" width="32" height="32" />
+            Noveris
           </Link>
           <h1 className="text-3xl font-semibold tracking-tight">
             {verified ? "Email verified" : config.title}

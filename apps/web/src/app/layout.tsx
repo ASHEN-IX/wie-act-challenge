@@ -2,14 +2,23 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: { default: "EdNova", template: "%s · EdNova" },
-  description: "Your space to learn, practice and study together.",
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+  ),
+  title: { default: "Noveris", template: "%s · Noveris" },
+  description:
+    "The space for curious university minds. Study with your peers, get AI guidance, and turn every course into a shared breakthrough.",
 };
+
+// Dark is applied server-side so it is painted on the first frame; the only
+// thing that can change it is a stored "light" preference, which ThemeControl
+// reads on mount. That keeps us clear of the nonce CSP in src/proxy.ts, which
+// blocks both inline and host-allowlisted scripts.
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="dark" suppressHydrationWarning>
       <body>
         <a
           href="#main-content"

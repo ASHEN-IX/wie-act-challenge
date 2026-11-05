@@ -236,7 +236,7 @@ function CourseUploader({
             Course uploaded
           </h2>
           <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
-            EdNova has accepted your sources and is preparing the course. You
+            Noveris has accepted your sources and is preparing the course. You
             can leave this page; processing will continue in the background.
           </p>
         </div>
