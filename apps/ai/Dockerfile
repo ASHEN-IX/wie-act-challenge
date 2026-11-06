@@ -37,6 +37,10 @@ RUN --mount=type=cache,id=ednova-ai-poetry,target=/root/.cache/pypoetry,sharing=
        POETRY_REQUESTS_MAX_RETRIES=5 \
        /opt/poetry/bin/poetry install --only main --no-ansi
 
+COPY requirements-speech.txt ./
+ARG INSTALL_LOCAL_SPEECH=1
+RUN --mount=type=cache,id=ednova-ai-pip,target=/root/.cache/pip,sharing=locked     if [ "$INSTALL_LOCAL_SPEECH" = "1" ]; then pip install -r requirements-speech.txt; fi
+
 FROM runtime-base AS runtime
 
 ENV HOME=/home/ednova \

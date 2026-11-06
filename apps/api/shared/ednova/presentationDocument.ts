@@ -13,6 +13,24 @@ import {
   parseLessonBlock,
   type LessonBlockV2,
 } from './learningDocumentV2';
+import {
+  buildPresentationPlan,
+  PRESENTATION_PLAN_VERSION,
+  type PresentationPlan,
+} from './presentationPlan';
+import {
+  ASSET_COMPONENTS,
+  ASSET_LIMITS,
+  STRUCTURED_ASSET_SCHEMA_VERSION,
+  parseStructuredAsset,
+  projectStructuredAsset,
+  type PublishedStructuredAssetV1,
+} from './structuredAsset';
+import { COMPONENT_REGISTRY_VERSION, COMPONENT_TYPES } from './componentRegistry';
+
+/** Read-mode plan carried by the presentation document. It is built from the
+ * same validated blocks, so it cannot introduce content the document lacks. */
+export type PublishedPresentationPlanV1 = PresentationPlan;
 
 export const PRESENTATION_SCHEMA_VERSION = '1.0.0' as const;
 export const PRESENTATION_READER_SCHEMA_VERSION = '2.0.0' as const;
@@ -89,6 +107,14 @@ export type PublishedPresentationV1 = {
   };
   objectives: Array<{ objectiveId: string; statement: string; bloomLevel: string }>;
   chapters: PresentationChapterV1[];
+  /** Additive Milestone 3.5 projection. Read-mode component plan for this
+   * revision; reproducible from the same canonical inputs. Consumers that do
+   * not understand it may ignore it — canonical blocks remain authoritative. */
+  plan?: PublishedPresentationPlanV1;
+  /** Additive Milestone 3.6 projection. Optional structured supplements bound
+   * to this revision, each labelled with its provenance. Absent or empty when
+   * the revision has none — never inferred from canonical content. */
+  assets?: PublishedStructuredAssetV1[];
   sources: Array<{
     documentId: string;
     contentHash: string;
@@ -144,6 +170,10 @@ const plain = (value: unknown, max: number) => {
 const count = (value: unknown) => {
   if (!Number.isSafeInteger(value) || (value as number) < 0) fail();
   return value as number;
+};
+const bool = (value: unknown) => {
+  if (typeof value !== 'boolean') fail();
+  return value as boolean;
 };
 const list = <T>(value: unknown, check: (v: unknown) => T, max: number): T[] => {
   if (!Array.isArray(value) || value.length > max) fail();
@@ -232,6 +262,151 @@ function mathSummary(blocks: PresentationBlockV1[]) {
   };
 }
 
+const PLAN_SELECTIONS = [
+  'heading',
+  'prose',
+  'definition',
+  'theorem',
+  'proof',
+  'example',
+  'exercise',
+  'note',
+  'reviewed_math',
+  'unreviewed_math',
+  'multiline_derivation',
+  'code',
+  'table',
+  'figure',
+  'process',
+  'chart',
+  'unsupported_block',
+  'invalid_props',
+] as const;
+
+/** Strict plan validation. The plan must describe exactly the blocks the
+ * document carries, in the same order, under the same render policy — a plan
+ * cannot add, drop, reorder or relabel content. */
+function parsePresentationPlan(
+  value: unknown,
+  chapters: PresentationChapterV1[],
+): PublishedPresentationPlanV1 {
+  const v = exact(value, [
+    'schemaVersion',
+    'registryVersion',
+    'courseId',
+    'revisionId',
+    'contentHash',
+    'mode',
+    'lessons',
+    'unclassified',
+  ]);
+  if (v.schemaVersion !== PRESENTATION_PLAN_VERSION) fail();
+  if (v.registryVersion !== COMPONENT_REGISTRY_VERSION) fail();
+  if (v.mode !== 'read') fail();
+  const lessons = new Map<string, PresentationLessonV1>(
+    chapters.flatMap((chapter) => chapter.lessons.map((l) => [l.id, l] as const)),
+  );
+  const planned = list(
+    v.lessons,
+    (entry) => {
+      const l = exact(entry, ['lessonId', 'title', 'instances', 'counts']);
+      const found = lessons.get(String(l.lessonId));
+      if (found === undefined) return fail();
+      const lesson = found;
+      const instances = list(
+        l.instances,
+        (instanceEntry) => {
+          const i = exact(instanceEntry, [
+            'instanceId',
+            'blockId',
+            'blockType',
+            'component',
+            'selection',
+            'render',
+            'reason',
+            'interactive',
+            'degraded',
+            'hasSourceRegion',
+          ]);
+          if (!COMPONENT_TYPES.includes(String(i.component) as never)) fail();
+          if (!(PLAN_SELECTIONS as readonly string[]).includes(String(i.selection))) fail();
+          if (i.render !== 'primary' && i.render !== 'source_faithful') fail();
+          const interactive = bool(i.interactive);
+          const hasSourceRegion = bool(i.hasSourceRegion);
+          const degraded =
+            i.degraded === undefined
+              ? undefined
+              : (() => {
+                  const d = exact(i.degraded, ['from', 'failure']);
+                  if (!COMPONENT_TYPES.includes(String(d.from) as never)) fail();
+                  return { from: d.from as never, failure: str(d.failure, 64) };
+                })();
+          return {
+            instanceId: str(i.instanceId, 256),
+            blockId: str(i.blockId, 128),
+            blockType: String(i.blockType) as never,
+            component: String(i.component) as never,
+            selection: String(i.selection) as never,
+            render: i.render as never,
+            reason: String(i.reason) as never,
+            interactive,
+            ...(degraded ? { degraded } : {}),
+            hasSourceRegion,
+          };
+        },
+        400,
+      );
+      if (instances.length !== lesson.blocks.length) fail();
+      // Positional binding: the plan is a projection of these exact blocks.
+      lesson.blocks.forEach((block, index) => {
+        const instance = instances[index];
+        if (instance.blockId !== block.id) fail();
+        if (instance.render !== block.render || instance.reason !== block.reason) fail();
+        if (instance.blockType !== block.block.type) fail();
+        if (instance.instanceId !== `${lesson.id}:${block.id}`) fail();
+      });
+      const counts = exact(l.counts, ['total', 'primary', 'sourceFallback', 'interactive']);
+      if (
+        count(counts.total) !== instances.length ||
+        count(counts.primary) !== instances.filter((x) => x.render === 'primary').length ||
+        count(counts.sourceFallback) !== instances.filter((x) => x.render === 'source_faithful').length ||
+        count(counts.interactive) !== instances.filter((x) => x.interactive).length
+      )
+        fail();
+      return {
+        lessonId: lesson.id,
+        title: str(l.title, 500),
+        instances,
+        counts: {
+          total: instances.length,
+          primary: counts.primary as number,
+          sourceFallback: counts.sourceFallback as number,
+          interactive: counts.interactive as number,
+        },
+      };
+    },
+    200,
+  );
+  if (planned.length !== lessons.size) fail();
+  const unclassified = count(v.unclassified);
+  const expectedUnclassified = planned.reduce(
+    (total, lesson) =>
+      total + lesson.instances.filter((i) => i.selection === 'unsupported_block').length,
+    0,
+  );
+  if (unclassified !== expectedUnclassified) fail();
+  return {
+    schemaVersion: PRESENTATION_PLAN_VERSION,
+    registryVersion: COMPONENT_REGISTRY_VERSION,
+    courseId: str(v.courseId, 24),
+    revisionId: str(v.revisionId, 128),
+    contentHash: str(v.contentHash, 71),
+    mode: 'read',
+    lessons: planned,
+    unclassified,
+  };
+}
+
 /** Deterministic canonical → presentation mapping. No content is added,
  * reordered or extrapolated; each projected block is validated by the reader
  * block parser before entering the presentation document. */
@@ -272,6 +447,19 @@ export function buildPublishedPresentation(input: PresentationBuildInput): Publi
     verification,
     objectives: input.objectives.map(objective),
     chapters,
+    plan: buildPresentationPlan({
+      courseId: input.courseId,
+      revisionId: input.revisionId,
+      contentHash: input.contentHash,
+      mode: 'read',
+      lessons: chapters.flatMap((chapter) =>
+        chapter.lessons.map((lesson) => ({
+          id: lesson.id,
+          title: lesson.title,
+          blocks: lesson.blocks,
+        })),
+      ),
+    }),
     sources: input.sources.map((source) => ({
       documentId: str(source.documentId, 128),
       contentHash: source.contentHash,
@@ -301,6 +489,8 @@ export function parsePublishedPresentation(value: unknown): PublishedPresentatio
     'verification',
     'objectives',
     'chapters',
+    'plan',
+    'assets',
     'sources',
     'fallback',
     'warnings',
@@ -373,6 +563,83 @@ export function parsePublishedPresentation(value: unknown): PublishedPresentatio
   );
   if (!chapters.length) fail();
 
+  // The plan is optional for forward compatibility with a 1.0.0 consumer that
+  // predates it, but when present it must describe this document's blocks.
+  const plan =
+    v.plan === undefined ? undefined : parsePresentationPlan(v.plan, chapters);
+  if (plan && (plan.courseId !== courseId || plan.contentHash !== contentHash)) fail();
+  if (plan && plan.revisionId !== String(v.revisionId)) fail();
+
+  // Assets are optional supplements. Every one is re-validated against the
+  // full asset contract and re-bound to this document's course and revision;
+  // a cross-revision or malformed asset fails the whole parse rather than
+  // arriving in the browser next to the wrong lesson.
+  const assets =
+    v.assets === undefined
+      ? undefined
+      : list(
+          v.assets,
+          (entry) => {
+            const raw = exact(entry, [
+              'schemaVersion',
+              'assetId',
+              'courseId',
+              'revisionId',
+              'lessonId',
+              'blockId',
+              'component',
+              'provenance',
+              'review',
+              'payload',
+              'label',
+              'fallback',
+              'disclosure',
+            ]);
+            if (raw.schemaVersion !== STRUCTURED_ASSET_SCHEMA_VERSION) fail();
+            if (!ASSET_COMPONENTS.includes(String(raw.component) as never)) fail();
+            const parsed = (() => {
+              try {
+                return parseStructuredAsset({
+                  schemaVersion: raw.schemaVersion,
+                  assetId: raw.assetId,
+                  courseId: raw.courseId,
+                  revisionId: raw.revisionId,
+                  ...(raw.blockId !== null && raw.blockId !== undefined
+                    ? { blockId: raw.blockId }
+                    : {}),
+                  lessonId: raw.lessonId,
+                  registryVersion: COMPONENT_REGISTRY_VERSION,
+                  component: raw.component,
+                  payload: raw.payload,
+                  provenance: raw.provenance,
+                  review: raw.review,
+                  audience: 'course',
+                  fallback: raw.fallback,
+                  disclosure: raw.disclosure,
+                });
+              } catch {
+                return fail();
+              }
+            })();
+            const projected = projectStructuredAsset(parsed, {
+              courseId: String(v.courseId),
+              revisionId: String(v.revisionId),
+            });
+            // A null projection means the asset must not be shown to a learner.
+            if (projected === null) return fail();
+            if (projected.label !== raw.label) fail();
+            return projected;
+          },
+          ASSET_LIMITS.maxAssetsPerRevision,
+        );
+  if (assets) {
+    const lessonIds = new Set(
+      chapters.flatMap((chapter) => chapter.lessons.map((lesson) => lesson.id)),
+    );
+    // An asset must point at a lesson that exists in this document.
+    for (const asset of assets) if (!lessonIds.has(asset.lessonId)) fail();
+  }
+
   const sources = list(
     v.sources,
     (entry) => {
@@ -424,6 +691,8 @@ export function parsePublishedPresentation(value: unknown): PublishedPresentatio
     },
     objectives: list(v.objectives, objective, 500),
     chapters,
+    ...(plan ? { plan } : {}),
+    ...(assets ? { assets } : {}),
     sources,
     fallback: {
       readerHref,

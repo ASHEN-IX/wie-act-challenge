@@ -51,6 +51,8 @@ AGENT_GROUPS = (
     # scenario planning must reason about the concept (capable).
     "visual_lab_selector",
     "visual_lab_planner",
+    "nardouch_compact",
+    "nardouch_capable",
 )
 
 
@@ -81,6 +83,8 @@ AGENT_TIERS: Dict[str, ModelTier] = {
     "facilitator": ModelTier.CAPABLE,
     "visual_lab_selector": ModelTier.COMPACT,
     "visual_lab_planner": ModelTier.CAPABLE,
+    "nardouch_compact": ModelTier.COMPACT,
+    "nardouch_capable": ModelTier.CAPABLE,
 }
 
 
@@ -460,6 +464,12 @@ def load_config() -> Dict[str, Any]:
 
         with open(config_path(), "r", encoding="utf-8") as fh:
             _config = yaml.safe_load(fh) or {}
+        for entry in _config.get("model_list", []):
+            alias = entry.get("model_name", "")
+            if alias in ("nardouch_compact", "nardouch_capable"):
+                override = os.getenv(alias.upper() + "_MODEL")
+                if override:
+                    entry["litellm_params"]["model"] = override
     return _config
 
 

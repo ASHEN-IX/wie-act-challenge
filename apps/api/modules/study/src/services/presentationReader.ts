@@ -8,6 +8,12 @@ import {
   buildPublishedPresentation,
   type PublishedPresentationV1,
 } from '../../../../shared/ednova/presentationDocument';
+import {
+  parseStructuredAsset,
+  projectStructuredAssets,
+  type PublishedStructuredAssetV1,
+} from '../../../../shared/ednova/structuredAsset';
+import { StructuredAsset } from '../models/StructuredAsset';
 import { canonicalBlocks, loadPublishedReading } from './courseReader';
 
 export class PresentationUnavailableError extends Error {
@@ -16,6 +22,61 @@ export class PresentationUnavailableError extends Error {
 
 function compact(value: unknown, max: number): string {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
+}
+
+/**
+ * Load the structured assets attached to one published revision.
+ *
+ * Authorization is already established: this is only called after
+ * `loadPublishedReading` resolved the actor's access and pinned the revision.
+ * Every stored asset is re-validated here, because the database is not a trust
+ * boundary — a row written before a contract change must not reach the browser.
+ *
+ * A malformed asset is skipped, never thrown: an optional supplement failing to
+ * validate must not take the whole lesson down. The learner keeps the static
+ * fallback, which is the documented behaviour for a missing asset.
+ */
+async function loadStructuredAssets(
+  courseId: string,
+  revisionId: string,
+): Promise<PublishedStructuredAssetV1[]> {
+  const rows = await StructuredAsset.find({ courseId, revisionId })
+    .sort({ assetId: 1 })
+    .limit(200)
+    .lean();
+  const valid = [];
+  for (const row of rows) {
+    try {
+      valid.push(
+        parseStructuredAsset({
+          schemaVersion: row.schemaVersion,
+          assetId: row.assetId,
+          courseId: row.courseId,
+          revisionId: row.revisionId,
+          ...(row.blockId !== undefined ? { blockId: row.blockId } : {}),
+          lessonId: row.lessonId,
+          registryVersion: row.registryVersion,
+          component: row.component,
+          payload: row.payload,
+          provenance: row.provenance,
+          review: {
+            status: row.reviewStatus,
+            ...(row.reviewedBy !== undefined ? { reviewedBy: row.reviewedBy } : {}),
+            ...(row.reviewedAt !== undefined ? { reviewedAt: row.reviewedAt } : {}),
+          },
+          ...(row.sourceReferences !== undefined
+            ? { sourceReferences: row.sourceReferences }
+            : {}),
+          audience: row.audience,
+          fallback: row.fallback,
+          disclosure: row.disclosure,
+        }),
+      );
+    } catch {
+      // Skipped deliberately: see the note above.
+    }
+  }
+  return projectStructuredAssets(valid, { courseId, revisionId });
 }
 
 export async function getPublishedPresentation(
@@ -85,4 +146,25 @@ export async function getPublishedPresentation(
     })),
     warnings,
   });
+}
+
+/**
+ * Published presentation plus the optional structured assets bound to it.
+ *
+ * The assets are additive and separate from the canonical projection: they are
+ * supplements, labelled with their provenance, and the reader keeps the static
+ * fallback wherever none applies. A revision with no assets returns an empty
+ * list, so this method is safe to call on every published course.
+ */
+export async function getPublishedPresentationWithAssets(
+  actor: string,
+  courseId: string,
+  revisionId?: string,
+): Promise<{
+  presentation: PublishedPresentationV1;
+  assets: PublishedStructuredAssetV1[];
+}> {
+  const presentation = await getPublishedPresentation(actor, courseId, revisionId);
+  const assets = await loadStructuredAssets(courseId, presentation.revisionId);
+  return { presentation, assets };
 }

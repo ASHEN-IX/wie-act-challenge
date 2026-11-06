@@ -342,11 +342,20 @@ test("real reference upload, Python ingestion/index, SDK replay, instructor publ
         .locator('[data-presentation-policy="source_faithful"]')
         .first(),
     ).toBeVisible();
+    // The reader is lesson-scoped (Batch 3), so the two reviewed formulas are
+    // not necessarily on screen at once. Assert that every reviewed formula on
+    // the current lesson is typeset, and that none is left as raw text.
+    const reviewedOnLesson = presentation.locator(
+      '[data-presentation-reason="reviewed_formula"]',
+    );
+    const reviewedCount = await reviewedOnLesson.count();
+    expect(reviewedCount).toBeGreaterThan(0);
+    await expect(
+      reviewedOnLesson.locator(".katex"),
+    ).toHaveCount(reviewedCount, { timeout: 30000 });
     await expect(
       presentation.locator('[data-block-type="math"] .katex'),
-    ).toHaveCount(2, {
-      timeout: 30000,
-    });
+    ).toHaveCount(reviewedCount, { timeout: 30000 });
     const presentationFallback = presentation.getByRole("link", {
       name: "Deterministic source-faithful reader",
     });
@@ -378,6 +387,342 @@ test("real reference upload, Python ingestion/index, SDK replay, instructor publ
     await login(outsiderPage, "final-outsider@example.test");
     expect((await outsiderPage.request.get(originalHref)).status()).toBe(403);
     await outsider.close();
+
+    // ---------------------------------------------------------------------
+    // Milestone 3.6: structured learning assets over real HTTP and MongoDB.
+    // These run against the revision published moments ago, so the binding,
+    // authorization and persistence are all real.
+    // ---------------------------------------------------------------------
+    const lessonsForAssets = presentationBody.chapters.flatMap((chapter: any) =>
+      chapter.lessons.map((lesson: any) => lesson),
+    );
+    const firstLessonId = lessonsForAssets[0].id;
+    const firstCodeBlock = presentationBody.chapters
+      .flatMap((c: any) => c.lessons)
+      .flatMap((l: any) => l.blocks)
+      .find((b: any) => b.block.type === "code");
+    const assetBase = {
+      schemaVersion: "1.0.0",
+      registryVersion: presentationBody.plan.registryVersion,
+      courseId,
+      revisionId: revision.revisionTag,
+      lessonId: firstLessonId,
+      audience: "course",
+      fallback: "CodeViewer",
+      disclosure: "Instructor-authored walkthrough supplied as a supplement.",
+    };
+    const walkthroughAsset = {
+      ...assetBase,
+      assetId: "asset_qa_walkthrough_1",
+      ...(firstCodeBlock ? { blockId: firstCodeBlock.id } : {}),
+      component: "CodeWalkthrough",
+      provenance: "instructor_authored",
+      review: { status: "not_applicable" },
+      payload: {
+        component: "CodeWalkthrough",
+        language: "python",
+        code: "total = sum(values)\nprint(total)",
+        annotations: [
+          { line: 0, explanation: "Accumulates the values." },
+          { line: 1, explanation: "Prints the total." },
+        ],
+      },
+    };
+    const assetsEndpoint = `/api/v1/study/learning/courses/${courseId}/presentation/assets?revisionId=${encodeURIComponent(revision.revisionTag)}`;
+
+    // Canonical content before any supplemental write.
+    const canonicalBefore = await db
+      .collection("course_revisions")
+      .findOne({ _id: revision._id ?? revision.id });
+    const canonicalHashBefore = canonicalBefore?.contentDocumentHash;
+
+    // Positive: the instructor attaches a valid authored asset.
+    const created = await page.request.post(assetsEndpoint, {
+      data: walkthroughAsset,
+    });
+    expect(created.status(), await created.text()).toBe(200);
+
+    // It is persisted in MongoDB under the exact binding.
+    const storedAsset = await db.collection("structuredassets").findOne({
+      assetId: "asset_qa_walkthrough_1",
+      courseId,
+      revisionId: revision.revisionTag,
+    });
+    expect(storedAsset).not.toBeNull();
+    expect(storedAsset!.createdByUserId).toBe("aaaaaaaaaaaaaaaaaaaaaaaa");
+    expect(storedAsset!.provenance).toBe("instructor_authored");
+
+    // The same revision returns it on the presentation surface.
+    const withAssets = await studentPage.request.get(
+      `/api/v1/study/learning/courses/${courseId}/presentation?revisionId=${encodeURIComponent(revision.revisionTag)}`,
+    );
+    expect(withAssets.status()).toBe(200);
+    const withAssetsBody: any = await withAssets.json();
+    expect(withAssetsBody.assets).toHaveLength(1);
+    expect(withAssetsBody.assets[0].assetId).toBe("asset_qa_walkthrough_1");
+    expect(withAssetsBody.assets[0].label).toBe("Instructor-authored material");
+
+    // Canonical content is untouched by the supplemental write.
+    const canonicalAfter = await db
+      .collection("course_revisions")
+      .findOne({ _id: revision._id ?? revision.id });
+    expect(canonicalAfter?.contentDocumentHash).toBe(canonicalHashBefore);
+
+    // ---------------------------------------------------------------------
+    // Integrity must fail closed. The checksum is tampered in the database,
+    // the API is asked for the projection, and it must refuse rather than
+    // serve degraded or silently switched content.
+    // ---------------------------------------------------------------------
+    const integrityRevisionId = revision._id ?? revision.id;
+    await db
+      .collection("course_revisions")
+      .updateOne(
+        { _id: revision._id ?? revision.id },
+        { $set: { contentDocumentHash: "sha256:" + "0".repeat(64) } },
+      );
+    try {
+      const tampered = await studentPage.request.get(
+        `/api/v1/study/learning/courses/${courseId}/presentation?revisionId=${encodeURIComponent(revision.revisionTag)}`,
+      );
+      expect(tampered.status()).not.toBe(200);
+      const tamperedDocument = await studentPage.request.get(
+        `/api/v1/study/learning/courses/${courseId}/document?revisionId=${encodeURIComponent(revision.revisionTag)}`,
+      );
+      expect(tamperedDocument.status()).not.toBe(200);
+
+      // A missing revision is a refusal, never a fallback to another revision.
+      const missingRevision = await studentPage.request.get(
+        `/api/v1/study/learning/courses/${courseId}/presentation?revisionId=rev_does_not_exist`,
+      );
+      expect([403, 404, 409, 422, 503]).toContain(missingRevision.status());
+    } finally {
+      await db
+        .collection("course_revisions")
+        .updateOne(
+          { _id: integrityRevisionId },
+          { $set: { contentDocumentHash: canonicalHashBefore } },
+        );
+    }
+    // Restored: the authorized revision serves again.
+    const restored = await studentPage.request.get(
+      `/api/v1/study/learning/courses/${courseId}/presentation?revisionId=${encodeURIComponent(revision.revisionTag)}`,
+    );
+    expect(restored.status()).toBe(200);
+
+    // Negative: an unauthorized user cannot read the presentation at all.
+    const outsiderContext = await browser.newContext();
+    const outsiderPage2 = await outsiderContext.newPage();
+    await login(outsiderPage2, "final-outsider@example.test");
+    const outsiderPresentation = await outsiderPage2.request.get(
+      `/api/v1/study/learning/courses/${courseId}/presentation?revisionId=${encodeURIComponent(revision.revisionTag)}`,
+    );
+    expect(outsiderPresentation.status()).toBe(403);
+    await outsiderContext.close();
+
+    // The enrolled student sees it rendered in the actual reader.
+    await studentPage.goto(
+      `/courses/${courseId}/present?revisionId=${encodeURIComponent(revision.revisionTag)}&lesson=${encodeURIComponent(firstLessonId)}`,
+    );
+    const renderedAsset = studentPage.locator("[data-structured-asset]");
+    await expect(renderedAsset).toBeVisible({ timeout: 30000 });
+    await expect(renderedAsset).toHaveAttribute(
+      "data-asset-provenance",
+      "instructor_authored",
+    );
+    // Supplemental, not a replacement: canonical content still renders.
+    await expect(
+      studentPage.locator("[data-presentation-lesson]").first(),
+    ).toBeVisible();
+    await studentPage.screenshot({
+      path: path.join(evidence, "student-structured-asset.png"),
+    });
+
+    // ---------------------------------------------------------------------
+    // Real-asset performance: measure layout stability and image behaviour on
+    // the actual presentation page, using the protected crop route — not a
+    // synthetic fixture.
+    // ---------------------------------------------------------------------
+    const imageRequests: string[] = [];
+    studentPage.on("request", (request) => {
+      if (request.resourceType() === "image") imageRequests.push(request.url());
+    });
+    await studentPage.goto(
+      `/courses/${courseId}/present?revisionId=${encodeURIComponent(revision.revisionTag)}`,
+    );
+    await studentPage.waitForTimeout(1500);
+    const imagesAtTop = imageRequests.length;
+    const cropStats = await studentPage.evaluate(() => {
+      const imgs = [...document.querySelectorAll("img")];
+      return {
+        total: imgs.length,
+        lazy: imgs.filter((img) => img.loading === "lazy").length,
+        withReservedAspect: imgs.filter((img) => {
+          const style = getComputedStyle(img);
+          return style.aspectRatio && style.aspectRatio !== "auto";
+        }).length,
+        broken: imgs.filter((img) => img.complete && img.naturalWidth === 0).length,
+      };
+    });
+    // Scroll the whole lesson to trigger lazy loads.
+    await studentPage.evaluate(async () => {
+      const step = window.innerHeight;
+      for (let y = 0; y < document.body.scrollHeight; y += step) {
+        window.scrollTo(0, y);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      window.scrollTo(0, 0);
+    });
+    await studentPage.waitForTimeout(1200);
+    const imagesAfterScroll = imageRequests.length;
+    const cls = await studentPage.evaluate(
+      () =>
+        new Promise<number>((resolve) => {
+          let total = 0;
+          new PerformanceObserver((list) => {
+            for (const entry of list.getEntries() as any[]) {
+              if (!entry.hadRecentInput) total += entry.value;
+            }
+          }).observe({ type: "layout-shift", buffered: true });
+          setTimeout(() => resolve(Number(total.toFixed(4))), 500);
+        }),
+    );
+    const mobileStability = await (async () => {
+      await studentPage.setViewportSize({ width: 390, height: 844 });
+      await studentPage.waitForTimeout(800);
+      const overflow = await studentPage.evaluate(
+        () => document.documentElement.scrollWidth > window.innerWidth + 1,
+      );
+      await studentPage.setViewportSize({ width: 1280, height: 900 });
+      return { horizontalOverflow: overflow };
+    })();
+    await fs.writeFile(
+      path.join(evidence, "presentation-performance.json"),
+      JSON.stringify(
+        {
+          capturedAt: new Date().toISOString(),
+          revision: revision.revisionTag,
+          images: { ...cropStats, requestedAtTop: imagesAtTop, requestedAfterScroll: imagesAfterScroll },
+          notAllFetchedEagerly: imagesAtTop < cropStats.total,
+          cumulativeLayoutShift: cls,
+          mobile: mobileStability,
+        },
+        null,
+        2,
+      ),
+    );
+    studentPage.removeAllListeners("request");
+
+    // Negative: a duplicate asset identity is refused, not silently replaced.
+    const duplicate = await page.request.post(assetsEndpoint, {
+      data: walkthroughAsset,
+    });
+    expect(duplicate.status()).toBe(409);
+
+    // Negative: an unauthenticated caller cannot attach at all.
+    const anonymous = await studentPage.request.post(assetsEndpoint, {
+      data: { ...walkthroughAsset, assetId: "asset_anon" },
+    });
+    expect([401, 403]).toContain(anonymous.status());
+
+    // Negative: a student (not a course author) cannot attach.
+    const studentAttempt = await studentPage.request.post(assetsEndpoint, {
+      data: { ...walkthroughAsset, assetId: "asset_by_student" },
+    });
+    expect(studentAttempt.status()).toBe(403);
+    expect(
+      await db.collection("structuredassets").findOne({ assetId: "asset_by_student" }),
+    ).toBeNull();
+
+    // Negative: forged reviewer metadata on a non-reviewed status.
+    const forged = await page.request.post(assetsEndpoint, {
+      data: {
+        ...walkthroughAsset,
+        assetId: "asset_forged_review",
+        review: {
+          status: "unreviewed",
+          reviewedBy: "someone-else",
+          reviewedAt: new Date().toISOString(),
+        },
+      },
+    });
+    expect(forged.status()).toBe(422);
+
+    // Negative: source-derived provenance without source references.
+    const noRefs = await page.request.post(assetsEndpoint, {
+      data: {
+        ...walkthroughAsset,
+        assetId: "asset_source_derived_no_refs",
+        provenance: "source_derived",
+        review: {
+          status: "instructor_reviewed",
+          reviewedBy: "instructor",
+          reviewedAt: new Date().toISOString(),
+        },
+      },
+    });
+    expect(noRefs.status()).toBe(422);
+
+    // Negative: an unreviewed generated proposal is accepted as a record but
+    // must never be projected to a learner.
+    const generated = await page.request.post(assetsEndpoint, {
+      data: {
+        ...walkthroughAsset,
+        assetId: "asset_generated_proposal",
+        provenance: "generated_proposal",
+        review: { status: "unreviewed" },
+      },
+    });
+    expect(generated.status()).toBe(200);
+    const afterGenerated: any = await (
+      await studentPage.request.get(
+        `/api/v1/study/learning/courses/${courseId}/presentation?revisionId=${encodeURIComponent(revision.revisionTag)}`,
+      )
+    ).json();
+    expect(
+      (afterGenerated.assets || []).some(
+        (a: any) => a.assetId === "asset_generated_proposal",
+      ),
+    ).toBe(false);
+
+    // Negative: oversized payload is refused.
+    const oversized = await page.request.post(assetsEndpoint, {
+      data: {
+        ...walkthroughAsset,
+        assetId: "asset_oversized",
+        payload: {
+          component: "CodeWalkthrough",
+          language: "python",
+          code: "x = 1",
+          annotations: Array.from({ length: 500 }, (_, index) => ({
+            line: 0,
+            explanation: `annotation ${index}`,
+          })),
+        },
+      },
+    });
+    expect(oversized.status()).toBe(422);
+
+    // Negative: an asset written for another revision is not returned here.
+    const foreignRevision = await page.request.post(
+      `/api/v1/study/learning/courses/${courseId}/presentation/assets?revisionId=${encodeURIComponent(revision.revisionTag)}`,
+      {
+        data: {
+          ...walkthroughAsset,
+          assetId: "asset_foreign_rev",
+          revisionId: "rev_not_this_one",
+        },
+      },
+    );
+    // Binding is overwritten with the authorized revision, so this either
+    // succeeds under the real revision or is refused; it must never persist
+    // against the foreign id.
+    expect(
+      await db
+        .collection("structuredassets")
+        .findOne({ assetId: "asset_foreign_rev", revisionId: "rev_not_this_one" }),
+    ).toBeNull();
+    expect([200, 409, 422]).toContain(foreignRevision.status());
+
     const indexed = await db
       .collection("chunk_embeddings")
       .find({ course_id: courseId, revision_id: revision.revisionTag })

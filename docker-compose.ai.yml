@@ -18,6 +18,10 @@ services:
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      NARDOUCH_SPEECH_MODEL_DIR: /models/nardouch
+      NARDOUCH_TTS_BUDGET_DB: /app/tts-state/elevenlabs.sqlite3
+      NARDOUCH_ASR_PROVIDER: local_whisper
+      NARDOUCH_TTS_PROVIDER: ${NARDOUCH_TTS_PROVIDER:-elevenlabs}
       LLM_MOCK: ${LLM_MOCK:-0}
       APP_ENV: production
       REDIS_URL: ${AI_REDIS_URL:?Set the reachable durable AI Redis URI}
@@ -30,8 +34,10 @@ services:
     volumes:
       - study_uploads:/app/uploads
       - revision_faiss:/app/faiss
+      - ./var/nardouch-models:/models/nardouch:ro
+      - ./var/nardouch-tts-state:/app/tts-state
     working_dir: /app
-    command: uvicorn services.api.main:app --host 0.0.0.0 --port 8000 --workers 2
+    command: uvicorn services.api.main:app --host 0.0.0.0 --port 8000 --workers 1
     restart: unless-stopped
   ingestion-worker:
     extends:

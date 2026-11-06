@@ -1,0 +1,5 @@
+{
+  "programming": ["récursivité", "recursion", "condition d'arrêt", "base case", "stack", "return", "Big O"],
+  "mathematics": ["dérivée", "derivative", "intégrale", "eigenvalue", "limite", "∀", "∃"],
+  "policy": "Preserve the student's technical term; explain it without unnecessary translation."
+}

@@ -11,6 +11,22 @@
 
 model_list:
 
+- model_name: nardouch_compact
+  litellm_params:
+    model: groq/openai/gpt-oss-20b
+    temperature: 0.2
+    max_tokens: 2400
+    timeout: 18
+    drop_params: true
+
+- model_name: nardouch_capable
+  litellm_params:
+    model: groq/openai/gpt-oss-120b
+    temperature: 0.2
+    max_tokens: 2400
+    timeout: 18
+    drop_params: true
+
 # ————————————————— agent groups (entry points) —————————————————
 
 # COACH — short, frequent nudges: speed + judgement.

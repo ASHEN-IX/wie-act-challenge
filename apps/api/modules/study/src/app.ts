@@ -27,6 +27,7 @@ const roomRoutes = require('./routes/rooms');
 const institutionRoutes = require('./routes/institutions');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const visualLabRoutes = require('./routes/visualLab');
+const nardouchRoutes = require('./routes/nardouch');
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const {
@@ -80,6 +81,7 @@ app.use('/api/v1/study/topics', authenticate, topicRoutes);
 app.use('/api/v1/study/sessions', authenticate, sessionRoutes);
 app.use('/api/v1/study/subjects', authenticate, subjectRoutes);
 app.use('/api/v1/study/courses', authenticate, courseRoutes);
+app.use('/api/v1/study/nardouch', authenticate, nardouchRoutes);
 app.use('/api/v1/study/plans', authenticate, planRoutes);
 app.use('/api/v1/study/learning-objectives', authenticate, learningObjectiveRoutes);
 app.use('/api/v1/competencies', authenticate, competencyRoutes);

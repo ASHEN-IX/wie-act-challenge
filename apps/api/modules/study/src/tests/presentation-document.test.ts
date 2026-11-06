@@ -225,4 +225,182 @@ describe('published presentation contract', () => {
     markup.chapters[0].lessons[0].blocks[0].block.onClick = 'alert(1)';
     expect(() => parsePublishedPresentation(markup)).toThrow('INVALID_PRESENTATION_DOCUMENT');
   });
+
+  it('carries a deterministic read-mode plan bound to the projected blocks', () => {
+    const document = buildPublishedPresentation(input());
+    const plan = document.plan!;
+    expect(plan.schemaVersion).toBe('1.0.0');
+    expect(plan.mode).toBe('read');
+    expect(plan.lessons[0].instances.map((entry) => entry.blockId)).toEqual([
+      'p1',
+      'm1',
+      'm2',
+      'img1',
+    ]);
+    expect(plan.lessons[0].instances.map((entry) => entry.component)).toEqual([
+      'ConceptExplanation',
+      'ReviewedFormula',
+      'SourceMathFallback',
+      'SourceDiagram',
+    ]);
+    // Read mode never offers an interaction.
+    expect(plan.lessons[0].counts.interactive).toBe(0);
+    // Rebuilding yields an identical plan.
+    expect(JSON.stringify(buildPublishedPresentation(input()).plan)).toBe(JSON.stringify(plan));
+  });
+
+  it('rejects a tampered plan that adds, drops, reorders or relabels blocks', () => {
+    const base = () => JSON.parse(JSON.stringify(buildPublishedPresentation(input())));
+
+    const dropped = base();
+    dropped.plan.lessons[0].instances.pop();
+    expect(() => parsePublishedPresentation(dropped)).toThrow('INVALID_PRESENTATION_DOCUMENT');
+
+    const reordered = base();
+    reordered.plan.lessons[0].instances.reverse();
+    expect(() => parsePublishedPresentation(reordered)).toThrow('INVALID_PRESENTATION_DOCUMENT');
+
+    const relabelled = base();
+    // Try to promote the unreviewed formula to a typeset component.
+    relabelled.plan.lessons[0].instances[2].component = 'ReviewedFormula';
+    relabelled.plan.lessons[0].instances[2].render = 'primary';
+    relabelled.plan.lessons[0].instances[2].reason = 'reviewed_formula';
+    expect(() => parsePublishedPresentation(relabelled)).toThrow('INVALID_PRESENTATION_DOCUMENT');
+
+    const foreignComponent = base();
+    foreignComponent.plan.lessons[0].instances[0].component = 'EvilComponent';
+    expect(() => parsePublishedPresentation(foreignComponent)).toThrow(
+      'INVALID_PRESENTATION_DOCUMENT',
+    );
+
+    const wrongCounts = base();
+    wrongCounts.plan.lessons[0].counts.interactive = 3;
+    expect(() => parsePublishedPresentation(wrongCounts)).toThrow('INVALID_PRESENTATION_DOCUMENT');
+
+    const foreignPlan = base();
+    foreignPlan.plan.contentHash = 'sha256:' + 'f'.repeat(64);
+    expect(() => parsePublishedPresentation(foreignPlan)).toThrow('INVALID_PRESENTATION_DOCUMENT');
+  });
+
+  it('carries validated structured assets bound to this revision', () => {
+    const document = buildPublishedPresentation(input());
+    const asset = {
+      schemaVersion: '1.0.0',
+      assetId: 'asset_walkthrough',
+      courseId,
+      revisionId,
+      lessonId: 'lesson-1',
+      blockId: 'p1',
+      component: 'CodeWalkthrough',
+      provenance: 'instructor_authored',
+      review: { status: 'not_applicable' },
+      payload: {
+        component: 'CodeWalkthrough',
+        language: 'python',
+        code: 'a = 1\nb = 2',
+        annotations: [{ line: 0, explanation: 'Assigns a.' }],
+      },
+      label: 'Instructor-authored material',
+      fallback: 'CodeViewer',
+      disclosure: 'Instructor-authored walkthrough.',
+    };
+    const withAssets = JSON.parse(JSON.stringify(document));
+    withAssets.assets = [asset];
+    const parsed = parsePublishedPresentation(withAssets);
+    expect(parsed.assets).toHaveLength(1);
+    expect(parsed.assets![0].component).toBe('CodeWalkthrough');
+  });
+
+  it('rejects an asset bound to a different revision', () => {
+    const withAssets = JSON.parse(JSON.stringify(buildPublishedPresentation(input())));
+    withAssets.assets = [
+      {
+        schemaVersion: '1.0.0',
+        assetId: 'asset_foreign',
+        courseId,
+        revisionId: 'rev_other_revision',
+        lessonId: 'lesson-1',
+        component: 'CodeWalkthrough',
+        provenance: 'instructor_authored',
+        review: { status: 'not_applicable' },
+        payload: {
+          component: 'CodeWalkthrough',
+          language: 'python',
+          code: 'x = 1',
+          annotations: [{ line: 0, explanation: 'x' }],
+        },
+        label: 'Instructor-authored material',
+        fallback: 'CodeViewer',
+        disclosure: 'Walkthrough.',
+      },
+    ];
+    expect(() => parsePublishedPresentation(withAssets)).toThrow(
+      'INVALID_PRESENTATION_DOCUMENT',
+    );
+  });
+
+  it('rejects an asset pointing at a lesson this revision lacks', () => {
+    const withAssets = JSON.parse(JSON.stringify(buildPublishedPresentation(input())));
+    withAssets.assets = [
+      {
+        schemaVersion: '1.0.0',
+        assetId: 'asset_orphan',
+        courseId,
+        revisionId,
+        lessonId: 'lesson-does-not-exist',
+        component: 'CodeWalkthrough',
+        provenance: 'instructor_authored',
+        review: { status: 'not_applicable' },
+        payload: {
+          component: 'CodeWalkthrough',
+          language: 'python',
+          code: 'x = 1',
+          annotations: [{ line: 0, explanation: 'x' }],
+        },
+        label: 'Instructor-authored material',
+        fallback: 'CodeViewer',
+        disclosure: 'Walkthrough.',
+      },
+    ];
+    expect(() => parsePublishedPresentation(withAssets)).toThrow(
+      'INVALID_PRESENTATION_DOCUMENT',
+    );
+  });
+
+  it('rejects an asset whose label misstates its provenance', () => {
+    const withAssets = JSON.parse(JSON.stringify(buildPublishedPresentation(input())));
+    withAssets.assets = [
+      {
+        schemaVersion: '1.0.0',
+        assetId: 'asset_mislabelled',
+        courseId,
+        revisionId,
+        lessonId: 'lesson-1',
+        component: 'CodeWalkthrough',
+        provenance: 'deterministic_demo',
+        review: { status: 'not_applicable' },
+        payload: {
+          component: 'CodeWalkthrough',
+          language: 'python',
+          code: 'x = 1',
+          annotations: [{ line: 0, explanation: 'x' }],
+        },
+        // Claims to be instructor work while the provenance says demo.
+        label: 'Instructor-authored material',
+        fallback: 'CodeViewer',
+        disclosure: 'Walkthrough.',
+      },
+    ];
+    expect(() => parsePublishedPresentation(withAssets)).toThrow(
+      'INVALID_PRESENTATION_DOCUMENT',
+    );
+  });
+
+  it('still accepts a 1.0.0 document that predates the plan', () => {
+    const legacy = JSON.parse(JSON.stringify(buildPublishedPresentation(input())));
+    delete legacy.plan;
+    const parsed = parsePublishedPresentation(legacy);
+    expect(parsed.plan).toBeUndefined();
+    expect(parsed.chapters[0].lessons[0].blocks).toHaveLength(4);
+  });
 });

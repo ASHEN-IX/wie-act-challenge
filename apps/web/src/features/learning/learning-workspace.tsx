@@ -6,6 +6,7 @@ import {
   AiModeNote,
   AiWaitStatus,
 } from "@/features/ai-status/ai-status-view";
+import { NardouchAssistant } from "@/features/nardouch/nardouch-assistant";
 import { ActivityRenderer } from "./activity-renderer";
 import { LearningStylePanel } from "./learning-style-panel";
 import {
@@ -298,7 +299,7 @@ export function LearningWorkspace({
     setSupport(null);
   }
   return (
-    <div
+    <div id="nardouch-practice-target"
       lang={workspaceLang}
       className="mx-auto max-w-4xl space-y-6 pb-16"
     >
@@ -644,7 +645,18 @@ export function LearningWorkspace({
         ref={tutorRef}
         className="rounded-xl border p-5 space-y-3"
       >
-        <h2 className="font-semibold">Source-grounded tutor</h2>
+        <NardouchAssistant
+          key={`${context.courseId}:${context.revisionId}`}
+          courseId={context.courseId} revisionId={context.revisionId}
+          userId={userId} objectiveId={objectiveId || undefined}
+          onPractice={() => {
+            void startActivity("practice");
+            document.getElementById("nardouch-practice-target")?.scrollIntoView({ behavior: "smooth" });
+          }}
+        />
+        <details className="border-t pt-3">
+        <summary className="cursor-pointer text-sm text-muted-foreground">Source excerpt lookup</summary>
+        <h3 className="font-semibold mt-3">Source-grounded tutor</h3>
         <label className="block">
           Your question
           <textarea
@@ -705,6 +717,7 @@ export function LearningWorkspace({
             ))}
           </div>
         )}
+        </details>
       </section>
       <section className="rounded-xl border p-5 space-y-3">
         <h2 className="font-semibold">Private progress and attempt history</h2>

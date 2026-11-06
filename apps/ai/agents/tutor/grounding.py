@@ -92,7 +92,8 @@ def verify_citations(answer_text, retrieved_manifest, authorized_document_ids):
     )
 
 
-def answer_grounded_question(req, vector_store=None):
+def retrieve_grounding(req, vector_store=None):
+    """Shared exact-revision RAG; retrieval never invokes a language model."""
     pin = {
         "courseId": req.courseId,
         "revisionId": req.revisionId,
@@ -127,6 +128,27 @@ def answer_grounded_question(req, vector_store=None):
             }
         )
     if not passages:
+        return pin, [], None
+    context = {
+        "schemaVersion": "1.0.0",
+        "visibility": "service_only",
+        "pin": pin,
+        "sources": list({
+            (p["documentId"], p["pageNumber"]): {
+                "documentId": p["documentId"], "contentHash": p["contentHash"],
+                "pageNumber": p["pageNumber"],
+                "locationKnown": p["pageNumber"] is not None, "provenance": "extracted",
+            } for p in passages
+        }.values()),
+        "excerpts": [{"documentId": p["documentId"], "text": p["text"]} for p in passages],
+    }
+    CONTRACTS["GroundingContext"].validate_python(context)
+    return pin, passages, context
+
+
+def answer_grounded_question(req, vector_store=None):
+    pin, passages, context = retrieve_grounding(req, vector_store)
+    if not passages:
         return TutorAnswerResult(
             answer="No authorized evidence is available for this question.",
             hasSufficientEvidence=False,
@@ -138,28 +160,6 @@ def answer_grounded_question(req, vector_store=None):
             retrievedEvidence=[],
             executionMode="UNAVAILABLE",
         )
-    context = {
-        "schemaVersion": "1.0.0",
-        "visibility": "service_only",
-        "pin": pin,
-        "sources": list(
-            {
-                (p["documentId"], p["pageNumber"]): {
-                    "documentId": p["documentId"],
-                    "contentHash": p["contentHash"],
-                    "pageNumber": p["pageNumber"],
-                    "locationKnown": p["pageNumber"] is not None,
-                    "provenance": "extracted",
-                }
-                for p in passages
-            }.values()
-        ),
-        "excerpts": [
-            {"documentId": p["documentId"], "text": p["text"]} for p in passages
-        ],
-    }
-    CONTRACTS["GroundingContext"].validate_python(context)
-
     def extractive(_):
         p = passages[0]
         page = f", p:{p['pageNumber']}" if p["pageNumber"] is not None else ""

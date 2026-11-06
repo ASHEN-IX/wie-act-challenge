@@ -1,0 +1,18 @@
+{
+  "repo": "oddadmix/lahgtna-chatterbox-v1",
+  "revision": "6b37e50d1952f07306dc9ff3f3d4ff4ddaf32541",
+  "usage": "evaluation_only",
+  "modelLicense": "MIT according to author model card",
+  "datasetProvenance": "Not disclosed; production review pending",
+  "runtimeRevision": "ab55923c27757c90cfcc407baa57dc25a7d25217",
+  "dialectMappingRevision": "433cb74200b55457bffa8ee6965a02ecab546a1c",
+  "files": {
+    "Cangjie5_TC.json": "7073fd9de919443ae88e0bd2449917a65fe54898a4413ed1edcc4b67f28bce8c",
+    "README.md": "706364e2273500562693b5786f7b6f3469375d4b1bfb5a156c589191fefb97bb",
+    "conds.pt": "6552d70568833628ba019c6b03459e77fe71ca197d5c560cef9411bee9d87f4e",
+    "grapheme_mtl_merged_expanded_v1.json": "df81a7ca7c31796cbe97f7a7142d5a53b12e88e12417ebe98f66602cafaf0461",
+    "s3gen.pt": "9b9ff07e60b20c136e2b1b3d7563a24604e8d2c4c267888d1ee929dd0151d2a3",
+    "t3_mtl23ls_v2.safetensors": "3bdf136861265c69540059b030d08f75a346ce33fbdaacf02449e671cc9bfa53",
+    "ve.pt": "4b16d836bc598509860f6fa068165a8bb5e9ac84f05582dfcf278a5a372879f1"
+  }
+}

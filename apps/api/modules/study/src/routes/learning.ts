@@ -24,7 +24,9 @@ import {
 } from '../services/learningStyle';
 import UserProfile from '../../../user-profile/src/models/UserProfile';
 import { getLearningDocument } from '../services/courseReader';
-import { getPublishedPresentation } from '../services/presentationReader';
+import { getPublishedPresentationWithAssets } from '../services/presentationReader';
+import { attachStructuredAsset } from '../services/structuredAssets';
+import { planLessonExperience } from '../services/experiencePlanning';
 
 // Interface languages the learning workspace can actually render. Keep this list
 // in step with the translations in the web workspace; a persisted value outside
@@ -61,6 +63,24 @@ const revision = (r: DomainRequest) => {
     throw Object.assign(new Error('Exact revision tag required'), { status: 400 });
   return r.query.revisionId as string | undefined;
 };
+// An authorized course author attaches a supplemental structured asset to a
+// published revision. The asset is supplemental only: it never mutates
+// canonical content, and a reader without it keeps the static fallback.
+router.post(
+  '/courses/:courseId/presentation/assets',
+  operation(async (r) => {
+    const revisionId = revision(r);
+    if (!revisionId)
+      throw Object.assign(new Error('Exact revision tag required'), { status: 400 });
+    const asset = await attachStructuredAsset(
+      r.user!.userId,
+      String(r.params.courseId),
+      revisionId,
+      (r.body || {}) as Record<string, unknown>,
+    );
+    return { asset };
+  })
+);
 router.get(
   '/courses/:courseId/activities',
   operation((r) => publishedActivities(r.user!.userId, String(r.params.courseId), revision(r)))
@@ -73,9 +93,36 @@ router.get(
 );
 router.get(
   '/courses/:courseId/presentation',
-  operation((r) =>
-    getPublishedPresentation(r.user!.userId, String(r.params.courseId), revision(r))
-  )
+  operation(async (r) => {
+    // Assets travel with the presentation so the reader makes one authorized
+    // request per lesson surface, not one per component.
+    const { presentation, assets } = await getPublishedPresentationWithAssets(
+      r.user!.userId,
+      String(r.params.courseId),
+      revision(r),
+    );
+    return assets.length ? { ...presentation, assets } : presentation;
+  })
+);
+// Development/QA-only experience planning (Batch 4, M4.1).
+//
+// The route is gated twice: the service refuses unless the environment flag is
+// explicitly set, and the mock planner is the only implementation the validator
+// will accept. A production deployment without the flag gets a 403 and keeps the
+// deterministic reader.
+router.post(
+  '/courses/:courseId/presentation/plan',
+  operation(async (r) => {
+    const body = (r.body || {}) as Record<string, unknown>;
+    if (typeof body.lessonId !== 'string' || typeof body.scenario !== 'string')
+      throw Object.assign(new Error('lessonId and scenario are required'), { status: 400 });
+    return planLessonExperience(
+      r.user!.userId,
+      String(r.params.courseId),
+      body.lessonId,
+      body.scenario as never,
+    );
+  })
 );
 router.get(
   '/courses/:courseId/progress',

@@ -30,7 +30,7 @@ function FormulaSourceFallback({ block, href }: { block: Extract<LessonBlockV2, 
   const [failed, setFailed] = useState(false);
   return <figure className="space-y-3 rounded-lg border p-4">
     <figcaption className="text-sm text-muted-foreground">Original equation image. Automatic transcription is unverified. The crop may omit nearby material; inspect the original PDF.</figcaption>
-    {href && !failed ? <img src={href} alt={`Original equation from PDF${block.sourceMeta?.page ? `, page ${block.sourceMeta.page}` : ""}. Extracted text is available below.`} loading="lazy" className="max-h-96 max-w-full rounded bg-white object-contain" onError={() => setFailed(true)} /> : <p role="status" className="text-sm">Equation image unavailable. Inspect the original document or the extracted text below.</p>}
+    {href && !failed ? <img src={href} alt={`Original equation from PDF${block.sourceMeta?.page ? `, page ${block.sourceMeta.page}` : ""}. Extracted text is available below.`} loading="lazy" decoding="async" className="max-h-96 max-w-full rounded bg-white object-contain" onError={() => setFailed(true)} /> : <p role="status" className="text-sm">Equation image unavailable. Inspect the original document or the extracted text below.</p>}
     <details><summary className="cursor-pointer text-sm">Original extracted text (unverified)</summary><pre className="mt-2 whitespace-pre-wrap break-words text-sm">{block.expression}</pre></details>
   </figure>;
 }
@@ -189,7 +189,7 @@ function Media({ block }: { block: Extract<LessonBlockV2, { type: "media" }> }) 
   // data URLs are rejected at the renderer boundary.
   if (!block.src.startsWith("/api/v1/"))
     return <div role="alert" className="rounded-xl border p-5 text-sm">This media source is unavailable.</div>;
-  if (block.mediaType === "image") return <figure className="space-y-2"><img src={block.src} alt={block.alt} className="max-h-[34rem] w-full rounded-xl border object-contain" />{block.caption && <figcaption className="text-xs text-muted-foreground">{block.caption}</figcaption>}</figure>;
+  if (block.mediaType === "image") return <figure className="space-y-2"><img src={block.src} alt={block.alt} loading="lazy" decoding="async" className="max-h-[34rem] w-full rounded-xl border object-contain" />{block.caption && <figcaption className="text-xs text-muted-foreground">{block.caption}</figcaption>}</figure>;
   if (block.mediaType === "audio") return <figure className="space-y-2 rounded-xl border p-4"><audio controls src={block.src} className="w-full" /><figcaption className="text-xs text-muted-foreground">{block.alt}</figcaption></figure>;
   return <figure className="space-y-2"><video controls src={block.src} aria-label={block.alt} className="w-full rounded-xl border" />{block.caption && <figcaption className="text-xs text-muted-foreground">{block.caption}</figcaption>}</figure>;
 }

@@ -15,7 +15,30 @@ export default async function cleanup() {
   try { docker(['exec', 'rabbitmq', 'rabbitmqctl', 'delete_vhost', name]); } catch {}
   const root = path.resolve('../../var/final-qa');
   for (const entry of await fs.readdir(root).catch(() => [])) {
-    if (entry.startsWith(name) && /^[A-Za-z0-9_]+$/.test(entry))
-      await fs.rm(path.join(root, entry), { recursive: true, force: true });
+    if (entry.startsWith(name) && /^[A-Za-z0-9_]+$/.test(entry)) {
+      const target = path.join(root, entry);
+      try {
+        await fs.rm(target, { recursive: true, force: true });
+      } catch (error) {
+        // The QA container runs as root and writes FAISS indexes the host user
+        // cannot unlink. Ask a container to remove them instead, so a run does
+        // not leave root-owned artefacts or fail teardown.
+        if ((error as NodeJS.ErrnoException).code !== "EACCES") throw error;
+        try {
+          docker([
+            "run",
+            "--rm",
+            "-v",
+            `${root}:/qa`,
+            "busybox:latest",
+            "rm",
+            "-rf",
+            `/qa/${entry}`,
+          ]);
+        } catch {
+          console.warn(`[cleanup] could not remove ${target}; leaving it for manual cleanup`);
+        }
+      }
+    }
   }
 }

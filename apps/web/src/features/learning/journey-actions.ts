@@ -16,6 +16,7 @@ import {
   migrateReadingDocumentV1,
 } from "@ednova/shared/ednova/learningDocumentV2";
 import { parsePublishedPresentation } from "@ednova/shared/ednova/presentationDocument";
+import { parsePublishedExperiencePlan } from "@ednova/shared/ednova/publishedExperiencePlan";
 export async function learningCatalog(courseId: string, revisionId?: string) {
   await requireIdentity();
   const data = await api<{
@@ -47,6 +48,34 @@ export async function publishedPresentation(courseId: string, revisionId?: strin
   // Strict browser-boundary parse: an unknown version, extra key or
   // inconsistent render policy is a projection failure, never a partial render.
   return parsePublishedPresentation(payload);
+}
+/**
+ * Request a mock-planned lesson layout (Batch 4, M4.1).
+ *
+ * Development/QA only: the API refuses unless its own environment flag is set,
+ * and this returns undefined on any failure so the caller keeps the
+ * deterministic reader. A planner failure is never surfaced as a page error.
+ */
+export async function plannedLessonExperience(
+  courseId: string,
+  lessonId: string,
+  scenario: string,
+  blockIds: readonly string[],
+) {
+  await requireIdentity();
+  try {
+    const payload = await api<unknown>(
+      `/api/v1/study/learning/courses/${segment(courseId)}/presentation/plan`,
+      { method: "POST", body: JSON.stringify({ lessonId, scenario }) },
+    );
+    const outcome = payload as { status?: unknown; plan?: unknown };
+    if (outcome?.status !== "planned") return undefined;
+    return parsePublishedExperiencePlan(outcome.plan, blockIds);
+  } catch {
+    // Unavailable, rejected or disabled all mean the same thing to a learner:
+    // read the deterministic presentation.
+    return undefined;
+  }
 }
 export async function learningProgress(courseId: string, revisionId: string) {
   await requireIdentity();

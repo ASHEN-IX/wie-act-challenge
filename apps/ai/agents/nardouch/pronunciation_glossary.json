@@ -1,0 +1,7 @@
+[
+ {"display":"récursivité","speech":"الريكيرسيفيتي","nativeSpeakerReviewed":false,"meaningReviewed":false},
+ {"display":"stack","speech":"ستاك","nativeSpeakerReviewed":false,"meaningReviewed":false},
+ {"display":"queue","speech":"كيو","nativeSpeakerReviewed":false,"meaningReviewed":false},
+ {"display":"LIFO","speech":"L I F O","nativeSpeakerReviewed":false,"meaningReviewed":false},
+ {"display":"FIFO","speech":"F I F O","nativeSpeakerReviewed":false,"meaningReviewed":false}
+]

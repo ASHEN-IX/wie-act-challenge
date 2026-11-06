@@ -1,0 +1,7 @@
+# Install in a dedicated Python 3.11/3.12 speech environment if host wheels differ.
+faster-whisper==1.2.1
+ctranslate2==4.8.5
+# TTS is optional; provision only after upstream dataset/voice rights review.
+# Install a reviewed, pinned VoxCPM release separately; see docs/NARDOUCH.md.
+
+piper-tts==1.8.0

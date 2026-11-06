@@ -929,6 +929,28 @@ export class StudyController {
       res
     );
   }
+  @Post('/api/v1/study/learning/courses/:courseId/presentation/assets')
+  post_api_v1_study_learning_courses_presentation_assets_4aaa4902(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute(
+      'POST /api/v1/study/learning/courses/:courseId/presentation/assets',
+      req,
+      res
+    );
+  }
+  @Post('/api/v1/study/learning/courses/:courseId/presentation/plan')
+  post_api_v1_study_learning_courses_presentation_plan_7b3ae656(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute(
+      'POST /api/v1/study/learning/courses/:courseId/presentation/plan',
+      req,
+      res
+    );
+  }
   @Get('/api/v1/study/learning/courses/:courseId/activities')
   get_api_v1_study_learning_courses_activities_107c44f7(
     @Req() req: DomainRequest,
@@ -1162,6 +1184,41 @@ export class StudyController {
     @Res() res: Response
   ): Promise<void> {
     return this.service.execute('POST /api/v1/study/visual-lab/:labId/check', req, res);
+  }
+  @Post('/api/v1/study/nardouch/turn')
+  post_api_v1_study_nardouch_turn_edeb5cea(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('POST /api/v1/study/nardouch/turn', req, res);
+  }
+  @Get('/api/v1/study/nardouch/conversations/:id')
+  get_api_v1_study_nardouch_conversations_6587914f(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('GET /api/v1/study/nardouch/conversations/:id', req, res);
+  }
+  @Post('/api/v1/study/nardouch/conversations/:id/feedback')
+  post_api_v1_study_nardouch_conversations_feedback_16a06cc5(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('POST /api/v1/study/nardouch/conversations/:id/feedback', req, res);
+  }
+  @Post('/api/v1/study/nardouch/transcribe')
+  post_api_v1_study_nardouch_transcribe_125b0e8b(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('POST /api/v1/study/nardouch/transcribe', req, res);
+  }
+  @Post('/api/v1/study/nardouch/conversations/:id/speech')
+  post_api_v1_study_nardouch_conversations_speech_f6a52bcd(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('POST /api/v1/study/nardouch/conversations/:id/speech', req, res);
   }
 }
 @Module({

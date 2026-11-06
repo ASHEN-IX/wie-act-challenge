@@ -43,6 +43,10 @@ async function main() {
     AI_SERVICE_URL: 'http://127.0.0.1:5362',
     AI_SERVICE_TIMEOUT_MS: '120000',
     REDIS_URL: '',
+    // Batch 4 M4.1: the isolated QA harness is the only place the mock planner
+    // is enabled. The route and the service both refuse without this flag, so a
+    // production deployment keeps the deterministic reader.
+    EDNOVA_ENABLE_MOCK_EXPERIENCE_PLANNING: 'true',
     RABBITMQ_URL: `amqp://${encodeURIComponent(rabbitUser)}:${encodeURIComponent(process.env.RABBITMQ_PASS || '')}@localhost:5672/${name}`,
     INGEST_UPLOADS_DIR: path.join(root, 'uploads'),
     FAISS_INDEX_DIR: path.join(root, 'indexes'),
@@ -102,6 +106,11 @@ async function main() {
     '2',
     '--user',
     '0',
+    // The env below rewrites every loopback service to host.docker.internal.
+    // Without this mapping that name does not resolve inside the container, so
+    // the QA service cannot reach MongoDB or RabbitMQ on the host.
+    '--add-host',
+    'host.docker.internal:host-gateway',
     '-v',
     path.resolve('../ai') + ':/app:ro',
     '-v',

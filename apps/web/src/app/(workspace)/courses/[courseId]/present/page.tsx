@@ -1,25 +1,66 @@
-import { learningDocument, publishedPresentation } from "@/features/learning/journey-actions";
-import { PresentationView } from "@/features/reader/presentation-view";
+import {
+  learningDocument,
+  plannedLessonExperience,
+  publishedPresentation,
+} from "@/features/learning/journey-actions";
+import { LessonReader } from "@/features/reader/lesson-reader";
 import { CourseReader } from "@/features/reader/course-reader";
 import { DataError } from "@/components/shared/states";
+import { isReaderMode, type ReaderMode } from "@ednova/shared/ednova/presentationPlan";
 
 /**
- * Published-course presentation route. The presentation contract is preferred;
- * if it is unavailable or fails its strict parse, the deterministic
+ * Published-course lesson reader. The presentation contract is preferred; if
+ * it is unavailable or fails its strict parse, the deterministic
  * source-faithful reader renders the same authorized revision instead.
+ *
+ * Lesson selection and reader mode live in the URL so a lesson is
+ * deep-linkable and browser history works.
  */
 export default async function PresentationPage({
   params,
   searchParams,
 }: {
   params: Promise<{ courseId: string }>;
-  searchParams: Promise<{ revisionId?: string }>;
+  searchParams: Promise<{
+    revisionId?: string;
+    lesson?: string;
+    mode?: string;
+    plan?: string;
+  }>;
 }) {
   const { courseId } = await params;
-  const { revisionId } = await searchParams;
+  const { revisionId, lesson, mode, plan } = await searchParams;
   try {
     const presentation = await publishedPresentation(courseId, revisionId);
-    return <PresentationView presentation={presentation} />;
+    const lessons = presentation.chapters.flatMap((chapter) => chapter.lessons);
+    const selected =
+      lessons.find((entry) => entry.id === lesson)?.id ?? lessons[0]?.id ?? "";
+    const readerMode: ReaderMode = isReaderMode(mode) ? mode : "read";
+
+    // Development/QA pathway: `?plan=<scenario>` asks the API for a mock-planned
+    // layout. Any failure — disabled, rejected, unavailable, unparseable — yields
+    // undefined and the deterministic presentation renders exactly as before.
+    const selectedLesson = lessons.find((entry) => entry.id === selected);
+    const experiencePlan =
+      plan && selectedLesson
+        ? await plannedLessonExperience(
+            courseId,
+            selected,
+            plan,
+            selectedLesson.blocks.map((entry) => entry.id),
+          )
+        : undefined;
+
+    return (
+      <LessonReader
+        presentation={presentation}
+        lessonId={selected}
+        practiceHref={`/courses/${courseId}/learn?revisionId=${encodeURIComponent(presentation.revisionId)}#practice-and-tutor`}
+        fallbackHref={presentation.fallback.readerHref}
+        initialMode={readerMode}
+        {...(experiencePlan ? { experiencePlan } : {})}
+      />
+    );
   } catch (error) {
     // Server-side diagnostic only; learners see the deterministic fallback, not
     // internal error text.

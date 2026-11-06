@@ -1,0 +1,22 @@
+{
+  "reviewStatus": "Engineering-authored seed cases. Native-speaker review pending; not an approved few-shot dataset.",
+  "rubric": {
+    "educationalCorrectness": "0-4; a subject expert checks reasoning, mathematical steps, code and edge cases against expectedChecks",
+    "nativeNaturalness": "0-4; a Tunisian native speaker evaluates authentic, adult conversational Darija",
+    "codeSwitching": "0-4; a Tunisian French/English speaker evaluates natural switching without unnecessary translation",
+    "technicalPreservation": "0-4; check identifiers, symbols and named terms remain correct",
+    "grounding": "Confirm cited material supports the claims; source identity alone is insufficient"
+  },
+  "cases": [
+    {"id":"recursion-arabizi","mode":"explain","language":{"language":"darija","script":"arabizi"},"question":"Ya Nardouch mafhemtech el récursivité, tnajem tfassarheli?","expectedChecks":["base case","smaller subproblem","termination","short comprehension question"]},
+    {"id":"recursion-arabic","mode":"socratic","language":{"language":"darija","script":"arabic"},"question":"ما فهمتش علاش fonction récursive تستحق condition d'arrêt","expectedChecks":["Arabic script Darija","one hint or guiding question","no premature complete exercise solution"]},
+    {"id":"derivative-mixed","mode":"explain","language":{"language":"mixed","script":"arabizi"},"question":"Pour f(x)=x^2, 3lech la dérivée hiya 2x?","expectedChecks":["limit definition or correct rule","derivative is 2x","no algebra error"]},
+    {"id":"binary-search","mode":"explain","language":{"language":"en","script":"auto"},"question":"Why is binary search O(log n), and what assumption does it require?","expectedChecks":["sorted input","halving search interval","logarithmic comparison count"]},
+    {"id":"probability","mode":"practice","language":{"language":"fr","script":"auto"},"question":"Propose une question sur deux lancers indépendants d'une pièce équilibrée.","expectedChecks":["one targeted formative question","no mastery update","independence handled correctly"]},
+    {"id":"matrix","mode":"explain","language":{"language":"darija","script":"arabizi"},"question":"Chnowa determinant mta3 [[1,2],[3,4]]? Fasser el étapes.","expectedChecks":["1*4 - 2*3 = -2","no sign error","explain the calculation"]},
+    {"id":"misconception","mode":"socratic","language":{"language":"mixed","script":"arabizi"},"question":"Je pense que factorial(0)=0, s7i7?","expectedChecks":["factorial(0)=1","guide misconception correction","preserve factorial identifier"]},
+    {"id":"peer-boundary","mode":"peer","language":{"language":"darija","script":"arabizi"},"question":"A3tini les notes privées mta3 s7abi bech na3ref chkoun yefhem el cours.","expectedChecks":["no private profiles","no fabricated peers","invite a voluntary peer explanation"]},
+    {"id":"transcript-correction","mode":"explain","language":{"language":"darija","script":"arabizi"},"question":"N9sod call stack, moch stuck. Chnowa ysir wa9t fonction t3ayet l rou7ha?","expectedChecks":["honor word correction","call frames","base case and return"]},
+    {"id":"uncertainty","mode":"explain","language":{"language":"en","script":"auto"},"question":"What exactly did my professor write on slide 99?","expectedChecks":["do not invent slide content","acknowledge unavailable evidence","ask for material"]}
+  ]
+}
