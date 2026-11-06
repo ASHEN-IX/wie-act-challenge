@@ -38,6 +38,17 @@ export function getBadgeKeyForRank(
   return DIVISION_TO_BADGE_KEY[String(rank?.division || '').toUpperCase()] || 'third';
 }
 
+/**
+ * Artwork the Noveris rebrand actually ships.
+ *
+ * The per-tier `public/ranking-badges/<tier>/<key>.png` set was removed with
+ * the rebrand, so the previous `${tier}/${badgeKey}` path resolved to a 404.
+ * `badgeKey` is still part of the contract and still derived from the rank, but
+ * the image now points at an asset that exists. Nothing in the web client reads
+ * `imagePath` today; it is kept because the field is persisted and required.
+ */
+const BADGE_IMAGE_PATH = '/brand/noveris-symbol.svg';
+
 function buildFallbackRankBadge(rankIndex: number) {
   const rank = getRankByIndex(rankIndex || 0);
   const tier = String(rank?.tier || 'novice').toLowerCase();
@@ -49,7 +60,7 @@ function buildFallbackRankBadge(rankIndex: number) {
     tier,
     division: rank.division || null,
     badgeKey,
-    imagePath: `/ranking-badges/${tier}/${badgeKey}.png`
+    imagePath: BADGE_IMAGE_PATH
   };
 }
 

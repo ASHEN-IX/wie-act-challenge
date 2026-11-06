@@ -283,7 +283,8 @@ async function main() {
           tier,
           division: rank.division || null,
           badgeKey,
-          imagePath: `/ranking-badges/${tier}/${badgeKey}.png`,
+          // The rebrand removed the per-tier badge PNGs; point at a shipped asset.
+    imagePath: '/brand/noveris-symbol.svg',
           isActive: true
         });
         badgeCount++;

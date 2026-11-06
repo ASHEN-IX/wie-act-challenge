@@ -64,6 +64,26 @@ test("validated mock experience plan renders through the trusted registry and fa
     await expect(reader.locator("[data-presentation-lesson]").first()).toBeVisible();
     await page.screenshot({ path: path.join(evidence, "01-deterministic-reader.png") });
 
+    // ---- companion loading state resolves -------------------------------
+    // The reader mounts the course companion, which shows a loading message
+    // until its request settles. This asserts the message is transient: after
+    // the network is idle, the companion has either rendered or reported an
+    // error, and is never left mid-load.
+    await page.waitForLoadState("networkidle");
+    const companionLoading = page.getByText("Loading your course companion");
+    const companionAlert = page.locator("[data-nardouch-stage], [role=alert]").first();
+    await expect
+      .poll(
+        async () => {
+          const loading = await companionLoading.count();
+          const settled = await companionAlert.count();
+          return loading === 0 || settled > 0;
+        },
+        { timeout: 20000, message: "companion loading state never resolved" },
+      )
+      .toBe(true);
+    await page.screenshot({ path: path.join(evidence, "01b-companion-state.png") });
+
     // The plan route requires a lesson id; read the first one from the
     // presentation the reader itself loaded.
     const presentationResponse = await page.request.get(
