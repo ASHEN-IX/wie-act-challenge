@@ -375,6 +375,13 @@ export async function planLessonExperience(
   if (!result.ok) return { status: 'planner_unavailable', failure: result.failure };
 
   const outcome: ValidationOutcome = tryValidateExperiencePlan(result.proposal, context);
-  if (!outcome.ok) return { status: 'rejected', code: outcome.code, stage: outcome.stage };
+  if (!outcome.ok) {
+    // The code and stage only: never the proposal, source text or actor.
+    console.warn(
+      `[experience-plan] rejected ${outcome.code} at ${outcome.stage} ` +
+        `(lesson=${lessonId} blocks=${context.blocks.length})`,
+    );
+    return { status: 'rejected', code: outcome.code, stage: outcome.stage };
+  }
   return { status: 'planned', plan: projectExperiencePlan(outcome.plan) };
 }

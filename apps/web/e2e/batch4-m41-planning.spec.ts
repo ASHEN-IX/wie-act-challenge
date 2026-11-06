@@ -17,11 +17,17 @@
  *   8. the reader still works after a planner failure.
  */
 import { test, expect } from "@playwright/test";
-import { MongoClient } from "mongodb";
 import fs from "node:fs/promises";
 import path from "node:path";
 
 const evidence = path.resolve("../../reports/evidence/batch4-m41");
+
+/** Identities of the published revision seeded by `tests/m41-fixture.ts`, which
+ * the QA harness runs before it starts the API. */
+const fixtureIdentities = {
+  courseId: "0123456789abcdef01234567",
+  revisionTag: "rev_m41_fixture",
+};
 
 async function login(page: any, email: string) {
   await page.goto("/login");
@@ -31,21 +37,11 @@ async function login(page: any, email: string) {
   await expect(page).toHaveURL(/dashboard/);
 }
 
-/** A published revision must already exist for the student. This suite reuses
- * the fixture the Batch 3 acceptance run publishes; it does not create one, so
- * it can run independently of the ingestion pipeline. */
-async function publishedRevisionFor(db: MongoClient) {
-  const revision = await db
-    .db()
-    .collection("courserevisions")
-    .findOne(
-      { status: "published", activationState: "committed", contentDocument: { $exists: true } },
-      { sort: { publishedAt: -1 } },
-    );
-  if (!revision) return null;
+/** The fixture is seeded by `batch4-m41-setup.ts` before the webServer starts. */
+async function publishedRevision() {
   return {
-    courseId: String(revision.courseId),
-    revisionTag: revision.revisionTag as string,
+    courseId: fixtureIdentities.courseId,
+    revisionTag: fixtureIdentities.revisionTag,
   };
 }
 
@@ -54,18 +50,8 @@ test("validated mock experience plan renders through the trusted registry and fa
   browser,
 }) => {
   await fs.mkdir(evidence, { recursive: true });
-  const client = new MongoClient("mongodb://127.0.0.1:27017/" + process.env.FINAL_QA_DB);
-  await client.connect();
-  try {
-    const published = await publishedRevisionFor(client);
-    if (!published) {
-      test.skip(
-        true,
-        "No published revision in this isolated database. Run scripts/qa-run-final.sh first; this suite reuses its fixture rather than re-ingesting.",
-      );
-      return;
-    }
-    const { courseId, revisionTag } = published;
+  {
+    const { courseId, revisionTag } = await publishedRevision();
 
     await login(page, "final-student@example.test");
 
@@ -180,8 +166,6 @@ test("validated mock experience plan renders through the trusted registry and fa
       { data: { lessonId: "lesson-that-does-not-exist", scenario: "valid_mathematics" } },
     );
     expect([404, 422]).toContain(otherRevision.status());
-  } finally {
-    await client.close();
   }
 });
 

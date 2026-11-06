@@ -18,6 +18,7 @@
  */
 
 import {
+  EXPERIENCE_PLAN_LIMITS,
   EXPERIENCE_PLAN_SCHEMA_VERSION,
   experienceContextFingerprint,
   type ProposedPlacement,
@@ -398,10 +399,12 @@ export function planMockExperience(
     case 'attack_oversized': {
       const proposal = base();
       const template = proposal.placements[0];
-      proposal.placements = Array.from({ length: 400 }, (_, index) => ({
-        ...template,
-        placementId: `p-${index}`,
-      }));
+      // One past the contract's own bound, so the limit check is what fires
+      // rather than a coverage rule that happens to trip first.
+      proposal.placements = Array.from(
+        { length: EXPERIENCE_PLAN_LIMITS.maxPlacements + 1 },
+        (_, index) => ({ ...template, placementId: `p-${index}` }),
+      );
       return { ok: true, proposal };
     }
     case 'attack_deeply_nested': {

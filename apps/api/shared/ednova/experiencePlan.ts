@@ -60,8 +60,14 @@ export type DisclosureMode = (typeof DISCLOSURE_MODES)[number];
 /** Hard bounds on a proposal. Exceeding any of them rejects the whole plan;
  * nothing is silently truncated, because a truncated plan would look complete. */
 export const EXPERIENCE_PLAN_LIMITS = Object.freeze({
-  /** Component placements across the whole lesson. */
-  maxPlacements: 120,
+  /** Component placements across the whole lesson.
+   *
+   * This must cover the canonical contract's own bound (400 blocks per lesson,
+   * enforced by `parseCanonicalDocument`), because coverage requires exactly one
+   * placement per canonical block. A lower cap would make a long but legitimate
+   * lesson permanently unplannable — a silent functional hole, not a safety
+   * win. The headroom is for supplements. */
+  maxPlacements: 400 + 24,
   /** Supplemental (non-canonical) placements a planner may add. */
   maxSupplemental: 24,
   /** Distinct grouping labels a plan may open. */

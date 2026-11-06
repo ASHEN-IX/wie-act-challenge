@@ -19,7 +19,13 @@ export default defineConfig({
       url: "http://localhost:5361/api/v1/health",
       timeout: 180000,
       gracefulShutdown: { signal: "SIGTERM", timeout: 20000 },
-      env: { FINAL_QA_DB: db },
+      env: {
+        FINAL_QA_DB: db,
+        FINAL_QA_SEED_M41: "true",
+        ...(process.env.FINAL_QA_DOCKER_NETWORK
+          ? { FINAL_QA_DOCKER_NETWORK: process.env.FINAL_QA_DOCKER_NETWORK }
+          : {}),
+      },
     },
     {
       command: "pnpm exec next dev --port 5360",

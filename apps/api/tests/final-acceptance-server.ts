@@ -89,10 +89,22 @@ async function main() {
     TOKENIZERS_PARALLELISM: 'false',
     OMP_NUM_THREADS: '2'
   };
-  for (const k of ['MONGODB_URI', 'RABBITMQ_URL', 'LLM_BUDGET_MONGODB_URI'])
+  // MongoDB is published on the host loopback, so it stays reachable through
+  // the host gateway. RabbitMQ is bound to loopback only, which the host
+  // gateway cannot reach; when the QA service joins the project network it
+  // reaches the broker by service name instead. The two are deliberately
+  // independent — forcing one mode for both is what broke earlier attempts.
+  const network = process.env.FINAL_QA_DOCKER_NETWORK;
+  for (const k of ['MONGODB_URI', 'LLM_BUDGET_MONGODB_URI'])
     env[k] = env[k]
-      .replace('127.0.0.1', 'host.docker.internal')
-      .replace('@localhost:', '@host.docker.internal:');
+      .replace(/@127\.0\.0\.1:/, '@host.docker.internal:')
+      .replace(/@localhost:/, '@host.docker.internal:')
+      .replace('127.0.0.1', 'host.docker.internal');
+  env.RABBITMQ_URL = network
+    ? env.RABBITMQ_URL.replace(/@(127\.0\.0\.1|localhost|host\.docker\.internal):/, '@rabbitmq:')
+    : env.RABBITMQ_URL
+        .replace(/@127\.0\.0\.1:/, '@host.docker.internal:')
+        .replace(/@localhost:/, '@host.docker.internal:');
   const args = [
     'run',
     '--rm',
@@ -118,6 +130,13 @@ async function main() {
     '-w',
     '/app'
   ];
+  // The project's RabbitMQ publishes on 127.0.0.1 only (a deliberate choice we
+  // do not weaken). On a host where `host.docker.internal` resolves to the
+  // default bridge, the QA service cannot reach it. Attaching to the project
+  // network lets it resolve `rabbitmq` by service name instead. Opt-in, because
+  // the network name depends on the deployment.
+  if (process.env.FINAL_QA_DOCKER_NETWORK)
+    args.push('--network', process.env.FINAL_QA_DOCKER_NETWORK);
   for (const [k, v] of Object.entries(env)) args.push('-e', k + '=' + v);
   const py = spawn(
     'docker',
@@ -207,6 +226,14 @@ async function main() {
     });
   const { migrateAuth } = require('../scripts/migrate-auth');
   await migrateAuth(db, { apply: true });
+  // Batch 4 M4.1: seed a published revision the planning suite can drive.
+  // It writes the same artifacts ingestion writes, and the application still
+  // verifies every hash before rendering, so this is a fixture, not a bypass.
+  if (process.env.FINAL_QA_SEED_M41 === 'true') {
+    const { seedPlanningFixture } = require('./m41-fixture');
+    const seeded = await seedPlanningFixture('mongodb://127.0.0.1:27017/' + name, root);
+    console.log('m41-fixture-seeded', seeded.courseId, seeded.revisionTag);
+  }
   const { start } = require('../dist/main');
   runtime = await start({ port: 5361, workers: true });
   await db
