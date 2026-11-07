@@ -95,11 +95,16 @@ async function main() {
   // reaches the broker by service name instead. The two are deliberately
   // independent — forcing one mode for both is what broke earlier attempts.
   const network = process.env.FINAL_QA_DOCKER_NETWORK;
+  // On the project network the mongo container is reachable by service name.
+  // Rewriting to `host.docker.internal` there made `get_db()` fail inside the
+  // AI service, which silently disabled the manifest branch of ingestion and
+  // forced the legacy parser — the root cause of the C1 chapter discrepancy.
+  const mongoHost = network ? 'ednova-qa-mongo' : 'host.docker.internal';
   for (const k of ['MONGODB_URI', 'LLM_BUDGET_MONGODB_URI'])
     env[k] = env[k]
-      .replace(/@127\.0\.0\.1:/, '@host.docker.internal:')
-      .replace(/@localhost:/, '@host.docker.internal:')
-      .replace('127.0.0.1', 'host.docker.internal');
+      .replace(/@127\.0\.0\.1:/, '@' + mongoHost + ':')
+      .replace(/@localhost:/, '@' + mongoHost + ':')
+      .replace('127.0.0.1', mongoHost);
   env.RABBITMQ_URL = network
     ? env.RABBITMQ_URL.replace(/@(127\.0\.0\.1|localhost|host\.docker\.internal):/, '@rabbitmq:')
     : env.RABBITMQ_URL
