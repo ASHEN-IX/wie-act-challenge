@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+vi.mock("@/features/nardouch/course-growth-actions", () => ({ loadCourseNardouch: vi.fn(), finishNardouchLesson: vi.fn() }));
+import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { LessonBlockV2 } from "@ednova/shared/ednova/learningDocumentV2";
 import {
@@ -294,8 +295,12 @@ describe("validated experience plan integration (M4.1)", () => {
   it("labels a planned layout with its provenance", () => {
     const html = renderWithPlan(boundPlan());
     expect(html).toContain('data-experience-plan="plan-test"');
-    expect(html).toContain('data-experience-plan-planner="mock_experience_planner"');
-    expect(html).toContain("Planned layout");
+    // M4.3: internal planner identity is not shown to a learner. The banner
+    // says what the arrangement is and that it does not verify the maths.
+    expect(html).not.toContain("mock_experience_planner");
+    expect(html).toContain("AI-arranged lesson");
+    expect(html).toContain("does not verify");
+    expect(html).toContain("QA mock planner");
   });
 
   it("renders the plan's chosen trusted component", () => {

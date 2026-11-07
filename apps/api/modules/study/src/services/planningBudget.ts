@@ -39,25 +39,47 @@ function budgetDb(): string | null {
   return name && name.length > 0 ? name : null;
 }
 
+/** One client per (uri) pair, reused. Opening and closing a client for every
+ * accounting read was both slow and racy under concurrent test processes, and
+ * the driver's handshake is not free. */
+let pooled: { uri: string; client: MongoClient } | null = null;
+
+async function budgetClient(uri: string): Promise<MongoClient> {
+  if (pooled && pooled.uri === uri) return pooled.client;
+  if (pooled) await pooled.client.close().catch(() => undefined);
+  const client = new MongoClient(uri, { serverSelectionTimeoutMS: 3000 });
+  await client.connect();
+  pooled = { uri, client };
+  return client;
+}
+
+/** Drop the pooled client. Callers that change the configured URI (tests,
+ * shutdown) use this so the next call connects fresh. */
+export async function closeBudgetClient(): Promise<void> {
+  if (!pooled) return;
+  const { client } = pooled;
+  pooled = null;
+  await client.close().catch(() => undefined);
+}
+
 async function withBudget<T>(run: (collection: Collection) => Promise<T>): Promise<T> {
   const uri = budgetUri();
   const dbName = budgetDb();
   if (!uri || !dbName) throw new PlanningBudgetError();
-  let client: MongoClient | null = null;
+  let client: MongoClient;
   try {
-    client = new MongoClient(uri, {
-      serverSelectionTimeoutMS: 2000,
-      connectTimeoutMS: 2000,
-      socketTimeoutMS: 3000,
-      retryWrites: false,
-    });
-    const collection = client.db(dbName).collection('llm_approval_budgets');
-    return await run(collection);
-  } catch (error) {
-    if (error instanceof PlanningBudgetError) throw error;
+    client = await budgetClient(uri);
+  } catch {
+    // Only a failure to *establish* the connection invalidates the pool. A
+    // query that merely matched nothing must not tear it down, or every second
+    // call in a process pays a reconnect.
+    await closeBudgetClient();
     throw new PlanningBudgetError();
-  } finally {
-    if (client) await client.close().catch(() => undefined);
+  }
+  try {
+    return await run(client.db(dbName).collection('llm_approval_budgets'));
+  } catch (error) {
+    throw error instanceof PlanningBudgetError ? error : new PlanningBudgetError();
   }
 }
 
@@ -69,9 +91,13 @@ export type Reservation = {
 /**
  * Reserve tokens atomically.
  *
- * The conditional update is the whole safety property: it only matches when the
- * approval is unexpired, unrevoked, for this exact task and model, and still has
- * room for the full reservation. Two concurrent callers cannot both win.
+ * Node owns this reservation. Python verifies affordability independently but
+ * does not debit, so one logical provider attempt is charged exactly once —
+ * the M4.2 defect this milestone corrects.
+ *
+ * The conditional update is the safety property: it only matches when the
+ * approval is unexpired, unrevoked, for this task and model, and still has room
+ * for the full reservation. Two concurrent callers cannot both win.
  */
 export async function reservePlanningBudget(input: {
   approvalId: string;
@@ -107,15 +133,11 @@ export async function reservePlanningBudget(input: {
 }
 
 /**
- * Reconcile after a dispatch.
+ * Reconcile the single reservation after dispatch.
  *
- * - reported usage: adjust the ledger to the actual amount, refunding any
- *   unused reservation
- * - no reported usage: keep the reservation spent, because the provider may
- *   still have charged for it
- *
- * A refund is a decrement, and it is bounded so a misreported number cannot
- * drive the ledger negative.
+ * Reported usage refunds the difference; **no report keeps the full
+ * reservation spent**, because the provider may still have charged for it.
+ * Refunds are bounded so a misreported number cannot drive the ledger negative.
  */
 export async function reconcilePlanningBudget(input: {
   approvalId: string;
@@ -124,14 +146,8 @@ export async function reconcilePlanningBudget(input: {
 }): Promise<{ chargedTokens: number; refunded: number; usageReported: boolean }> {
   const reported = input.usage?.usageReported ? input.usage.totalTokens : null;
   if (reported === null || !Number.isSafeInteger(reported) || reported < 0)
-    return {
-      chargedTokens: input.reservedTokens,
-      refunded: 0,
-      usageReported: false,
-    };
+    return { chargedTokens: input.reservedTokens, refunded: 0, usageReported: false };
 
-  // Charge the larger of what was used and what was reserved only when usage
-  // exceeds the reservation; otherwise refund the difference.
   if (reported >= input.reservedTokens)
     return { chargedTokens: reported, refunded: 0, usageReported: true };
 

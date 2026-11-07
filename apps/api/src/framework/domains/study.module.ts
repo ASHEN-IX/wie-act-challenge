@@ -973,6 +973,17 @@ export class StudyController {
       res
     );
   }
+  @Get('/api/v1/study/learning/courses/:courseId/presentation/plan/stored')
+  get_api_v1_study_learning_courses_presentation_plan_stored_a1688aca(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute(
+      'GET /api/v1/study/learning/courses/:courseId/presentation/plan/stored',
+      req,
+      res
+    );
+  }
   @Get('/api/v1/study/learning/courses/:courseId/activities')
   get_api_v1_study_learning_courses_activities_107c44f7(
     @Req() req: DomainRequest,

@@ -13,7 +13,7 @@ jest.mock('mongodb', () => {
   const db = jest.fn(() => ({ collection }));
   return {
     __mocks: { findOneAndUpdate, updateOne, findOne, close, collection, db },
-    MongoClient: jest.fn(() => ({ db, close })),
+    MongoClient: jest.fn(() => ({ db, close, connect: jest.fn(async () => undefined) })),
   };
 });
 

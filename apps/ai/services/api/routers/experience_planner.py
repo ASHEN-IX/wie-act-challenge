@@ -75,57 +75,20 @@ def _budget_active(approval: dict) -> bool:
     return bool(llm_client._budget_still_active(approval))
 
 
-def _reserve(approval: dict) -> bool:
-    """Atomically reserve the planning allowance in the existing ledger."""
+def _has_headroom(approval: dict) -> bool:
+    """Verify the ledger can fund this attempt, without debiting it.
+
+    M4.2 had both this service and NestJS increment `usedTokens` for the same
+    logical attempt, so one request was charged twice. NestJS owns the
+    reservation because it owns the request identity and lifecycle; this service
+    keeps an *independent* check that dispatch is affordable, which is the part
+    that matters for security, and stops charging for it.
+
+    The read is deliberately strict: a ledger that cannot be read, an approval
+    that does not match, or insufficient headroom all refuse dispatch.
+    """
     if type(approval.get("maxTokens")) is not int or approval["maxTokens"] < RESERVED_TOKENS:
         return False
-    from pymongo import MongoClient, ReturnDocument
-    from pymongo.write_concern import WriteConcern
-
-    client = None
-    try:
-        client = MongoClient(
-            os.environ["LLM_BUDGET_MONGODB_URI"],
-            serverSelectionTimeoutMS=2000,
-            connectTimeoutMS=2000,
-            socketTimeoutMS=3000,
-            retryWrites=False,
-        )
-        records = client[os.environ["LLM_BUDGET_DB_NAME"]].get_collection(
-            "llm_approval_budgets",
-            write_concern=WriteConcern(w="majority", j=True, wtimeout=2000),
-        )
-        match = {
-            "_id": approval["approvalId"],
-            "task": PLANNER_TASK,
-            "model": approval["model"],
-            "limit": approval["maxRequests"],
-            "maxTokens": approval["maxTokens"],
-            "expiresAt": {"$eq": float(approval["expiresAt"]), "$gt": time.time()},
-            "revokedAt": {"$exists": False},
-            "usedTokens": {"$lte": approval["maxTokens"] - RESERVED_TOKENS},
-        }
-        return bool(
-            records.find_one_and_update(
-                match,
-                {"$inc": {"usedTokens": RESERVED_TOKENS, "usedRequests": 1}},
-                return_document=ReturnDocument.AFTER,
-            )
-        )
-    except Exception:
-        return False
-    finally:
-        if client is not None:
-            client.close()
-
-
-def _reconcile(approval: dict, tokens) -> None:
-    """Charge what the provider reported; keep the reservation when it did not.
-
-    Never negative, never a refund larger than the reservation.
-    """
-    if type(tokens) is not int or tokens < 0 or tokens >= RESERVED_TOKENS:
-        return
     from pymongo import MongoClient
 
     client = None
@@ -137,17 +100,40 @@ def _reconcile(approval: dict, tokens) -> None:
             socketTimeoutMS=3000,
             retryWrites=False,
         )
-        refund = RESERVED_TOKENS - tokens
-        client[os.environ["LLM_BUDGET_DB_NAME"]].get_collection("llm_approval_budgets").update_one(
-            {"_id": approval["approvalId"]},
-            [{"$set": {"usedTokens": {"$max": [0, {"$subtract": ["$usedTokens", refund]}]}}}],
+        records = client[os.environ["LLM_BUDGET_DB_NAME"]].get_collection("llm_approval_budgets")
+        row = records.find_one(
+            {
+                "_id": approval["approvalId"],
+                "task": PLANNER_TASK,
+                "model": approval["model"],
+                "maxTokens": approval["maxTokens"],
+                "expiresAt": {"$eq": float(approval["expiresAt"]), "$gt": time.time()},
+                "revokedAt": {"$exists": False},
+            }
         )
+        if not row:
+            return False
+        # Headroom must cover a full reservation, including the one NestJS has
+        # already taken for this attempt.
+        return int(row.get("usedTokens", 0)) + RESERVED_TOKENS <= approval["maxTokens"]
     except Exception:
-        # A failed refund is conservative: the reservation stays spent.
-        pass
+        return False
     finally:
         if client is not None:
             client.close()
+
+
+def _reconcile(approval: dict, tokens) -> None:
+    """Report usage to the caller; do not adjust the ledger.
+
+    NestJS made the reservation and is the only place that reconciles it. A
+    second reconcile here would refund against a reservation this service never
+    made, which is how the double-debit surfaced in the first place.
+
+    The observed token count is returned to the caller in the response and
+    recorded there; this function exists to keep that contract explicit.
+    """
+    return None
 
 
 @router.post("/preflight")
@@ -181,7 +167,7 @@ def plan(req: PlanRequest):
 
     # Everything above is pre-dispatch and provable. From here on a failure is
     # uncertain: the request may have reached the model.
-    if not _reserve(approval):
+    if not _has_headroom(approval):
         _refuse("PROVIDER_BUDGET_UNAVAILABLE")
 
     sdk = None

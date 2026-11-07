@@ -46,6 +46,8 @@ import {
 import { StructuredAsset } from '../models/StructuredAsset';
 import { getPublishedPresentation } from './presentationReader';
 import { generateExperiencePlan } from './experiencePlanGeneration';
+import { loadAcceptedPlan } from './experiencePlanStore';
+import { isLearningMode } from '../../../../shared/ednova/learningModes';
 import { configuredPlannerModel } from './experiencePlannerProviders';
 import type { ExperiencePlannerProvider } from '../../../../shared/ednova/experiencePlannerProvider';
 import {
@@ -597,4 +599,56 @@ export async function planLessonWithProvider(
     requestId: outcome.requestId,
     usageReported: outcome.usageReported,
   };
+}
+
+export type StoredPlanOutcome =
+  | { status: 'available'; plan: PublishedExperiencePlanV1 }
+  | { status: 'absent' }
+  | { status: 'stale'; reason: string }
+  | { status: 'rejected'; code: string };
+
+/**
+ * The student read path.
+ *
+ * Deliberately separate from generation: an enrolled reader may *view* an
+ * accepted plan, but nothing here can dispatch to a provider. Authorization
+ * goes through the same published-reading boundary as every other learner
+ * surface, and the stored plan is revalidated against current trusted records
+ * before it is returned.
+ *
+ * A learner never sees an internal code. Every non-available outcome becomes
+ * `undefined` at the route, and the deterministic reader renders.
+ */
+export async function readStoredPlan(input: {
+  actor: string;
+  courseId: string;
+  lessonId: string;
+  mode: string;
+}): Promise<StoredPlanOutcome> {
+  if (!isLearningMode(input.mode) || input.mode === 'read') return { status: 'absent' };
+
+  // Building the live context is what re-checks authorization, revision pinning
+  // and persisted review decisions. It throws for an unauthorized actor.
+  const trusted = await loadTrustedPlanningContext(
+    input.actor,
+    input.courseId,
+    input.lessonId,
+    input.mode,
+  );
+
+  const outcome = await loadAcceptedPlan({
+    courseId: trusted.validationContext.courseId,
+    revisionId: trusted.validationContext.revisionId,
+    lessonId: input.lessonId,
+    mode: input.mode,
+    contentHash: trusted.validationContext.contentHash,
+    contextFingerprint: trusted.validationContext.contextFingerprint,
+    validationContext: trusted.validationContext,
+  });
+
+  if (outcome.status === 'available') return { status: 'available', plan: outcome.plan };
+  if (outcome.status === 'rejected')
+    return { status: 'rejected', code: outcome.code };
+  if (outcome.status === 'stale') return { status: 'stale', reason: outcome.reason };
+  return { status: 'absent' };
 }

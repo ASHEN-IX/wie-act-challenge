@@ -26,7 +26,12 @@ import UserProfile from '../../../user-profile/src/models/UserProfile';
 import { getLearningDocument } from '../services/courseReader';
 import { getPublishedPresentationWithAssets } from '../services/presentationReader';
 import { attachStructuredAsset } from '../services/structuredAssets';
-import { planLessonExperience, planLessonWithProvider } from '../services/experiencePlanning';
+import {
+  planLessonExperience,
+  planLessonWithProvider,
+  readStoredPlan,
+} from '../services/experiencePlanning';
+import { canManageCourse } from '../services/resourceAccess';
 import { resolvePlannerProvider, configuredPlannerModel } from '../services/experiencePlannerProviders';
 import { grantPlanningConsent } from '../services/planningGovernance';
 import { getCourseNardouch, completeNardouchLesson } from '../services/courseNardouch';
@@ -127,12 +132,42 @@ router.post(
 // Real-provider planning (Batch 4, M4.2). Off unless an operator enables it;
 // the provider is resolved from configuration, never from the request body.
 // A refusal is a normal outcome: the caller keeps the deterministic reader.
+// Learner read path (Batch 4, M4.3).
+//
+// Viewing an accepted plan is a different privilege from generating one: this
+// route can never dispatch to a provider. It revalidates the stored plan against
+// current trusted records and returns only a plan that still passes.
+router.get(
+  '/courses/:courseId/presentation/plan/stored',
+  operation(async (r) => {
+    const lessonId = r.query.lessonId;
+    const mode = r.query.mode;
+    if (typeof lessonId !== 'string' || typeof mode !== 'string')
+      throw Object.assign(new Error('lessonId and mode are required'), { status: 400 });
+    const outcome = await readStoredPlan({
+      actor: r.user!.userId,
+      courseId: String(r.params.courseId),
+      lessonId,
+      mode,
+    });
+    // A non-available outcome is not an error to a learner: the reader falls
+    // back. Internal codes never reach the browser.
+    return outcome.status === 'available'
+      ? { status: 'available', plan: outcome.plan }
+      : { status: 'unavailable' };
+  })
+);
 router.post(
   '/courses/:courseId/presentation/plan/ai',
   operation(async (r) => {
     const body = (r.body || {}) as Record<string, unknown>;
     if (typeof body.lessonId !== 'string')
       throw Object.assign(new Error('lessonId is required'), { status: 400 });
+    // Generating a plan is an author/operator privilege, not a learner one.
+    if (!(await canManageCourse(r.user!.userId, String(r.params.courseId))))
+      throw Object.assign(new Error('Plan generation requires course author rights'), {
+        status: 403,
+      });
     const provider = resolvePlannerProvider(async () => {
       throw new Error('Mock delegation is not used on this path');
     });

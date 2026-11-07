@@ -23,6 +23,7 @@ import {
   DISCLOSURE_MODES,
 } from './experiencePlan';
 import { EXPERIENCE_PLAN_BINDINGS } from './experiencePlan';
+import { isLearningMode, modeObjective, modePolicy } from './learningModes';
 
 /** Hard caps on what leaves the process. Exceeding any of them refuses the
  * request rather than silently truncating the lesson. */
@@ -337,6 +338,13 @@ export function plannerTask(context: PlanningContext, input: PlanningContextInpu
   lines.push(`Revision: ${input.revisionId}`);
   lines.push(`Lesson: ${compact(input.lessonTitle, 200)}`);
   lines.push(`Mode: ${input.mode}`);
+  // The mode objective is fixed application text, never document content. It
+  // states what this mode prefers and what it must not do.
+  const objective = isLearningMode(input.mode) ? modeObjective(input.mode) : null;
+  if (objective) lines.push(`Mode objective: ${objective}`);
+  const policy = isLearningMode(input.mode) ? modePolicy(input.mode) : null;
+  if (policy && policy.preferredComponents.length)
+    lines.push(`Preferred components for this mode: ${policy.preferredComponents.join(', ')}`);
   lines.push(`Schema version: ${EXPERIENCE_PLAN_SCHEMA_VERSION}`);
   lines.push(`Registry version: ${EXPERIENCE_PLAN_BINDINGS.registryVersion}`);
   lines.push('');

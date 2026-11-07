@@ -106,6 +106,32 @@ export async function aiPlannedLessonExperience(
     return undefined;
   }
 }
+/**
+ * Fetch an accepted, revalidated plan for a learning mode (Batch 4, M4.3).
+ *
+ * Read-only from the learner's side: this can never dispatch to a provider.
+ * Every non-available outcome collapses to `undefined`, so a stale, revoked or
+ * unauthorized plan simply returns the learner to the deterministic reader.
+ */
+export async function storedLessonPlan(
+  courseId: string,
+  lessonId: string,
+  mode: string,
+  blockIds: readonly string[],
+) {
+  await requireIdentity();
+  try {
+    const payload = await api<unknown>(
+      `/api/v1/study/learning/courses/${segment(courseId)}/presentation/plan/stored` +
+        `?lessonId=${encodeURIComponent(lessonId)}&mode=${encodeURIComponent(mode)}`,
+    );
+    const outcome = payload as { status?: unknown; plan?: unknown };
+    if (outcome?.status !== "available") return undefined;
+    return parsePublishedExperiencePlan(outcome.plan, blockIds);
+  } catch {
+    return undefined;
+  }
+}
 export async function learningProgress(courseId: string, revisionId: string) {
   await requireIdentity();
   return api<{

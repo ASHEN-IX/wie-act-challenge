@@ -16,13 +16,11 @@ import {
   X,
 } from "lucide-react";
 import type { LessonBlockV2 } from "@ednova/shared/ednova/learningDocumentV2";
-import type {
-  PublishedPresentationV1,
-  PresentationLessonV1,
-} from "@ednova/shared/ednova/presentationDocument";
+import type { PublishedPresentationV1 } from "@ednova/shared/ednova/presentationDocument";
 import type { ReaderMode } from "@ednova/shared/ednova/presentationPlan";
 import type { PublishedStructuredAssetV1 } from "@ednova/shared/ednova/structuredAsset";
 import type { PublishedExperiencePlanV1 } from "@ednova/shared/ednova/publishedExperiencePlan";
+import { CourseNardouch } from "@/features/nardouch/course-growth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,7 +66,34 @@ export type LessonReaderProps = {
    * may only change *which trusted component* renders a block, never whether
    * the block renders. Absent means the deterministic Batch 3 plan is used. */
   experiencePlan?: PublishedExperiencePlanV1;
+  /** Learning mode from the URL (Batch 4, M4.3). Falls back to `initialMode`. */
+  initialLearningMode?: string;
+  /**
+   * Loads the accepted plan for a mode, or undefined when none is available.
+   * Injected so the reader stays a pure component and the QA suite can drive it
+   * without a server round trip.
+   */
+  loadModePlan?: (
+    lessonId: string,
+    mode: LearningModeView,
+    blockIds: readonly string[],
+  ) => Promise<PublishedExperiencePlanV1 | undefined>;
 };
+
+function isLearningModeView(value: unknown): value is LearningModeView {
+  return (
+    typeof value === "string" && (LEARNING_MODE_ORDER as readonly string[]).includes(value)
+  );
+}
+
+/** The Batch 3 reader mode a learning mode renders through. Guided and Deep
+ * Dive are reading arrangements; Explore and Practice keep their existing
+ * interactive surfaces. */
+function readerModeFor(mode: LearningModeView): ReaderMode {
+  if (mode === "explore") return "explore";
+  if (mode === "practice") return "practice";
+  return "read";
+}
 
 const MODE_LABELS: Record<ReaderMode, string> = {
   read: "Read",
@@ -80,6 +105,33 @@ const MODE_HINTS: Record<ReaderMode, string> = {
   read: "Source-faithful reading with interactions collapsed.",
   explore: "Trusted interactive components for this lesson.",
   practice: "Open the lesson's exercises and practice tools.",
+};
+
+/**
+ * Learning modes (Batch 4, M4.3).
+ *
+ * `read` renders the deterministic presentation and is always available. The
+ * others ask the server for an accepted AI-arranged plan; when none exists the
+ * reader renders the deterministic presentation and says so, rather than
+ * pretending a mode did something.
+ */
+const LEARNING_MODE_ORDER = ["read", "guided", "explore", "practice", "deep_dive"] as const;
+type LearningModeView = (typeof LEARNING_MODE_ORDER)[number];
+
+const LEARNING_MODE_LABELS: Record<LearningModeView, string> = {
+  read: "Read",
+  guided: "Guided",
+  explore: "Explore",
+  practice: "Practice",
+  deep_dive: "Deep Dive",
+};
+
+const LEARNING_MODE_HINTS: Record<LearningModeView, string> = {
+  read: "The lesson exactly as extracted, in source order.",
+  guided: "Progressive arrangement: definitions, examples and proofs in reading order.",
+  explore: "Interactive and diagram components where this lesson has the data for them.",
+  practice: "The lesson's own exercises and worked examples. Nothing is graded here.",
+  deep_dive: "Fullest detail: proofs, derivations and source references expanded.",
 };
 
 function flattenLessons(presentation: PublishedPresentationV1) {
@@ -105,8 +157,16 @@ export function LessonReader({
   fallbackHref,
   basePath = `/courses/${presentation.courseId}/present`,
   experiencePlan,
+  initialLearningMode,
+  loadModePlan,
 }: LessonReaderProps) {
   const hrefFor = (id: string, mode: ReaderMode) => lessonHref(presentation, id, mode, basePath);
+  // A learning mode is carried in the same `mode` query parameter the reader
+  // already uses, so a mode is deep-linkable and back/forward works.
+  const modeHref = (id: string, learning: LearningModeView) =>
+    learning === "read"
+      ? lessonHref(presentation, id, "read", basePath)
+      : `${basePath}?revisionId=${encodeURIComponent(presentation.revisionId)}&lesson=${encodeURIComponent(id)}&mode=${encodeURIComponent(learning)}`;
   const flat = useMemo(() => flattenLessons(presentation), [presentation]);
   // An unknown lesson must not silently show a different one: the URL named a
   // lesson that is not in this revision, so the reader says so.
@@ -117,6 +177,27 @@ export function LessonReader({
   const next = index < flat.length - 1 ? flat[index + 1] : undefined;
 
   const [mode, setMode] = useState<ReaderMode>(initialMode);
+  // The learning mode is the full five-mode vocabulary; `mode` remains the
+  // existing Batch 3 reader mode that `read`/`explore`/`practice` map onto.
+  const [learningMode, setLearningMode] = useState<LearningModeView>(() =>
+    // A learning mode in the URL wins; otherwise the legacy reader mode maps
+    // onto its equivalent, so existing deep links keep working.
+    isLearningModeView(initialLearningMode)
+      ? initialLearningMode
+      : initialMode === "explore" || initialMode === "practice"
+        ? initialMode
+        : "read",
+  );
+  // The plan the server returned for this mode, if any. Absent means the
+  // deterministic presentation renders; the learner is told which it is.
+  const [modePlan, setModePlan] = useState<{
+    mode: LearningModeView;
+    lessonId: string;
+    plan: PublishedExperiencePlanV1;
+  } | null>(null);
+  const [planState, setPlanState] = useState<"idle" | "loading" | "ready" | "unavailable">(
+    "idle",
+  );
   const [outlineOpen, setOutlineOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -212,6 +293,39 @@ export function LessonReader({
     };
   }, [current]);
 
+  // Fetch the accepted plan for the selected mode. Read never requests one: the
+  // deterministic presentation is the mode. A failure is not an error to the
+  // learner — the deterministic reader renders and the hint says so.
+  useEffect(() => {
+    if (!loadModePlan || learningMode === "read" || !current) {
+      setModePlan(null);
+      setPlanState("idle");
+      return;
+    }
+    let active = true;
+    setPlanState("loading");
+    const blockIds = current.lesson.blocks.map((entry) => entry.id);
+    void loadModePlan(current.lesson.id, learningMode, blockIds)
+      .then((plan) => {
+        if (!active) return;
+        if (plan) {
+          setModePlan({ mode: learningMode, lessonId: current.lesson.id, plan });
+          setPlanState("ready");
+        } else {
+          setModePlan(null);
+          setPlanState("unavailable");
+        }
+      })
+      .catch(() => {
+        if (!active) return;
+        setModePlan(null);
+        setPlanState("unavailable");
+      });
+    return () => {
+      active = false;
+    };
+  }, [loadModePlan, learningMode, current]);
+
   // Assets for this lesson, grouped by the block they annotate. An asset with
   // no blockId is a lesson-level supplement and renders at the end.
   const assetsByBlock = useMemo(() => {
@@ -232,13 +346,27 @@ export function LessonReader({
 
   // The plan this reader will actually honour. Binding is checked once, here,
   // so the lookup below and the provenance label cannot disagree.
+  //
+  // A mode plan (M4.3) takes precedence over the M4.1 experience plan, and both
+  // are ignored unless bound to this exact course, revision and lesson.
   const activePlan = useMemo(() => {
-    if (!experiencePlan) return undefined;
-    if (experiencePlan.courseId !== presentation.courseId) return undefined;
-    if (experiencePlan.revisionId !== presentation.revisionId) return undefined;
-    if (experiencePlan.lessonId !== current?.lesson.id) return undefined;
-    return experiencePlan;
-  }, [experiencePlan, presentation.courseId, presentation.revisionId, current]);
+    const candidate =
+      modePlan && modePlan.lessonId === current?.lesson.id && modePlan.mode === learningMode
+        ? modePlan.plan
+        : experiencePlan;
+    if (!candidate) return undefined;
+    if (candidate.courseId !== presentation.courseId) return undefined;
+    if (candidate.revisionId !== presentation.revisionId) return undefined;
+    if (candidate.lessonId !== current?.lesson.id) return undefined;
+    return candidate;
+  }, [
+    modePlan,
+    experiencePlan,
+    learningMode,
+    presentation.courseId,
+    presentation.revisionId,
+    current,
+  ]);
 
   const planByBlock = useMemo(() => {
     const map = new Map<string, { component: string; interactive: boolean }>();
@@ -422,27 +550,33 @@ export function LessonReader({
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 <div
                   role="group"
-                  aria-label="Reader mode"
-                  className="flex rounded-lg border p-0.5"
+                  aria-label="Learning mode"
+                  className="flex flex-wrap gap-0.5 rounded-lg border p-0.5"
                 >
-                  {(Object.keys(MODE_LABELS) as ReaderMode[]).map((option) => (
+                  {LEARNING_MODE_ORDER.map((option) => (
                     <Link
                       key={option}
-                      href={hrefFor(current.lesson.id, option)}
-                      onClick={() => setMode(option)}
-                      aria-current={mode === option ? "true" : undefined}
+                      href={modeHref(current.lesson.id, option)}
+                      onClick={() => {
+                        setLearningMode(option);
+                        setMode(readerModeFor(option));
+                      }}
+                      aria-current={learningMode === option ? "true" : undefined}
                       scroll={false}
+                      data-learning-mode={option}
                       className={`rounded-md px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${
-                        mode === option
+                        learningMode === option
                           ? "bg-primary text-primary-foreground"
                           : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
-                      {MODE_LABELS[option]}
+                      {LEARNING_MODE_LABELS[option]}
                     </Link>
                   ))}
                 </div>
-                <span className="text-xs text-muted-foreground">{MODE_HINTS[mode]}</span>
+                <span className="text-xs text-muted-foreground" data-mode-hint>
+                  {LEARNING_MODE_HINTS[learningMode]}
+                </span>
               </div>
 
               {lessonMath.total > 0 && (
@@ -473,17 +607,52 @@ export function LessonReader({
                   role="note"
                   data-experience-plan={activePlan.planId}
                   data-experience-plan-digest={activePlan.digest}
-                  data-experience-plan-planner={activePlan.planner.implementation}
+                  data-experience-plan-mode={learningMode}
                   className="mt-4 flex items-start gap-2 rounded-lg border border-brand-cyan/40 bg-brand-cyan/[0.06] px-4 py-2.5 text-xs leading-5 text-muted-foreground"
                 >
                   <ListTree className="mt-0.5 size-3.5 shrink-0 text-brand-cyan" />
                   <span>
-                    Planned layout ({activePlan.planner.implementation} v
-                    {activePlan.planner.version}). {activePlan.disclosure}
+                    {/* A learner sees "AI-arranged lesson", never an internal
+                        planner name, request id or digest. */}
+                    {activePlan.planner.implementation.startsWith("mock")
+                      ? "AI-arranged lesson (QA mock planner)."
+                      : "AI-arranged lesson."}{" "}
+                    Course content is unchanged and every block is rendered by a trusted
+                    component. AI arrangement does not verify the lesson's mathematics.
                   </span>
                 </p>
               )}
             </header>
+
+            {/* A mode with no accepted plan falls back to the deterministic
+                presentation. The learner is told, rather than being shown a
+                mode that silently does nothing. */}
+            {learningMode !== "read" && planState === "unavailable" && !activePlan && (
+              <p
+                role="status"
+                data-mode-unavailable={learningMode}
+                className="mt-4 rounded-lg border border-border/70 bg-muted/40 px-4 py-2.5 text-xs leading-5 text-muted-foreground"
+              >
+                No AI-arranged presentation is available for {LEARNING_MODE_LABELS[learningMode]}{" "}
+                on this lesson yet. Showing the lesson as extracted from the source. You can
+                keep reading, or ask your instructor to prepare this mode.
+              </p>
+            )}
+            {learningMode !== "read" && planState === "loading" && !activePlan && (
+              <p role="status" className="mt-4 text-xs text-muted-foreground">
+                Arranging this lesson for {LEARNING_MODE_LABELS[learningMode]}…
+              </p>
+            )}
+
+            {basePath === `/courses/${presentation.courseId}/present` && (
+              <CourseNardouch
+                key={`${presentation.courseId}:${presentation.revisionId}`}
+                courseId={presentation.courseId}
+                revisionId={presentation.revisionId}
+                lessonId={lessonId}
+                practiceHref={practiceHref}
+              />
+            )}
 
             {mode === "practice" && (
               <section className="border-b py-6" aria-labelledby="practice-in-lesson">

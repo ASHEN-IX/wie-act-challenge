@@ -42,6 +42,8 @@ import {
   reservePlanningBudget,
   PlanningBudgetError,
 } from './planningBudget';
+import { storeAcceptedPlan } from './experiencePlanStore';
+import { isLearningMode } from '../../../../shared/ednova/learningModes';
 import {
   buildPlanningContext,
   plannerOutputSchema,
@@ -342,6 +344,24 @@ export async function generateExperiencePlan(input: {
       $unset: { code: 1, stage: 1 },
     },
   );
+  // M4.3: persist the accepted body so a learner can retrieve it without
+  // another inference. Storing does not make it trusted; the read path
+  // revalidates against current records.
+  const stored = await storeAcceptedPlan({
+    plan: validation.plan,
+    generatedBy: input.actor,
+    contextFingerprint: context.fingerprint,
+    mode: isLearningMode(input.mode) ? input.mode : 'read',
+  });
+  if (!stored.stored) {
+    // A plan that validated but cannot be stored is not usable to a learner;
+    // report it rather than pretend it is available.
+    await ExperiencePlanRequest.updateOne(
+      { _id: row._id },
+      { $set: { state: 'validated', planDigest: validation.plan.digest, code: 'PLAN_NOT_STORED' } },
+    );
+  }
+
   return {
     status: 'validated',
     plan: validation.plan,

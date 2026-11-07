@@ -2,11 +2,13 @@ import {
   learningDocument,
   plannedLessonExperience,
   publishedPresentation,
+  storedLessonPlan,
 } from "@/features/learning/journey-actions";
 import { LessonReader } from "@/features/reader/lesson-reader";
 import { CourseReader } from "@/features/reader/course-reader";
 import { DataError } from "@/components/shared/states";
 import { isReaderMode, type ReaderMode } from "@ednova/shared/ednova/presentationPlan";
+import { isLearningMode } from "@ednova/shared/ednova/learningModes";
 
 /**
  * Published-course lesson reader. The presentation contract is preferred; if
@@ -35,6 +37,9 @@ export default async function PresentationPage({
     const lessons = presentation.chapters.flatMap((chapter) => chapter.lessons);
     const selected =
       lessons.find((entry) => entry.id === lesson)?.id ?? lessons[0]?.id ?? "";
+    // `mode` carries either a Batch 3 reader mode or a Batch 4.3 learning mode.
+    // A learning mode wins when it is one; otherwise the legacy mapping applies.
+    const learningMode = isLearningMode(mode) ? mode : undefined;
     const readerMode: ReaderMode = isReaderMode(mode) ? mode : "read";
 
     // Development/QA pathway: `?plan=<scenario>` asks the API for a mock-planned
@@ -51,6 +56,20 @@ export default async function PresentationPage({
           )
         : undefined;
 
+    // M4.3: a mode plan is fetched on the server for the selected mode. Read
+    // never requests one. A missing or stale plan yields undefined, and the
+    // reader falls back with a visible explanation.
+    const modePlan =
+      learningMode && learningMode !== "read" && selectedLesson
+        ? await storedLessonPlan(
+            courseId,
+            selected,
+            learningMode,
+            selectedLesson.blocks.map((entry) => entry.id),
+          )
+        : undefined;
+    const effectivePlan = modePlan ?? experiencePlan;
+
     return (
       <LessonReader
         presentation={presentation}
@@ -58,7 +77,8 @@ export default async function PresentationPage({
         practiceHref={`/courses/${courseId}/learn?revisionId=${encodeURIComponent(presentation.revisionId)}#practice-and-tutor`}
         fallbackHref={presentation.fallback.readerHref}
         initialMode={readerMode}
-        {...(experiencePlan ? { experiencePlan } : {})}
+        {...(learningMode ? { initialLearningMode: learningMode } : {})}
+        {...(effectivePlan ? { experiencePlan: effectivePlan } : {})}
       />
     );
   } catch (error) {
@@ -76,7 +96,7 @@ export default async function PresentationPage({
             The presentation projection is unavailable for this revision. Showing the
             deterministic source-faithful reader of the same authorized revision.
           </p>
-          <CourseReader document={document} practiceHref="#practice-and-tutor" />
+          <CourseReader document={document} practiceHref={`/courses/${courseId}/learn?revisionId=${encodeURIComponent(document.revisionId)}#practice-and-tutor`} />
         </div>
       );
     } catch (error) {
