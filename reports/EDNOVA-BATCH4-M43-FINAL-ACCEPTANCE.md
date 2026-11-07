@@ -1,188 +1,157 @@
-# EdNova Batch 4 — M4.3 Final Acceptance
+# EdNova Batch 4 — M4.3 Post-Acceptance Hardening: Final Acceptance
 
-**Milestone:** 4.3 — AI Learning Modes, Durable Experience Plans & Student
-Integration
+**Question:** is the system ready for Batch 4.4?
 **Date:** 2026-11-07
-**Scope completed:** M4.3 only. Batch 4.4 not started.
 
 ---
 
 ## 1. Verdict
 
-# CONDITIONAL GO
+# GO
 
-All mandatory technical and security gates pass with a mocked provider SDK:
-durable plans persist and revalidate, the accounting double-debit is fixed and
-measured, five modes work on real source-backed lessons, and author/student
-privileges are separated.
-
-The conditions are bounded and non-critical:
-
-1. **No live provider behaviour is verified** — by design, and stated throughout.
-2. **The Node+Python ledger invariant is proven from both sides separately**, not
-   in one combined process. A combined harness was attempted and abandoned
-   because it would have been a third implementation of the thing under test.
-3. **C1, C2 and C4 remain open** and are not this milestone's to close.
+All mandatory hardening gates pass, **including the real combined-service
+accounting test** the M4.3 acceptance could not provide. The exact-budget defect
+this review was asked to investigate was real, is fixed, and is now covered by
+both a unit test and a cross-service scenario.
 
 ---
 
-## 2. Git baseline
+## 2. What was confirmed versus corrected
 
-```
-<this commit>  feat(m43): durable experience plans and five learning modes
-a0ebda4        docs(m42): provider, budget, security and acceptance evidence
-4f10461        feat(m42): provider-independent planner with Gemini, consent and budget
-d5c8e77        docs(m41): final closure and workstream isolation
-a8928b9        (mixed nardouch commit — preserved, never rewritten)
-```
+### Confirmed as reported
 
-One path-scoped commit, **zero nardouch files**. No history rewritten.
+| Item | Verified |
+|---|---|
+| 1,075 API tests / 74 suites | yes, before the fix |
+| 207 web tests | yes |
+| 4 browser tests | yes |
+| Zero TypeScript errors | yes |
+| Five modes, durable plans, author-only generation | yes |
+| No live provider calls, no deployment | yes |
+
+### Corrected
+
+| Finding | Severity |
+|---|---|
+| **Exact-budget dispatch refused** — Python required a second reservation for an already-funded attempt | **High**, fixed |
+| Documentation said "eight scenarios", listed seven | Low, corrected with a note |
+| Bonus: the extra tests raised coverage 1,075→1,085 and 14→20 Python | — |
+
+### Repository state correction
+
+The brief's "19 untracked Nardouch entries" no longer applies: another workstream
+committed them (`021185f`, 84 files tracked). The working tree is clean apart
+from dotfiles. No Nardouch file was modified here.
 
 ---
 
 ## 3. Gate ledger
 
-| # | Gate | Status | Evidence |
-|---|---|---|---|
-| 1 | Validated plan safely persisted and retrieved | **PASS** | 19 store tests; 4 browser tests |
-| 2 | Retrieved plans revalidated against trusted records | **PASS** | 9 read-path negative tests |
-| 3 | Budget cannot charge twice for one attempt | **PASS** | 7-scenario ledger proof; 14 Python tests |
-| 4 | At least two meaningfully distinct modes on real lessons | **PASS** | 5 modes; browser evidence |
-| 5 | All modes preserve canonical coverage | **PASS** | validator stage 3; browser per-mode checks |
-| 6 | Unreviewed mathematics stays source-faithful | **PASS** | policy gate; reader disclosure |
-| 7 | Author/reviewed assets retain correct provenance | **PASS** | M4.2 C3 provenance unchanged |
-| 8 | Enrolled students access authorized plans | **PASS** | stored-plan route; browser test |
-| 9 | Students cannot invoke provider calls | **PASS** | read route has no provider; 403 on generate |
-| 10 | Mode switching and browser navigation work | **PASS** | reload, back, forward |
-| 11 | Planning failure never blocks deterministic reading | **PASS** | unavailable state + fallback |
-| 12 | No arbitrary model-generated code executed | **PASS** | M4.1 structural guarantees retained |
-| 13 | Critical authorization/integrity regressions pass | **PASS** | 1075 API + 207 web |
-| 14 | Real-service browser validation passes | **PASS** | 4/4 against real BetterAuth/NestJS/Mongo |
-| 15 | No live Gemini call | **PASS** | SDK mocked throughout |
-| 16 | No production deployment | **PASS** | local QA harness only |
-
----
-
-## 4. Test counts
-
-| Suite | Count | Notes |
+| Gate | Status | Evidence |
 |---|---|---|
-| API unit | **1075 / 1075**, 74 suites | +32 M4.3 |
-| Web unit | **207 / 207**, 32 files | unchanged count, 1 test rewritten |
-| Browser | **4 / 4** | +1 M4.3 scenario |
-| Python boundary | **14 / 14** | +2 net |
-
-### New M4.3 tests (32 API + 1 browser)
-
-| Suite | Tests |
-|---|---|
-| `learning-modes.test.ts` | 13 |
-| `experience-plan-store.test.ts` | 19 |
-| `learning modes render from a persisted plan…` (browser) | 1 |
-
-### Commands
-
-```bash
-cd apps/api && npx jest modules src shared --runInBand
-cd apps/web && npx vitest run --maxWorkers=2
-cd apps/api && npx tsx --tsconfig tsconfig.json scripts/m43-budget-proof.ts
-DOCKER_CONTEXT=default FINAL_QA_DOCKER_NETWORK=ednova-api_default \
-  pnpm --filter web exec playwright test --config playwright.m41.config.ts
-```
+| Lifecycle mapped before changing code | **PASS** | architecture note §2 |
+| Exact-budget boundary investigated | **PASS** | defect reproduced, then fixed |
+| One authoritative reservation per attempt | **PASS** | Node writes; Python reads |
+| Independent Python check retained | **PASS** | `_ledger_permits_dispatch` + `_propagated_reservation` |
+| No third accounting implementation | **PASS** | zero Python writes, asserted |
+| Combined Node+Python test | **PASS** | 10/10, real MongoDB |
+| Machine-readable per-scenario evidence | **PASS** | `cross-service-accounting.json` |
+| Durable-plan security (12 properties) | **PASS** | security regression §2 |
+| Canonical coverage under all modes | **PASS** | validator stage 3 + browser |
+| Formula governance preserved | **PASS** | Deep Dive prefers source-faithful |
+| Provider isolation | **PASS** | read route has no provider |
+| Full regressions | **PASS** | §5 |
+| No test weakened | **PASS** | suites grew; only corrected tests replaced |
+| No live provider call / no deploy | **PASS** | SDK stubbed throughout |
 
 ---
 
-## 5. The defect this milestone found
+## 4. The defect, in one table
 
-M4.2 shipped two reservations for one attempt. Both were individually atomic,
-which is why neither side's tests caught it. Running them together charged
-**twice** the real usage.
-
-| Scenario | Before | After |
+| Ledger state | Before | After |
 |---|---|---|
-| one provider call, 150 tokens reported | 300 charged | **150** |
-| no usage report | 65 536 | **32 768** |
-| timeout after dispatch | 65 536 | **32 768** |
+| used 0, limit 1,000,000 | dispatch, 150 charged | unchanged |
+| **used 967,232, limit 1,000,000** | **refused** | **dispatch, 967,382** |
+| used 1,000,001, limit 1,000,000 | refused | refused |
+| two concurrent, room for one | one wins | one wins |
 
-Fixed by giving the reservation one owner while keeping both security checks.
-This is the clearest evidence for the brief's instruction not to assert that
-"both reservation functions are individually atomic" and call it verified.
+The middle row is the finding. It is now asserted at two levels: the unit test
+`test_exactly_sufficient_budget_permits_dispatch`, and combined scenario #5.
 
 ---
 
-## 6. Browser evidence
+## 5. Final regression counts
 
-`reports/evidence/batch4-m41/`:
-
-| File | Shows |
+| Suite | Result |
 |---|---|
-| `01-deterministic-reader.png` | Read mode, no plan, source-faithful |
-| `02-validated-plan.png` | AI-arranged plan with learner-facing label |
-| `03-rejected-plan-fallback.png` | invalid plan → deterministic fallback |
-| `04-mode-selector.png` | **all five modes**, Read active, content readable |
-| `05-guided-mode.png` | Guided mode rendering the same lesson |
-
-Desktop viewport captured. The selector wraps on narrow widths by design
-(`flex-wrap`), so it remains operable on mobile.
-
----
-
-## 7. Upstream conditions (not this milestone's)
-
-| # | Condition | Owner | Status |
-|---|---|---|---|
-| C1 | Batch 3 extraction assertions target the wrong hierarchy | Batch 3 | open, untouched, assertions not weakened |
-| C2 | Nardouch can show an indefinite loading state on a non-throwing revision mismatch | Nardouch | open, untouched; visible in `04-mode-selector.png` |
-| C4 | Legacy `experiencePlanner.ts` unused | cleanup | open, untouched |
-
-C2's loading text appears in the M4.3 screenshot because the QA fixture has no
-Nardouch route. That is the pre-existing behaviour, not a M4.3 regression, and
-this milestone deliberately did not modify Nardouch code.
+| API unit | **1,085 / 1,085**, 75 suites |
+| Web unit | **207 / 207**, 32 files |
+| Browser (real services) | **4 / 4** |
+| Python boundary | **20 / 20** |
+| API typecheck | 0 errors |
+| Web typecheck | 0 errors |
+| `m43-budget-proof.ts` | ALL SCENARIOS MATCH (7) |
+| `m43-cross-service-proof.ts` | **10 / 10** |
 
 ---
 
-## 8. Remaining risks
+## 6. Learning mode quality
 
-| # | Risk | Severity | Mitigation |
-|---|---|---|---|
-| R1 | No live-provider verification | **Medium** | out of scope; requires fresh authorization |
-| R2 | Combined Node+Python ledger run not achieved in one process | **Low** | proven from both sides; residual listed |
-| R3 | Stored plans are re-planned, not cached across contexts | **Low** | deliberate; caching policy is a later milestone |
-| R4 | Explore is only as useful as a lesson's structured assets | **Low** | explicitly reported as indistinguishable from Read |
-| R5 | Mode pedagogy unmeasured | **Low** | arrangement only; no learning claim made |
+| Mode | Observable difference | Verified |
+|---|---|---|
+| Read | none — deliberately. No planner request. | yes |
+| Guided | definition/example/proof preference, collapsed disclosure | yes |
+| Explore | interactive components only with a structured asset; **reports indistinguishability otherwise** | yes |
+| Practice | `ExerciseBlock` first; lesson's own exercises | yes |
+| Deep Dive | proof/derivation/source preference, expanded | yes |
 
----
+Every mode preference resolves to a component the registry actually owns
+(`every mode preference names a component the registry actually owns`), and the
+four planned modes have distinct preference signatures.
 
-## 9. What this milestone does not claim
-
-- No learning-outcome or pedagogical improvement from any mode.
-- No live provider behaviour, cost or retention verification.
-- No mastery inference, personalisation, voice or generated lesson content.
-- No resolution of C1, C2 or C4.
-- No production deployment, and no production data touched.
+**No pedagogical benefit is claimed.** Arrangement differs; student outcomes were
+not measured and are not in scope.
 
 ---
 
-## 10. Files
+## 7. Remaining risks
 
-**New**
-- `apps/api/shared/ednova/learningModes.ts`
-- `apps/api/modules/study/src/models/ExperiencePlanRecord.ts`
-- `apps/api/modules/study/src/services/experiencePlanStore.ts`
-- `apps/api/modules/study/src/tests/learning-modes.test.ts`
-- `apps/api/modules/study/src/tests/experience-plan-store.test.ts`
-- `apps/api/scripts/m43-budget-proof.ts`
+| # | Risk | Severity | Evidence | Owner |
+|---|---|---|---|---|
+| R1 | No live provider behaviour observed | Medium | stub throughout | M4.4+, needs fresh authorization |
+| R2 | Combined test runs the Python router in-process against real DBs, not over HTTP | Low | control flow is identical; documented | — |
+| R3 | Mode pedagogy unmeasured | Low | arrangement only | product |
+| R4 | C1 — Batch 3 extraction assertions target the wrong hierarchy | Medium | out of scope, untouched | Batch 3 |
+| R5 | C2 — Nardouch loading state on non-throwing revision mismatch | Low | out of scope, untouched | Nardouch |
+| R6 | C4 — legacy `experiencePlanner.ts` unused | Low | out of scope, untouched | cleanup |
 
-**Changed**
-- `apps/api/modules/study/src/services/planningBudget.ts` (pooled client; single-owner reservation)
-- `apps/api/modules/study/src/services/experiencePlanGeneration.ts` (persists accepted plan)
-- `apps/api/modules/study/src/services/experiencePlanning.ts` (mode-aware read path)
-- `apps/api/modules/study/src/routes/learning.ts` (author-gated generate; learner read)
-- `apps/api/src/framework/domains/study.module.ts` (generated route method)
-- `apps/api/shared/ednova/planningContext.ts` (mode objective in the task)
-- `apps/ai/services/api/routers/experience_planner.py` (`_has_headroom`; no ledger write)
-- `apps/ai/tests/test_experience_planner_dispatch.py` (14 tests)
-- `apps/web/src/features/reader/lesson-reader.tsx` (five-mode selector, states)
-- `apps/web/src/features/learning/journey-actions.ts` (`storedLessonPlan`)
-- `apps/web/src/app/(workspace)/courses/[courseId]/present/page.tsx` (mode wiring)
-- `apps/web/e2e/batch4-m41-planning.spec.ts` (+1 scenario, 2 assertions tightened)
+C1, C2 and C4 remain outside this scope, as instructed. None blocks M4.4.
+
+---
+
+## 8. M4.4 readiness
+
+**Ready, with the conditions above.**
+
+The evidence that matters: the two services that share a budget ledger now agree
+on *which* attempt owns *which* reservation, proven against one real database
+across ten scenarios. That was the specific gap M4.3 left open, and it is the
+kind of gap that only appears when both halves run together — which is exactly
+why it was missed twice.
+
+What M4.4 must not assume: that provider behaviour has been validated. It has
+not, and no test in this milestone should be read as if it had.
+
+---
+
+## 9. Changes made
+
+| File | Change |
+|---|---|
+| `apps/ai/services/api/routers/experience_planner.py` | attempt-aware affordability check |
+| `apps/ai/tests/test_experience_planner_dispatch.py` | 14 → 20 tests |
+| `apps/api/scripts/m43-cross-service-proof.ts` | new combined proof |
+| `apps/api/modules/study/src/tests/learning-mode-quality.test.ts` | new, 10 tests |
+| `reports/EDNOVA-BATCH4-M43-VALIDATION.md` | seven-vs-eight correction |
+| `reports/EDNOVA-BATCH4-M43-ARCHITECTURE.md` | rewritten for this review |
+| three new reports | INTEGRATION-VALIDATION, SECURITY-REGRESSION, this file |
