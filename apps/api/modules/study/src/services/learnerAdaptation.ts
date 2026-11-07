@@ -174,13 +174,27 @@ export async function loadEligibleEvidence(input: {
   userId: string;
   courseId: string;
   revisionId: string;
+  /**
+   * Objectives this lesson teaches. Supplying them makes the bound meaningful:
+   * M4.4 capped at 200 recent rows and filtered by objective *afterwards*, so a
+   * learner with a long history in other objectives could fill the cap and hide
+   * the one authoritative record for this lesson.
+   *
+   * Omitted means "every objective in this revision", which is still correctly
+   * scoped and still bounded.
+   */
+  objectiveIds?: readonly string[];
 }): Promise<AdaptationEvidence[]> {
-  const rows = await LearningEvidence.find({
+  const filter: Record<string, unknown> = {
     userId: input.userId,
     'activity.courseId': input.courseId,
     'activity.revisionId': input.revisionId,
     status: 'accepted',
-  })
+  };
+  if (input.objectiveIds && input.objectiveIds.length > 0)
+    filter.objectiveId = { $in: [...input.objectiveIds] };
+
+  const rows = await LearningEvidence.find(filter)
     .select({
       'activity.revisionId': 1,
       objectiveId: 1,
@@ -188,6 +202,9 @@ export async function loadEligibleEvidence(input: {
       'evaluator.type': 1,
       'evaluator.validationVersion': 1,
     })
+    // Still bounded, but now the bound applies *within* the objectives that can
+    // matter for this lesson rather than across the learner's whole history.
+    .sort({ timestamp: -1 })
     .limit(200)
     .lean();
 
@@ -297,6 +314,8 @@ export async function recommendForLesson(input: {
         userId: input.userId,
         courseId: input.courseId,
         revisionId: input.revisionId,
+        // Scope the read to what this lesson can actually act on.
+        objectiveIds: input.lessonObjectiveIds,
       })
     : [];
 

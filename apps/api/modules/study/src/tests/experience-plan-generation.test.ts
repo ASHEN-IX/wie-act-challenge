@@ -16,6 +16,10 @@ jest.mock('../models/ExperiencePlanRequest', () => ({
   },
   ACTIVE_STATES: ['requested', 'authorized', 'reserved', 'dispatched', 'validating'],
 }));
+jest.mock('../services/experiencePlanStore', () => ({
+  peekStoredPlan: jest.fn(),
+  storeAcceptedPlan: jest.fn(async () => ({ stored: true, planId: 'p' })),
+}));
 jest.mock('../models/StructuredAssetReview', () => ({
   StructuredAssetReview: { find: jest.fn(), findOneAndUpdate: jest.fn() },
 }));
@@ -29,6 +33,7 @@ jest.mock('../services/planningGovernance', () => {
 });
 
 import { ExperiencePlanRequest } from '../models/ExperiencePlanRequest';
+import { peekStoredPlan } from '../services/experiencePlanStore';
 import { StructuredAssetReview } from '../models/StructuredAssetReview';
 import { canAuthorCourse } from '../services/resourceAccess';
 import {
@@ -56,6 +61,7 @@ const revisionId = 'rev_1';
 const contentHash = 'sha256:' + 'b'.repeat(64);
 const actor = 'aaaaaaaaaaaaaaaaaaaaaaaa';
 
+const peek = peekStoredPlan as jest.Mock;
 const upsert = ExperiencePlanRequest.findOneAndUpdate as jest.Mock;
 const findOne = ExperiencePlanRequest.findOne as jest.Mock;
 const updateOne = ExperiencePlanRequest.updateOne as jest.Mock;
@@ -203,6 +209,7 @@ function run(p: ExperiencePlannerProvider = provider()) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  peek.mockResolvedValue(false);
   authorize.mockResolvedValue({ approvalId: 'approval-1', maxTokens: 100_000 });
   canAuthor.mockResolvedValue(true);
   const row = {
@@ -230,7 +237,13 @@ describe('generation lifecycle', () => {
   it('persists every state transition', async () => {
     await run();
     const states = updateOne.mock.calls.map((call) => call[1]?.$set?.state).filter(Boolean);
-    expect(states).toContain('authorized');
+    // `authorized` is now written by the atomic claim (a conditional
+    // findOneAndUpdate), not by a plain update, so it appears on that path.
+    expect(updateMany.mock.calls.length + upsert.mock.calls.length).toBeGreaterThan(0);
+    const claimed = upsert.mock.calls.some(
+      (call) => call[1]?.$set?.state === 'authorized',
+    );
+    expect(claimed || states.includes('authorized')).toBe(true);
     expect(states).toContain('dispatched');
     expect(states).toContain('validating');
     expect(states).toContain('validated');
@@ -338,10 +351,31 @@ describe('generation lifecycle', () => {
     expect(p.plan).not.toHaveBeenCalled();
   });
 
-  it('does not retain a plan body for a previously validated request', async () => {
-    upsert.mockReturnValue({ lean: async () => ({ _id: 'row-1', requestId: 'req-1', state: 'validated', planDigest: 'd' }) });
-    const outcome = await run();
-    expect(outcome).toMatchObject({ status: 'failed', code: 'PLAN_NOT_RETAINED' });
+  it('reuses a stored accepted plan instead of a second inference', async () => {
+    // M4.5: a validated request whose plan record is still live must not be
+    // regenerated. The caller reads the store; no second dispatch occurs.
+    upsert.mockReturnValue({
+      lean: async () => ({ _id: 'row-1', requestId: 'req-1', state: 'validated', planDigest: 'd' }),
+    });
+    peek.mockResolvedValue(true);
+    const p = provider();
+    const outcome = await run(p);
+    expect(outcome).toMatchObject({ status: 'already_accepted' });
+    expect(p.plan).not.toHaveBeenCalled();
+  });
+
+  it('regenerates after the stored plan was invalidated', async () => {
+    // Invalidation releases the identity: regeneration is legitimate, and is
+    // separately reserved and reconciled like any other attempt.
+    upsert.mockReturnValue({
+      lean: async () => ({ _id: 'row-1', requestId: 'req-1', state: 'validated', planDigest: 'd' }),
+    });
+    peek.mockResolvedValue(false);
+    const p = provider();
+    const outcome = await run(p);
+    expect(outcome.status).toBe('validated');
+    expect(p.plan).toHaveBeenCalled();
+    expect(reserve).toHaveBeenCalled();
   });
 
   it('reconciles usage against the reservation', async () => {
@@ -351,11 +385,18 @@ describe('generation lifecycle', () => {
     );
   });
 
-  it('marks a stale in-flight attempt uncertain rather than replaying it', async () => {
+  it('marks stale dispatched attempts uncertain and pre-dispatch ones failed', async () => {
+    // M4.5: the original recovery only handled `dispatched`/`validating`, so a
+    // crash during `authorized` or `reserved` blocked the identity forever.
     updateMany.mockResolvedValue({ modifiedCount: 2 });
-    expect(await recoverStalePlanningRequests()).toBe(2);
-    const [, update] = updateMany.mock.calls[0];
-    expect(update.$set.state).toBe('uncertain');
+    expect(await recoverStalePlanningRequests()).toBe(4);
+    const states = updateMany.mock.calls.map((call) => call[1].$set.state);
+    expect(states).toContain('uncertain');
+    expect(states).toContain('failed');
+    // A possibly-billed attempt is never replayed; a provably pre-dispatch one
+    // is released with an audit code.
+    const failed = updateMany.mock.calls.find((call) => call[1].$set.state === 'failed');
+    expect(failed[1].$set.code).toBe('PRE_DISPATCH_INTERRUPTED');
   });
 
   it('derives a stable identity from the authorized operation', () => {

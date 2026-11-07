@@ -18,6 +18,7 @@ import {
 import { StructuredAsset } from '../models/StructuredAsset';
 import { CourseRevision } from '../models/CourseRevision';
 import { canAuthorCourse } from './resourceAccess';
+import { invalidateStoredPlans } from './experiencePlanStore';
 import { PresentationUnavailableError } from './presentationReader';
 
 export class StructuredAssetForbiddenError extends Error {
@@ -114,6 +115,16 @@ export async function attachStructuredAsset(
     fallback: asset.fallback,
     disclosure: asset.disclosure,
     createdByUserId: actor,
+  });
+
+  // A new eligible supplement can change which modes a lesson supports, so any
+  // accepted plan for this lesson was built without it. Invalidating is safe:
+  // the plan is rebuilt on demand through the normal authorized path, and no
+  // learner loses access because the deterministic reader remains available.
+  await invalidateStoredPlans({
+    courseId: asset.courseId,
+    revisionId: asset.revisionId,
+    reason: 'STRUCTURED_ASSET_ADDED',
   });
 
   return asset;

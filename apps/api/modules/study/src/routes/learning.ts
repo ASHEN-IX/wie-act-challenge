@@ -40,6 +40,7 @@ import {
   savePreferences,
 } from '../services/lessonAdaptation';
 import { isLearningMode } from '../../../../shared/ednova/learningModes';
+import { summarizeMetrics } from '../services/planningMetrics';
 import { resolvePlannerProvider, configuredPlannerModel } from '../services/experiencePlannerProviders';
 import { grantPlanningConsent } from '../services/planningGovernance';
 import { getCourseNardouch, completeNardouchLesson } from '../services/courseNardouch';
@@ -115,6 +116,20 @@ router.get(
       revision(r)
     );
     return assets.length ? { ...presentation, assets } : presentation;
+  })
+);
+// Operational metrics for the planning path (Batch 4, M4.5).
+//
+// Author-only: counts and latency buckets, never a learner, course or request
+// identifier. A learner has no reason to read it and no permission to.
+router.get(
+  '/courses/:courseId/planning/metrics',
+  operation(async (r) => {
+    // Scoped to a course the caller actually manages: no new policy, no global
+    // metrics surface.
+    if (!(await canManageCourse(r.user!.userId, String(r.params.courseId))))
+      throw Object.assign(new Error('Metrics require course author rights'), { status: 403 });
+    return summarizeMetrics();
   })
 );
 // Evidence-based adaptation (Batch 4, M4.4).

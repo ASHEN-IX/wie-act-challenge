@@ -26,6 +26,7 @@ import {
   type ValidatedLearningExperiencePlan,
 } from '../../../../shared/ednova/experiencePlan';
 import { tryValidateExperiencePlan } from '../../../../shared/ednova/experiencePlanValidator';
+import { recordEvent } from './planningMetrics';
 import type { PublishedExperiencePlanV1 } from './experiencePlanning';
 import { projectExperiencePlan } from './experiencePlanning';
 import { COMPONENT_REGISTRY_VERSION } from '../../../../shared/ednova/componentRegistry';
@@ -161,28 +162,66 @@ export type LoadOutcome =
  * data, the context is truth.
  */
 /**
- * Does a live accepted plan exist for this lesson and mode?
+ * Availability of a stored plan for one lesson and mode.
  *
- * Used by adaptation to decide which modes to *offer*. It answers availability
- * only — the plan is still fully revalidated before anything renders, so this
- * cannot be used to skip validation.
+ * M4.4 answered this with `exists()`, which promises more than an existence
+ * query can support: a row written under another registry version, or one whose
+ * asset review was revoked, still exists but cannot render. Adaptation then
+ * advertised a mode whose plan would fail on retrieval.
+ *
+ * This reports the honest state, from the record's own compatibility fields, in
+ * one bounded read:
+ *
+ *   available       a live row whose schema/registry/revision still match
+ *   stale           a row exists but is incompatible — it will be refused
+ *   unavailable     no live row
+ *
+ * It is still not a substitute for retrieval: the caller revalidates fully
+ * before rendering. This only stops the UI promising what validation will deny.
  */
+export type PlanAvailability = 'available' | 'stale' | 'unavailable';
+
 export async function peekStoredPlan(input: {
   courseId: string;
   revisionId: string;
   lessonId: string;
   mode: string;
 }): Promise<boolean> {
-  if (input.mode === 'read') return true;
-  const found = await ExperiencePlanRecord.exists({
+  return (await checkStoredPlanAvailability(input)) === 'available';
+}
+
+export async function checkStoredPlanAvailability(input: {
+  courseId: string;
+  revisionId: string;
+  lessonId: string;
+  mode: string;
+}): Promise<PlanAvailability> {
+  if (input.mode === 'read') return 'available';
+  const row = await ExperiencePlanRecord.findOne({
     courseId: input.courseId,
     revisionId: input.revisionId,
     lessonId: input.lessonId,
     mode: input.mode,
     supersededAt: { $exists: false },
-    invalidatedAt: { $exists: false },
-  });
-  return Boolean(found);
+  })
+    .select({
+      invalidatedAt: 1,
+      planSchemaVersion: 1,
+      registryVersion: 1,
+      presentationSchemaVersion: 1,
+    })
+    .lean();
+  if (!row) return 'unavailable';
+  // Explicitly invalidated rows are stale, not merely absent: the UI must not
+  // keep offering a mode whose plan was withdrawn.
+  if (row.invalidatedAt) return 'stale';
+  if (
+    row.planSchemaVersion !== EXPERIENCE_PLAN_SCHEMA_VERSION ||
+    row.registryVersion !== COMPONENT_REGISTRY_VERSION ||
+    row.presentationSchemaVersion !== PRESENTATION_SCHEMA_VERSION
+  )
+    return 'stale';
+  return 'available';
 }
 
 export async function loadAcceptedPlan(input: {
@@ -251,5 +290,6 @@ export async function invalidateStoredPlans(input: {
     { courseId: input.courseId, revisionId: input.revisionId, invalidatedAt: { $exists: false } },
     { $set: { invalidatedAt: new Date(), invalidationReason: input.reason.slice(0, 80) } },
   );
+  if (result.modifiedCount > 0) recordEvent('plan_invalidated', result.modifiedCount);
   return result.modifiedCount;
 }

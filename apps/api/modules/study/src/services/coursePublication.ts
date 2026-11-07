@@ -208,6 +208,16 @@ export async function publishCourseRevision(
       },
       { $set: { status: 'deprecated' } }
     );
+  // A superseded revision keeps its plans readable (it stays authorized), but
+  // they are pinned to it and must not be reused when the course moves on.
+  if (draft.expectedActiveRevisionId) {
+    const { invalidateStoredPlans } = require('./experiencePlanStore');
+    await invalidateStoredPlans({
+      courseId: String(courseId),
+      revisionId: draft.expectedActiveRevisionId,
+      reason: 'REVISION_SUPERSEDED',
+    }).catch(() => undefined);
+  }
   return {
     success: true,
     courseId,

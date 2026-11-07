@@ -20,6 +20,7 @@ import { createHash } from 'node:crypto';
 import type { StructuredAssetV1 } from '../../../../shared/ednova/structuredAsset';
 import { StructuredAssetReview } from '../models/StructuredAssetReview';
 import { canAuthorCourse } from './resourceAccess';
+import { invalidateStoredPlans } from './experiencePlanStore';
 
 /** Content hash of an asset payload. Two assets with the same id but different
  * payloads hash differently, so approval cannot silently transfer across an
@@ -258,6 +259,15 @@ export async function recordAssetReviewDecision(
     },
     { upsert: true, new: true },
   );
+
+  // A decision changes review eligibility, and plans may have been accepted
+  // while the previous decision stood. Withdrawing them is the safe direction:
+  // a plan that depended on a now-rejected asset must not keep rendering it.
+  await invalidateStoredPlans({
+    courseId: input.courseId,
+    revisionId: input.revisionId,
+    reason: `ASSET_REVIEW_${input.decision.toUpperCase()}`,
+  });
 
   return { reviewId, decision: input.decision, contentHash };
 }

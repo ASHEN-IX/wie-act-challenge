@@ -42,7 +42,8 @@ import {
   reservePlanningBudget,
   PlanningBudgetError,
 } from './planningBudget';
-import { storeAcceptedPlan } from './experiencePlanStore';
+import { peekStoredPlan, storeAcceptedPlan } from './experiencePlanStore';
+import { recordEvent } from './planningMetrics';
 import { isLearningMode } from '../../../../shared/ednova/learningModes';
 import {
   buildPlanningContext,
@@ -67,7 +68,8 @@ export type GenerationOutcome =
   | { status: 'rejected'; code: string; stage: string; requestId: string }
   | { status: 'refused'; code: PlanningRefusal | string; requestId: string | null }
   | { status: 'failed'; code: string; requestId: string; uncertain: boolean }
-  | { status: 'duplicate'; requestId: string };
+  | { status: 'duplicate'; requestId: string }
+  | { status: 'already_accepted'; planDigest: string; requestId: string };
 
 /** Stable idempotency key: the same authorized operation maps to one row. */
 export function planningIdentity(input: {
@@ -120,6 +122,7 @@ export async function generateExperiencePlan(input: {
 }): Promise<GenerationOutcome> {
   const providerIdentity = input.provider.identity;
 
+  recordEvent('planning_request');
   if (!input.provider.isEnabled())
     return { status: 'refused', code: 'PLANNING_DISABLED', requestId: null };
 
@@ -164,6 +167,13 @@ export async function generateExperiencePlan(input: {
     model: providerIdentity.model,
   });
 
+  // ---- release expired in-flight attempts ---------------------------------
+  // Without this a process that dies mid-attempt blocks its identity forever:
+  // every later request would answer `duplicate` for a plan that can never
+  // exist. Bounded by age, so live work is never disturbed and no possibly
+  // billable attempt is replayed.
+  await recoverBeforePlanning();
+
   // ---- idempotency -------------------------------------------------------
   // One row per authorized operation. If an attempt is still in flight, a
   // duplicate must not start a second dispatch.
@@ -198,22 +208,60 @@ export async function generateExperiencePlan(input: {
   if (!row) return { status: 'refused', code: 'PLANNING_FORBIDDEN', requestId: null };
 
   const requestId = String(row.requestId);
-  // `requested` is the state this call just created, so it is not a duplicate.
-  // Anything genuinely in flight is: a second dispatch would double-charge.
-  if (IN_FLIGHT_STATES.includes(String(row.state))) return { status: 'duplicate', requestId };
 
-  // A previously validated attempt for the same material is reusable; a failed
-  // or uncertain one is not silently retried as though it were free.
-  // A previously validated attempt has no retained plan body (the row stores
-  // identities and accounting only), so it cannot be replayed from storage.
-  // Re-planning is a fresh, separately-accounted operation.
-  if (row.state === 'validated' && row.planDigest)
-    return { status: 'failed', code: 'PLAN_NOT_RETAINED', requestId, uncertain: false };
+  // ---- atomic claim ------------------------------------------------------
+  // Reading the row and then acting on it is a check-then-act race: two
+  // processes both read `requested` and both conclude they may proceed. M4.5's
+  // cross-process proof showed exactly that — five workers reserved five times
+  // for one logical attempt. The claim must be a single conditional update so
+  // only one caller can move `requested` forward.
+  if (String(row.state) === 'requested') {
+    const claimed = await ExperiencePlanRequest.findOneAndUpdate(
+      { _id: row._id, state: 'requested' },
+      { $set: { state: 'authorized' } },
+      { new: true },
+    ).lean();
+    if (!claimed) {
+      // Another process won the claim. Re-read to report its state honestly.
+      const current = await ExperiencePlanRequest.findOne({ _id: row._id }).lean();
+      recordEvent('duplicate_suppressed');
+      return { status: 'duplicate', requestId: String(current?.requestId ?? requestId) };
+    }
+    row = claimed;
+  }
+
+  // Any other in-flight state belongs to a live attempt.
+  if (IN_FLIGHT_STATES.includes(String(row.state))) {
+    recordEvent('duplicate_suppressed');
+    return { status: 'duplicate', requestId };
+  }
+
+  // A previously validated attempt whose plan record is still live is the
+  // answer: re-planning would be a second, separately-accounted provider call
+  // for material that is already accepted.
+  if (row.state === 'validated' && row.planDigest) {
+    const live = await peekStoredPlan({
+      courseId: input.courseId,
+      revisionId: input.revisionId,
+      lessonId: input.lessonId,
+      mode: input.mode,
+    });
+    // The accepted plan is already stored; this call must not produce a second
+    // one. `already_accepted` tells the caller to read the store instead.
+    if (live) {
+      recordEvent('already_accepted_reuse');
+      recordEvent('cache_hit');
+      return { status: 'already_accepted', planDigest: String(row.planDigest), requestId };
+    }
+    recordEvent('cache_miss');
+    // The record was invalidated or superseded (asset edit, review revocation,
+    // registry change), so the accepted plan no longer applies. Regeneration is
+    // legitimate — and is separately reserved and reconciled like any attempt.
+  }
   if (row.state === 'uncertain')
     return { status: 'failed', code: 'PROVIDER_UNCERTAIN_PREVIOUS', requestId, uncertain: true };
 
   // ---- reserve -----------------------------------------------------------
-  await ExperiencePlanRequest.updateOne({ _id: row._id, state: row.state }, { $set: { state: 'authorized' } });
   let reservation;
   try {
     reservation = await (input.reserve ?? reservePlanningBudget)({
@@ -298,6 +346,7 @@ export async function generateExperiencePlan(input: {
 
   if (!outcome.ok) {
     const uncertain = outcome.failure === 'uncertain' || failureClass(outcome.code) === 'uncertain';
+    recordEvent(uncertain ? 'uncertain_outcome' : 'known_failure');
     await ExperiencePlanRequest.updateOne(
       { _id: row._id },
       {
@@ -319,6 +368,7 @@ export async function generateExperiencePlan(input: {
   );
 
   if (!validation.ok) {
+    recordEvent('validation_reject');
     await ExperiencePlanRequest.updateOne(
       { _id: row._id },
       {
@@ -333,6 +383,8 @@ export async function generateExperiencePlan(input: {
     return { status: 'rejected', code: validation.code, stage: validation.stage, requestId };
   }
 
+  recordEvent('validation_accept');
+  recordEvent('provider_dispatch');
   await ExperiencePlanRequest.updateOne(
     { _id: row._id },
     {
@@ -378,18 +430,41 @@ export async function generateExperiencePlan(input: {
  * proof of no charge, so it is reconciled by a human rather than replayed.
  */
 export async function recoverStalePlanningRequests(olderThanMs = 120_000): Promise<number> {
-  const result = await ExperiencePlanRequest.updateMany(
+  const cutoff = new Date(Date.now() - olderThanMs);
+
+  // An attempt that reached `dispatched` or `validating` may have been billed,
+  // so it becomes uncertain and is never replayed automatically.
+  const uncertain = await ExperiencePlanRequest.updateMany(
     {
       state: { $in: ['dispatched', 'validating'] },
-      dispatchAt: { $lt: new Date(Date.now() - olderThanMs) },
+      $or: [{ dispatchAt: { $lt: cutoff } }, { dispatchAt: { $exists: false } }],
+      updatedAt: { $lt: cutoff },
     },
     {
-      $set: {
-        state: 'uncertain',
-        code: 'WORKER_INTERRUPTED',
-        finishedAt: new Date(),
-      },
+      $set: { state: 'uncertain', code: 'WORKER_INTERRUPTED', finishedAt: new Date() },
     },
   );
-  return result.modifiedCount;
+
+  // `authorized` and `reserved` are provably pre-dispatch: the provider was
+  // never contacted, so the attempt failed safely and the identity is released
+  // for a fresh, separately-accounted request. Recording `failed` rather than
+  // deleting keeps the audit trail while unblocking the lesson.
+  const abandoned = await ExperiencePlanRequest.updateMany(
+    {
+      state: { $in: ['authorized', 'reserved'] },
+      updatedAt: { $lt: cutoff },
+    },
+    {
+      $set: { state: 'failed', code: 'PRE_DISPATCH_INTERRUPTED', finishedAt: new Date() },
+    },
+  );
+
+  return uncertain.modifiedCount + abandoned.modifiedCount;
+}
+
+/** Release expired in-flight rows before deciding a duplicate. Cheap, bounded,
+ * and only touches rows older than the cutoff, so it cannot disturb live work. */
+export async function recoverBeforePlanning(olderThanMs = 120_000): Promise<void> {
+  const recovered = await recoverStalePlanningRequests(olderThanMs).catch(() => 0);
+  if (recovered > 0) recordEvent('stale_recovered', recovered);
 }
