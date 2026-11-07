@@ -345,3 +345,76 @@ describe("validated experience plan integration (M4.1)", () => {
     expect(html).toContain("Closed forms");
   });
 });
+
+describe("evidence-based mode suggestion (M4.4)", () => {
+  const presentation = buildPublishedPresentation(fixture);
+
+  const renderWithSuggestion = (
+    recommendation?: { mode: "guided" | "explore" | "practice" | "deep_dive"; reason: string },
+  ) =>
+    renderToStaticMarkup(
+      <LessonReader
+        presentation={presentation}
+        lessonId="lesson-1"
+        initialMode="read"
+        practiceHref={`/courses/${courseId}/learn?revisionId=${revisionId}#practice-and-tutor`}
+        fallbackHref={`/courses/${courseId}/learn?revisionId=${revisionId}`}
+        {...(recommendation ? { recommendation: recommendation as never } : {})}
+      />,
+    );
+
+  it("renders no suggestion when none is offered", () => {
+    const html = renderWithSuggestion(undefined);
+    expect(html).not.toContain("data-adaptation-suggestion");
+  });
+
+  it("offers a suggested mode with its reason", () => {
+    const html = renderWithSuggestion({ mode: "guided", reason: "guided_requested" });
+    expect(html).toContain('data-adaptation-suggestion="guided"');
+    expect(html).toContain('data-adaptation-reason="guided_requested"');
+    expect(html).toContain("Try");
+    expect(html).toContain("Guided");
+    expect(html).toContain("you asked for more explanation");
+  });
+
+  it("offers accept, dismiss and disable controls", () => {
+    const html = renderWithSuggestion({ mode: "deep_dive", reason: "proof_material_requested" });
+    expect(html).toContain("Open Deep Dive");
+    expect(html).toContain("Not now");
+    expect(html).toContain("Turn off suggestions");
+  });
+
+  it("never claims the suggestion improves learning", () => {
+    for (const reason of [
+      "explicit_preference",
+      "guided_requested",
+      "proof_material_requested",
+      "visual_asset_available",
+      "objective_not_yet_mastered",
+      "preference_unavailable_for_lesson",
+    ]) {
+      const html = renderWithSuggestion({ mode: "guided", reason });
+      expect(html).not.toMatch(/improve|better results|proven|guarantee/i);
+    }
+  });
+
+  it("never exposes raw evidence, scores or objective ids in the suggestion", () => {
+    const html = renderWithSuggestion({ mode: "guided", reason: "objective_not_yet_mastered" });
+    expect(html).not.toContain("obj-1");
+    expect(html).not.toMatch(/score|attemptId|evidenceId/);
+    // The copy talks about the lesson, not about the learner's ability.
+    expect(html).not.toMatch(/struggl|weak|behind|poor/i);
+  });
+
+  it("keeps the mode control available alongside a suggestion", () => {
+    const html = renderWithSuggestion({ mode: "guided", reason: "guided_requested" });
+    for (const mode of ["read", "guided", "explore", "practice", "deep_dive"])
+      expect(html).toContain(`data-learning-mode="${mode}"`);
+  });
+
+  it("labels the suggestion for assistive technology", () => {
+    const html = renderWithSuggestion({ mode: "guided", reason: "guided_requested" });
+    expect(html).toContain('role="note"');
+    expect(html).toContain('aria-label="Suggested learning mode"');
+  });
+});

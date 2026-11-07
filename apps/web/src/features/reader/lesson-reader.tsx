@@ -10,6 +10,7 @@ import {
   GraduationCap,
   ListTree,
   MessageCircleQuestion,
+  Sparkles,
   PanelRight,
   Search,
   ShieldAlert,
@@ -20,6 +21,7 @@ import type { PublishedPresentationV1 } from "@ednova/shared/ednova/presentation
 import type { ReaderMode } from "@ednova/shared/ednova/presentationPlan";
 import type { PublishedStructuredAssetV1 } from "@ednova/shared/ednova/structuredAsset";
 import type { PublishedExperiencePlanV1 } from "@ednova/shared/ednova/publishedExperiencePlan";
+import type { AdaptationReason } from "@ednova/shared/ednova/learningAdaptation";
 import { CourseNardouch } from "@/features/nardouch/course-growth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -78,6 +80,41 @@ export type LessonReaderProps = {
     mode: LearningModeView,
     blockIds: readonly string[],
   ) => Promise<PublishedExperiencePlanV1 | undefined>;
+  /**
+   * An optional, explained mode suggestion (Batch 4, M4.4). The reader only
+   * renders it; the server decided it from the learner's own preferences and
+   * accepted evidence. Absent means no suggestion.
+   */
+  recommendation?: AdaptationSuggestion | null;
+  /** Endpoint the reader posts to when the learner dismisses a suggestion. A
+   * plain string, because a server component cannot pass a handler. */
+  dismissSuggestionHref?: string;
+  /** The learner's preference version, so a disable write does not silently
+   * overwrite a change made in another tab. */
+  preferenceVersion?: number;
+};
+
+export type AdaptationSuggestion = {
+  mode: LearningModeView;
+  reason: AdaptationReason;
+};
+
+/**
+ * Learner-facing copy for each reason code.
+ *
+ * Deliberately plain and non-judgemental: no reason says anything about the
+ * learner's ability, and none reveals an assessment score or objective name.
+ */
+const RECOMMENDATION_COPY: Record<AdaptationReason, string> = {
+  explicit_preference: "this is the mode you chose.",
+  guided_requested: "you asked for more explanation and this lesson has worked examples.",
+  proof_material_requested: "you asked for detailed proofs and this lesson includes them.",
+  visual_asset_available: "this lesson has reviewed interactive material to explore.",
+  objective_not_yet_mastered:
+    "this lesson covers an objective you have not yet confirmed through practice.",
+  neutral_default: "",
+  preference_unavailable_for_lesson:
+    "this lesson does not include the material your preferred mode needs.",
 };
 
 function isLearningModeView(value: unknown): value is LearningModeView {
@@ -159,6 +196,9 @@ export function LessonReader({
   experiencePlan,
   initialLearningMode,
   loadModePlan,
+  recommendation,
+  dismissSuggestionHref,
+  preferenceVersion: initialPreferenceVersion,
 }: LessonReaderProps) {
   const hrefFor = (id: string, mode: ReaderMode) => lessonHref(presentation, id, mode, basePath);
   // A learning mode is carried in the same `mode` query parameter the reader
@@ -198,6 +238,10 @@ export function LessonReader({
   const [planState, setPlanState] = useState<"idle" | "loading" | "ready" | "unavailable">(
     "idle",
   );
+  // A suggestion the learner dismissed in this session. The server records it
+  // too; this keeps the UI honest without a round trip.
+  const [dismissedMode, setDismissedMode] = useState<LearningModeView | null>(null);
+  const [preferenceVersion, setPreferenceVersion] = useState(initialPreferenceVersion ?? 0);
   const [outlineOpen, setOutlineOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -623,6 +667,73 @@ export function LessonReader({
                 </p>
               )}
             </header>
+
+            {/* A recommendation is an optional suggestion with a stated reason.
+                It never navigates on its own: the learner opens it, ignores it,
+                or turns suggestions off. Nothing here infers ability. */}
+            {recommendation && dismissedMode !== recommendation.mode && (
+              <aside
+                role="note"
+                aria-label="Suggested learning mode"
+                data-adaptation-suggestion={recommendation.mode}
+                data-adaptation-reason={recommendation.reason}
+                className="mt-4 rounded-lg border border-brand-violet-soft/40 bg-brand-violet/[0.06] px-4 py-3 text-sm leading-6"
+              >
+                <p className="flex flex-wrap items-center gap-2">
+                  <Sparkles aria-hidden="true" className="size-4 shrink-0 text-brand-violet-soft" />
+                  <span>
+                    Try <strong>{LEARNING_MODE_LABELS[recommendation.mode]}</strong> —{" "}
+                    {RECOMMENDATION_COPY[recommendation.reason]}
+                  </span>
+                </p>
+                <div className="mt-2.5 flex flex-wrap items-center gap-2 pl-6">
+                  <Button asChild size="sm">
+                    <Link href={modeHref(current.lesson.id, recommendation.mode)}>
+                      Open {LEARNING_MODE_LABELS[recommendation.mode]}
+                    </Link>
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      // Plain fetch, then hide locally: the reader owns this
+                      // interaction and the server records it.
+                      void fetch(dismissSuggestionHref ?? "", {
+                        method: "POST",
+                        headers: { "content-type": "application/json" },
+                        body: JSON.stringify({
+                          revisionId: presentation.revisionId,
+                          lessonId: current.lesson.id,
+                          mode: recommendation.mode,
+                        }),
+                      }).catch(() => undefined);
+                      setDismissedMode(recommendation.mode);
+                    }}
+                  >
+                    Not now
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      void fetch("/api/v1/study/learning/adaptation/preferences", {
+                        method: "PUT",
+                        headers: { "content-type": "application/json" },
+                        body: JSON.stringify({
+                          version: preferenceVersion ?? 0,
+                          preferences: { recommendationsEnabled: false },
+                        }),
+                      }).catch(() => undefined);
+                      setDismissedMode(recommendation.mode);
+                    }}
+                  >
+                    Turn off suggestions
+                  </Button>
+                </div>
+              </aside>
+            )}
 
             {/* A mode with no accepted plan falls back to the deterministic
                 presentation. The learner is told, rather than being shown a

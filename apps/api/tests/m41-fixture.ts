@@ -192,7 +192,28 @@ export async function seedPlanningFixture(
       publishedAt: new Date(),
       publishedByUserId: instructorId,
       summary: "M4.1 planning fixture",
-      topics: [],
+      // M4.4: objectives live on subtopics, and a canonical lesson's id is that
+      // subtopic's id. This is the real objective→lesson join adaptation uses.
+      topics: [
+        {
+          id: "topic_1",
+          title: "Foundations",
+          subtopics: [
+            {
+              id: "lesson-1",
+              title: "Summation identities",
+              learning_objectives: [
+                { id: "obj_summation", objectiveId: "obj_summation", statement: "Apply summation identities.", bloomLevel: "apply" },
+              ],
+            },
+            {
+              id: "lesson-2",
+              title: "Implementation notes",
+              learning_objectives: [],
+            },
+          ],
+        },
+      ],
       contentHash: sourceHash,
       contentDocument: document,
       contentDocumentHash,
@@ -300,6 +321,173 @@ export async function seedPlanningFixture(
       decidedAt: new Date("2026-11-01T10:00:00.000Z"),
       createdAt: new Date(),
       updatedAt: new Date(),
+    });
+
+    // M4.4: accepted assessment evidence for the enrolled student, for the
+    // objective lesson-1 teaches, not yet mastered. This is the *real* trusted
+    // evidence collection the recommendation path reads — a QA fixture, not a
+    // claim about a real learner.
+    await db.collection("learning_evidences").deleteMany({ userId: studentId });
+    await db.collection("learning_evidences").insertOne({
+      evidenceId: `ev_m44_${courseId}`,
+      evidenceVersion: "1.0.0",
+      userId: studentId,
+      attemptId: `attempt_m44_${courseId}`,
+      activity: {
+        courseId,
+        revisionId: revisionTag,
+        contentHash: sourceHash,
+        activityId: "activity_m44",
+        activityRevision: "1",
+        activityType: "InteractiveQuiz",
+      },
+      objectiveId: "obj_summation",
+      status: "accepted",
+      bloomLevel: "apply",
+      score: 0.5,
+      masteryAchieved: false,
+      evaluator: {
+        type: "deterministic_rubric",
+        model: null,
+        validationVersion: "1.0.0",
+        executionMode: "DETERMINISTIC_FALLBACK",
+      },
+      timestamp: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    // M4.4: a validated Guided plan for lesson-1, produced through the real
+    // validator against these exact blocks. Without one, adaptation correctly
+    // declines to recommend Guided — which another scenario asserts.
+    const { validateExperiencePlan } = require('../shared/ednova/experiencePlanValidator');
+    const { experienceContextFingerprint } = require('../shared/ednova/experiencePlan');
+    const { projectExperiencePlan } = require('../modules/study/src/services/experiencePlanning');
+    const { COMPONENT_CAPABILITIES, COMPONENT_REGISTRY_VERSION } = require('../shared/ednova/componentRegistry');
+
+    const lessonBlocks = document.chapters[0].lessons[0].blocks;
+    // Canonical blocks use semantic types (`definition`, `proof`); the reading
+    // projection turns those into `callout` with a role. Map to the projected
+    // shape, which is what the validator checks against the registry.
+    const SEMANTIC = new Set([
+      'definition', 'theorem', 'proposition', 'lemma', 'corollary',
+      'proof', 'example', 'exercise', 'solution', 'remark',
+    ]);
+    const plannerBlocks = lessonBlocks.map((block: any) => ({
+      blockId: block.id,
+      blockType: SEMANTIC.has(block.type) ? 'callout' : block.type,
+      ...(SEMANTIC.has(block.type) ? { role: block.type } : {}),
+      render: block.type === 'math' && !block.reviewedFormula ? ('source_faithful' as const) : ('primary' as const),
+      hasEvidence: true,
+      hasSourceRegion: block.type === 'math',
+      isReviewedFormula: block.type === 'math' && Boolean(block.reviewedFormula),
+      hasStructuredFixture: false,
+    }));
+    const guidedFingerprint = experienceContextFingerprint({
+      courseId,
+      revisionId: revisionTag,
+      contentHash: sourceHash,
+      lessonId: 'lesson-1',
+      mode: 'guided',
+      blockIds: plannerBlocks.map((block: any) => block.blockId),
+    });
+
+    // The component each block kind is legitimately rendered by. Chosen from the
+    // registry's own declared capabilities, not invented.
+    const componentFor = (block: any): string => {
+      if (block.blockType === 'heading') return 'SectionHeading';
+      if (block.blockType === 'callout') {
+        if (['theorem', 'proposition', 'lemma', 'corollary'].includes(block.role ?? '')) return 'TheoremCard';
+        if (block.role === 'proof') return 'ProofBlock';
+        if (block.role === 'definition') return 'DefinitionCard';
+        if (block.role === 'exercise') return 'ExerciseBlock';
+        if (['example', 'solution'].includes(block.role ?? '')) return 'ExampleBlock';
+        return 'ImportantNote';
+      }
+      if (block.blockType === 'math') return block.isReviewedFormula ? 'ReviewedFormula' : 'SourceMathFallback';
+      if (block.blockType === 'code') return 'CodeViewer';
+      return 'ConceptExplanation';
+    };
+
+    const proposal = {
+      schemaVersion: '1.0.0',
+      planId: 'plan_m44_guided',
+      claims: {
+        courseId,
+        revisionId: revisionTag,
+        contentHash: sourceHash,
+        lessonId: 'lesson-1',
+        mode: 'guided',
+        registryVersion: COMPONENT_REGISTRY_VERSION,
+        presentationSchemaVersion: '1.0.0',
+        contextFingerprint: guidedFingerprint,
+      },
+      planner: { implementation: 'mock_experience_planner', version: '1.0.0' },
+      placements: plannerBlocks.map((block: any, index: number) => {
+        const component = componentFor(block);
+        return {
+          placementId: `p-${index + 1}`,
+          kind: 'canonical',
+          block: { lessonId: 'lesson-1', blockId: block.blockId },
+          component,
+          componentVersion: COMPONENT_CAPABILITIES[component].version,
+          group: 'none',
+          disclosure: 'expanded',
+          fallback: COMPONENT_CAPABILITIES[component].fallback,
+        };
+      }),
+      notes: [],
+    };
+
+    const validated = validateExperiencePlan(proposal, {
+      courseId,
+      revisionId: revisionTag,
+      contentHash: sourceHash,
+      lessonId: 'lesson-1',
+      mode: 'guided',
+      contextFingerprint: guidedFingerprint,
+      allowedPlanners: [{ implementation: 'mock_experience_planner', version: '1.0.0' }],
+      blocks: plannerBlocks,
+      assets: [],
+    });
+    // Write the record the store would write. The fixture runs before the app
+    // opens its mongoose connection, so it writes the collection directly —
+    // same shape, same fields, same identity derivation.
+    const projected = projectExperiencePlan(validated);
+    await db.collection('experience_plan_records').deleteMany({ courseId });
+    await db.collection('experience_plan_records').insertOne({
+      planId:
+        'plan_' +
+        crypto
+          .createHash('sha256')
+          .update(
+            JSON.stringify([
+              courseId,
+              revisionTag,
+              'lesson-1',
+              'guided',
+              guidedFingerprint,
+            ]),
+          )
+          .digest('hex')
+          .slice(0, 32),
+      courseId,
+      revisionId: revisionTag,
+      lessonId: 'lesson-1',
+      mode: 'guided',
+      contentHash: sourceHash,
+      contextFingerprint: guidedFingerprint,
+      planSchemaVersion: '1.0.0',
+      registryVersion: COMPONENT_REGISTRY_VERSION,
+      presentationSchemaVersion: '1.0.0',
+      provider: projected.planner.implementation,
+      providerModel: projected.planner.version,
+      plannerImplementation: projected.planner.implementation,
+      plannerVersion: projected.planner.version,
+      planDigest: projected.digest,
+      plan: projected,
+      generatedBy: instructorId,
+      generatedAt: new Date(),
     });
 
     return { courseId, revisionTag, lessonIds: ["lesson-1", "lesson-2"] };

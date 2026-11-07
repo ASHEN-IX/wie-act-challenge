@@ -329,3 +329,112 @@ test("learning modes render from a persisted plan and never widen learner access
   expect(badMode.status()).toBe(200);
   expect((await badMode.json()).status).toBe("unavailable");
 });
+
+/**
+ * Batch 4 M4.4: evidence-based suggestion, student control and privacy.
+ *
+ * The fixture seeds accepted assessment evidence for an objective lesson-1
+ * teaches, not yet mastered. This drives the real adaptation route through real
+ * BetterAuth and MongoDB. No provider is involved.
+ */
+test("adaptation suggests with a reason, stays dismissible and never leaks evidence", async ({
+  page,
+  browser,
+}) => {
+  const courseId = "0123456789abcdef01234567";
+  const revisionTag = "rev_m41_fixture";
+  const readerUrl = `/courses/${courseId}/present?revisionId=${encodeURIComponent(revisionTag)}`;
+
+  await login(page, "final-student@example.test");
+
+  // ---- preferences start at defaults -------------------------------------
+  const prefs = await page.request.get(`/api/v1/study/learning/adaptation/preferences`);
+  expect(prefs.status()).toBe(200);
+  const prefsBody: any = await prefs.json();
+  expect(prefsBody.version).toBeGreaterThanOrEqual(0);
+  expect(prefsBody.preferences.recommendationsEnabled).toBe(true);
+
+  // ---- the suggestion is produced from accepted evidence -----------------
+  const adaptation = await page.request.get(
+    `/api/v1/study/learning/courses/${courseId}/adaptation?lessonId=lesson-1&mode=read`,
+  );
+  expect(adaptation.status()).toBe(200);
+  const body: any = await adaptation.json();
+  expect(body.adaptation).toBeTruthy();
+  expect(body.adaptation.recommendedMode).toBe("guided");
+  expect(body.adaptation.reason).toBe("objective_not_yet_mastered");
+  expect(body.surface).toBe(true);
+  // The payload carries no answers, no scores and no other student's data.
+  const serialized = JSON.stringify(body);
+  expect(serialized).not.toContain("score");
+  expect(serialized).not.toContain("attempt_m44");
+  expect(serialized).not.toContain("ev_m44");
+
+  // ---- it renders in the real reader -------------------------------------
+  await page.goto(readerUrl);
+  const suggestion = page.locator("[data-adaptation-suggestion]");
+  await expect(suggestion).toBeVisible({ timeout: 30000 });
+  await expect(suggestion).toHaveAttribute("data-adaptation-suggestion", "guided");
+  await expect(suggestion).toContainText("not yet confirmed through practice");
+  // The renderer never navigates on its own.
+  await expect(page.locator('[data-learning-mode="read"]')).toHaveAttribute("aria-current", "true");
+  await page.screenshot({ path: path.join(evidence, "06-adaptation-suggestion.png") });
+
+  // ---- dismissal is recorded through the real route ----------------------
+  // The suggestion is a server-rendered element, so the dismissal is verified
+  // through the API it calls rather than by a client re-render in this harness.
+  const dismissed = await page.request.post(
+    `/api/v1/study/learning/courses/${courseId}/adaptation/dismiss`,
+    { data: { revisionId: revisionTag, lessonId: "lesson-1", mode: "guided" } },
+  );
+  expect(dismissed.status()).toBe(200);
+  const afterDismiss = await page.request.get(
+    `/api/v1/study/learning/courses/${courseId}/adaptation?lessonId=lesson-1&mode=read`,
+  );
+  const afterDismissBody: any = await afterDismiss.json();
+  // The recommendation still exists; it is simply no longer surfaced.
+  expect(afterDismissBody.adaptation.recommendedMode).toBe("guided");
+  expect(afterDismissBody.surface).toBe(false);
+  // Reading is unaffected either way.
+  await page.reload();
+  await expect(page.locator("[data-presentation-view]")).toBeVisible({ timeout: 30000 });
+
+  // ---- turning suggestions off removes them entirely ---------------------
+  const disabled = await page.request.put(`/api/v1/study/learning/adaptation/preferences`, {
+    data: { version: prefsBody.version, preferences: { recommendationsEnabled: false } },
+  });
+  expect(disabled.status()).toBe(200);
+  const after = await page.request.get(
+    `/api/v1/study/learning/courses/${courseId}/adaptation?lessonId=lesson-1&mode=read`,
+  );
+  const afterBody: any = await after.json();
+  expect(afterBody.adaptation.recommendedMode).toBeNull();
+  expect(afterBody.surface).toBe(false);
+  // The lesson is still fully readable with adaptation off.
+  await page.goto(readerUrl);
+  await expect(page.locator("[data-presentation-view]")).toBeVisible({ timeout: 30000 });
+  await expect(page.locator("[data-block-type]").first()).toBeVisible();
+
+  // ---- a stale preference write is rejected ------------------------------
+  const stale = await page.request.put(`/api/v1/study/learning/adaptation/preferences`, {
+    data: { version: prefsBody.version, preferences: { preferDetailedProofs: true } },
+  });
+  expect(stale.status()).toBe(409);
+
+  // ---- another student sees no evidence of this one ----------------------
+  const outsider = await browser.newContext();
+  const outsiderPage = await outsider.newPage();
+  await login(outsiderPage, "final-outsider@example.test");
+  const outsiderAdaptation = await outsiderPage.request.get(
+    `/api/v1/study/learning/courses/${courseId}/adaptation?lessonId=lesson-1&mode=read`,
+  );
+  // Authorization fails before any evidence is considered.
+  expect([403, 404]).toContain(outsiderAdaptation.status());
+  const outsiderPrefs = await outsiderPage.request.get(
+    `/api/v1/study/learning/adaptation/preferences`,
+  );
+  expect(outsiderPrefs.status()).toBe(200);
+  // A different user gets their own defaults, not the first student's settings.
+  expect((await outsiderPrefs.json()).preferences.recommendationsEnabled).toBe(true);
+  await outsider.close();
+});

@@ -160,6 +160,31 @@ export type LoadOutcome =
  * decisions — never from the stored row. That is the whole point: the record is
  * data, the context is truth.
  */
+/**
+ * Does a live accepted plan exist for this lesson and mode?
+ *
+ * Used by adaptation to decide which modes to *offer*. It answers availability
+ * only — the plan is still fully revalidated before anything renders, so this
+ * cannot be used to skip validation.
+ */
+export async function peekStoredPlan(input: {
+  courseId: string;
+  revisionId: string;
+  lessonId: string;
+  mode: string;
+}): Promise<boolean> {
+  if (input.mode === 'read') return true;
+  const found = await ExperiencePlanRecord.exists({
+    courseId: input.courseId,
+    revisionId: input.revisionId,
+    lessonId: input.lessonId,
+    mode: input.mode,
+    supersededAt: { $exists: false },
+    invalidatedAt: { $exists: false },
+  });
+  return Boolean(found);
+}
+
 export async function loadAcceptedPlan(input: {
   courseId: string;
   revisionId: string;

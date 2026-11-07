@@ -32,6 +32,14 @@ import {
   readStoredPlan,
 } from '../services/experiencePlanning';
 import { canManageCourse } from '../services/resourceAccess';
+import {
+  adaptationForLesson,
+  dismissRecommendation,
+  readPreferences,
+  resetPreferences,
+  savePreferences,
+} from '../services/lessonAdaptation';
+import { isLearningMode } from '../../../../shared/ednova/learningModes';
 import { resolvePlannerProvider, configuredPlannerModel } from '../services/experiencePlannerProviders';
 import { grantPlanningConsent } from '../services/planningGovernance';
 import { getCourseNardouch, completeNardouchLesson } from '../services/courseNardouch';
@@ -107,6 +115,61 @@ router.get(
       revision(r)
     );
     return assets.length ? { ...presentation, assets } : presentation;
+  })
+);
+// Evidence-based adaptation (Batch 4, M4.4).
+//
+// Learner-scoped and read-mostly: the recommendation route reads the student's
+// own trusted evidence and preferences and returns a suggestion. It never
+// dispatches to a provider, and it never reads another student's records.
+router.get(
+  '/courses/:courseId/adaptation',
+  operation(async (r) => {
+    const lessonId = r.query.lessonId;
+    const mode = r.query.mode;
+    if (typeof lessonId !== 'string' || typeof mode !== 'string')
+      throw Object.assign(new Error('lessonId and mode are required'), { status: 400 });
+    if (!isLearningMode(mode)) return { adaptation: null, surface: false };
+    return adaptationForLesson(
+      r.user!.userId,
+      String(r.params.courseId),
+      lessonId,
+      mode,
+      revision(r),
+    );
+  })
+);
+router.get(
+  '/adaptation/preferences',
+  operation(async (r) => readPreferences(r.user!.userId))
+);
+router.put(
+  '/adaptation/preferences',
+  operation(async (r) => {
+    const body = (r.body || {}) as Record<string, unknown>;
+    return savePreferences(r.user!.userId, body.preferences ?? body, Number(body.version ?? 0));
+  })
+);
+router.delete(
+  '/adaptation/preferences',
+  operation(async (r) => {
+    await resetPreferences(r.user!.userId);
+    return { reset: true };
+  })
+);
+router.post(
+  '/courses/:courseId/adaptation/dismiss',
+  operation(async (r) => {
+    const body = (r.body || {}) as Record<string, unknown>;
+    if (typeof body.lessonId !== 'string' || typeof body.mode !== 'string')
+      throw Object.assign(new Error('lessonId and mode are required'), { status: 400 });
+    await dismissRecommendation(r.user!.userId, {
+      courseId: String(r.params.courseId),
+      revisionId: String(body.revisionId ?? ''),
+      lessonId: body.lessonId,
+      mode: body.mode,
+    });
+    return { dismissed: true };
   })
 );
 // Development/QA-only experience planning (Batch 4, M4.1).

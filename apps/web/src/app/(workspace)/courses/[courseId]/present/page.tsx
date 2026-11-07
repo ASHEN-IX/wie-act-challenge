@@ -1,5 +1,6 @@
 import {
   learningDocument,
+  lessonRecommendation,
   plannedLessonExperience,
   publishedPresentation,
   storedLessonPlan,
@@ -70,6 +71,12 @@ export default async function PresentationPage({
         : undefined;
     const effectivePlan = modePlan ?? experiencePlan;
 
+    // M4.4: an optional, explained suggestion. Any failure yields undefined and
+    // the reader simply shows no suggestion — adaptation never blocks a lesson.
+    const suggestion = selected
+      ? await lessonRecommendation(courseId, selected, learningMode ?? "read")
+      : undefined;
+
     return (
       <LessonReader
         presentation={presentation}
@@ -79,6 +86,8 @@ export default async function PresentationPage({
         initialMode={readerMode}
         {...(learningMode ? { initialLearningMode: learningMode } : {})}
         {...(effectivePlan ? { experiencePlan: effectivePlan } : {})}
+        {...(suggestion ? { recommendation: suggestion } : {})}
+        dismissSuggestionHref={`/api/v1/study/learning/courses/${encodeURIComponent(courseId)}/adaptation/dismiss`}
       />
     );
   } catch (error) {

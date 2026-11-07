@@ -17,6 +17,8 @@ import {
 } from "@ednova/shared/ednova/learningDocumentV2";
 import { parsePublishedPresentation } from "@ednova/shared/ednova/presentationDocument";
 import { parsePublishedExperiencePlan } from "@ednova/shared/ednova/publishedExperiencePlan";
+import type { LearningMode } from "@ednova/shared/ednova/learningModes";
+import type { AdaptationReason } from "@ednova/shared/ednova/learningAdaptation";
 export async function learningCatalog(courseId: string, revisionId?: string) {
   await requireIdentity();
   const data = await api<{
@@ -130,6 +132,86 @@ export async function storedLessonPlan(
     return parsePublishedExperiencePlan(outcome.plan, blockIds);
   } catch {
     return undefined;
+  }
+}
+/**
+ * Ask for an explained mode suggestion (Batch 4, M4.4).
+ *
+ * Read-only and optional: the server returns a suggestion only when the
+ * learner's own preferences or accepted evidence justify one. Anything else —
+ * disabled, no evidence, unavailable plan, any error — yields undefined, and
+ * the reader shows no suggestion at all.
+ *
+ * This never dispatches a provider request and never changes the learner's mode.
+ */
+export async function lessonRecommendation(
+  courseId: string,
+  lessonId: string,
+  mode: string,
+) {
+  try {
+    await requireIdentity();
+    const payload = await api<unknown>(
+      `/api/v1/study/learning/courses/${segment(courseId)}/adaptation` +
+        `?lessonId=${encodeURIComponent(lessonId)}&mode=${encodeURIComponent(mode)}`,
+    );
+    const result = payload as {
+      adaptation?: {
+        recommendedMode?: unknown;
+        reason?: unknown;
+      } | null;
+      surface?: unknown;
+    };
+    const adaptation = result?.adaptation;
+    if (!adaptation || result?.surface !== true) return undefined;
+    const recommended = adaptation.recommendedMode;
+    const reason = adaptation.reason;
+    if (typeof recommended !== "string" || typeof reason !== "string") return undefined;
+    if (recommended === "read" || recommended === mode) return undefined;
+    return { mode: recommended as LearningMode, reason: reason as AdaptationReason };
+  } catch {
+    return undefined;
+  }
+}
+/**
+ * Record that the learner dismissed a suggestion (Batch 4, M4.4).
+ *
+ * Scoped to one learner and one lesson+mode. Dismissal is a UI courtesy, not a
+ * permanent setting: the learner can still turn suggestions off entirely.
+ */
+export async function dismissModeSuggestion(
+  courseId: string,
+  input: { revisionId: string; lessonId: string; mode: string },
+) {
+  await requireIdentity();
+  try {
+    await api<unknown>(
+      `/api/v1/study/learning/courses/${segment(courseId)}/adaptation/dismiss`,
+      { method: "POST", body: JSON.stringify(input) },
+    );
+    return { dismissed: true };
+  } catch {
+    return { dismissed: false };
+  }
+}
+
+/** Turn evidence-based suggestions off for this learner. */
+export async function disableModeSuggestions(): Promise<boolean> {
+  await requireIdentity();
+  try {
+    const current = await api<{ version?: number; preferences?: Record<string, unknown> }>(
+      `/api/v1/study/learning/adaptation/preferences`,
+    );
+    await api<unknown>(`/api/v1/study/learning/adaptation/preferences`, {
+      method: "PUT",
+      body: JSON.stringify({
+        version: current?.version ?? 0,
+        preferences: { recommendationsEnabled: false },
+      }),
+    });
+    return true;
+  } catch {
+    return false;
   }
 }
 export async function learningProgress(courseId: string, revisionId: string) {

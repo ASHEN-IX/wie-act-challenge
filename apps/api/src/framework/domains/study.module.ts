@@ -984,6 +984,61 @@ export class StudyController {
       res
     );
   }
+  @Get('/api/v1/study/learning/courses/:courseId/adaptation')
+  get_api_v1_study_learning_courses_adaptation_f1b2ac0b(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute(
+      'GET /api/v1/study/learning/courses/:courseId/adaptation',
+      req,
+      res
+    );
+  }
+  @Get('/api/v1/study/learning/adaptation/preferences')
+  get_api_v1_study_learning_adaptation_preferences_ed9f1969(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute(
+      'GET /api/v1/study/learning/adaptation/preferences',
+      req,
+      res
+    );
+  }
+  @Put('/api/v1/study/learning/adaptation/preferences')
+  put_api_v1_study_learning_adaptation_preferences_25dc615e(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute(
+      'PUT /api/v1/study/learning/adaptation/preferences',
+      req,
+      res
+    );
+  }
+  @Delete('/api/v1/study/learning/adaptation/preferences')
+  delete_api_v1_study_learning_adaptation_preferences_e0246604(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute(
+      'DELETE /api/v1/study/learning/adaptation/preferences',
+      req,
+      res
+    );
+  }
+  @Post('/api/v1/study/learning/courses/:courseId/adaptation/dismiss')
+  post_api_v1_study_learning_courses_adaptation_dismiss_45244f39(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute(
+      'POST /api/v1/study/learning/courses/:courseId/adaptation/dismiss',
+      req,
+      res
+    );
+  }
   @Get('/api/v1/study/learning/courses/:courseId/activities')
   get_api_v1_study_learning_courses_activities_107c44f7(
     @Req() req: DomainRequest,
