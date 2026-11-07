@@ -589,6 +589,36 @@ export async function planLessonWithProvider(
     validationContext: trusted.validationContext,
   });
 
+  // An accepted plan already exists for this exact scope: reuse it rather than
+  // paying for a second inference. The read path revalidates it against live
+  // records, so reuse is not a shortcut around validation.
+  if (outcome.status === 'already_accepted') {
+    const reused = await loadAcceptedPlan({
+      courseId: trusted.validationContext.courseId,
+      revisionId: trusted.validationContext.revisionId,
+      lessonId,
+      mode: isLearningMode(mode) ? mode : 'guided',
+      contentHash: trusted.validationContext.contentHash,
+      contextFingerprint: trusted.validationContext.contextFingerprint,
+      validationContext: trusted.validationContext,
+    });
+    if (reused.status === 'available')
+      return {
+        status: 'planned',
+        plan: reused.plan,
+        requestId: outcome.requestId,
+        usageReported: false,
+      };
+    // The stored record no longer passes validation; report it plainly rather
+    // than pretending a plan is available.
+    return {
+      status: 'failed',
+      code: reused.status === 'rejected' ? reused.code : String((reused as { reason?: string }).reason ?? 'PLAN_UNAVAILABLE'),
+      uncertain: false,
+      requestId: outcome.requestId,
+    };
+  }
+
   if (outcome.status !== 'validated') return outcome;
 
   // The validated plan is handed straight to the projection. It is never
