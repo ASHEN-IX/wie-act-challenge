@@ -306,12 +306,28 @@ describe('the record validates strictly', () => {
     ).toThrow();
   });
 
-  it('rejects a recommendation without a reason, or a reason without one', () => {
+  it('rejects a recommendation without a reason', () => {
     const record = evaluate({ preferences: prefs({ preferredMode: 'guided' }) });
     expect(() => parseLearningAdaptation({ ...record, reason: null }, binding)).toThrow();
+  });
+
+  it('rejects a silent record claiming an actionable reason', () => {
+    // Only the two neutral reasons may accompany "no recommendation".
     const neutral = evaluate();
+    for (const reason of ['explicit_preference', 'objective_not_yet_mastered', 'guided_requested'])
+      expect(() => parseLearningAdaptation({ ...neutral, reason }, binding)).toThrow();
+  });
+
+  it('accepts a neutral record that explains its own silence', () => {
+    const neutral = evaluate();
+    expect(parseLearningAdaptation(neutral, binding).recommendedMode).toBeNull();
+    expect(neutral.reason).toBe('neutral_default');
+  });
+
+  it('rejects a recommendation carrying a neutral reason', () => {
+    const record = evaluate({ preferences: prefs({ preferredMode: 'guided' }) });
     expect(() =>
-      parseLearningAdaptation({ ...neutral, reason: 'explicit_preference' }, binding),
+      parseLearningAdaptation({ ...record, reason: 'neutral_default' }, binding),
     ).toThrow();
   });
 

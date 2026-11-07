@@ -242,7 +242,19 @@ export function parseLearningAdaptation(
         ? (value.reason as AdaptationReason)
         : fail('INVALID_ADAPTATION');
   // A recommendation without a reason is not explainable and must not exist.
-  if ((recommendedMode === null) !== (reason === null)) return fail('INVALID_ADAPTATION');
+  // The neutral states are the exception: they carry `neutral_default` or
+  // `preference_unavailable_for_lesson` so the UI can say *why* it is silent,
+  // while recommending nothing. Any other reason without a mode is malformed.
+  if (recommendedMode !== null && reason === null) return fail('INVALID_ADAPTATION');
+  if (
+    recommendedMode === null &&
+    reason !== null &&
+    reason !== 'neutral_default' &&
+    reason !== 'preference_unavailable_for_lesson'
+  )
+    return fail('INVALID_ADAPTATION');
+  if (recommendedMode !== null && reason === 'neutral_default')
+    return fail('INVALID_ADAPTATION');
 
   if (!Array.isArray(value.objectiveIds) || value.objectiveIds.length > 32)
     return fail('INVALID_ADAPTATION');
