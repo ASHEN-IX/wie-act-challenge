@@ -193,11 +193,12 @@ describe('governance is re-derived per call, not carried by the brand', () => {
     if (!outcome.ok) expect(outcome.code).toBe('PLAN_IDENTITY_REVISION_MISMATCH');
   });
 
-  it('does not let a branded plan bypass a later asset-governance check', () => {
-    // A plan can be valid at validation time and still name an asset whose
-    // trusted review record is absent. Verification is a separate, repeatable
-    // step; the brand does not short-circuit it.
-    const unreviewed = {
+  it('never derives review authority from an asset claim alone', () => {
+    // M4.1 checked that a review claim *looked* consistent. M4.2 replaced that
+    // with persisted decisions (C3), so this pure binding step now reports
+    // reviewVerified: false for everything. Only
+    // `verifyAssetBindingsWithProvenance` can set it true, and only from a row.
+    const claimed = {
       assetId: 'asset_1',
       courseId,
       revisionId,
@@ -207,22 +208,13 @@ describe('governance is re-derived per call, not carried by the brand', () => {
       review: { status: 'instructor_reviewed', reviewedBy: 'x', reviewedAt: '2026-01-01T00:00:00Z' },
     } as unknown as StructuredAssetV1;
 
-    const [verified] = verifyAssetBindings([unreviewed], {
+    const [verified] = verifyAssetBindings([claimed], {
       courseId,
       revisionId,
       lessonId: 'lesson-1',
       authorizedDocumentIds: new Set(),
     });
-    expect(verified.reviewVerified).toBe(true);
-
-    // Bound to another revision, the same claim is no longer trusted.
-    const [foreign] = verifyAssetBindings([{ ...unreviewed, revisionId: 'rev_other' }], {
-      courseId,
-      revisionId,
-      lessonId: 'lesson-1',
-      authorizedDocumentIds: new Set(),
-    });
-    expect(foreign.reviewVerified).toBe(false);
+    expect(verified.reviewVerified).toBe(false);
   });
 
   it('rejects a generated proposal regardless of a valid plan elsewhere', () => {

@@ -4,6 +4,16 @@ jest.mock('../services/presentationReader', () => ({
 jest.mock('../models/StructuredAsset', () => ({
   StructuredAsset: { find: jest.fn() },
 }));
+// Review authority now comes from persisted decisions (C3). These workflow
+// tests exercise the mock-planner path, so the decision lookup returns an
+// approved row for the asset under test and nothing for the rest.
+jest.mock('../models/StructuredAssetReview', () => ({
+  StructuredAssetReview: { find: jest.fn(), findOneAndUpdate: jest.fn() },
+}));
+jest.mock('../services/resourceAccess', () => ({
+  canAuthorCourse: jest.fn(),
+  canManageCourse: jest.fn(),
+}));
 
 import type { PublishedPresentationV1 } from '../../../../shared/ednova/presentationDocument';
 import { PRESENTATION_SCHEMA_VERSION } from '../../../../shared/ednova/presentationDocument';
@@ -11,6 +21,8 @@ import { COMPONENT_REGISTRY_VERSION } from '../../../../shared/ednova/componentR
 import { STRUCTURED_ASSET_SCHEMA_VERSION } from '../../../../shared/ednova/structuredAsset';
 import { getPublishedPresentation } from '../services/presentationReader';
 import { StructuredAsset } from '../models/StructuredAsset';
+import { StructuredAssetReview } from '../models/StructuredAssetReview';
+import { assetContentHash } from '../services/assetReviewProvenance';
 import {
   EXPERIENCE_PLAN_DISCLOSURE,
   ExperiencePlanningDisabledError,
@@ -32,6 +44,28 @@ const contentHash = 'sha256:' + 'c'.repeat(64);
 
 const load = getPublishedPresentation as jest.MockedFunction<typeof getPublishedPresentation>;
 const find = StructuredAsset.find as jest.Mock;
+const findReviews = StructuredAssetReview.find as jest.Mock;
+
+/** A persisted approval for one asset version. The hash must match what
+ * `assetContentHash` derives, so the test builds it from the real helper. */
+function approvedReview(asset: StructuredAssetV1) {
+  return {
+    reviewId: 'rev_1',
+    courseId: asset.courseId,
+    revisionId: asset.revisionId,
+    assetId: asset.assetId,
+    contentHash: assetContentHash(asset),
+    lessonId: asset.lessonId,
+    decision: 'approved' as const,
+    reviewerUserId: 'aaaaaaaaaaaaaaaaaaaaaaaa',
+    reviewerRole: 'instructor' as const,
+    decidedAt: new Date('2026-11-01T10:00:00Z'),
+  };
+}
+
+function mockReviews(rows: unknown[]) {
+  findReviews.mockReturnValue({ limit: () => ({ lean: async () => rows }) });
+}
 
 function presentation(): PublishedPresentationV1 {
   const block = (
@@ -209,9 +243,13 @@ const originalFlag = process.env.EDNOVA_ENABLE_MOCK_EXPERIENCE_PLANNING;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  const access = jest.requireMock('../services/resourceAccess');
+  (access.canAuthorCourse as jest.Mock).mockResolvedValue(true);
+  (access.canManageCourse as jest.Mock).mockResolvedValue(true);
   process.env.EDNOVA_ENABLE_MOCK_EXPERIENCE_PLANNING = 'true';
   load.mockResolvedValue(presentation());
   mockRows([]);
+  mockReviews([]);
 });
 
 afterAll(() => {
@@ -284,8 +322,31 @@ describe('experience planning workflow', () => {
     expect(load).not.toHaveBeenCalled();
   });
 
-  it('selects a trusted instructor asset as a supplement', async () => {
-    mockRows([storedAsset()]);
+  it('selects an asset only when a persisted approval covers it', async () => {
+    const row = storedAsset();
+    mockRows([row]);
+    // Build the decision from the same parsed asset the loader will produce.
+    const parsed = parseStructuredAsset({
+      schemaVersion: row.schemaVersion,
+      assetId: row.assetId,
+      courseId: row.courseId,
+      revisionId: row.revisionId,
+      blockId: row.blockId,
+      lessonId: row.lessonId,
+      registryVersion: row.registryVersion,
+      component: row.component,
+      payload: row.payload,
+      provenance: row.provenance,
+      review: {
+        status: row.reviewStatus,
+        reviewedBy: row.reviewedBy,
+        reviewedAt: row.reviewedAt,
+      },
+      audience: row.audience,
+      fallback: row.fallback,
+      disclosure: row.disclosure,
+    });
+    mockReviews([approvedReview(parsed)]);
     const outcome = await planLessonExperience('student', courseId, 'lesson-1', 'valid_programming');
     if (outcome.status !== 'planned')
       throw new Error(`expected a plan, got ${outcome.status} ${'code' in outcome ? outcome.code : ''}`);
@@ -307,7 +368,25 @@ describe('experience planning workflow', () => {
   });
 
   it('skips a malformed stored asset instead of failing the lesson', async () => {
-    mockRows([{ assetId: 'broken', schemaVersion: '0.0.0' }, storedAsset()]);
+    const row = storedAsset();
+    mockRows([{ assetId: 'broken', schemaVersion: '0.0.0' }, row]);
+    const parsed = parseStructuredAsset({
+      schemaVersion: row.schemaVersion,
+      assetId: row.assetId,
+      courseId: row.courseId,
+      revisionId: row.revisionId,
+      blockId: row.blockId,
+      lessonId: row.lessonId,
+      registryVersion: row.registryVersion,
+      component: row.component,
+      payload: row.payload,
+      provenance: row.provenance,
+      review: { status: row.reviewStatus, reviewedBy: row.reviewedBy, reviewedAt: row.reviewedAt },
+      audience: row.audience,
+      fallback: row.fallback,
+      disclosure: row.disclosure,
+    });
+    mockReviews([approvedReview(parsed)]);
     const outcome = await planLessonExperience('student', courseId, 'lesson-1', 'valid_programming');
     if (outcome.status !== 'planned') throw new Error('expected a plan');
     expect(outcome.plan.supplemental.map((entry) => entry.assetId)).toEqual([
@@ -336,7 +415,9 @@ describe('asset review verification', () => {
     authorizedDocumentIds: new Set(['doc-1']),
   };
 
-  it('verifies a review claim that is internally consistent and bound', () => {
+  it('does not treat an internally consistent claim as review authority', () => {
+    // C3: a claim that merely looks consistent proved nothing. Review authority
+    // now requires a persisted decision, which this pure step cannot see.
     const asset = parseStructuredAsset({
       schemaVersion: STRUCTURED_ASSET_SCHEMA_VERSION,
       assetId: 'a1',
@@ -362,7 +443,7 @@ describe('asset review verification', () => {
       disclosure: 'Instructor-authored.',
     });
     const [verified] = verifyAssetBindings([asset], binding);
-    expect(verified.reviewVerified).toBe(true);
+    expect(verified.reviewVerified).toBe(false);
   });
 
   it('does not verify a review claim on an asset bound elsewhere', () => {

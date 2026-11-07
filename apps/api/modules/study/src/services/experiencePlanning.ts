@@ -45,6 +45,17 @@ import {
 } from '../../../../shared/ednova/structuredAsset';
 import { StructuredAsset } from '../models/StructuredAsset';
 import { getPublishedPresentation } from './presentationReader';
+import { generateExperiencePlan } from './experiencePlanGeneration';
+import { configuredPlannerModel } from './experiencePlannerProviders';
+import type { ExperiencePlannerProvider } from '../../../../shared/ednova/experiencePlannerProvider';
+import {
+  capabilityDigest,
+} from '../../../../shared/ednova/experiencePlanValidator';
+import type { PlanningContextInput } from '../../../../shared/ednova/planningContext';
+import {
+  verifyReviewProvenance,
+  type ReviewProvenance,
+} from './assetReviewProvenance';
 
 /**
  * Mock planning is a development/QA pathway, never a production feature.
@@ -112,13 +123,6 @@ export function verifyAssetBindings(
       asset.revisionId === binding.revisionId &&
       asset.lessonId === binding.lessonId;
 
-    const reviewVerified =
-      asset.review.status === 'instructor_reviewed' &&
-      typeof asset.review.reviewedBy === 'string' &&
-      asset.review.reviewedBy.length > 0 &&
-      typeof asset.review.reviewedAt === 'string' &&
-      Number.isFinite(Date.parse(asset.review.reviewedAt));
-
     const sourceVerified =
       asset.provenance !== 'source_derived'
         ? true
@@ -134,10 +138,38 @@ export function verifyAssetBindings(
       blockId: asset.blockId ?? null,
       component: asset.component,
       provenance: asset.provenance,
-      reviewVerified: bound && reviewVerified,
+      // Review authority is NOT derived here. M4.1 checked claim shape, which
+      // proved nothing about whether a person approved this version; M4.2
+      // resolves it from persisted decisions in `verifyReviewProvenance`.
+      reviewVerified: false,
       sourceVerified: bound && sourceVerified,
     };
   });
+}
+
+/**
+ * Bind assets to a lesson with review authority taken from persisted decisions.
+ *
+ * This is the M4.2 replacement for claim-shaped verification (C3). The pure
+ * function above still answers "is this asset bound and source-verified?";
+ * this one additionally asks the database who approved this exact version.
+ */
+export async function verifyAssetBindingsWithProvenance(
+  assets: StructuredAssetV1[],
+  binding: { courseId: string; revisionId: string; lessonId: string; authorizedDocumentIds: Set<string> },
+): Promise<{ bindings: ValidatedAssetBinding[]; provenance: Map<string, ReviewProvenance> }> {
+  const bindings = verifyAssetBindings(assets, binding);
+  const provenance = await verifyReviewProvenance(assets, binding);
+  const bound = new Set(bindings.filter((entry) => entry.lessonId === binding.lessonId).map((e) => e.assetId));
+  return {
+    bindings: bindings.map((entry) => ({
+      ...entry,
+      // Only a persisted, unrevoked, version-matching decision from a current
+      // course author counts. A proposal cannot influence this value.
+      reviewVerified: bound.has(entry.assetId) && provenance.get(entry.assetId)?.verified === true,
+    })),
+    provenance,
+  };
 }
 
 async function loadAssets(courseId: string, revisionId: string): Promise<StructuredAssetV1[]> {
@@ -320,7 +352,9 @@ export async function planLessonExperience(
 
   const storedAssets = await loadAssets(presentation.courseId, presentation.revisionId);
   const authorizedDocumentIds = new Set(presentation.sources.map((source) => source.documentId));
-  const assetBindings = verifyAssetBindings(storedAssets, {
+  // Review authority is resolved from persisted decisions on both paths, so the
+  // mock planner cannot select an asset the real planner could not either.
+  const { bindings: assetBindings } = await verifyAssetBindingsWithProvenance(storedAssets, {
     courseId: presentation.courseId,
     revisionId: presentation.revisionId,
     lessonId,
@@ -384,4 +418,183 @@ export async function planLessonExperience(
     return { status: 'rejected', code: outcome.code, stage: outcome.stage };
   }
   return { status: 'planned', plan: projectExperiencePlan(outcome.plan) };
+}
+
+/**
+ * The trusted context both planners share.
+ *
+ * Built once, from the pinned published revision and persisted assets, so the
+ * mock path and the real-provider path can never drift in what they consider
+ * authoritative. Nothing here comes from a provider.
+ */
+export async function loadTrustedPlanningContext(
+  actor: string,
+  courseId: string,
+  lessonId: string,
+  mode: string,
+): Promise<{
+  presentation: Awaited<ReturnType<typeof getPublishedPresentation>>;
+  lessonId: string;
+  mode: string;
+  validationContext: ExperiencePlanValidationContext;
+  contextInput: PlanningContextInput;
+  keySha256: string | null;
+}> {
+  const presentation = await getPublishedPresentation(actor, courseId);
+  const lesson = presentation.chapters
+    .flatMap((chapter) => chapter.lessons)
+    .find((entry) => entry.id === lessonId);
+  if (!lesson) throw Object.assign(new Error('Lesson not found in this revision'), { status: 404 });
+
+  const storedAssets = await loadAssets(presentation.courseId, presentation.revisionId);
+  const authorizedDocumentIds = new Set(presentation.sources.map((source) => source.documentId));
+  // Review authority comes from persisted decisions (M4.2, closes C3).
+  const { bindings, provenance } = await verifyAssetBindingsWithProvenance(storedAssets, {
+    courseId: presentation.courseId,
+    revisionId: presentation.revisionId,
+    lessonId,
+    authorizedDocumentIds,
+  });
+  const lessonAssets = storedAssets.filter((asset) => asset.lessonId === lessonId);
+  const bindingByAsset = new Map(bindings.map((entry) => [entry.assetId, entry] as const));
+
+  const blocks = lesson.blocks.map((entry) => {
+    const block = entry.block;
+    return {
+      blockId: block.id,
+      block,
+      render: entry.render,
+      ...(block.type === 'callout' ? { role: block.kind } : {}),
+      hasSourceRegion: block.type !== 'chart' && Boolean(block.sourceMeta?.regionId),
+      isReviewedFormula: block.type === 'math' && Boolean(block.review),
+      hasStructuredFixture: false,
+    };
+  });
+
+  const validationContext: ExperiencePlanValidationContext = {
+    courseId: presentation.courseId,
+    revisionId: presentation.revisionId,
+    contentHash: presentation.contentHash,
+    lessonId,
+    mode,
+    contextFingerprint: experienceContextFingerprint({
+      courseId: presentation.courseId,
+      revisionId: presentation.revisionId,
+      contentHash: presentation.contentHash,
+      lessonId,
+      mode,
+      blockIds: blocks.map((block) => block.blockId),
+    }),
+    // Both implementations are permitted; the provider is chosen by config and
+    // the proposal's own `planner` field must match one of these.
+    allowedPlanners: ALLOWED_PLANNERS,
+    blocks: blocks.map((entry) => ({
+      blockId: entry.blockId,
+      blockType: entry.block.type,
+      ...(entry.role !== undefined ? { role: entry.role } : {}),
+      render: entry.render,
+      hasEvidence:
+        ('evidence' in entry.block &&
+          Array.isArray(entry.block.evidence) &&
+          entry.block.evidence.length > 0) ||
+        (entry.block.provenance?.length ?? 0) > 0,
+      hasSourceRegion: entry.hasSourceRegion,
+      isReviewedFormula: entry.isReviewedFormula,
+      hasStructuredFixture: entry.hasStructuredFixture,
+    })),
+    assets: bindings,
+  };
+
+  const contextInput: PlanningContextInput = {
+    courseTitle: presentation.title,
+    courseId: presentation.courseId,
+    revisionId: presentation.revisionId,
+    lessonId,
+    lessonTitle: lesson.title,
+    mode,
+    blocks,
+    // Only assets whose review is verified by a persisted decision are offered
+    // to the planner. An unverified asset is not merely hidden; it is never
+    // named, so the model cannot select it.
+    assets: lessonAssets
+      .filter((asset) => bindingByAsset.get(asset.assetId)?.reviewVerified === true)
+      .map((asset) => ({
+        assetId: asset.assetId,
+        blockId: asset.blockId ?? '',
+        component: asset.component,
+        provenance: asset.provenance,
+        reviewVerified: true,
+      })),
+    capabilities: capabilityDigest(),
+  };
+
+  // Eligibility carries the key fingerprint the operator verified; governance
+  // compares it again before dispatch.
+  const keySha256 = await loadEligibilityKeySha(presentation.courseId, mode);
+
+  void provenance;
+  return { presentation, lessonId, mode, validationContext, contextInput, keySha256 };
+}
+
+/** The operator-verified credential fingerprint for this provider/model, or
+ * null when none is recorded. Null means "no dispatch", never "trust anything". */
+async function loadEligibilityKeySha(courseId: string, mode: string): Promise<string | null> {
+  void courseId;
+  void mode;
+  const mongoose = await import('mongoose');
+  const db = mongoose.default.connection.db;
+  if (!db) return null;
+  const model = configuredPlannerModel();
+  const row = await db.collection('experience_planner_eligibility').findOne({
+    provider: 'gemini',
+    model,
+    revoked: { $ne: true },
+  });
+  const keySha = row?.keySha256;
+  return typeof keySha === 'string' && /^[a-f0-9]{64}$/.test(keySha) ? keySha : null;
+}
+
+export type RealPlanningOutcome =
+  | { status: 'planned'; plan: PublishedExperiencePlanV1; requestId: string; usageReported: boolean }
+  | { status: 'rejected'; code: string; stage: string; requestId: string }
+  | { status: 'refused'; code: string }
+  | { status: 'failed'; code: string; uncertain: boolean; requestId: string }
+  | { status: 'duplicate'; requestId: string };
+
+/**
+ * Plan one lesson with the configured real provider.
+ *
+ * The deterministic reader remains the fallback for every non-`planned` outcome.
+ * A learner never sees a provider error: the caller renders the reader instead.
+ */
+export async function planLessonWithProvider(
+  actor: string,
+  courseId: string,
+  lessonId: string,
+  provider: ExperiencePlannerProvider,
+  mode = 'read',
+): Promise<RealPlanningOutcome> {
+  const trusted = await loadTrustedPlanningContext(actor, courseId, lessonId, mode);
+  const outcome = await generateExperiencePlan({
+    actor,
+    provider,
+    courseId: trusted.validationContext.courseId,
+    revisionId: trusted.validationContext.revisionId,
+    lessonId,
+    mode,
+    keySha256: trusted.keySha256 ?? '',
+    contextInput: trusted.contextInput,
+    validationContext: trusted.validationContext,
+  });
+
+  if (outcome.status !== 'validated') return outcome;
+
+  // The validated plan is handed straight to the projection. It is never
+  // re-read from storage and never rebuilt from browser input.
+  return {
+    status: 'planned',
+    plan: projectExperiencePlan(outcome.plan),
+    requestId: outcome.requestId,
+    usageReported: outcome.usageReported,
+  };
 }

@@ -198,3 +198,44 @@ test("mock planning is refused when the environment flag is absent", async ({ re
   );
   expect(anonymous.status()).toBe(401);
 });
+
+/**
+ * Batch 4 M4.2: the real-provider planning path must never break the reader.
+ *
+ * No live provider is called. The route is disabled by configuration here, so
+ * every outcome this exercises is a refusal — which is exactly the state a
+ * learner must be protected from seeing as an error.
+ */
+test("AI planning is optional and never blocks the deterministic reader", async ({ page }) => {
+  const courseId = "0123456789abcdef01234567";
+  const revisionTag = "rev_m41_fixture";
+  await login(page, "final-student@example.test");
+
+  const response = await page.request.post(
+    `/api/v1/study/learning/courses/${courseId}/presentation/plan/ai`,
+    { data: { lessonId: "lesson-1" } },
+  );
+  expect(response.status()).toBe(200);
+  const body: any = await response.json();
+  // Disabled by default: a refusal, not a plan and not a 5xx.
+  expect(body.status).not.toBe("planned");
+  expect(["refused", "failed", "duplicate"]).toContain(body.status);
+  expect(JSON.stringify(body)).not.toContain("GEMINI_API_KEY");
+  expect(JSON.stringify(body)).not.toContain("apiKey");
+
+  // The reader still renders the lesson.
+  await page.goto(
+    `/courses/${courseId}/present?revisionId=${encodeURIComponent(revisionTag)}`,
+  );
+  await expect(page.locator("[data-presentation-view]")).toBeVisible({ timeout: 30000 });
+  await expect(page.locator("[data-presentation-lesson]").first()).toBeVisible();
+  // And no AI plan banner appears, because no plan was accepted.
+  await expect(page.locator("[data-experience-plan]")).toHaveCount(0);
+
+  // An anonymous caller cannot reach the planning route at all.
+  const anonymous = await page.request.post(
+    `/api/v1/study/learning/courses/${courseId}/presentation/plan/ai`,
+    { data: { lessonId: "lesson-1" }, headers: { cookie: "" } },
+  );
+  expect([401, 403]).toContain(anonymous.status());
+});

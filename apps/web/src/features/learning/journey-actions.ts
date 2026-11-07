@@ -77,6 +77,35 @@ export async function plannedLessonExperience(
     return undefined;
   }
 }
+/**
+ * Request an AI-planned lesson layout (Batch 4, M4.2).
+ *
+ * Optional and never blocking: the deterministic presentation is what renders
+ * unless this returns a plan that parses. Every other outcome — refused,
+ * rejected, failed, uncertain, duplicate, disabled — collapses to `undefined`,
+ * because they all mean the same thing to a learner: read the lesson.
+ *
+ * A provider error is never surfaced. A security refusal is never dressed up as
+ * success: the caller simply gets no plan.
+ */
+export async function aiPlannedLessonExperience(
+  courseId: string,
+  lessonId: string,
+  blockIds: readonly string[],
+) {
+  await requireIdentity();
+  try {
+    const payload = await api<unknown>(
+      `/api/v1/study/learning/courses/${segment(courseId)}/presentation/plan/ai`,
+      { method: "POST", body: JSON.stringify({ lessonId }) },
+    );
+    const outcome = payload as { status?: unknown; plan?: unknown };
+    if (outcome?.status !== "planned") return undefined;
+    return parsePublishedExperiencePlan(outcome.plan, blockIds);
+  } catch {
+    return undefined;
+  }
+}
 export async function learningProgress(courseId: string, revisionId: string) {
   await requireIdentity();
   return api<{

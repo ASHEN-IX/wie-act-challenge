@@ -951,6 +951,28 @@ export class StudyController {
       res
     );
   }
+  @Post('/api/v1/study/learning/courses/:courseId/presentation/plan/ai')
+  post_api_v1_study_learning_courses_presentation_plan_ai_b92c3d89(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute(
+      'POST /api/v1/study/learning/courses/:courseId/presentation/plan/ai',
+      req,
+      res
+    );
+  }
+  @Post('/api/v1/study/learning/courses/:courseId/presentation/plan/consent')
+  post_api_v1_study_learning_courses_presentation_plan_consent_2b59935e(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute(
+      'POST /api/v1/study/learning/courses/:courseId/presentation/plan/consent',
+      req,
+      res
+    );
+  }
   @Get('/api/v1/study/learning/courses/:courseId/activities')
   get_api_v1_study_learning_courses_activities_107c44f7(
     @Req() req: DomainRequest,

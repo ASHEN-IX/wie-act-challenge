@@ -26,7 +26,10 @@ import UserProfile from '../../../user-profile/src/models/UserProfile';
 import { getLearningDocument } from '../services/courseReader';
 import { getPublishedPresentationWithAssets } from '../services/presentationReader';
 import { attachStructuredAsset } from '../services/structuredAssets';
-import { planLessonExperience } from '../services/experiencePlanning';
+import { planLessonExperience, planLessonWithProvider } from '../services/experiencePlanning';
+import { resolvePlannerProvider, configuredPlannerModel } from '../services/experiencePlannerProviders';
+import { grantPlanningConsent } from '../services/planningGovernance';
+import { getCourseNardouch, completeNardouchLesson } from '../services/courseNardouch';
 
 // Interface languages the learning workspace can actually render. Keep this list
 // in step with the translations in the web workspace; a persisted value outside
@@ -70,13 +73,12 @@ router.post(
   '/courses/:courseId/presentation/assets',
   operation(async (r) => {
     const revisionId = revision(r);
-    if (!revisionId)
-      throw Object.assign(new Error('Exact revision tag required'), { status: 400 });
+    if (!revisionId) throw Object.assign(new Error('Exact revision tag required'), { status: 400 });
     const asset = await attachStructuredAsset(
       r.user!.userId,
       String(r.params.courseId),
       revisionId,
-      (r.body || {}) as Record<string, unknown>,
+      (r.body || {}) as Record<string, unknown>
     );
     return { asset };
   })
@@ -87,9 +89,7 @@ router.get(
 );
 router.get(
   '/courses/:courseId/document',
-  operation((r) =>
-    getLearningDocument(r.user!.userId, String(r.params.courseId), revision(r))
-  )
+  operation((r) => getLearningDocument(r.user!.userId, String(r.params.courseId), revision(r)))
 );
 router.get(
   '/courses/:courseId/presentation',
@@ -99,7 +99,7 @@ router.get(
     const { presentation, assets } = await getPublishedPresentationWithAssets(
       r.user!.userId,
       String(r.params.courseId),
-      revision(r),
+      revision(r)
     );
     return assets.length ? { ...presentation, assets } : presentation;
   })
@@ -120,13 +120,58 @@ router.post(
       r.user!.userId,
       String(r.params.courseId),
       body.lessonId,
-      body.scenario as never,
+      body.scenario as never
     );
+  })
+);
+// Real-provider planning (Batch 4, M4.2). Off unless an operator enables it;
+// the provider is resolved from configuration, never from the request body.
+// A refusal is a normal outcome: the caller keeps the deterministic reader.
+router.post(
+  '/courses/:courseId/presentation/plan/ai',
+  operation(async (r) => {
+    const body = (r.body || {}) as Record<string, unknown>;
+    if (typeof body.lessonId !== 'string')
+      throw Object.assign(new Error('lessonId is required'), { status: 400 });
+    const provider = resolvePlannerProvider(async () => {
+      throw new Error('Mock delegation is not used on this path');
+    });
+    if (!provider)
+      return { status: 'refused', code: 'PLANNING_DISABLED' };
+    return planLessonWithProvider(
+      r.user!.userId,
+      String(r.params.courseId),
+      body.lessonId,
+      provider,
+    );
+  })
+);
+router.post(
+  '/courses/:courseId/presentation/plan/consent',
+  operation(async (r) => {
+    const body = (r.body || {}) as Record<string, unknown>;
+    if (typeof body.revisionId !== 'string' || typeof body.termsVersion !== 'string')
+      throw Object.assign(new Error('revisionId and termsVersion are required'), { status: 400 });
+    return grantPlanningConsent(r.user!.userId, {
+      courseId: String(r.params.courseId),
+      revisionId: body.revisionId,
+      provider: 'gemini',
+      model: configuredPlannerModel(),
+      termsVersion: body.termsVersion,
+    });
   })
 );
 router.get(
   '/courses/:courseId/progress',
   operation((r) => learnerProgress(r.user!.userId, String(r.params.courseId), revision(r)))
+);
+router.get(
+  '/courses/:courseId/nardouch',
+  operation((r) => getCourseNardouch(r.user!.userId, String(r.params.courseId), revision(r)))
+);
+router.post(
+  '/courses/:courseId/nardouch/lessons',
+  operation((r) => completeNardouchLesson(r.user!.userId, String(r.params.courseId), r.body))
 );
 router.post(
   '/courses/:courseId/select',
@@ -145,8 +190,14 @@ router.get(
   '/learning-style/probe',
   operation(async () => ({ questions: learningStyleProbeQuestions() }))
 );
-router.get('/learning-style', operation((r) => getLearningStyle(r.user!.userId)));
-router.put('/learning-style', operation((r) => saveLearningStyle(r.user!.userId, r.body)));
+router.get(
+  '/learning-style',
+  operation((r) => getLearningStyle(r.user!.userId))
+);
+router.put(
+  '/learning-style',
+  operation((r) => saveLearningStyle(r.user!.userId, r.body))
+);
 // The learner's interface language, so the choice survives a reload and follows
 // them to any surface that renders these languages.
 router.get(
@@ -160,7 +211,7 @@ router.put(
     if (!WORKSPACE_LANGUAGES.includes(language)) {
       throw Object.assign(new Error('Unsupported interface language'), { status: 400 });
     }
-    const profile = await UserProfile.findOneAndUpdate(
+    await UserProfile.findOneAndUpdate(
       { userId: r.user!.userId },
       { $set: { 'preferences.language': language } },
       { new: true, upsert: true, setDefaultsOnInsert: true }

@@ -216,6 +216,9 @@ export async function seedPlanningFixture(
           institutionId: new ObjectId(institutionId),
           ownerUserId: instructorId,
           userId: instructorId,
+          // Institutional grants resolve through membership + assignment, so the
+          // reviewer must be an assigned instructor to hold author rights.
+          assignedInstructorIds: [instructorId],
           activeRevisionId: revisionTag,
         },
       },
@@ -235,7 +238,7 @@ export async function seedPlanningFixture(
     // One instructor-authored walkthrough asset on the code block, so the
     // planning path has a real supplement to select.
     await db.collection("structuredassets").deleteMany({ courseId });
-    await db.collection("structuredassets").insertOne({
+    const asset = {
       schemaVersion: "1.0.0",
       assetId: "asset_m41_walkthrough",
       courseId,
@@ -261,6 +264,40 @@ export async function seedPlanningFixture(
       fallback: "CodeViewer",
       disclosure: "Instructor-authored walkthrough.",
       createdByUserId: instructorId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    await db.collection("structuredassets").insertOne(asset);
+
+    // The exact digest `assetContentHash` derives: the same field set, the same
+    // sorted-key canonicalisation, so a payload edit would invalidate it.
+    const assetContentHash = digest({
+      assetId: asset.assetId,
+      courseId: asset.courseId,
+      revisionId: asset.revisionId,
+      lessonId: asset.lessonId,
+      blockId: asset.blockId ?? null,
+      component: asset.component,
+      payload: asset.payload,
+      provenance: asset.provenance,
+      disclosure: asset.disclosure,
+    });
+
+    // M4.2 (C3): review authority now comes from a persisted decision, not from
+    // the asset's own claim. Seed the authoritative record for this exact asset
+    // version, using the same content hash the service derives.
+    await db.collection("structured_asset_reviews").deleteMany({ courseId });
+    await db.collection("structured_asset_reviews").insertOne({
+      reviewId: `rev_${assetContentHash.slice(7, 23)}`,
+      courseId,
+      revisionId: revisionTag,
+      assetId: "asset_m41_walkthrough",
+      contentHash: assetContentHash,
+      lessonId: "lesson-1",
+      decision: "approved",
+      reviewerUserId: instructorId,
+      reviewerRole: "instructor",
+      decidedAt: new Date("2026-11-01T10:00:00.000Z"),
       createdAt: new Date(),
       updatedAt: new Date(),
     });
