@@ -6,6 +6,7 @@ import {
   AiModeNote,
   AiWaitStatus,
 } from "@/features/ai-status/ai-status-view";
+import { refreshCourseNardouch } from "@/features/nardouch/course-growth";
 import { NardouchAssistant } from "@/features/nardouch/nardouch-assistant";
 import { ActivityRenderer } from "./activity-renderer";
 import { LearningStylePanel } from "./learning-style-panel";
@@ -216,6 +217,7 @@ export function LearningWorkspace({
   }[workspaceLang];
   async function refresh() {
     setProgress(await learningProgress(context.courseId, context.revisionId));
+    refreshCourseNardouch(context.courseId, context.revisionId);
   }
   useEffect(() => {
     let current = true;

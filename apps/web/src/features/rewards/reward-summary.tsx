@@ -1,9 +1,5 @@
 import type { LearningRewards } from "./types";
 import { ActionForm } from "@/components/shared/action-form";
-import {
-  NardouchAvatar,
-  stageForLevel,
-} from "@/components/brand/nardouch-avatar";
 import { retryLearningReward } from "./actions";
 
 /** Quiet server projection: no client award calculation or replayed toast. */
@@ -30,7 +26,6 @@ export function RewardSummary({ rewards }: { rewards: LearningRewards }) {
           <dt>Motivation level</dt>
           <dd className="flex items-center gap-2 text-3xl font-semibold">
             {rewards.level}
-            <NardouchAvatar stage={stageForLevel(rewards.level)} size={30} />
           </dd>
         </div>
         <div>

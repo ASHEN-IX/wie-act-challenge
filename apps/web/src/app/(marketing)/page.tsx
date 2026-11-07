@@ -1,17 +1,17 @@
-import { Hero } from "@/components/marketing/hero";
-import { FeatureGrid } from "@/components/marketing/feature-grid";
-import { HowItWorks } from "@/components/marketing/how-it-works";
-import { EvolutionTimeline } from "@/components/marketing/evolution-timeline";
-import { JourneyBanner } from "@/components/marketing/journey-banner";
+import { HeroSection } from "@/components/landing/HeroSection";
+import { FeaturesSection } from "@/components/landing/FeaturesSection";
+import { HowItWorks } from "@/components/landing/HowItWorks";
+import { NardouchEvolution } from "@/components/landing/NardouchEvolution";
+import { FinalCTA } from "@/components/landing/FinalCTA";
 
 export default function LandingPage() {
   return (
     <main>
-      <Hero />
-      <FeatureGrid />
+      <HeroSection />
+      <FeaturesSection />
       <HowItWorks />
-      <EvolutionTimeline />
-      <JourneyBanner />
+      <NardouchEvolution />
+      <FinalCTA />
     </main>
   );
 }

@@ -4,6 +4,7 @@ export default {
   outputFileTracingRoot: path.resolve(process.cwd(), "../.."),
   output: "standalone",
   devIndicators: false,
+  images: { qualities: [75, 90] },
   experimental: { serverActions: { bodySizeLimit: "26mb" } },
   logging: { incomingRequests: false },
   transpilePackages: ["@ednova/shared"],

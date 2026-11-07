@@ -361,8 +361,18 @@
   filter: drop-shadow(0 30px 34px rgba(116, 60, 214, 0.32));
   animation: m-float 6.8s ease-in-out infinite;
 }
+.marketing-root .hero-nardouch.reduced-motion {
+  animation: none;
+}
 .marketing-root .hero-nardouch img {
   object-fit: contain;
+}
+.marketing-root .hero-orbits-container {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: grid;
+  place-items: center;
 }
 .marketing-root .hero-orbit {
   position: absolute;
@@ -375,6 +385,7 @@
   width: 640px;
   height: 250px;
   border: 4px solid transparent;
+  transform-origin: center center;
 }
 .marketing-root .hero-orbit.outer {
   border-top-color: #ca62ff;
@@ -391,6 +402,77 @@
   transform: translate(-50%, -50%) rotate(32deg);
   border: 2px solid rgba(116, 95, 250, 0.17);
   z-index: -1;
+  transform-origin: center center;
+}
+.marketing-root .orbit-svg {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.marketing-root .orbit-svg-outer {
+  filter: drop-shadow(0 0 10px rgba(202, 98, 255, 0.45))
+          drop-shadow(0 0 22px rgba(101, 228, 255, 0.35));
+}
+.marketing-root .orbit-glow-aura {
+  position: absolute;
+  inset: -15px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(168, 85, 247, 0.32), transparent 70%);
+  filter: blur(16px);
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+.marketing-root .hero-particles-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+.marketing-root .orbit-bead {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.marketing-root .bead-violet {
+  margin-left: 215px;
+  margin-top: -65px;
+}
+.marketing-root .bead-cyan {
+  margin-left: -205px;
+  margin-top: 55px;
+}
+.marketing-root .bead-accent {
+  margin-left: -65px;
+  margin-top: -110px;
+  width: 9px;
+  height: 9px;
+}
+.marketing-root .bead-core {
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 8px #ffffff, 0 0 16px #65e4ff;
+}
+.marketing-root .bead-halo {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(186, 125, 247, 0.7), transparent 70%);
+  filter: blur(4px);
+}
+.marketing-root .spark-c {
+  top: 145px;
+  left: 30%;
+  font-size: 24px;
+  opacity: 0.8;
 }
 .marketing-root .floating-study-note {
   position: absolute;
@@ -480,6 +562,20 @@
   box-shadow:
     inset 0 1px 1px rgba(255, 255, 255, 0.06),
     0 12px 28px rgba(0, 0, 0, 0.12);
+  transition:
+    border-color 0.28s cubic-bezier(0.2, 1, 0.33, 1),
+    box-shadow 0.28s cubic-bezier(0.2, 1, 0.33, 1),
+    transform 0.28s cubic-bezier(0.2, 1, 0.33, 1);
+  position: relative;
+  overflow: hidden;
+}
+.marketing-root .feature-tile:hover {
+  border-color: rgba(197, 134, 255, 0.85);
+  box-shadow:
+    inset 0 1px 2px rgba(255, 255, 255, 0.15),
+    0 16px 36px rgba(131, 62, 242, 0.32),
+    0 0 20px rgba(101, 228, 255, 0.25);
+  transform: translateY(-4px);
 }
 .marketing-root .feature-icon {
   display: grid;
@@ -747,9 +843,10 @@
   position: relative;
   color: #fff;
   background:
-    radial-gradient(ellipse at 60% 38%, rgba(77, 46, 166, 0.17), transparent 55%),
-    linear-gradient(180deg, #12112e, #100e2b);
-  padding: 35px 0 51px;
+    radial-gradient(ellipse at 70% 30%, rgba(101, 228, 255, 0.12), transparent 50%),
+    radial-gradient(ellipse at 30% 60%, rgba(138, 58, 245, 0.22), transparent 60%),
+    linear-gradient(180deg, #100e2b 0%, #0d0c24 100%);
+  padding: 50px 0 65px;
   overflow: hidden;
 }
 .marketing-root .evolution-section:before {
@@ -765,9 +862,9 @@
 .marketing-root .evolution-grid {
   position: relative;
   display: grid;
-  grid-template-columns: 370px minmax(0, 1fr);
+  grid-template-columns: 360px minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
+  gap: 28px;
 }
 .marketing-root .section-pill {
   display: inline-flex;
@@ -788,44 +885,211 @@
 .marketing-root .evolution-copy {
   position: relative;
   z-index: 2;
+  padding-right: 10px;
 }
 .marketing-root .evolution-copy h2 {
   font-family: Sora, Inter, sans-serif;
-  font-size: clamp(34px, 3.7vw, 52px);
-  letter-spacing: -0.065em;
+  font-size: clamp(34px, 3.8vw, 48px);
+  font-weight: 700;
+  letter-spacing: -0.05em;
   line-height: 1.05;
-  margin: 14px 0 12px;
+  margin: 16px 0 10px;
+  color: #ffffff;
 }
 .marketing-root .evolution-copy h2 span {
-  color: #c86dfd;
+  color: #ca62ff;
 }
 .marketing-root .evolution-copy h3 {
   font-family: Sora, Inter, sans-serif;
-  font-size: 15px;
-  line-height: 1.5;
-  margin: 0 0 10px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+  line-height: 1.45;
+  margin: 0 0 14px;
 }
 .marketing-root .evolution-copy > p {
-  font-size: 12px;
-  line-height: 1.73;
+  font-size: 13px;
+  line-height: 1.68;
   color: #d2cbe5;
   max-width: 345px;
-  margin: 0;
+  margin: 0 0 14px;
 }
 .marketing-root .evolution-copy > small {
   display: block;
   max-width: 320px;
   color: #928db7;
-  font-size: 10px;
-  line-height: 1.65;
-  margin-top: 12px;
+  font-size: 10.5px;
+  line-height: 1.6;
+}
+.marketing-root .evolution-art {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+.marketing-root .evolution-cast {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: end;
+  position: relative;
+  z-index: 2;
+  width: 100%;
+}
+.marketing-root .evolution-col {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  width: 100%;
+}
+.marketing-root .evolution-arrow {
+  position: absolute;
+  right: -7px;
+  top: 55%;
+  transform: translateY(-50%);
+  font-size: 15px;
+  color: rgba(185, 175, 225, 0.45);
+  pointer-events: none;
+  z-index: 3;
+  font-family: Inter, sans-serif;
+}
+.marketing-root .evolution-character {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  position: relative;
+  will-change: opacity, transform;
+}
+.marketing-root .character-stage-pod {
+  position: relative;
+  width: 100%;
+  height: 165px;
+  display: grid;
+  place-items: end center;
+}
+.marketing-root .character-platform {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 72px;
+  height: 15px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(168, 85, 247, 0.5) 0%, rgba(147, 51, 234, 0.22) 60%, transparent 80%);
+  border: 1.5px solid rgba(202, 98, 255, 0.95);
+  box-shadow:
+    0 0 16px rgba(168, 85, 247, 0.8),
+    inset 0 0 10px rgba(202, 98, 255, 0.4);
+  pointer-events: none;
+  z-index: 0;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.marketing-root .stage-graduate .character-platform {
+  width: 82px;
+  height: 17px;
+  background: radial-gradient(ellipse at center, rgba(101, 228, 255, 0.4) 0%, rgba(168, 85, 247, 0.25) 60%, transparent 80%);
+  border-color: rgba(101, 228, 255, 0.95);
+  box-shadow:
+    0 0 20px rgba(101, 228, 255, 0.85),
+    0 0 30px rgba(168, 85, 247, 0.5),
+    inset 0 0 10px rgba(101, 228, 255, 0.4);
+}
+.marketing-root .graduate-celebration-glow {
+  position: absolute;
+  inset: -15px -10px -5px;
+  border-radius: 50%;
+  background: radial-gradient(circle at center, rgba(101, 228, 255, 0.3), rgba(168, 85, 247, 0.2) 45%, transparent 70%);
+  filter: blur(14px);
+  pointer-events: none;
+  z-index: 0;
+}
+.marketing-root .character-image {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 155px;
+  display: grid;
+  place-items: end center;
+}
+.marketing-root .character-image img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 20px rgba(153, 78, 246, 0.35));
+}
+.marketing-root .stage-1 .character-image img {
+  height: 90px;
+}
+.marketing-root .stage-2 .character-image img {
+  height: 108px;
+}
+.marketing-root .stage-3 .character-image img {
+  height: 126px;
+}
+.marketing-root .stage-4 .character-image img {
+  height: 140px;
+}
+.marketing-root .stage-5 .character-image img {
+  height: 158px;
+}
+.marketing-root .character-name {
+  font-family: Sora, Inter, sans-serif;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #ffffff;
+  margin-top: 10px;
+  text-align: center;
+}
+.marketing-root .evolution-track {
+  position: relative;
+  margin: 22px 10% 0;
+  height: 3px;
+  background: rgba(114, 90, 177, 0.35);
+  border-radius: 4px;
+}
+.marketing-root .evolution-track-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #ca62ff 0%, #ca62ff 55%, #65e4ff 100%);
+  box-shadow: 0 0 12px rgba(202, 98, 255, 0.8);
+  border-radius: 4px;
+  transform-origin: left center;
+  transform: scaleX(0);
+}
+.marketing-root .evolution-nodes {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.marketing-root .timeline-node {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #110e2b;
+  border: 2.5px solid #4d2e82;
+  box-shadow: 0 0 6px rgba(77, 46, 130, 0.3);
+  z-index: 2;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+.marketing-root .timeline-node.node-violet {
+  border-color: #ca62ff;
+  box-shadow: 0 0 14px #ca62ff, 0 0 22px rgba(202, 98, 255, 0.6);
+}
+.marketing-root .timeline-node.node-cyan {
+  border-color: #65e4ff;
+  box-shadow: 0 0 16px #65e4ff, 0 0 25px rgba(101, 228, 255, 0.7);
 }
 .marketing-root .stage-description {
   min-height: 57px;
   margin-top: 12px;
+  text-align: center;
 }
 .marketing-root .stage-description p {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.55;
   color: #cfc2f2;
   margin: 0;
@@ -845,10 +1109,11 @@
 .marketing-root .evolution-cast {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 1px;
+  gap: 8px;
   align-items: end;
   position: relative;
   z-index: 2;
+  margin-top: 10px;
 }
 .marketing-root .evolution-character {
   display: flex;
@@ -861,15 +1126,20 @@
   min-width: 0;
   padding: 0 0 20px;
   position: relative;
-  filter: brightness(0.89);
-  transition: filter 0.2s;
+  filter: brightness(0.85);
+  transition: filter 0.22s ease, transform 0.22s ease;
+  cursor: pointer;
 }
 .marketing-root .evolution-character:hover,
 .marketing-root .evolution-character.active {
-  filter: brightness(1.14);
+  filter: brightness(1.18);
+  transform: translateY(-4px);
+}
+.marketing-root .evolution-character.passed {
+  filter: brightness(1.05);
 }
 .marketing-root .character-image {
-  height: 160px;
+  height: 130px;
   width: 100%;
   display: grid;
   place-items: end center;
@@ -889,74 +1159,81 @@
   z-index: -1;
 }
 .marketing-root .character-image img {
-  height: 175px;
+  height: 125px;
   width: auto;
-  max-width: 133%;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
   filter: drop-shadow(0 7px 19px rgba(153, 78, 246, 0.23));
-  mask-image: radial-gradient(ellipse 77% 75% at 50% 49%, black 57%, transparent 99%);
 }
 .marketing-root .stage-1 .character-image img {
-  height: 116px;
+  height: 95px;
 }
 .marketing-root .stage-2 .character-image img {
-  height: 132px;
+  height: 108px;
 }
 .marketing-root .stage-3 .character-image img {
-  height: 160px;
+  height: 120px;
 }
 .marketing-root .stage-4 .character-image img {
-  height: 171px;
+  height: 126px;
 }
 .marketing-root .stage-5 .character-image img {
-  height: 178px;
+  height: 130px;
 }
 .marketing-root .character-name {
   font-size: 12px;
   font-weight: 800;
-  margin-top: 0;
+  margin-top: 4px;
 }
 .marketing-root .character-unlock {
   font-size: 9px;
   color: #b9b4d3;
-  margin-top: 4px;
+  margin-top: 3px;
   text-align: center;
 }
 .marketing-root .evolution-track {
-  position: absolute;
-  bottom: 3px;
-  left: 8%;
-  right: 8%;
-  height: 3px;
+  position: relative;
+  margin: 10px 4% 0;
+  height: 4px;
   background: rgba(114, 90, 177, 0.66);
   border-radius: 8px;
   box-shadow: 0 0 9px rgba(135, 77, 240, 0.6);
 }
 .marketing-root .evolution-track-fill {
   height: 100%;
-  width: 100%;
   background: linear-gradient(90deg, #b751fd, #774fff, #45daff);
   box-shadow: 0 0 14px rgba(162, 73, 255, 0.72);
   transform-origin: left center;
+  transition: width 0.15s ease-out;
 }
 .marketing-root .evolution-ticks {
   position: absolute;
-  inset: 0;
+  inset: -6px 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
-.marketing-root .evolution-ticks span {
-  width: 15px;
-  height: 15px;
+.marketing-root .evolution-ticks span,
+.marketing-root .timeline-node {
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: #a05bfa;
   border: 2px solid #f1dcff;
   box-shadow: 0 0 12px #9a48ff;
+  transition: background 0.25s, box-shadow 0.25s, transform 0.25s;
 }
-.marketing-root .evolution-ticks span.selected {
-  background: #7adfff;
-  box-shadow: 0 0 17px #75dbff;
+.marketing-root .timeline-node.active-node {
+  background: #b566ff;
+  box-shadow: 0 0 14px #a64dff;
+}
+.marketing-root .evolution-ticks span.selected,
+.marketing-root .timeline-node.selected {
+  background: #65e4ff;
+  border-color: #ffffff;
+  box-shadow: 0 0 18px #65e4ff;
+  transform: scale(1.15);
 }
 
 /* Journey CTA */
@@ -1047,7 +1324,6 @@
   width: 100%;
   height: 100%;
   filter: drop-shadow(0 5px 29px rgba(163, 63, 244, 0.39));
-  mask-image: radial-gradient(ellipse at 51% 46%, black 53%, transparent 85%);
 }
 .marketing-root .journey-planet {
   z-index: -1;
@@ -1274,6 +1550,9 @@
     grid-template-columns: 1fr;
     gap: 20px;
   }
+  .marketing-root .evolution-timeline-container {
+    max-width: 900px;
+  }
   .marketing-root .evolution-copy {
     text-align: center;
     max-width: 610px;
@@ -1457,49 +1736,64 @@
     display: none;
   }
   .marketing-root .evolution-section {
-    padding: 50px 0;
+    padding: 38px 0;
   }
-  .marketing-root .evolution-copy h2 {
-    font-size: 38px;
+  .marketing-root .evolution-art {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 20px;
+    padding-top: 10px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(160, 91, 250, 0.4) transparent;
   }
   .marketing-root .evolution-cast {
-    gap: 0;
+    display: flex;
+    flex-direction: row;
+    width: max-content;
+    min-width: 100%;
+    gap: 16px;
+    padding: 0 12px;
   }
-  .marketing-root .evolution-character {
-    padding-bottom: 23px;
+  .marketing-root .evolution-col {
+    flex: 0 0 130px;
+    width: 130px;
+  }
+  .marketing-root .character-stage-pod {
+    height: 125px;
   }
   .marketing-root .character-image {
-    height: 109px;
+    height: 115px;
   }
-  .marketing-root .character-image img,
-  .marketing-root .stage-5 .character-image img,
-  .marketing-root .stage-4 .character-image img {
-    height: 120px;
-    max-width: 156%;
+  .marketing-root .character-image img {
+    height: 105px;
   }
   .marketing-root .stage-1 .character-image img {
-    height: 75px;
+    height: 72px;
   }
   .marketing-root .stage-2 .character-image img {
-    height: 95px;
+    height: 86px;
   }
   .marketing-root .stage-3 .character-image img {
-    height: 106px;
+    height: 98px;
+  }
+  .marketing-root .stage-4 .character-image img {
+    height: 108px;
+  }
+  .marketing-root .stage-5 .character-image img {
+    height: 118px;
   }
   .marketing-root .character-name {
-    font-size: 10px;
+    font-size: 11px;
+    margin-top: 6px;
   }
-  .marketing-root .character-unlock {
-    font-size: 8px;
-    line-height: 1.15;
-    min-height: 25px;
+  .marketing-root .evolution-arrow {
+    right: -10px;
+    top: 52%;
+    font-size: 13px;
   }
   .marketing-root .evolution-track {
-    bottom: 7px;
-  }
-  .marketing-root .evolution-ticks span {
-    width: 12px;
-    height: 12px;
+    display: none;
   }
   .marketing-root .journey-outer {
     padding: 7px 0 40px;

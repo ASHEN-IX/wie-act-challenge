@@ -1,6 +1,6 @@
 import "@/components/marketing/marketing.css";
-import { SiteNav } from "@/components/marketing/site-nav";
-import { Footer } from "@/components/marketing/footer";
+import { SiteNav } from "@/components/landing/SiteNav";
+import { Footer } from "@/components/landing/Footer";
 import { ScrollExperience } from "@/components/marketing/scroll-experience";
 
 export default function MarketingLayout({

@@ -1,3 +1,4 @@
+vi.mock("@/features/nardouch/course-growth-actions", () => ({ loadCourseNardouch: vi.fn(), finishNardouchLesson: vi.fn() }));
 import { describe, it, expect, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 vi.mock("./journey-actions", () => ({ learningProgress: vi.fn() }));

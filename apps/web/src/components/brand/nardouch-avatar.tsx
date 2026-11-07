@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { stages, type StageId } from "@/lib/brand";
+import { nardouchImage, stages, type StageId } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 
 /**
@@ -19,7 +19,7 @@ export function NardouchAvatar({
   const meta = stages.find((s) => s.id === stage) ?? stages[1];
   return (
     <Image
-      src={`/images/nardouch-${meta.id}.webp`}
+      src={nardouchImage(meta.id)}
       alt=""
       aria-hidden="true"
       width={size}
@@ -28,13 +28,4 @@ export function NardouchAvatar({
       title={`Nardouch · ${meta.name}`}
     />
   );
-}
-
-/** Reward level drives the stage; XP is motivation, not mastery (see rewards). */
-export function stageForLevel(level: number): StageId {
-  if (level >= 20) return "graduate";
-  if (level >= 12) return "expert";
-  if (level >= 6) return "explorer";
-  if (level >= 2) return "learner";
-  return "baby";
 }

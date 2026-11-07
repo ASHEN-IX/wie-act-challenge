@@ -1050,3 +1050,90 @@ passed its pinned hash check, the real offline CPU synthesis completed within th
 300-second evaluation bound, and the resulting WAV decoded correctly. API,
 frontend and browser files were not changed in this evaluation; their earlier
 results are historical, not newly rerun checks.
+
+## Per-course Nardouch growth
+
+Each learner starts a separate Baby Nardouch for each published course revision.
+The course overview, source-faithful reader and lesson presentation show the
+companion. Use **Complete lesson** to save reading completion; this is an explicit
+learner action and never an assessment or an XP award. Returning to a course
+restores its saved progress. Another course or a new revision starts fresh.
+
+| Stage | Unlock rule |
+| --- | --- |
+| Baby | No lessons completed |
+| Learner | First lesson completed, below 40% |
+| Explorer | At least 40% of lessons completed |
+| Expert | At least 75% completed, including finished reading while checks remain |
+| Graduate | Every lesson completed AND accepted mastery evidence for every course objective |
+
+Short courses can skip intermediate stages. Graduation uses the existing reviewed
+activity checks and grader, not a separate generated final exam. A wrong,
+unavailable or unreviewed result cannot unlock Graduate. Courses with no objectives
+or no reviewed checks cannot graduate. Reading completion alone never changes
+competency, grades or learning XP. The rewards summary no longer derives a
+mascot's stage from global motivation XP.
+
+`course_nardouch_progress` stores completed lesson IDs with a unique
+`(userId, courseId, revisionId)` index. The authenticated principal supplies the
+owner; clients cannot submit a user, stage, score or graduation flag. The service
+validates lesson IDs against the verified published source/canonical document,
+checks current course access and uses atomic `$addToSet` writes. Repeated and
+concurrent completion requests converge on one row. Graduation is recomputed
+from current, pinned accepted evidence rather than persisted as a client flag.
+
+The existing authenticated learning router exposes:
+
+- `GET /api/v1/study/learning/courses/:courseId/nardouch?revisionId=...`
+- `POST /api/v1/study/learning/courses/:courseId/nardouch/lessons`, with exactly
+  `{ "revisionId": "...", "lessonId": "..." }`.
+
+Next Server Actions forward the authenticated session and use uncached API
+requests. Completion and graded attempts refresh the companion; focus/reload also
+refresh its state. A save failure retains the last confirmed stage and offers a
+retry. No local storage is used for production course progress.
+
+### Supplied artwork
+
+The initial ZIP contained 512×512 opaque PNGs (and SVGs embedding those same
+rasters). These have been superseded by the six newly supplied 1254×1254 RGBA
+cutouts. All six have actual transparent pixels (alpha range 0–255), not just
+an alpha-capable format. They were visually compared with the course stages and
+renamed without changing their bytes:
+
+| Original generated filename ending | Picture | New filename |
+| --- | --- | --- |
+| `09_05_49 PM-1.png` | Reading a book | `nardouch-learner-transparent.png` |
+| `09_05_49 PM-2.png` | Laptop and floating rock | `nardouch-hero-transparent.png` |
+| `09_05_50 PM-3.png` | Graduation cap and diploma | `nardouch-graduate-transparent.png` |
+| `09_05_50 PM-4.png` | Backpack and magnifying glass | `nardouch-explorer-transparent.png` |
+| `09_05_51 PM-5.png` | Code and chart panel | `nardouch-expert-transparent.png` |
+| `09_05_52 PM-6.png` | Baby holding a star | `nardouch-baby-transparent.png` |
+
+All paths live in `apps/web/public/images`. A single `nardouchImage()` mapping
+selects the new artwork for the landing hero, growth timeline, graduation banner
+and course companion. New URLs avoid reusing cached opaque art. Image quality 90
+is allowed explicitly in Next configuration. The old image masks and rounded
+image clipping were removed so the supplied transparent silhouettes stay whole;
+responsive containment still keeps stage images clear of labels. Course growth
+rules and saved progress are unchanged by this artwork update.
+
+### Validation
+
+- API growth/persistence rule tests and existing Nardouch unit regressions: 35 passed.
+- Frontend companion, reader, practice and assistant tests: 28 passed.
+- Real MongoDB integration: 7 passed, including concurrent idempotent writes,
+  reconnect persistence, separate courses/revisions, permission denial, incorrect
+  checks staying at Expert, and the real reviewed grader unlocking Graduate.
+- Existing real Nest/Better Auth conversation regressions: 6 passed.
+- Playwright: growth, reload, course isolation, failed saves, mobile layout and
+  real Next landing image loading. The component interaction harness substitutes
+  only Server Action/router transport; database and grading behavior are covered
+  by the real integration test above.
+- API/frontend type checks and production builds passed. Targeted lint checks
+  passed on the changed implementation files.
+
+Reproduce the browser checks with
+`pnpm --filter web exec playwright test --config e2e/course-growth/playwright.config.ts`.
+The harness starts a Vite component fixture on 4181 and Next on 5373 with a separate
+`.next-growth-qa` output directory. Screenshots are written under ignored `var/tmp`.

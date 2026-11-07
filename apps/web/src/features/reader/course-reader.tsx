@@ -16,6 +16,7 @@ import {
   MessageCircleQuestion,
   X,
 } from "lucide-react";
+import { CourseNardouch } from "@/features/nardouch/course-growth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LearningBlockView, type ReaderContext } from "./registry";
@@ -145,7 +146,7 @@ export function CourseReader({
                 <a href="#course-source"><ArrowDown data-icon="inline-start" /> Read source material</a>
               </Button>
               <Button asChild variant="outline" size="sm">
-                <a href="#practice-and-tutor"><GraduationCap data-icon="inline-start" /> Practice and tutor</a>
+                <a href={practiceHref}><GraduationCap data-icon="inline-start" /> Practice and tutor</a>
               </Button>
             </div>
           </header>
@@ -166,7 +167,9 @@ export function CourseReader({
             </section>
           )}
 
-          {document.sections.filter((section) => section.id !== "course-source").map((section, index, lessons) => (
+          <CourseNardouch courseId={document.courseId} revisionId={document.revisionId} practiceHref={practiceHref} />
+
+          {document.sections.filter((section) => section.id !== "course-source").map((section, index) => (
             <section
               key={section.id}
               id={section.id}
@@ -246,7 +249,7 @@ export function CourseReader({
                 </p>
               </div>
               <Button asChild>
-                <a href="#practice-and-tutor"><GraduationCap data-icon="inline-start" /> Open practice</a>
+                <a href={practiceHref}><GraduationCap data-icon="inline-start" /> Open practice</a>
               </Button>
             </div>
           </section>

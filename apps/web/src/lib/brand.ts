@@ -16,37 +16,43 @@ export const stages = [
   {
     id: "baby",
     name: "Baby",
-    description: "Your very first day with a new subject.",
-    unlock: "New subject",
+    description: "A fresh companion for every new course.",
+    unlock: "Start a course",
   },
   {
     id: "learner",
     name: "Learner",
-    description: "The first course is done. Curiosity becomes a habit.",
-    unlock: "First course",
+    description: "Your first lesson is complete. Curiosity becomes a habit.",
+    unlock: "First lesson",
   },
   {
     id: "explorer",
     name: "Explorer",
-    description: "More courses, more questions, more to discover.",
-    unlock: "Making progress",
+    description: "At least 40% of the lessons completed. Keep exploring.",
+    unlock: "40% of lessons",
   },
   {
     id: "expert",
     name: "Expert",
-    description: "Most courses completed. Your companion is ready for anything.",
-    unlock: "Nearly there",
+    description:
+      "At least 75% of the lessons completed. Your Graduate cap is getting closer.",
+    unlock: "75% of lessons",
   },
   {
     id: "graduate",
     name: "Graduate",
-    description: "You finished every course in this subject. Celebrate it.",
-    unlock: "Subject complete",
+    description:
+      "All lessons completed and every reviewed objective check passed. Celebrate together.",
+    unlock: "Finish & pass checks",
   },
 ] as const;
 
 export type Stage = (typeof stages)[number];
 export type StageId = Stage["id"];
+
+/** New 1254px transparent artwork, visually matched to each course stage. */
+export const nardouchImage = (stage: StageId | "hero") =>
+  `/images/nardouch-${stage}-transparent.png`;
 
 export const features = [
   {

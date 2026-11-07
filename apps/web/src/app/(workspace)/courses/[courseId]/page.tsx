@@ -4,6 +4,7 @@ import { hasTeachingAccess } from "@/server/teaching";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { CourseNardouch } from "@/features/nardouch/course-growth";
 import { PageHeader } from "@/components/shared/page-header";
 import { DataError, EmptyState } from "@/components/shared/states";
 import { ActionForm } from "@/components/shared/action-form";
@@ -106,6 +107,7 @@ export default async function CoursePage({
           </AlertDescription>
         </Alert>
       )}
+      {stage === "ready" && <CourseNardouch courseId={courseId} />}
       <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1fr)_280px]">
         <section className="flex flex-col gap-7">
           <h2 className="text-xl font-semibold">Course outline</h2>
