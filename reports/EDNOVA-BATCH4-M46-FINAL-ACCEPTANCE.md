@@ -77,7 +77,15 @@ Course-scoped URL and authorization, process-global counters. One course author
 could infer another course's planning activity. The payload now declares
 `scope: 'process'`.
 
-### D3 — C4 assumption wrong *(recorded)*
+### D3 — C1 actually a harness wiring defect *(fixed, follow-up)*
+
+The chapter discrepancy was traced to the QA harness rewriting `MONGODB_URI` to
+`host.docker.internal` on a network where that name does not resolve, so the
+worker's manifest branch was skipped and the legacy parser (no chapter concept)
+ran. Fixing the URI restores the intended path; the **original unmodified**
+assertions — 2 chapters, 16 lessons — now pass.
+
+### D4 — C4 assumption wrong *(recorded)*
 
 `experiencePlanner.ts` is live test code, not dead code. Cannot be deleted
 without rewriting `semantic-content.test.ts`.
@@ -127,7 +135,7 @@ defects were found by measurement and fixed with regression coverage.
 
 | # | Issue | Owner | Severity |
 |---|---|---|---|
-| C1 | Batch 3 extraction assertions — one wrong-layer, one unresolved | Batch 3 | Medium |
+| ~~C1~~ | ~~Batch 3 extraction assertions~~ — **RESOLVED**: harness URI rewrite forced the legacy parser; both original assertions now pass unmodified | Batch 3 | **Closed** |
 | C2 | Nardouch loading on non-throwing mismatch | Nardouch | Low |
 | C4 | `experiencePlanner.ts` still imported by a test | cleanup | Low |
 | — | No independent math certification | academic | Medium |

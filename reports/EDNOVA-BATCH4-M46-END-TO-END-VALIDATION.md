@@ -106,6 +106,33 @@ Local, single-process, bounded. **Not a production capacity figure.**
 
 ### C1 — Batch 3 extraction assertions
 
+**Status: RESOLVED (M4.6 follow-up).**
+
+Root cause, established by instrumenting the running worker rather than reading
+code: the QA harness rewrote `MONGODB_URI` to `host.docker.internal` even when
+the AI container was attached to the project network, where that name does not
+resolve. `get_db()` returned `None`, so the worker skipped its manifest branch
+and fell back to the legacy text parser. That parser has **no chapter concept**,
+which is why the artifact held one course-title chapter and no source spans.
+
+Measured, before the fix:
+
+```
+ingest_parse_path=legacy     sections=15 chapters=0
+```
+
+After pointing the URI at the mongo service on the shared network, the
+originally-specified assertions — **2 chapters, 16 lessons** — pass **unmodified**.
+That is the evidence the fix is real rather than a relaxation: the test was never
+changed. Source regions return with it, and so do the extraction-review gate and
+the formula-review workflow that depend on them.
+
+The earlier reading that this was "one wrong-layer assertion plus one unresolved
+discrepancy" was half right: the assertion was correct, and the discrepancy was
+a harness wiring defect that made the product take its legacy path.
+
+### C1 — original analysis (superseded)
+
 **Status: OPEN, and now better understood.** Prior reports attributed the two
 failing assertions to "wrong hierarchy". Traced this milestone:
 
