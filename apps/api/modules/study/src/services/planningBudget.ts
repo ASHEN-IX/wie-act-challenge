@@ -144,6 +144,68 @@ export async function reconcilePlanningBudget(input: {
   reservedTokens: number;
   usage: ProviderUsage | null;
 }): Promise<{ chargedTokens: number; refunded: number; usageReported: boolean }> {
+  return reconcile(input);
+}
+
+/**
+ * Release a reservation for an attempt that provably never dispatched.
+ *
+ * `reconcilePlanningBudget` deliberately retains the reservation when no usage
+ * is reported, because an *uncertain* outcome may still have been billed. A
+ * crash between reserving and writing the dispatch marker is a different case:
+ * the provider was never contacted, so the tokens were consumed for nothing.
+ *
+ * Without this, each such crash silently drained the allowance and a retry
+ * reserved again — repeated crashes cost budget with zero inference (measured:
+ * two reservations, 65,536 tokens, no provider call).
+ *
+ * The caller must only reach this for a state it can prove is pre-dispatch.
+ * It is idempotent: releasing an already-released or unknown reservation is a
+ * no-op, so concurrent recovery workers cannot double-refund.
+ */
+export async function releaseUndispatchedReservation(input: {
+  approvalId: string;
+  reservedTokens: number;
+  /** Unique per attempt, so a repeated release is recognised. */
+  releaseToken: string;
+}): Promise<{ released: boolean; refunded: number }> {
+  if (!Number.isSafeInteger(input.reservedTokens) || input.reservedTokens <= 0)
+    return { released: false, refunded: 0 };
+  if (!/^[A-Za-z0-9_.:-]{8,128}$/.test(input.releaseToken))
+    return { released: false, refunded: 0 };
+
+  // The release marker lives on the ledger row. Its uniqueness is what makes a
+  // second concurrent release a no-op rather than a second refund.
+  const released = await withBudget(async (collection) => {
+    const claimed = await (
+      collection as unknown as {
+        findOneAndUpdate: (filter: unknown, update: unknown, options: unknown) => Promise<unknown>;
+      }
+    ).findOneAndUpdate(
+      {
+        _id: input.approvalId,
+        releaseMarkers: { $ne: input.releaseToken },
+        usedTokens: { $gte: input.reservedTokens },
+      },
+      {
+        $inc: { usedTokens: -input.reservedTokens },
+        $push: { releaseMarkers: input.releaseToken },
+      },
+      { returnDocument: 'after' },
+    );
+    return Boolean(claimed);
+  });
+
+  return released
+    ? { released: true, refunded: input.reservedTokens }
+    : { released: false, refunded: 0 };
+}
+
+async function reconcile(input: {
+  approvalId: string;
+  reservedTokens: number;
+  usage: ProviderUsage | null;
+}): Promise<{ chargedTokens: number; refunded: number; usageReported: boolean }> {
   const reported = input.usage?.usageReported ? input.usage.totalTokens : null;
   if (reported === null || !Number.isSafeInteger(reported) || reported < 0)
     return { chargedTokens: input.reservedTokens, refunded: 0, usageReported: false };

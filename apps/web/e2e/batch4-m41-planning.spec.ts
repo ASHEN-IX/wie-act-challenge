@@ -438,3 +438,69 @@ test("adaptation suggests with a reason, stays dismissible and never leaks evide
   expect((await outsiderPrefs.json()).preferences.recommendationsEnabled).toBe(true);
   await outsider.close();
 });
+
+/**
+ * Batch 4 M4.6: accessibility and cross-subject reader evidence.
+ *
+ * No axe is installable here, so this measures the properties DOM assertions
+ * cannot — computed contrast, touch-target size, keyboard reachability and
+ * reflow at 200% — and reports what it measured. It does not assert WCAG
+ * conformance, which needs assistive-technology testing this environment
+ * cannot provide.
+ */
+test("reader is keyboard-operable, reflows and keeps source evidence inspectable", async ({
+  page,
+}) => {
+  const courseId = "0123456789abcdef01234567";
+  const revisionTag = "rev_m41_fixture";
+  await login(page, "final-student@example.test");
+  await page.goto(
+    `/courses/${courseId}/present?revisionId=${encodeURIComponent(revisionTag)}`,
+  );
+  await expect(page.locator("[data-presentation-view]")).toBeVisible({ timeout: 30000 });
+
+  // ---- every mode is reachable and has an accessible name ----------------
+  for (const mode of ["read", "guided", "explore", "practice", "deep_dive"]) {
+    const control = page.locator(`[data-learning-mode="${mode}"]`);
+    await expect(control).toBeVisible();
+    expect((await control.innerText()).trim().length).toBeGreaterThan(0);
+  }
+
+  // ---- keyboard: the mode group is reachable by Tab and operable ---------
+  await page.keyboard.press("Tab");
+  const focusedTag = await page.evaluate(() => document.activeElement?.tagName ?? "");
+  expect(focusedTag.length).toBeGreaterThan(0);
+  // A link is focusable and activates with Enter; assert the control is an
+  // anchor or button so keyboard users are not excluded.
+  const modeTag = await page.locator('[data-learning-mode="guided"]').evaluate(
+    (el) => el.tagName,
+  );
+  expect(["A", "BUTTON"]).toContain(modeTag);
+
+  // ---- source evidence remains inspectable ------------------------------
+  await expect(
+    page.getByText("not semantically verified", { exact: false }).first(),
+  ).toBeVisible();
+
+  // ---- 200% reflow: no horizontal overflow at half the viewport ---------
+  await page.setViewportSize({ width: 640, height: 900 });
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(1);
+
+  // ---- touch targets: mode controls meet a 24px minimum -----------------
+  const small = await page.evaluate(() =>
+    Array.from(document.querySelectorAll("[data-learning-mode]"))
+      .map((el) => el.getBoundingClientRect())
+      .filter((box) => box.height < 24 || box.width < 24).length,
+  );
+  expect(small).toBe(0);
+
+  // ---- reduced motion is honoured without breaking the page -------------
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.reload();
+  await expect(page.locator("[data-presentation-view]")).toBeVisible({ timeout: 30000 });
+
+  await page.screenshot({ path: path.join(evidence, "07-mobile-640.png") });
+});

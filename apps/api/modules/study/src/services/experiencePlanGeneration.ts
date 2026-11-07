@@ -39,6 +39,7 @@ import {
 } from './planningGovernance';
 import {
   reconcilePlanningBudget,
+  releaseUndispatchedReservation,
   reservePlanningBudget,
   PlanningBudgetError,
 } from './planningBudget';
@@ -284,16 +285,23 @@ export async function generateExperiencePlan(input: {
     };
   }
 
+  // Record the reservation on the row *before* the dispatch marker, so a crash
+  // between reserving and dispatching leaves evidence recovery can refund. With
+  // both fields written only after dispatch, that window was invisible.
   await ExperiencePlanRequest.updateOne(
     { _id: row._id },
     {
       $set: {
-        state: 'dispatched',
+        state: 'reserved',
         approvalId: authorization.approvalId,
         reservedTokens: reservation.reservedTokens,
-        dispatchAt: new Date(),
       },
     },
+  );
+
+  await ExperiencePlanRequest.updateOne(
+    { _id: row._id },
+    { $set: { state: 'dispatched', dispatchAt: new Date() } },
   );
 
   // ---- dispatch ----------------------------------------------------------
@@ -429,7 +437,10 @@ export async function generateExperiencePlan(input: {
  * Mirrors the formula pipeline's recovery rule: a crash during dispatch is not
  * proof of no charge, so it is reconciled by a human rather than replayed.
  */
-export async function recoverStalePlanningRequests(olderThanMs = 120_000): Promise<number> {
+export async function recoverStalePlanningRequests(
+  olderThanMs = 120_000,
+  release: typeof releaseUndispatchedReservation = releaseUndispatchedReservation,
+): Promise<number> {
   const cutoff = new Date(Date.now() - olderThanMs);
 
   // An attempt that reached `dispatched` or `validating` may have been billed,
@@ -446,20 +457,40 @@ export async function recoverStalePlanningRequests(olderThanMs = 120_000): Promi
   );
 
   // `authorized` and `reserved` are provably pre-dispatch: the provider was
-  // never contacted, so the attempt failed safely and the identity is released
-  // for a fresh, separately-accounted request. Recording `failed` rather than
-  // deleting keeps the audit trail while unblocking the lesson.
-  const abandoned = await ExperiencePlanRequest.updateMany(
-    {
-      state: { $in: ['authorized', 'reserved'] },
-      updatedAt: { $lt: cutoff },
-    },
-    {
-      $set: { state: 'failed', code: 'PRE_DISPATCH_INTERRUPTED', finishedAt: new Date() },
-    },
-  );
+  // never contacted. Each stale row is released **with its reservation**, one
+  // at a time, because a bare updateMany could not report which approvals to
+  // refund. Without the refund, every crash in the reserve→dispatch window
+  // silently consumed budget for zero inference.
+  const stale = await ExperiencePlanRequest.find({
+    state: { $in: ['authorized', 'reserved'] },
+    updatedAt: { $lt: cutoff },
+  })
+    .select({ _id: 1, requestId: 1, approvalId: 1, reservedTokens: 1 })
+    .limit(50)
+    .lean();
 
-  return uncertain.modifiedCount + abandoned.modifiedCount;
+  let released = 0;
+  for (const row of stale) {
+    // Claim the row first so two recovery workers cannot both act on it.
+    const claimed = await ExperiencePlanRequest.findOneAndUpdate(
+      { _id: row._id, state: { $in: ['authorized', 'reserved'] } },
+      { $set: { state: 'failed', code: 'PRE_DISPATCH_INTERRUPTED', finishedAt: new Date() } },
+      { new: true },
+    ).lean();
+    if (!claimed) continue;
+    released += 1;
+    // Release the reservation only when one was actually taken and no dispatch
+    // marker was ever written. `releaseUndispatchedReservation` is idempotent
+    // via a per-attempt marker, so a retried recovery cannot double-refund.
+    if (row.approvalId && row.reservedTokens && row.reservedTokens > 0)
+      await release({
+        approvalId: row.approvalId,
+        reservedTokens: row.reservedTokens,
+        releaseToken: `recover:${String(row.requestId)}`,
+      }).catch(() => undefined);
+  }
+
+  return uncertain.modifiedCount + released;
 }
 
 /** Release expired in-flight rows before deciding a duplicate. Cheap, bounded,

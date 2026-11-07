@@ -10,6 +10,7 @@
 jest.mock('../models/ExperiencePlanRequest', () => ({
   ExperiencePlanRequest: {
     findOneAndUpdate: jest.fn(),
+    find: jest.fn(),
     findOne: jest.fn(),
     updateOne: jest.fn(),
     updateMany: jest.fn(),
@@ -62,6 +63,7 @@ const contentHash = 'sha256:' + 'b'.repeat(64);
 const actor = 'aaaaaaaaaaaaaaaaaaaaaaaa';
 
 const peek = peekStoredPlan as jest.Mock;
+const find = ExperiencePlanRequest.find as jest.Mock;
 const upsert = ExperiencePlanRequest.findOneAndUpdate as jest.Mock;
 const findOne = ExperiencePlanRequest.findOne as jest.Mock;
 const updateOne = ExperiencePlanRequest.updateOne as jest.Mock;
@@ -386,17 +388,37 @@ describe('generation lifecycle', () => {
   });
 
   it('marks stale dispatched attempts uncertain and pre-dispatch ones failed', async () => {
-    // M4.5: the original recovery only handled `dispatched`/`validating`, so a
-    // crash during `authorized` or `reserved` blocked the identity forever.
+    // M4.5: recovery only handled `dispatched`/`validating`, so a crash during
+    // `authorized` or `reserved` blocked the identity forever. M4.6 additionally
+    // releases the reservation for the provably pre-dispatch case.
     updateMany.mockResolvedValue({ modifiedCount: 2 });
-    expect(await recoverStalePlanningRequests()).toBe(4);
-    const states = updateMany.mock.calls.map((call) => call[1].$set.state);
-    expect(states).toContain('uncertain');
-    expect(states).toContain('failed');
-    // A possibly-billed attempt is never replayed; a provably pre-dispatch one
-    // is released with an audit code.
-    const failed = updateMany.mock.calls.find((call) => call[1].$set.state === 'failed');
-    expect(failed[1].$set.code).toBe('PRE_DISPATCH_INTERRUPTED');
+    find.mockReturnValue({
+      select: () => ({ limit: () => ({ lean: async () => [] }) }),
+    });
+    expect(await recoverStalePlanningRequests()).toBe(2);
+    const [, update] = updateMany.mock.calls[0];
+    expect(update.$set.state).toBe('uncertain');
+    // A possibly-billed attempt is only ever marked uncertain.
+    expect(updateMany.mock.calls.some((call) => call[1].$set.state === 'failed')).toBe(false);
+  });
+
+  it('releases the reservation for a stale pre-dispatch attempt', async () => {
+    updateMany.mockResolvedValue({ modifiedCount: 0 });
+    find.mockReturnValue({
+      select: () => ({
+        limit: () => ({
+          lean: async () => [
+            { _id: 'row-a', requestId: 'req-a', approvalId: 'approval-1', reservedTokens: 32768 },
+          ],
+        }),
+      }),
+    });
+    upsert.mockReturnValue({ lean: async () => ({ _id: 'row-a', state: 'failed' }) });
+    const released = jest.fn(async () => ({ released: true, refunded: 32768 }));
+    expect(await recoverStalePlanningRequests(0, released as never)).toBe(1);
+    expect(released).toHaveBeenCalledWith(
+      expect.objectContaining({ approvalId: 'approval-1', reservedTokens: 32768 }),
+    );
   });
 
   it('derives a stable identity from the authorized operation', () => {

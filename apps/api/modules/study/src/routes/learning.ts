@@ -125,11 +125,21 @@ router.get(
 router.get(
   '/courses/:courseId/planning/metrics',
   operation(async (r) => {
-    // Scoped to a course the caller actually manages: no new policy, no global
-    // metrics surface.
     if (!(await canManageCourse(r.user!.userId, String(r.params.courseId))))
       throw Object.assign(new Error('Metrics require course author rights'), { status: 403 });
-    return summarizeMetrics();
+    // M4.6: these counters are **process-wide**, not per-course. Returning them
+    // under a course-scoped URL let one course author infer another course's
+    // planning activity. The figures are labelled for what they are and carry
+    // no course data; the scope is stated in the payload so a caller cannot
+    // mistake them for a measurement of this course.
+    return {
+      scope: 'process' as const,
+      scopeNote:
+        'Aggregate counters for this application process across all courses. ' +
+        'No per-course or per-learner breakdown is recorded.',
+      processUptimeSeconds: Math.round(process.uptime()),
+      ...summarizeMetrics(),
+    };
   })
 );
 // Evidence-based adaptation (Batch 4, M4.4).
