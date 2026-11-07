@@ -56,7 +56,7 @@ def controls(monkeypatch):
     monkeypatch.setenv("LLM_BUDGET_DB_NAME", "budget")
     monkeypatch.setattr(planner, "_approval", lambda model: _approval())
     monkeypatch.setattr(planner, "_budget_active", lambda approval: True)
-    monkeypatch.setattr(planner, "_has_headroom", lambda approval: True)
+    monkeypatch.setattr(planner, "_has_headroom", lambda approval, request_id="": True)
     monkeypatch.setattr(planner, "_reconcile", lambda approval, tokens: None)
 
 
@@ -113,7 +113,7 @@ def test_refuses_when_budget_is_inactive(controls, monkeypatch):
 
 
 def test_refuses_when_the_ledger_has_no_headroom(controls, monkeypatch):
-    monkeypatch.setattr(planner, "_has_headroom", lambda approval: False)
+    monkeypatch.setattr(planner, "_has_headroom", lambda approval, request_id="": False)
     with pytest.raises(HTTPException) as excinfo:
         planner.plan(_request())
     assert _refusal(excinfo) == "PROVIDER_BUDGET_UNAVAILABLE"
@@ -268,60 +268,171 @@ def test_python_never_adjusts_the_budget_ledger(monkeypatch):
     assert writes == [], "the Python boundary must never write the budget ledger"
 
 
-def test_headroom_check_refuses_when_insufficient(monkeypatch):
-    """An independent affordability check still gates dispatch."""
+def _fake_clients(ledger_row, request_row):
+    """Both collections the planner reads, behind one fake MongoClient."""
+
     class FakeCollection:
+        def __init__(self, row):
+            self.row = row
+
         def find_one(self, query):
-            return {"usedTokens": 990_000, "maxTokens": 1_000_000}
+            return self.row
 
     class FakeDb:
+        def __init__(self):
+            self.colls = {
+                "llm_approval_budgets": FakeCollection(ledger_row),
+                "experience_plan_requests": FakeCollection(request_row),
+            }
+
+        def __getitem__(self, name):
+            return self.colls[name]
+
         def get_collection(self, name):
-            return FakeCollection()
+            return self.colls[name]
 
     class FakeClient:
         def __init__(self, *args, **kwargs):
-            pass
+            self.db = FakeDb()
 
         def __getitem__(self, name):
-            return FakeDb()
+            return self.db
+
+        def get_default_database(self):
+            return self.db
 
         def close(self):
             pass
 
+    return FakeClient
+
+
+def _env(monkeypatch):
+    monkeypatch.setenv("MONGODB_URI", "mongodb://app.test/ednova")
+    monkeypatch.setenv("DB_NAME", "ednova")
     monkeypatch.setenv("LLM_BUDGET_MONGODB_URI", "mongodb://budget.test/")
     monkeypatch.setenv("LLM_BUDGET_DB_NAME", "budget")
-    import pymongo
 
-    monkeypatch.setattr(pymongo, "MongoClient", FakeClient)
 
+def _request_row(approval, **overrides):
+    row = {
+        "requestId": "req-1",
+        "approvalId": approval["approvalId"],
+        "reservedTokens": planner.RESERVED_TOKENS,
+        "state": "dispatched",
+        "model": approval["model"],
+    }
+    row.update(overrides)
+    return row
+
+
+def test_exactly_sufficient_budget_permits_dispatch(monkeypatch):
+    """The boundary case that the old arithmetic got wrong.
+
+    NestJS reserves first, so a ledger with exactly one attempt's budget left is
+    already at its limit when Python looks. Refusing here would deadlock every
+    exactly-funded attempt.
+    """
     approval = _approval(maxTokens=1_000_000)
-    # 990000 + 32768 > 1000000, so there is no headroom for this attempt.
-    assert planner._has_headroom(approval) is False
-
-
-def test_headroom_check_allows_when_affordable(monkeypatch):
-    class FakeCollection:
-        def find_one(self, query):
-            return {"usedTokens": 0, "maxTokens": 1_000_000}
-
-    class FakeDb:
-        def get_collection(self, name):
-            return FakeCollection()
-
-    class FakeClient:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        def __getitem__(self, name):
-            return FakeDb()
-
-        def close(self):
-            pass
-
-    monkeypatch.setenv("LLM_BUDGET_MONGODB_URI", "mongodb://budget.test/")
-    monkeypatch.setenv("LLM_BUDGET_DB_NAME", "budget")
+    _env(monkeypatch)
     import pymongo
 
-    monkeypatch.setattr(pymongo, "MongoClient", FakeClient)
+    monkeypatch.setattr(
+        pymongo, "MongoClient", _fake_clients(
+            {"usedTokens": 1_000_000, "maxTokens": 1_000_000}, _request_row(approval)
+        )
+    )
+    assert planner._has_headroom(approval, "req-1") is True
 
-    assert planner._has_headroom(_approval(maxTokens=1_000_000)) is True
+
+def test_insufficient_budget_refuses_dispatch(monkeypatch):
+    approval = _approval(maxTokens=1_000_000)
+    _env(monkeypatch)
+    import pymongo
+
+    monkeypatch.setattr(
+        pymongo, "MongoClient", _fake_clients(
+            {"usedTokens": 1_100_000, "maxTokens": 1_000_000}, _request_row(approval)
+        )
+    )
+    assert planner._has_headroom(approval, "req-1") is False
+
+
+def test_dispatch_without_an_owned_reservation_is_refused(monkeypatch):
+    """A ledger with room is not enough: this attempt must have funded itself."""
+    approval = _approval(maxTokens=1_000_000)
+    _env(monkeypatch)
+    import pymongo
+
+    monkeypatch.setattr(
+        pymongo, "MongoClient", _fake_clients(
+            {"usedTokens": 0, "maxTokens": 1_000_000}, None
+        )
+    )
+    assert planner._has_headroom(approval, "req-1") is False
+
+
+def test_reservation_for_another_approval_is_refused(monkeypatch):
+    approval = _approval(maxTokens=1_000_000)
+    _env(monkeypatch)
+    import pymongo
+
+    monkeypatch.setattr(
+        pymongo, "MongoClient", _fake_clients(
+            {"usedTokens": 0, "maxTokens": 1_000_000},
+            _request_row(approval, approvalId="someone-else"),
+        )
+    )
+    assert planner._has_headroom(approval, "req-1") is False
+
+
+def test_reservation_with_the_wrong_amount_is_refused(monkeypatch):
+    approval = _approval(maxTokens=1_000_000)
+    _env(monkeypatch)
+    import pymongo
+
+    monkeypatch.setattr(
+        pymongo, "MongoClient", _fake_clients(
+            {"usedTokens": 0, "maxTokens": 1_000_000},
+            _request_row(approval, reservedTokens=1),
+        )
+    )
+    assert planner._has_headroom(approval, "req-1") is False
+
+
+def test_reservation_no_longer_in_flight_is_refused(monkeypatch):
+    approval = _approval(maxTokens=1_000_000)
+    _env(monkeypatch)
+    import pymongo
+
+    monkeypatch.setattr(
+        pymongo, "MongoClient", _fake_clients(
+            {"usedTokens": 0, "maxTokens": 1_000_000},
+            _request_row(approval, state="failed"),
+        )
+    )
+    assert planner._has_headroom(approval, "req-1") is False
+
+
+def test_unknown_approval_is_refused(monkeypatch):
+    approval = _approval(maxTokens=1_000_000)
+    _env(monkeypatch)
+    import pymongo
+
+    monkeypatch.setattr(
+        pymongo, "MongoClient", _fake_clients(None, _request_row(approval))
+    )
+    assert planner._has_headroom(approval, "req-1") is False
+
+
+def test_unreadable_ledger_is_refused(monkeypatch):
+    approval = _approval(maxTokens=1_000_000)
+    _env(monkeypatch)
+    import pymongo
+
+    class Boom:
+        def __init__(self, *a, **k):
+            raise RuntimeError("unreachable")
+
+    monkeypatch.setattr(pymongo, "MongoClient", Boom)
+    assert planner._has_headroom(approval, "req-1") is False

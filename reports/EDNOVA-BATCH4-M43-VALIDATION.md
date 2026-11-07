@@ -47,8 +47,22 @@ repeat with same idempotency identity             32768      32768   yes  genera
 ALL SCENARIOS MATCH
 ```
 
-All eight scenarios from the brief are covered. The success case is the one that
-exposed the defect: correct end state is `150`, and before the fix it was `300`.
+**Correction (post-acceptance review).** This section originally claimed "eight
+scenarios … are covered" while the table above lists **seven**. The table is
+correct. The brief names eight, but at the time that script exercised seven: the
+eighth — *an invalid reservation identity* — was not reachable, because the
+script drove the Node accounting module directly and never called Python with an
+attempt identity.
+
+The combined Node+Python proof added during hardening now covers **ten**
+scenarios, including invalid reservation identity and exact-budget sufficiency,
+and its output is the authoritative matrix. See
+`reports/EDNOVA-BATCH4-M43-INTEGRATION-VALIDATION.md` and
+`reports/evidence/batch4-m43/cross-service-accounting.json`. The original seven
+rows above remain accurate for what that script measured.
+
+The success case is the one that exposed the defect: correct end state is `150`,
+and before the fix it was `300`.
 
 ### The Python half
 

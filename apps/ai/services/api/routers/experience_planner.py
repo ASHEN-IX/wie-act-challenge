@@ -75,33 +75,70 @@ def _budget_active(approval: dict) -> bool:
     return bool(llm_client._budget_still_active(approval))
 
 
-def _has_headroom(approval: dict) -> bool:
-    """Verify the ledger can fund this attempt, without debiting it.
+def _propagated_reservation(approval: dict, request_id: str) -> bool:
+    """Verify this exact attempt already holds a valid reservation.
 
-    M4.2 had both this service and NestJS increment `usedTokens` for the same
-    logical attempt, so one request was charged twice. NestJS owns the
-    reservation because it owns the request identity and lifecycle; this service
-    keeps an *independent* check that dispatch is affordable, which is the part
-    that matters for security, and stops charging for it.
+    M4.3 originally checked `usedTokens + RESERVED <= limit`, which is wrong for
+    the boundary case: NestJS reserves *first*, so a ledger with exactly enough
+    budget left for one attempt is already at its limit when Python looks. The
+    check then refused an attempt that had legitimately funded itself.
 
-    The read is deliberately strict: a ledger that cannot be read, an approval
-    that does not match, or insufficient headroom all refuse dispatch.
+    The correction is attempt-aware rather than arithmetic. NestJS owns the
+    reservation and records it on the request row it already maintains:
+    `approvalId`, `reservedTokens`, and a `dispatched` state. Python reads that
+    row from the trusted application database — never from the caller — and
+    confirms the reservation exists, belongs to this request and approval, is
+    for the expected amount, and is still in flight.
+
+    This is a read-only verification of a reservation somebody else owns. It
+    creates no second reservation and adds no third accounting implementation.
     """
-    if type(approval.get("maxTokens")) is not int or approval["maxTokens"] < RESERVED_TOKENS:
+    uri = os.getenv("MONGODB_URI", "")
+    if not uri or not request_id:
         return False
     from pymongo import MongoClient
 
     client = None
     try:
-        client = MongoClient(
-            os.environ["LLM_BUDGET_MONGODB_URI"],
-            serverSelectionTimeoutMS=2000,
-            connectTimeoutMS=2000,
-            socketTimeoutMS=3000,
-            retryWrites=False,
+        client = MongoClient(uri, serverSelectionTimeoutMS=2000, connectTimeoutMS=2000, socketTimeoutMS=3000)
+        db = client[os.environ["DB_NAME"]] if os.getenv("DB_NAME") else client.get_default_database()
+        row = db["experience_plan_requests"].find_one(
+            {"requestId": request_id}
         )
-        records = client[os.environ["LLM_BUDGET_DB_NAME"]].get_collection("llm_approval_budgets")
-        row = records.find_one(
+        if not row:
+            return False
+        return (
+            row.get("approvalId") == approval["approvalId"]
+            and int(row.get("reservedTokens") or 0) == RESERVED_TOKENS
+            and row.get("state") in ("dispatched", "validating")
+            and str(row.get("model", approval["model"])) == approval["model"]
+        )
+    except Exception:
+        return False
+    finally:
+        if client is not None:
+            client.close()
+
+
+def _ledger_permits_dispatch(approval: dict) -> bool:
+    """Independent affordability check over the shared budget ledger.
+
+    Separate from the attempt check on purpose: this proves the approval is live
+    and the ledger is reachable, so a service restart or a missing request row
+    cannot turn into permission. It reads, and never writes.
+    """
+    if type(approval.get("maxTokens")) is not int or approval["maxTokens"] < RESERVED_TOKENS:
+        return False
+    uri = os.getenv("LLM_BUDGET_MONGODB_URI", "")
+    db_name = os.getenv("LLM_BUDGET_DB_NAME", "")
+    if not uri or not db_name:
+        return False
+    from pymongo import MongoClient
+
+    client = None
+    try:
+        client = MongoClient(uri, serverSelectionTimeoutMS=2000, connectTimeoutMS=2000, socketTimeoutMS=3000)
+        row = client[db_name]["llm_approval_budgets"].find_one(
             {
                 "_id": approval["approvalId"],
                 "task": PLANNER_TASK,
@@ -113,14 +150,24 @@ def _has_headroom(approval: dict) -> bool:
         )
         if not row:
             return False
-        # Headroom must cover a full reservation, including the one NestJS has
-        # already taken for this attempt.
-        return int(row.get("usedTokens", 0)) + RESERVED_TOKENS <= approval["maxTokens"]
+        used = int(row.get("usedTokens", 0))
+        # The attempt's own reservation is already counted in `used`, so the
+        # ledger is merely required to be within its limit.
+        return used <= approval["maxTokens"]
     except Exception:
         return False
     finally:
         if client is not None:
             client.close()
+
+
+def _has_headroom(approval: dict, request_id: str = "") -> bool:
+    """Both independent gates, in the order that cannot be gamed.
+
+    The ledger check proves the approval and budget are live; the attempt check
+    proves *this* request funded its own dispatch.
+    """
+    return _ledger_permits_dispatch(approval) and _propagated_reservation(approval, request_id)
 
 
 def _reconcile(approval: dict, tokens) -> None:
@@ -167,7 +214,7 @@ def plan(req: PlanRequest):
 
     # Everything above is pre-dispatch and provable. From here on a failure is
     # uncertain: the request may have reached the model.
-    if not _has_headroom(approval):
+    if not _has_headroom(approval, req.requestId):
         _refuse("PROVIDER_BUDGET_UNAVAILABLE")
 
     sdk = None
