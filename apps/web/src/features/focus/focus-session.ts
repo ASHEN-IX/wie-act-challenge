@@ -14,6 +14,8 @@ export const STALE_AFTER_MS = 2 * 60 * 1000;
 
 type Common = {
   plannedMs: number;
+  /** Deep Focus: started automatically, open-ended (plannedMs is only a safety cap). */
+  auto: boolean;
   objective: string;
   /** Route the learner started from, so we can offer a way back. */
   route: string;
@@ -36,6 +38,7 @@ export function startFocus(now: number, minutes: number, objective: string, rout
   return {
     status: "running",
     plannedMs: clampMinutes(minutes) * 60_000,
+    auto: false,
     objective: objective.trim().slice(0, 140),
     route,
     startedAt: now,
@@ -44,6 +47,24 @@ export function startFocus(now: number, minutes: number, objective: string, rout
     lastSeenAt: now,
   };
 }
+
+/** Deep Focus: no timer to set. The planned length is only a safety cap. */
+export function startAutoFocus(now: number, route: string): FocusState {
+  return {
+    status: "running",
+    plannedMs: MAX_MINUTES * 60_000,
+    auto: true,
+    objective: "",
+    route,
+    startedAt: now,
+    focusedMs: 0,
+    lastResumeAt: now,
+    lastSeenAt: now,
+  };
+}
+
+/** Learner has been idle or away for long enough that the gap is not study time. */
+export const IDLE_AFTER_MS = 5 * 60 * 1000;
 
 export function focusedMs(state: FocusState, now: number): number {
   if (state.status === "idle") return 0;
@@ -75,6 +96,7 @@ export function endFocus(state: FocusState, now: number): FocusState {
   return {
     status: "ended",
     plannedMs: state.plannedMs,
+    auto: state.auto,
     objective: state.objective,
     route: state.route,
     startedAt: state.startedAt,
@@ -120,6 +142,7 @@ export function restoreFocus(raw: string | null, now: number): FocusState {
     return IDLE;
   const common = {
     plannedMs: v.plannedMs,
+    auto: v.auto === true,
     objective: v.objective.slice(0, 140),
     route: v.route.slice(0, 300),
     startedAt: v.startedAt,
@@ -157,6 +180,8 @@ export function formatClock(ms: number): string {
 
 /** Neutral, non-judgemental follow-up. Time spent never implies mastery. */
 export function nextStepFor(state: Extract<FocusState, { status: "ended" }>): string {
+  if (state.auto && state.focusedMs >= 60_000)
+    return "Take a short break, then check what you learned by explaining it to the tutor or a peer.";
   if (state.focusedMs < 60_000) return "That was a short one. Start again whenever you are ready.";
   if (state.completed)
     return "Take a short break, then check what you learned by explaining it to the tutor or a peer.";

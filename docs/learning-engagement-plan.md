@@ -6,11 +6,11 @@ Status labels: **Implemented** (code + automated tests), **Verified in browser**
 
 | Area | Status |
 |---|---|
-| A. Focus Mode (in-app) | Implemented, verified in browser (start, pause, reload recovery, end summary, chrome restored) |
+| A. Focus Mode / Deep Focus (in-app) | Implemented, verified in browser (auto-start, away pause, reload recovery, emergency exit, auto end) |
 | B. Adaptive onboarding + preferences | Implemented, verified in browser (persist, prefill, dashboard order, edit/reset) |
 | C. Whiteboard (Excalidraw) in Study Together | Implemented + API/unit tests. **Not yet driven with two live users in a browser.** |
 | D. Connections, room invites, study groups | Implemented + API tests; connections page renders. **Two-user flows not yet driven in a browser.** |
-| Browser extension that blocks other sites | **Deferred** (see below) |
+| Deep Focus extension (blocks other sites) | Implemented (`apps/extension/deep-focus`); service-worker logic tested against a mocked `chrome` API, **not yet loaded in a real browser** |
 
 ## A. Focus Mode
 - `apps/web/src/features/focus/`. A pure, timestamp-based state machine (`focus-session.ts`) with `localStorage` recovery (`ednova:focus-session:v1`) and a floating "Focus" pill on learning routes only (`/courses/:id/learn`, `/study-together`, `/sessions`, `/practice`).
@@ -20,8 +20,15 @@ Status labels: **Implemented** (code + automated tests), **Verified in browser**
 - Recovery: if the page is closed while running, a stale heartbeat (> 2 min) turns the session into *paused*; time while the browser was closed is never counted.
 - No XP, no mastery, no score. The end summary shows focused time, the objective and a link to Progress. The gaze-based `FocusSession` in `signal-processing` is untouched.
 
-### Browser extension (Deferred)
-A web page cannot block other sites or apps. A Manifest V3 Chromium companion is feasible but is a separate deliverable (own manifest, permission review, store listing). Not started.
+### Deep Focus (automatic)
+- Starts by itself on `/courses/:id/learn` and inside a study room (`/study-together/:id`). No timer or activation step. Open-ended; a 3 h cap is only a safety limit.
+- Counts only active time: hidden tab → paused immediately; 5 minutes without input → paused; resumes on return. Time while the browser was closed is never counted. Persists across refresh (`localStorage`); ends by itself when the learner leaves the study pages (sessions under 1 min are dropped, longer ones show the summary).
+- Emergency exit: **Exit Deep Focus** in the bar (also via the extension). It is remembered for the browser tab session; the Focus pill offers "Turn Deep Focus back on". The manual timed session remains available from the pill.
+- Learning features are untouched. Only EdNova's own sidebar and header are hidden, as before.
+- Not stored on the server: sessions live in the browser only.
+
+### What can and cannot be blocked
+A web page cannot block other sites, tabs or apps. Best reliable in-page measures: counting only active time, a tab-title nudge ("Your study session is waiting") and a welcome-back notice. The optional MV3 extension (`apps/extension/deep-focus/README.md`) adds real blocking of other sites and returns the learner to the study tab, and fails open (heartbeat timeout, browser restart, three emergency exits). It does not block other apps, other browsers or incognito (unless allowed), and only works in Chromium.
 
 ## B. Onboarding and learning preferences
 - One store: `UserProfile.learningProfile` (normalised by `apps/api/shared/ednova/learningProfile.ts`). The sign-up `onboardingDraft` is a one-time capture and is not read afterwards.
@@ -56,7 +63,8 @@ A web page cannot block other sites or apps. A Manifest V3 Chromium companion is
 
 ## Known limitations
 - Whiteboard: no live cursors and no participant legend (the author id is stored but not shown).
-- Focus summary does not list completed activities or XP.
+- Focus summary does not list completed activities or XP. Deep Focus sessions are not persisted server-side.
+- Extension: allow-lists only `http://localhost:3000`; add the deployed origin to its manifest. Sign-in flows that redirect through another site (e.g. a third-party login) are blocked during a session; use the emergency exit.
 - Group session codes live on the group document (12 h freshness). Rooms hold 6 participants while groups allow 10 members.
 - The room-invite limiter is in-memory, so it is per API instance.
 - The workspace layout now makes one extra profile call per page.
