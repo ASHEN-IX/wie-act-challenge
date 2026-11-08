@@ -320,6 +320,13 @@ export class StudyController {
   ): Promise<void> {
     return this.service.execute('PUT /api/v1/study/courses/:courseId/draft', req, res);
   }
+  @Post('/api/v1/study/courses/:courseId/draft/review')
+  post_api_v1_study_courses_draft_review_041c5223(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('POST /api/v1/study/courses/:courseId/draft/review', req, res);
+  }
   @Post('/api/v1/study/courses/:courseId/draft/sources/prepare')
   post_api_v1_study_courses_draft_sources_prepare_5f7671a4(
     @Req() req: DomainRequest,
@@ -749,6 +756,20 @@ export class StudyController {
     @Res() res: Response
   ): Promise<void> {
     return this.service.execute('PUT /api/v1/study/rooms/:roomId/visualization', req, res);
+  }
+  @Get('/api/v1/study/rooms/:roomId/whiteboard')
+  get_api_v1_study_rooms_whiteboard_05f68722(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('GET /api/v1/study/rooms/:roomId/whiteboard', req, res);
+  }
+  @Put('/api/v1/study/rooms/:roomId/whiteboard')
+  put_api_v1_study_rooms_whiteboard_90b64067(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('PUT /api/v1/study/rooms/:roomId/whiteboard', req, res);
   }
   @Post('/api/v1/study/rooms')
   post_api_v1_study_rooms_1cfc2126(@Req() req: DomainRequest, @Res() res: Response): Promise<void> {

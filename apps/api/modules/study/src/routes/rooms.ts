@@ -1,5 +1,12 @@
 import { readRoomVisualization } from '../services/roomVisualization';
 import {
+  readWhiteboard,
+  setWhiteboardLocked,
+  writeWhiteboardElements,
+  type WhiteboardView
+} from '../services/roomWhiteboard';
+import { WhiteboardError } from '../../../../shared/ednova/whiteboard';
+import {
   resolveRoomActivity,
   resolveRoomSourceRevision,
   sameActivityPin,
@@ -624,6 +631,84 @@ router.put('/:roomId/visualization', async (req: RoomRequest, res: Response) => 
     }
   }
   return res.status(result.status).json(result.body);
+});
+
+// ── Shared whiteboard ──────────────────────────────────────────────────────────
+// Same identity and authorization as the room: only active participants can read
+// or write. Realtime carries only a version number; clients fetch the board, so
+// a missed message is recovered by the next read.
+async function broadcastWhiteboard(room: IStudyRoom, board: WhiteboardView, req: DomainRequest) {
+  try {
+    await moduleClient.post(
+      `${NOTIFICATION_URL}/api/v1/notifications/broadcast-session`,
+      {
+        roomId: room.roomId,
+        sessionId: room.roomId,
+        payload: {
+          type: 'ROOM_WHITEBOARD_SYNC',
+          roomId: room.roomId,
+          version: board.version,
+          locked: board.locked
+        }
+      },
+      {
+        headers: buildInternalHeaders(req.headers.cookie || req.headers.authorization),
+        timeout: 3000
+      }
+    );
+  } catch (err) {
+    logger.warn(`Failed to broadcast whiteboard for ${room.roomId}: ${errorDetails(err).message}`);
+  }
+}
+
+function whiteboardPayload(board: WhiteboardView, room: IStudyRoom, userId: string) {
+  return {
+    roomId: board.roomId,
+    version: board.version,
+    locked: board.locked,
+    canEdit: !board.locked || room.hostUserId === userId,
+    isHost: room.hostUserId === userId,
+    elements: board.elements
+  };
+}
+
+router.get('/:roomId/whiteboard', requireActiveRoom, async (req: RoomRequest, res: Response) => {
+  res.setHeader('Cache-Control', 'private, no-store');
+  try {
+    const room = req.studyRoom!;
+    return res.json(whiteboardPayload(await readWhiteboard(room.roomId), room, req.user!.userId));
+  } catch {
+    return res.status(500).json({ error: 'Whiteboard unavailable' });
+  }
+});
+
+router.put('/:roomId/whiteboard', requireActiveRoom, async (req: RoomRequest, res: Response) => {
+  res.setHeader('Cache-Control', 'private, no-store');
+  const room = req.studyRoom!;
+  const userId = req.user!.userId;
+  const body = req.body || {};
+  try {
+    if (typeof body.locked === 'boolean' && body.elements === undefined) {
+      if (room.hostUserId !== userId) {
+        return res.status(403).json({ error: 'Only the host can lock the board' });
+      }
+      const board = await setWhiteboardLocked(room.roomId, body.locked);
+      await broadcastWhiteboard(room, board, req);
+      return res.json(whiteboardPayload(board, room, userId));
+    }
+    const { board, changed } = await writeWhiteboardElements(
+      room.roomId,
+      userId,
+      room.hostUserId,
+      body.elements
+    );
+    if (changed) await broadcastWhiteboard(room, board, req);
+    return res.json(whiteboardPayload(board, room, userId));
+  } catch (err) {
+    if (err instanceof WhiteboardError) return res.status(err.status).json({ error: err.message });
+    logger.warn(`Whiteboard write failed for ${room.roomId}: ${errorDetails(err).message}`);
+    return res.status(500).json({ error: 'Whiteboard unavailable' });
+  }
 });
 
 // POST / — Create study room (Contract 10)

@@ -2,14 +2,12 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import {
-  AiModeNote,
-  AiWaitStatus,
-} from "@/features/ai-status/ai-status-view";
+import { AiModeNote } from "@/features/ai-status/ai-status-view";
 import { refreshCourseNardouch } from "@/features/nardouch/course-growth";
 import { NardouchAssistant } from "@/features/nardouch/nardouch-assistant";
 import { ActivityRenderer } from "./activity-renderer";
 import { LearningStylePanel } from "./learning-style-panel";
+import { TutorThread } from "./tutor-answer";
 import {
   isTransientLearningError,
   learningErrorMessage,
@@ -82,6 +80,7 @@ export function LearningWorkspace({
   // reports in the "next step" card. Neither may discard the learner's work.
   const [tutorError, setTutorError] = useState("");
   const [asking, setAsking] = useState(false);
+  const [askedQuestion, setAskedQuestion] = useState<string | null>(null);
   const [noActivity, setNoActivity] = useState(false);
   const [rationale, setRationale] = useState("");
   const [lastResult, setLastResult] = useState<{
@@ -256,6 +255,29 @@ export function LearningWorkspace({
       setWorkspaceLang(previous);
       setError("Could not save your language choice. Try again.");
     });
+  }
+  function ask(text: string) {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    void run(async () => {
+      const objective = objectives.find((o) => o.objectiveId === objectiveId);
+      if (!objective) throw new Error("Choose a published objective");
+      setAnswer(null);
+      setAskedQuestion(trimmed);
+      setAsking(true);
+      try {
+        setAnswer(
+          await askLearningTutor(context.courseId, {
+            revisionId: context.revisionId,
+            topicId: objective.topicId,
+            objectiveId,
+            question: trimmed,
+          }),
+        );
+      } finally {
+        setAsking(false);
+      }
+    }, "tutor");
   }
   async function run(
     action: () => Promise<void>,
@@ -669,59 +691,29 @@ export function LearningWorkspace({
             className="block w-full rounded border p-3"
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !busy && question.trim())
+                ask(question);
+            }}
           />
         </label>
-        <Button
-          disabled={busy || !question.trim()}
-          onClick={() =>
-            run(async () => {
-              const objective = objectives.find(
-                (o) => o.objectiveId === objectiveId,
-              );
-              if (!objective) throw new Error("Choose a published objective");
-              setAnswer(null);
-              setAsking(true);
-              try {
-                setAnswer(
-                  await askLearningTutor(context.courseId, {
-                    revisionId: context.revisionId,
-                    topicId: objective.topicId,
-                    objectiveId,
-                    question,
-                  }),
-                );
-              } finally {
-                setAsking(false);
-              }
-            }, "tutor")
-          }
-        >
+        <Button disabled={busy || !question.trim()} onClick={() => ask(question)}>
           {asking ? "Loading…" : "Ask from sources"}
         </Button>
-        {asking && <AiWaitStatus />}
-        {tutorError && (
-          <p role="alert" className="text-sm text-destructive">
-            {tutorError}
-          </p>
-        )}
-        {answer && (
-          <div data-testid="tutor-answer">
-            <AiModeNote mode={answer.executionMode} />
-            <p className="whitespace-pre-wrap">
-              {answer.answer || "No verified answer available."}
-            </p>
-            {answer.citations?.map((c, i) => (
-              <a
-                className="block underline"
-                key={i}
-                href={`/api/v1/study/courses/${encodeURIComponent(context.courseId)}/revisions/${encodeURIComponent(context.revisionId)}/sources/${encodeURIComponent(c.documentId)}${c.pageNumber ? "#page=" + c.pageNumber : ""}`}
-              >
-                Source {i + 1}
-                {c.pageNumber ? `, page ${c.pageNumber}` : " (text; no page)"}
-              </a>
-            ))}
-          </div>
-        )}
+        <TutorThread
+          question={askedQuestion}
+          pending={asking}
+          answer={answer}
+          error={tutorError || null}
+          sourceHref={(c) =>
+            `/api/v1/study/courses/${encodeURIComponent(context.courseId)}/revisions/${encodeURIComponent(context.revisionId)}/sources/${encodeURIComponent(c.documentId)}${c.pageNumber ? "#page=" + c.pageNumber : ""}`
+          }
+          onFollowUp={(text) => {
+            const followUp = askedQuestion ? `${text}: ${askedQuestion}` : text;
+            setQuestion(followUp);
+            if (!busy) ask(followUp);
+          }}
+        />
         </details>
       </section>
       <section className="rounded-xl border p-5 space-y-3">

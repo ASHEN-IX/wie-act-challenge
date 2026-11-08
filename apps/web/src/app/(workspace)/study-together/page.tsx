@@ -64,6 +64,13 @@ export default async function Rooms({
             ? "Peer study rooms are available to learners. Use your teaching workspace to manage courses."
             : "Study with up to six peers in a shared room. Create one or join with a code."
         }
+        action={
+          !teaching && (
+            <Button asChild variant="outline">
+              <Link href="/study-together/connections">Connections & groups</Link>
+            </Button>
+          )
+        }
       />
       <DataError message={courses.error || sessions.error || studyRooms.error} />
       {!teaching && <div className="mb-10 grid max-w-4xl gap-8 md:grid-cols-2">

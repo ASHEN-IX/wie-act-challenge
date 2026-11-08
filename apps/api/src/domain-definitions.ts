@@ -34,7 +34,8 @@ const definitions: DomainTuple[] = [
       ['/api/v1/users/learning-rewards', 'learningRewards'],
       ['/api/v1/users/gamification/rank', 'ranking'],
       ['/api/v1/users/quests', 'quests'],
-      ['/api/v1/users/friends', 'friends']
+      ['/api/v1/users/friends', 'friends'],
+      ['/api/v1/users/groups', 'groups']
     ]
   ],
   [

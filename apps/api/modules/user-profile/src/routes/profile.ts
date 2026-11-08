@@ -11,6 +11,11 @@ import fs from 'node:fs';
 import { logger } from '@ednova/shared';
 import UserProfile from '../models/UserProfile';
 import Gamification from '../models/Gamification';
+import {
+  defaultLearningProfile,
+  normalizeLearningProfile,
+  type LearningProfile
+} from '../../../../shared/ednova/learningProfile';
 
 const router = createContracts();
 
@@ -153,6 +158,52 @@ router.get('/', async (req: DomainRequest, res: Response) => {
   }
 
   res.json({ profile });
+});
+
+// Learning preferences (onboarding answers). Private to the owner: no other
+// route exposes this document, and it is never copied into friend profiles.
+router.get('/learning', async (req: DomainRequest, res: Response) => {
+  res.setHeader('Cache-Control', 'private, no-store');
+  const profile = await UserProfile.findOne({ userId: req.user!.userId }).lean();
+  const stored = profile?.learningProfile as LearningProfile | null | undefined;
+  res.json({ learningProfile: stored ? normalizeLearningProfile(stored) : defaultLearningProfile() });
+});
+
+router.put('/learning', async (req: DomainRequest, res: Response) => {
+  res.setHeader('Cache-Control', 'private, no-store');
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+    return res.status(400).json({ error: 'Invalid learning preferences' });
+  }
+  const userId = req.user!.userId;
+  const existing = await UserProfile.findOne({ userId }).lean();
+  const base = existing?.learningProfile
+    ? normalizeLearningProfile(existing.learningProfile)
+    : defaultLearningProfile();
+  const next = normalizeLearningProfile(req.body, base);
+  // Saving answers completes onboarding unless the caller says otherwise.
+  if (!('onboardingStatus' in req.body) && next.onboardingStatus === 'pending') {
+    next.onboardingStatus = 'completed';
+  }
+  await UserProfile.findOneAndUpdate(
+    { userId },
+    { $set: { learningProfile: next }, $setOnInsert: { userId } },
+    { upsert: true, new: true }
+  );
+  res.json({ learningProfile: next });
+});
+
+// Reset returns the learner to a clean, skipped state (not "pending", so the
+// app does not nag them again).
+router.delete('/learning', async (req: DomainRequest, res: Response) => {
+  res.setHeader('Cache-Control', 'private, no-store');
+  const userId = req.user!.userId;
+  const cleared: LearningProfile = { ...defaultLearningProfile(), onboardingStatus: 'skipped' };
+  await UserProfile.findOneAndUpdate(
+    { userId },
+    { $set: { learningProfile: cleared }, $setOnInsert: { userId } },
+    { upsert: true, new: true }
+  );
+  res.json({ learningProfile: cleared });
 });
 
 // Update profile (supports file upload or JSON)

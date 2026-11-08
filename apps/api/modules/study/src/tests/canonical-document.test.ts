@@ -53,6 +53,25 @@ function fixture() {
 }
 
 describe('canonical course document', () => {
+  test('accepts a chapter-sized lesson with hundreds of blocks and source spans', () => {
+    const document: any = fixture();
+    const lesson = document.chapters[0].lessons[0];
+    lesson.blocks = Array.from({ length: 464 }, (_, i) => ({
+      id: `blk_${i}`, type: 'paragraph', text: `Paragraph ${i}`, evidence: [span],
+      regionId: `region_${i}`, extractionMethod: 'text', confidence: 1,
+    }));
+    lesson.source_spans = Array.from({ length: 544 }, () => span);
+    expect(parseCanonicalDocument(document).chapters[0].lessons[0].blocks).toHaveLength(464);
+  });
+
+  test('still rejects a lesson beyond the hard block bound', () => {
+    const document: any = fixture();
+    document.chapters[0].lessons[0].blocks = Array.from({ length: 2001 }, (_, i) => ({
+      id: `blk_${i}`, type: 'paragraph', text: 'x', evidence: [span],
+    }));
+    expect(() => parseCanonicalDocument(document)).toThrow('INVALID_CANONICAL_DOCUMENT');
+  });
+
   test('accepts real region paragraphs and extraction metadata while rejecting event handlers', () => {
     const document: any = fixture();
     document.chapters[0].lessons[0].blocks.push({

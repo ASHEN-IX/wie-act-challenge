@@ -19,6 +19,8 @@ import { type RoomSnapshotState, applyRoomSnapshot } from "./room-sync";
 import { PrivateHelpPanel } from "./private-help-panel";
 import { RoomLearningPanel } from "./room-learning-panel";
 import { VoiceModeratorControls } from "./voice-moderator-controls";
+import { Whiteboard } from "../whiteboard/whiteboard";
+import { InvitePanel } from "../community/invite-panel";
 
 export interface FacilitatorInterventionInfo {
   interventionId: string;
@@ -118,6 +120,14 @@ export function RoomView({
   const [hintLevel, setHintLevel] = useState<number>(1);
   const [customQuestion, setCustomQuestion] = useState<string>("");
   const [tab, setTab] = useState<"chat" | "help" | "voice">("chat");
+  // The board is mounted on first use and then kept mounted, so switching back
+  // to the activity never loses it.
+  const [mainView, setMainView] = useState<"activity" | "board">("activity");
+  const [boardOpened, setBoardOpened] = useState(false);
+  const [boardSignal, setBoardSignal] = useState<{
+    version: number;
+    locked: boolean;
+  } | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isFacilitatorPending, startFacilitatorTransition] = useTransition();
 
@@ -186,6 +196,15 @@ export function RoomView({
             data.roomId === roomId
           ) {
             setSnapshot((previous) => applyRoomSnapshot(previous, data));
+          }
+
+          if (
+            data.type === "ROOM_WHITEBOARD_SYNC" &&
+            data.roomId === roomId &&
+            Number.isSafeInteger(data.version) &&
+            typeof data.locked === "boolean"
+          ) {
+            setBoardSignal({ version: data.version, locked: data.locked });
           }
 
           if (
@@ -438,7 +457,40 @@ export function RoomView({
           </div>
         )}
 
-        <RoomLearningPanel room={room} userId={currentUserId} />
+        <div role="group" aria-label="Shared workspace" className="flex gap-2">
+          {(
+            [
+              ["activity", "Activity"],
+              ["board", "Whiteboard"],
+            ] as const
+          ).map(([id, label]) => (
+            <Button
+              key={id}
+              size="sm"
+              variant={mainView === id ? "default" : "outline"}
+              aria-pressed={mainView === id}
+              onClick={() => {
+                setMainView(id);
+                if (id === "board") setBoardOpened(true);
+              }}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+
+        <div hidden={mainView !== "activity"}>
+          <RoomLearningPanel room={room} userId={currentUserId} />
+        </div>
+        {boardOpened && (
+          <div hidden={mainView !== "board"}>
+            <Whiteboard
+              roomId={roomId}
+              connected={connectionStatus === "connected"}
+              signal={boardSignal}
+            />
+          </div>
+        )}
 
         <div className="flex justify-end">
           <ActionForm action={leaveRoom} submit="Leave room" variant="outline">
@@ -513,6 +565,8 @@ export function RoomView({
             })}
           </ul>
         </div>
+
+        <InvitePanel roomId={roomId} />
 
         <div className="flex flex-col gap-3 rounded-xl border p-3">
           <div role="tablist" aria-label="Room tools" className="flex gap-1">

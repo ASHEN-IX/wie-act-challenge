@@ -34,8 +34,10 @@ services:
     volumes:
     # Both the ingestion worker and the authenticated source-preparation HTTP
     # endpoint create revision artifacts on this shared volume.
-    - ./var/dev-faiss:/app/faiss
-    - ./var/dev-uploads:/app/uploads
+    # Host sources must match the API's INGEST_UPLOADS_DIR / FAISS_INDEX_DIR
+    # (see .env); otherwise the worker cannot see uploaded originals.
+    - ${FAISS_INDEX_DIR:-./var/dev-faiss}:/app/faiss
+    - ${INGEST_UPLOADS_DIR:-./var/dev-uploads}:/app/uploads
     depends_on:
       mongodb:
         condition: service_healthy

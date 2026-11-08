@@ -58,8 +58,6 @@ const schema = new Schema<ILearnerAdaptationPreference>(
   { collection: 'learner_adaptation_preferences', timestamps: true },
 );
 
-schema.index({ userId: 1 }, { unique: true });
-
 export const LearnerAdaptationPreference: Model<ILearnerAdaptationPreference> =
   models.LearnerAdaptationPreference ||
   model<ILearnerAdaptationPreference>('LearnerAdaptationPreference', schema);

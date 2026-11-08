@@ -162,7 +162,8 @@ export function CourseReviewPanel({
           {(review.ai.status === "unavailable" ||
             review.ai.status === "invalid") && (
             <p className="text-sm text-muted-foreground">
-              AI review: {review.ai.reason?.replace(/\.$/, "")}. The automatic checks above still
+              {/^AI review/i.test(review.ai.reason ?? "") ? "" : "AI review: "}
+              {review.ai.reason?.replace(/\.$/, "")}. The automatic checks above still
               apply.
             </p>
           )}

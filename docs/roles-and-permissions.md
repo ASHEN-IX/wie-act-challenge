@@ -78,3 +78,6 @@ The repository now has one Better Auth identity plus Study-owned `institutions`,
 - The profile page shows only active memberships and provides an invitation-token acceptance form. Course enrollment, instructor assignment, material scoping and publication remain later missions gated by ED-26/Contract 03 review.
 
 See the [M04-A verification](../reports/EDNOVA-M04A-INSTITUTION-FOUNDATION-VERIFICATION.md) and the [M04-A.1 invitation reliability verification](../reports/EDNOVA-M04A1-INVITATION-RELIABILITY-VERIFICATION.md).
+
+## Learning engagement (whiteboard, connections, groups) — implemented
+Whiteboard access follows the study room (active participants edit, host locks). Connections and study groups are personal and never grant course, institution or progress access. Details: `learning-engagement-plan.md`.

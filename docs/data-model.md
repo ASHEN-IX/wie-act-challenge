@@ -254,3 +254,8 @@ EdNova enforces strict storage boundaries to prevent duplication and ensure that
 ---
 
 *This document defines the complete Data Architecture for EdNova.*
+
+## Learning engagement collections
+- `user_profiles.learningProfile` (Mixed, normalised in `shared/ednova/learningProfile.ts`): stated learning preferences.
+- `room_whiteboards`: one board per room, `version` CAS token, TTL 7 days on `updatedAt`.
+- `studygroups` (`StudyGroup`): owner, members, invites, optional active session.

@@ -14,24 +14,33 @@ import { isCourseReady } from "@/features/courses/lifecycle";
 import { load } from "@/lib/api";
 import { TaskList, type Task } from "@/features/tasks/task-list";
 import type { LearningRewards } from "@/features/rewards/types";
+import {
+  orderHomeActions,
+  normalizeLearningProfile,
+  type HomeAction,
+  type LearningProfile,
+} from "@ednova/shared/ednova/learningProfile";
 
 export const metadata = { title: "Overview — Noveris" };
 
 // One line each: where it goes and what happens there.
 const QUICK_ACTIONS = [
   {
+    id: "courses",
     href: "/courses",
     label: "My Learning",
     hint: "Your courses, practice and tutor",
     icon: BookOpen,
   },
   {
+    id: "study_together",
     href: "/study-together",
     label: "Study Together",
     hint: "Join or start a live room",
     icon: Users,
   },
   {
+    id: "visual_lab",
     href: "/visual-lab",
     label: "Visual Lab",
     hint: "Standalone experiments, practice only",
@@ -84,11 +93,19 @@ export default async function Dashboard() {
       </div>
     );
   }
-  const [courses, tasks, rewards] = await Promise.all([
+  const [courses, tasks, rewards, learning] = await Promise.all([
     getCourses(),
     load<{ tasks: Task[] }>("/api/v1/study/tasks"),
     load<LearningRewards>("/api/v1/users/learning-rewards"),
+    load<{ learningProfile: LearningProfile }>("/api/v1/users/profile/learning"),
   ]);
+  const profile = learning.data
+    ? normalizeLearningProfile(learning.data.learningProfile)
+    : null;
+  const actionOrder: HomeAction[] = orderHomeActions(profile);
+  const quickActions = [...QUICK_ACTIONS].sort(
+    (a, b) => actionOrder.indexOf(a.id) - actionOrder.indexOf(b.id),
+  );
 
   // The first course that is published for learning. The app does not track
   // "last opened", so the card says Next course rather than implying history.
@@ -106,6 +123,21 @@ export default async function Dashboard() {
       />
 
       <DataError message={courses.error || tasks.error} />
+
+      {profile?.onboardingStatus === "pending" && (
+        <div
+          role="note"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3"
+        >
+          <p className="text-sm">
+            Tell us how you like to learn so suggestions fit you. It takes a
+            minute and you can skip it.
+          </p>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/onboarding">Set up my learning</Link>
+          </Button>
+        </div>
+      )}
 
       <section aria-label="Next step">
         {activeCourse ? (
@@ -159,7 +191,7 @@ export default async function Dashboard() {
         aria-label="Quick actions"
         className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"
       >
-        {QUICK_ACTIONS.map(({ href, label, hint, icon: Icon }) => (
+        {quickActions.map(({ href, label, hint, icon: Icon }) => (
           <Link
             key={href}
             href={href}

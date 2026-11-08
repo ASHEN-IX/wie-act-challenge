@@ -9,8 +9,11 @@ const text = (value: unknown, max: number) => {
   if (typeof value !== 'string' || !value || value.length > max) throw new Error('INVALID_CANONICAL_DOCUMENT');
   return value;
 };
+// Per-lesson bound. A real chapter-sized PDF section yields hundreds of blocks
+// and source spans; this still caps what a single lesson can carry.
+const MAX_LESSON_ITEMS = 2000;
 const spans = (value: unknown): EvidenceSpan[] => {
-  if (!Array.isArray(value) || value.length > 400) throw new Error('INVALID_CANONICAL_DOCUMENT');
+  if (!Array.isArray(value) || value.length > MAX_LESSON_ITEMS) throw new Error('INVALID_CANONICAL_DOCUMENT');
   return value.map((entry) => {
     const span = record(entry);
     const start = span.lineStart, end = span.lineEnd;
@@ -107,7 +110,7 @@ export function parseCanonicalDocument(value: unknown): CanonicalDocumentV1 {
         id: text(chapter.id, 128), title: text(chapter.title, 500),
         lessons: chapter.lessons.map((entry) => {
           const lesson = record(entry);
-          if (!Array.isArray(lesson.blocks) || lesson.blocks.length > 400) throw new Error('INVALID_CANONICAL_DOCUMENT');
+          if (!Array.isArray(lesson.blocks) || lesson.blocks.length > MAX_LESSON_ITEMS) throw new Error('INVALID_CANONICAL_DOCUMENT');
           return {
             id: text(lesson.id, 128), title: text(lesson.title, 500), summary: String(lesson.summary || '').slice(0, 2000),
             source_spans: spans(lesson.source_spans),

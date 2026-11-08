@@ -16,7 +16,7 @@ for (const name of ['apps/api/.env', 'apps/web/.env.local', 'apps/ai/.env']) {
   envs[name] = existsSync(file) ? dotenv.parse(readFileSync(file, 'utf8')) : {};
 }
 const api = envs['apps/api/.env']; const web = envs['apps/web/.env.local']; const ai = envs['apps/ai/.env'];
-for (const key of ['MONGODB_URI', 'BETTER_AUTH_SECRET', 'BETTER_AUTH_URL']) {
+for (const key of ['MONGODB_URI', 'BETTER_AUTH_SECRET', 'BETTER_AUTH_URL', 'SMTP_HOST', 'SMTP_PORT', 'SMTP_SECURE']) {
   check(Boolean(api[key]) && api[key] === web[key], `API/web ${key} matches`);
 }
 check(Boolean(api.BETTER_AUTH_SECRET) && api.BETTER_AUTH_SECRET.length >= 32 && !api.BETTER_AUTH_SECRET.includes('replace-with'), 'Auth secret is configured');

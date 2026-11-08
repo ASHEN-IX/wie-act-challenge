@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@ednova/shared": "workspace:*",
+    "@excalidraw/excalidraw": "0.18.1",
     "@gsap/react": "^2.1.2",
     "@react-three/drei": "10.0.1",
     "@react-three/fiber": "9.0.4",
