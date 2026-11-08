@@ -1,5 +1,5 @@
 import { parseBinarySearchState } from '../../../../shared/visualization';
-import { resolveRoomActivity, validateRoomRevision } from './roomActivity';
+import { resolveRoomActivity, resolveRoomSourceRevision, validateRoomRevision } from './roomActivity';
 import { createHash, randomUUID, randomInt } from 'node:crypto';
 import Joi from 'joi';
 import { StudyRoom, type IStudyRoom, type IRoomCommandReceipt } from '../models/StudyRoom';
@@ -156,7 +156,6 @@ export async function runRoomCommand(
         if (!access.authorized) throw new CommandError(403, 'Course access is unavailable');
         if (!value.title && access.title) title = `${access.title} Study Group`;
       }
-      await validateRoomRevision(actor.userId, value);
       // Ensure the required unique index exists even when autoIndex is disabled.
       // This creates no new collection and never removes existing indexes.
       await StudyRoom.collection.createIndex(
@@ -174,10 +173,12 @@ export async function runRoomCommand(
       if (previous) {
         if (!membership(previous, actor.userId))
           throw new CommandError(403, 'Not an active participant in this room');
+        await validateRoomRevision(actor.userId, previous);
         const saved = receipt(previous, actor.userId, commandId, payloadHash);
         if (!saved) throw new CommandError(503, 'Creation receipt unavailable');
         return { status: saved.status, body: saved.response };
       }
+      const revisionId = await resolveRoomSourceRevision(actor.userId, value);
       const now = new Date();
       const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
       const created = {
@@ -185,7 +186,7 @@ export async function runRoomCommand(
         inviteCode: Array.from({ length: 6 }, () => chars[randomInt(chars.length)]).join(''),
         createCommandId: commandId,
         ...(value.courseId ? { courseId: value.courseId } : {}),
-        ...(value.revisionId ? { revisionId: value.revisionId } : {}),
+        ...(revisionId ? { revisionId } : {}),
         title,
         hostUserId: actor.userId,
         presenterUserId: actor.userId,
@@ -228,6 +229,7 @@ export async function runRoomCommand(
           createCommandId: commandId
         }).select('+commandReceipts');
         if (committed && membership(committed, actor.userId)) {
+          await validateRoomRevision(actor.userId, committed);
           const recorded = receipt(committed, actor.userId, commandId, payloadHash);
           if (recorded) return { status: recorded.status, body: recorded.response };
         }

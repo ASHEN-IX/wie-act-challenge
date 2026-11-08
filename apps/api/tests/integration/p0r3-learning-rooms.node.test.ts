@@ -202,11 +202,12 @@ test('P0-R3 canonical learning selection, durable pinned rooms, private checks a
       const created = await runRoomCommand(
         'create',
         { userId: actor },
-        { commandId: crypto.randomUUID(), courseId, revisionId: 'rev_one' },
+        { commandId: crypto.randomUUID(), courseId },
         undefined,
         authorize
       );
       assert.equal(created.status, 201);
+      assert.equal(created.body.revisionId, 'rev_one');
       roomId = String(created.body.roomId);
       const cmd = {
         commandId: crypto.randomUUID(),

@@ -417,17 +417,24 @@ export function RoomView({
                 ["individual_attempt", "Open Individual Attempt"],
                 ["debrief", "Move to Debrief"],
               ] as const
-            ).map(([phase, label]) => (
-              <Button
-                key={phase}
-                size="sm"
-                variant={room.currentPhase === phase ? "default" : "outline"}
-                onClick={() => handlePhaseChange(phase)}
-                disabled={isPending || room.currentPhase === phase}
-              >
-                {label}
-              </Button>
-            ))}
+            )
+              .filter(
+                ([phase]) =>
+                  phase !== "individual_attempt" ||
+                  !room.courseId ||
+                  Boolean(room.activeActivityId && room.activityRound),
+              )
+              .map(([phase, label]) => (
+                <Button
+                  key={phase}
+                  size="sm"
+                  variant={room.currentPhase === phase ? "default" : "outline"}
+                  onClick={() => handlePhaseChange(phase)}
+                  disabled={isPending || room.currentPhase === phase}
+                >
+                  {label}
+                </Button>
+              ))}
           </div>
         )}
 

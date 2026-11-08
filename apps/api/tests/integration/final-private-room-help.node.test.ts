@@ -115,9 +115,21 @@ test('Private room help persists only requester history and fails closed at deli
       );
     }
   );
+  await t.test('older course rooms can use the published source before selecting an activity', async () => {
+    await StudyRoom.updateOne({ roomId }, { $unset: { revisionId: 1 } });
+    try {
+      const previousCalls = calls;
+      await askPrivateRoomHelp(actor, roomId, request);
+      assert.equal(calls, previousCalls + 1);
+      assert.equal((await privateHelpHistory(actor, roomId)).history.length, 1);
+    } finally {
+      await StudyRoom.updateOne({ roomId }, { $set: { revisionId: 'rev_private' } });
+    }
+  });
   await t.test(
     'peer, educator and forged requester cannot read or ask for private course context',
     async () => {
+      const previousCalls = calls;
       for (const foreign of [peer, teacher, 'outsider']) {
         await assert.rejects(() => privateHelpHistory(foreign, roomId));
         await assert.rejects(() => askPrivateRoomHelp(foreign, roomId, request));
@@ -125,7 +137,7 @@ test('Private room help persists only requester history and fails closed at deli
       await assert.rejects(() => askPrivateRoomHelp(actor, roomId, { ...request, userId: peer }));
       const publicRoom = await StudyRoom.findOne({ roomId }).lean();
       assert.ok(!JSON.stringify(publicRoom).includes(request.question));
-      assert.equal(calls, 2);
+      assert.equal(calls, previousCalls);
     }
   );
   await t.test(
@@ -181,6 +193,7 @@ test('Private room help persists only requester history and fails closed at deli
     await assert.rejects(() => askPrivateRoomHelp(actor, roomId, request));
   });
   await t.test('source-free room returns explicit unavailable without invoking AI', async () => {
+    const previousCalls = calls;
     const free = 'room_free_' + Date.now();
     await StudyRoom.create({
       roomId: free,
@@ -197,6 +210,6 @@ test('Private room help persists only requester history and fails closed at deli
     });
     assert.equal(result.status, 'unavailable');
     assert.equal(result.response, null);
-    assert.equal(calls, 2);
+    assert.equal(calls, previousCalls);
   });
 });

@@ -833,6 +833,20 @@ async function main() {
     await peer.page.waitForURL(/\/study-together\/room_/, {
       waitUntil: "domcontentloaded",
     });
+    for (const actor of [learner, peer]) {
+      const panel = actor.page.getByTestId("room-learning");
+      await expect(
+        panel.getByRole("link", { name: "Open the course material" }),
+      ).toHaveAttribute(
+        "href",
+        `/courses/${courseId}/learn?revisionId=${revisionId}`,
+      );
+      await expect(panel.getByTestId("room-visualization")).toHaveCount(0);
+    }
+    assert.equal(
+      (await http(learner, "GET", "/api/v1/study/rooms/" + roomId)).body.room.revisionId,
+      revisionId,
+    );
     for (const extra of extraPeers) {
       await new Promise((resolve) => setTimeout(resolve, 61000));
       await extra.page.goto(webOrigin + "/study-together");

@@ -1,3 +1,5 @@
+import type { FilterQuery } from 'mongoose';
+import type { ICourseInvitation } from '../models/CourseInvitation';
 import crypto from 'node:crypto';
 import {
   Course,
@@ -9,6 +11,8 @@ import {
   Institution
 } from '../models';
 import { canAdministerCourse, canManageEnrollments } from './resourceAccess';
+
+const INVITATION_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
 const OBJECT_ID = /^[a-f\d]{24}$/i;
 const DEFAULT_INVITATION_HOURS = 168; // 7 days
@@ -137,6 +141,7 @@ export async function issueCourseInvitation(
   options: {
     role?: CourseInvitationRole;
     expiresInHours?: number;
+    recipientEmail?: string;
   } = {}
 ) {
   const courseId = parseId(courseIdRaw, 'Course');
@@ -161,7 +166,9 @@ export async function issueCourseInvitation(
   );
   const expiresAt = new Date(Date.now() + hours * 3600 * 1000);
 
-  const rawToken = crypto.randomBytes(32).toString('hex');
+  const rawToken = role === 'student'
+    ? Array.from({ length: 16 }, () => INVITATION_ALPHABET[crypto.randomInt(32)]).join('')
+    : crypto.randomBytes(32).toString('hex');
   const tokenHash = sha256(rawToken);
 
   const invitation = await CourseInvitation.create({
@@ -169,6 +176,7 @@ export async function issueCourseInvitation(
     institutionId: course.institutionId,
     role,
     tokenHash,
+    recipientEmail: options.recipientEmail,
     status: 'pending',
     issuedByUserId: actorUserId,
     expiresAt
@@ -178,7 +186,7 @@ export async function issueCourseInvitation(
     invitationId: invitation._id.toString(),
     courseId: course._id.toString(),
     role,
-    token: rawToken,
+    token: role === 'student' ? rawToken.match(/.{4}/g)!.join('-') : rawToken,
     expiresAt
   };
 }
@@ -193,18 +201,61 @@ export async function issueCourseInvitation(
  * - Multi-actor collision rejection (second user gets 409).
  * - Recipient must be an active member of the course's institution.
  */
-export async function acceptCourseInvitation(userId: string, rawToken: string) {
+export async function acceptCourseInvitation(userId: string, rawToken: string, email?: string) {
   if (!userId || typeof rawToken !== 'string' || !rawToken.trim()) {
     throw new EnrollmentError(400, 'Invalid user or invitation token');
   }
 
-  const tokenHash = sha256(rawToken.trim());
-  const now = new Date();
+  const entered = rawToken.trim();
+  const compact = entered.replace(/[\s-]/g, '').toUpperCase();
+  const token = /^[a-f0-9]{64}$/i.test(entered) ? entered.toLowerCase() : compact;
+  const recipient = email?.trim().toLowerCase();
+  return claimCourseInvitation(userId, {
+    tokenHash: sha256(token),
+    $or: [
+      { recipientEmail: { $exists: false } },
+      ...(recipient ? [{ recipientEmail: recipient }] : [])
+    ]
+  });
+}
 
-  // Atomically claim the pending invitation
+export async function acceptAddressedCourseInvitation(userId: string, email: string | undefined, invitationId: unknown) {
+  if (!email || typeof invitationId !== 'string' || !OBJECT_ID.test(invitationId)) {
+    throw new EnrollmentError(404, 'Invitation not found or invalid');
+  }
+  return claimCourseInvitation(userId, {
+    _id: invitationId,
+    recipientEmail: email.trim().toLowerCase(),
+    role: 'student'
+  });
+}
+
+export async function listAddressedCourseInvitations(email?: string) {
+  if (!email) return { invitations: [], pendingCount: 0 };
+  const filter = {
+    recipientEmail: email.trim().toLowerCase(),
+    status: 'pending',
+    role: 'student',
+    expiresAt: { $gt: new Date() }
+  };
+  const [rows, pendingCount] = await Promise.all([
+    CourseInvitation.find(filter).select('courseId expiresAt').sort({ createdAt: -1 }).limit(50).lean(),
+    CourseInvitation.countDocuments(filter)
+  ]);
+  const courses = await Course.find({ _id: { $in: rows.map((row) => row.courseId) } }).select('title').lean();
+  const titles = new Map(courses.map((course) => [course._id.toString(), course.title]));
+  const invitations = rows.flatMap((row) => {
+    const title = titles.get(row.courseId.toString());
+    return title ? [{ id: row._id.toString(), title, expiresAt: row.expiresAt }] : [];
+  });
+  return { invitations, pendingCount };
+}
+
+async function claimCourseInvitation(userId: string, selector: FilterQuery<ICourseInvitation>) {
+  const now = new Date();
   const claimed = await CourseInvitation.findOneAndUpdate(
     {
-      tokenHash,
+      ...selector,
       status: 'pending',
       expiresAt: { $gt: now }
     },
@@ -220,7 +271,7 @@ export async function acceptCourseInvitation(userId: string, rawToken: string) {
 
   if (!claimed) {
     // Check if it was already claimed
-    const existing = await CourseInvitation.findOne({ tokenHash });
+    const existing = await CourseInvitation.findOne(selector);
     if (!existing) {
       throw new EnrollmentError(404, 'Invitation not found or invalid');
     }

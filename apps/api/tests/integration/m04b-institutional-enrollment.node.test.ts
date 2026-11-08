@@ -5,6 +5,8 @@ import bcrypt from 'bcryptjs';
 import { migrateAuth } from '../../scripts/migrate-auth';
 
 interface ContextBody {
+  pendingCount?: number;
+  invitations?: { id: string; title: string }[];
   course?: {
     id: string;
     title: string;
@@ -466,6 +468,7 @@ test(
       assert.equal(invRes.status, 201);
       assert.ok(invRes.body.token);
       courseInvitationToken = invRes.body.token!;
+      assert.match(courseInvitationToken, /^(?:[0-9A-Z]{4}-){3}[0-9A-Z]{4}$/);
 
       // Outsider (not a member of Alpha) attempts to accept -> rejected 403
       const outsiderAccept = await request(
@@ -481,7 +484,7 @@ test(
         actors.get('student-alpha-1')!,
         'POST',
         '/api/v1/study/courses/invitations/accept',
-        { token: courseInvitationToken }
+        { token: courseInvitationToken.replaceAll("-", "").toLowerCase() }
       );
       assert.equal(acceptRes.status, 200);
       assert.equal(acceptRes.body.status, 'active');
@@ -512,6 +515,31 @@ test(
         { token: courseInvitationToken }
       );
       assert.equal(conflictAccept.status, 409);
+    });
+
+    await t.test('the addressed account can accept an invitation from its inbox without a code', async () => {
+      const recipient = actors.get('student-alpha-1')!;
+      const issued = await request(
+        actors.get('instructor-alpha-1')!,
+        'POST',
+        `/api/v1/study/courses/${courseAlphaId}/invitations`,
+        { email: recipient.email }
+      );
+      assert.equal(issued.status, 201);
+      const other = actors.get('student-alpha-2')!;
+      const inbox = '/api/v1/study/courses/invitations/inbox';
+      const endpoint = '/api/v1/study/courses/invitations/accept';
+      const listed = await request(recipient, 'GET', inbox);
+      assert.equal(listed.status, 200);
+      assert.equal(listed.body.pendingCount, 1);
+      const invitation = listed.body.invitations?.[0];
+      assert.ok(invitation?.id);
+      assert.equal(JSON.stringify(listed.body).includes(issued.body.token!), false);
+      assert.deepEqual((await request(other, 'GET', inbox)).body.invitations, []);
+      assert.equal((await request(other, 'POST', endpoint, { invitationId: invitation.id })).status, 404);
+      assert.equal((await request(other, 'POST', endpoint, { token: issued.body.token })).status, 404);
+      assert.equal((await request(recipient, 'POST', endpoint, { invitationId: invitation.id })).status, 200);
+      assert.equal((await request(recipient, 'GET', inbox)).body.pendingCount, 0);
     });
 
     await t.test('5. Direct administrative enrollment and roster listing', async () => {

@@ -35,6 +35,7 @@ test('M17 / ED-07 & ED-29: Real Shared Room Synchronized Activity & Private Subm
   const testPrefix = `m17_${Date.now()}`;
   const ownerUserId = `${testPrefix}_owner`;
   const instructorId = `${testPrefix}_instructor`;
+  const presenterId = `${testPrefix}_presenter`;
   const studentId = `${testPrefix}_student`;
   const institutionId = new mongoose.Types.ObjectId();
 
@@ -122,15 +123,17 @@ test('M17 / ED-07 & ED-29: Real Shared Room Synchronized Activity & Private Subm
       courseId = rawCourse._id.toString();
       await prepareCourseFixture(courseId, t);
 
-      // Enroll student
-      await CourseEnrollment.create({
-        courseId,
-        institutionId,
-        userId: studentId,
-        enrolledRole: 'student',
-        status: 'active',
-        enrolledAt: new Date()
-      });
+      // The instructor publishes the revision, then two learners study it.
+      await CourseEnrollment.create(
+        [presenterId, studentId].map((userId) => ({
+          courseId,
+          institutionId,
+          userId,
+          enrolledRole: 'student',
+          status: 'active',
+          enrolledAt: new Date()
+        }))
+      );
 
       // 3. Draft revision
       const initialDraftTag = `rev_${Date.now()}`;
@@ -319,10 +322,10 @@ test('M17 / ED-07 & ED-29: Real Shared Room Synchronized Activity & Private Subm
   );
 
   await t.test('2. Room Lifecycle: Create room and join peer learner', async () => {
-    // Instructor creates room bound to published course
+    // Presenter creates room bound to published course
     const createRes = await request(app)
       .post('/api/v1/study/rooms')
-      .set('x-test-actor', instructorId)
+      .set('x-test-actor', presenterId)
       .send({
         courseId,
         title: 'Thermo Study Group Alpha',
@@ -330,6 +333,7 @@ test('M17 / ED-07 & ED-29: Real Shared Room Synchronized Activity & Private Subm
       });
 
     assert.equal(createRes.status, 201);
+    assert.equal(createRes.body.revisionId, publishedRevisionTag);
     roomId = createRes.body.roomId;
     inviteCode = createRes.body.inviteCode;
     assert.ok(roomId, 'roomId should be generated');
@@ -348,8 +352,9 @@ test('M17 / ED-07 & ED-29: Real Shared Room Synchronized Activity & Private Subm
     const roomDoc = await StudyRoom.findOne({ roomId });
     assert.ok(roomDoc);
     assert.equal(roomDoc.participants.length, 2);
-    assert.equal(roomDoc.presenterUserId, instructorId);
+    assert.equal(roomDoc.presenterUserId, presenterId);
     assert.equal(roomDoc.currentPhase, 'idle');
+    assert.equal(roomDoc.revisionId, publishedRevisionTag);
     assert.equal(roomDoc.activeActivityId, null);
   });
 
@@ -369,7 +374,7 @@ test('M17 / ED-07 & ED-29: Real Shared Room Synchronized Activity & Private Subm
       // Presenter selects non-existent activity -> 404
       const notFoundRes = await request(app)
         .put(`/api/v1/study/rooms/${roomId}/phase`)
-        .set('x-test-actor', instructorId)
+        .set('x-test-actor', presenterId)
         .send({
           currentPhase: 'individual_attempt',
           activeActivityId: 'act_non_existent_999'
@@ -379,7 +384,7 @@ test('M17 / ED-07 & ED-29: Real Shared Room Synchronized Activity & Private Subm
       // Presenter successfully selects registered quiz activity
       const selectRes = await request(app)
         .put(`/api/v1/study/rooms/${roomId}/phase`)
-        .set('x-test-actor', instructorId)
+        .set('x-test-actor', presenterId)
         .send({
           currentPhase: 'individual_attempt',
           activeActivityId: quizActivityId
@@ -442,18 +447,18 @@ test('M17 / ED-07 & ED-29: Real Shared Room Synchronized Activity & Private Subm
         'Student participant must be marked as hasSubmitted'
       );
 
-      const instructorParticipant = roomDoc.participants.find((p) => p.userId === instructorId);
-      assert.ok(instructorParticipant);
+      const presenterParticipant = roomDoc.participants.find((p) => p.userId === presenterId);
+      assert.ok(presenterParticipant);
       assert.equal(
-        instructorParticipant.hasSubmitted,
+        presenterParticipant.hasSubmitted,
         false,
-        'Instructor participant has not submitted'
+        'Presenter participant has not submitted'
       );
 
       // Fetch public room state via GET
       const roomGetRes = await request(app)
         .get(`/api/v1/study/rooms/${roomId}`)
-        .set('x-test-actor', instructorId);
+        .set('x-test-actor', presenterId);
 
       assert.equal(roomGetRes.status, 200);
       assert.equal(roomGetRes.body.room.publicSubmissionsCount, 1);
@@ -474,7 +479,7 @@ test('M17 / ED-07 & ED-29: Real Shared Room Synchronized Activity & Private Subm
     // Presenter selects second activity (GuidedProblem)
     const selectRes2 = await request(app)
       .put(`/api/v1/study/rooms/${roomId}/phase`)
-      .set('x-test-actor', instructorId)
+      .set('x-test-actor', presenterId)
       .send({
         currentPhase: 'individual_attempt',
         activeActivityId: problemActivityId

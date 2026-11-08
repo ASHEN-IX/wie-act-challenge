@@ -57,6 +57,11 @@ export default async function CoursePage({
                 <Link href={`/courses/${course.id}/studio`}>Course Studio</Link>
               </Button>
             )}
+            {canAuthor && course.scope === "institutional" && (
+              <Button variant="outline" asChild>
+                <Link href={`/courses/${course.id}/students`}>Invite students</Link>
+              </Button>
+            )}
             {stage === "ready" && (
               <>
                 <Button asChild>

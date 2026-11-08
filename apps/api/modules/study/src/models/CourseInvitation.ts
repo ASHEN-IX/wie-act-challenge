@@ -11,6 +11,7 @@ export interface ICourseInvitation {
   institutionId?: Types.ObjectId;
   role: CourseInvitationRole;
   tokenHash: string;
+  recipientEmail?: string;
   status: CourseInvitationStatus;
   issuedByUserId: string;
   acceptedByUserId?: string;
@@ -48,6 +49,7 @@ const courseInvitationSchema = new Schema<ICourseInvitation>(
       unique: true,
       select: false
     },
+    recipientEmail: { type: String },
     status: {
       type: String,
       enum: COURSE_INVITATION_STATUSES,
@@ -76,6 +78,7 @@ const courseInvitationSchema = new Schema<ICourseInvitation>(
   { collection: 'course_invitations', timestamps: true }
 );
 
+courseInvitationSchema.index({ recipientEmail: 1, status: 1, expiresAt: 1 });
 courseInvitationSchema.index({ courseId: 1, status: 1, expiresAt: 1 });
 
 export const CourseInvitation =

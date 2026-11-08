@@ -28,10 +28,10 @@ async function getTransporter(): Promise<MailTransport> {
       host: process.env.SMTP_HOST,
       port: parseInt(process.env.SMTP_PORT || '587'),
       secure: process.env.SMTP_SECURE === 'true',
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
-      }
+      ...(process.env.SMTP_USER ? { auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } } : {}),
+      connectionTimeout: 5000,
+      greetingTimeout: 5000,
+      socketTimeout: 10000
     });
   } else {
     // Dev: use Ethereal fake SMTP
@@ -82,4 +82,24 @@ export async function sendSubscriptionExpiryNotice(
   });
 
   logEmail('[Email] Subscription reminder sent to', to, '| MessageId:', info.messageId);
+}
+
+export async function sendCourseInvitationEmail(to: string, courseTitle: string, code: string) {
+  if (!process.env.SMTP_HOST) throw new Error('Course invitation email is not configured');
+  const transport = await getTransporter();
+  const joinUrl = new URL('/courses#join-course', process.env.FRONTEND_URL || APP_URL);
+  await transport.sendMail({
+    from: process.env.SMTP_FROM || FROM_ADDRESS,
+    to,
+    subject: 'Your invitation to join an EdNova course',
+    text: `You have been invited to join ${courseTitle}.
+
+` +
+      `Sign in with this email address at ${joinUrl} and enter this code:
+
+${code}
+
+` +
+      'This invitation is single-use and requires an active membership at your institution.'
+  });
 }

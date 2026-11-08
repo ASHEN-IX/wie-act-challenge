@@ -1,3 +1,4 @@
+import { NotificationsLink } from "./notifications-link";
 import { Search } from "lucide-react";
 import { Navigation } from "./navigation";
 import { Logo, LogoMark } from "@/components/brand/logo";
@@ -98,6 +99,7 @@ export function WorkspaceShell({
         </details>
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <ThemeControl />
+          <NotificationsLink />
           <form
             action="/courses"
             className="relative hidden min-w-0 w-72 sm:block"

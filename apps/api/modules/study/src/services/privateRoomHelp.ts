@@ -5,6 +5,7 @@ import { activeLearningRoom } from './roomLearning';
 import { askGroundedTutor } from './tutorGrounding';
 import { broadcastToUser } from '../../../notification/src/realtime';
 import { ActivityBoundaryError } from './activityResolution';
+import { resolveRoomSourceRevision } from './roomActivity';
 interface HelpRow {
   userId: string;
   roomId: string;
@@ -42,11 +43,12 @@ const fail = (status: number, code: string, text: string): never => {
 };
 async function context(actor: string, roomId: string) {
   const room = await activeLearningRoom(actor, roomId);
+  const revisionId = room.revisionId || (await resolveRoomSourceRevision(actor, room));
   return {
     room,
     pin:
-      room.courseId && room.revisionId
-        ? { courseId: String(room.courseId), revisionId: room.revisionId }
+      room.courseId && revisionId
+        ? { courseId: String(room.courseId), revisionId }
         : null
   };
 }

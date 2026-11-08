@@ -62,16 +62,17 @@ class TestFacilitatorAgent(unittest.TestCase):
         self.assertIn("atomicity", intervention.messageText.lower())
 
     def test_graduated_hint_request(self):
-        """Pedagogical Rule 3: Graduated Socratic hint Level 1."""
+        """Pedagogical Rule 3: a hint refers to the current course activity."""
         obs = FacilitatorObservationInput(
             roomId="room_test_01",
             speakerUserId="usr_111",
             speakerName="Habib",
             transcriptText="We are stuck on this problem.",
             actionType="request_hint",
-            hintLevel=1,
+            hintLevel=2,
             currentPhase="peer_discussion",
             participants=self.sample_participants,
+            learningContext={"courseId": "physics", "activityTitle": "Heat transfer"},
         )
 
         intervention = run_facilitator(obs)
@@ -79,7 +80,9 @@ class TestFacilitatorAgent(unittest.TestCase):
         self.assertTrue(intervention.shouldIntervene)
         self.assertEqual(intervention.strategy, FacilitatorStrategy.SOCRATIC_NUDGE)
         self.assertEqual(intervention.trigger, FacilitatorTrigger.REQUEST_HINT)
-        self.assertTrue("Tasnim" in intervention.messageText or "key invariant" in intervention.messageText)
+        self.assertIn("Level 2", intervention.messageText)
+        self.assertIn("Heat transfer", intervention.messageText)
+        self.assertIn("course material", intervention.messageText)
 
     def test_phase_transition_consensus_check(self):
         """Pedagogical Rule 4: Phase advancement prompts team consensus check."""

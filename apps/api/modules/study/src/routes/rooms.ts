@@ -1,5 +1,10 @@
 import { readRoomVisualization } from '../services/roomVisualization';
-import { resolveRoomActivity, validateRoomRevision } from '../services/roomActivity';
+import {
+  resolveRoomActivity,
+  resolveRoomSourceRevision,
+  sameActivityPin,
+  validateRoomRevision
+} from '../services/roomActivity';
 import type { Response, NextFunction } from 'express';
 import type { FilterQuery } from 'mongoose';
 import type { DomainRequest } from '../../../../src/framework/contracts';
@@ -205,6 +210,7 @@ function evaluateLocalPeerFirstPolicy(obs: {
   participants: Array<Pick<IStudyRoomParticipant, 'userId' | 'name' | 'leftAt'>>;
   speakerName?: string;
   speakerUserId?: string;
+  learningContext?: { courseId?: string; activityTitle?: string };
 }): {
   shouldIntervene: boolean;
   strategy: string;
@@ -288,29 +294,21 @@ function evaluateLocalPeerFirstPolicy(obs: {
   // Rule 3: Graduated Socratic hint
   if (obs.actionType === 'request_hint') {
     const level = obs.hintLevel || 1;
-    if (level === 1) {
-      return {
-        shouldIntervene: true,
-        strategy: 'SOCRATIC_NUDGE',
-        trigger: 'request_hint',
-        targetUserId: obs.speakerUserId,
-        targetSpeakerName: obs.speakerName,
-        reasoning: 'Graduated Socratic hint Level 1: Conceptual invariant.',
-        messageText:
-          'Socratic Hint (Level 1): Consider the core invariant. Are any attributes storing multi-valued collections or delimited lists?'
-      };
-    } else {
-      return {
-        shouldIntervene: true,
-        strategy: 'SOCRATIC_NUDGE',
-        trigger: 'request_hint',
-        targetUserId: obs.speakerUserId,
-        targetSpeakerName: obs.speakerName,
-        reasoning: 'Graduated Socratic hint Level 2: Structural breakdown.',
-        messageText:
-          'Socratic Hint (Level 2): Check the attributes table. If a student can take multiple subjects, should subjects be in one column or a separate relationship table?'
-      };
-    }
+    const title = obs.learningContext?.activityTitle;
+    const focus = title ? `“${title}”` : 'the question your group is discussing';
+    const evidence = obs.learningContext?.courseId ? 'the course material' : 'your study notes';
+    const prompt = level === 1
+      ? `Which concept from ${evidence} helps explain ${focus}?`
+      : `Find a worked example or definition in ${evidence}. How could your group use it to take the next step on ${focus}?`;
+    return {
+      shouldIntervene: true,
+      strategy: 'SOCRATIC_NUDGE',
+      trigger: 'request_hint',
+      targetUserId: obs.speakerUserId,
+      targetSpeakerName: obs.speakerName,
+      reasoning: `Graduated Socratic hint Level ${level}.`,
+      messageText: `Socratic Hint (Level ${level}): ${prompt}`
+    };
   }
 
   // Rule 4: Phase transition consensus check
@@ -649,7 +647,7 @@ router.post('/', durableRoomCommand('create'), async (req: RoomRequest, res: Res
         title = `${access.title} Study Group`;
       }
     }
-    await validateRoomRevision(userId, value);
+    const revisionId = await resolveRoomSourceRevision(userId, value);
     if (!title) title = 'Study Together Room';
 
     let inviteCode = generateInviteCode();
@@ -667,7 +665,7 @@ router.post('/', durableRoomCommand('create'), async (req: RoomRequest, res: Res
       roomId,
       inviteCode,
       courseId: value.courseId || undefined,
-      revisionId: value.revisionId || undefined,
+      revisionId,
       hostUserId: userId,
       presenterUserId: userId,
       title,
@@ -696,6 +694,7 @@ router.post('/', durableRoomCommand('create'), async (req: RoomRequest, res: Res
       roomId: room.roomId,
       inviteCode: room.inviteCode,
       courseId: room.courseId,
+      revisionId: room.revisionId,
       title: room.title,
       presenterUserId: room.presenterUserId,
       moderatorMode: room.moderatorMode,
@@ -1494,6 +1493,13 @@ router.post(
       }
 
       const activeParticipants = room.participants.filter((p) => !p.leftAt);
+      let activityTitle: string | undefined;
+      if (room.activeActivityId && room.activePin) {
+        const activity = await resolveRoomActivity(userId, room, room.activeActivityId);
+        if (!sameActivityPin(room.activePin, activity.pin))
+          return res.status(409).json({ error: 'Room activity changed' });
+        activityTitle = activity.definition.title;
+      }
       const actionPayload = {
         roomId: room.roomId,
         actionType: actionType || 'ask_facilitator',
@@ -1503,7 +1509,7 @@ router.post(
         hintLevel,
         currentPhase: room.currentPhase,
         activeActivityId: room.activeActivityId || null,
-        learningContext: { courseId: room.courseId, title: room.title },
+        learningContext: { courseId: room.courseId, title: room.title, activityTitle },
         participants: activeParticipants.map((p) => ({
           userId: p.userId,
           name: p.name || 'Student',

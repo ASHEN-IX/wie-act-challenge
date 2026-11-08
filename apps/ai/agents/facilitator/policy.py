@@ -108,10 +108,14 @@ def evaluate_rules(obs: FacilitatorObservationInput) -> Optional[FacilitatorInte
 
     # 3. Handle explicit hint requests
     if obs.actionType == "request_hint":
+        context = obs.learningContext or {}
+        title = context.get("activityTitle")
+        focus = f"“{title}”" if title else "the question your group is discussing"
+        evidence = "the course material" if context.get("courseId") else "your study notes"
         hint_text = (
-            f"{peer_name}, let's look at the foundational rule on screen together. What is the key invariant we need to verify first?"
+            f"{peer_name}, which concept from {evidence} helps explain {focus}?"
             if obs.hintLevel == 1
-            else f"Hint: Consider whether each attribute holds atomic, indivisible values. {peer_name}, what does your teammate's example show?"
+            else f"{peer_name}, find a worked example or definition in {evidence}. How could your group use it to take the next step on {focus}?"
         )
         return FacilitatorInterventionProposal(
             interventionId=f"int_{uuid.uuid4().hex[:12]}",
@@ -121,7 +125,7 @@ def evaluate_rules(obs: FacilitatorObservationInput) -> Optional[FacilitatorInte
             targetSpeakerId=obs.speakerUserId,
             targetSpeakerName=obs.speakerName,
             reasoning=f"Provided graduated Socratic hint Level {obs.hintLevel}.",
-            messageText=hint_text,
+            messageText=f"Socratic Hint (Level {obs.hintLevel}): {hint_text}",
             cooldownSeconds=10,
             shouldIntervene=True,
         )

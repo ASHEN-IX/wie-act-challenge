@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { api, segment } from "@/lib/api";
 import { text, optionalText } from "@/lib/validation";
+import { getInvitationInbox } from "./invitation-inbox";
 import type { ActionState } from "@/lib/action-state";
 
 export async function createSubject(
@@ -122,21 +123,28 @@ export async function acceptCourseInvitationAction(
 ): Promise<ActionState> {
   await requireIdentity();
   try {
-    const token = text(form, "token", 200);
-    if (!/^[a-f0-9]{64}$/i.test(token.trim()))
-      return { error: "Paste the full invitation code from your teacher." };
+    const invitationId = optionalText(form, "invitationId", 24);
+    let token: string | undefined;
+    if (!invitationId) {
+      token = text(form, "token", 200);
+      const compact = token.replace(/[\s-]/g, "");
+      if (!/^[a-f0-9]{64}$/i.test(token.trim()) && !/^[0-9A-HJKMNP-TV-Z]{16}$/i.test(compact))
+        return { error: "Enter the invitation code from your teacher." };
+    }
 
     const joined = await api<{ courseId: string; role?: string }>("/api/v1/study/courses/invitations/accept", {
       method: "POST",
-      body: JSON.stringify({ token: token.trim() }),
+      body: JSON.stringify(invitationId ? { invitationId } : { token: token?.trim() }),
     });
     revalidatePath("/courses");
     revalidatePath("/dashboard");
+    revalidatePath("/notifications");
     let destination = `/courses/${segment(joined.courseId)}`;
     try {
       const details = await api<{ course: { activeRevisionId?: string } }>(destination.replace("/courses/", "/api/v1/study/courses/"));
       if (details.course.activeRevisionId && joined.role !== "instructor") destination += "/learn";
     } catch (error) { unstable_rethrow(error); /* Enrollment succeeded; keep the course link if details are temporarily unavailable. */ }
+    if (invitationId) redirect(destination);
     return {
       success: joined.role === "instructor" ? "Course assignment accepted." : "You joined the course. It is now in My Learning.",
       destination,
@@ -162,15 +170,21 @@ export async function issueCourseInvitationAction(
     const courseId = text(form, "courseId", 50);
     const role = "student";
     const expiresInHours = 168;
+    const email = optionalText(form, "email", 254) || undefined;
 
-    const res = await api<{ token: string; expiresAt: string }>(
+    const res = await api<{ token: string; expiresAt: string; emailSent: boolean }>(
       `/api/v1/study/courses/${segment(courseId)}/invitations`,
       {
         method: "POST",
-        body: JSON.stringify({ role, expiresInHours }),
+        body: JSON.stringify({ role, expiresInHours, email }),
       },
     );
-    return { success: "Invitation ready. Copy the code and send it to one student.", invitation: res };
+    if (email && !res.emailSent)
+      return { error: "The invitation is in the student’s Notifications, but email could not be sent. You can also share the code below.", invitation: res };
+    return {
+      success: email ? `Invitation sent to ${email} and added to their Notifications.` : "Invitation ready to share.",
+      invitation: res,
+    };
   } catch (error) {
     unstable_rethrow(error);
     return {
@@ -349,4 +363,11 @@ export async function registerCandidateActivity(
       serverEvaluation,
     }),
   });
+}
+
+
+export async function getPendingInvitationCount() {
+  await requireIdentity();
+  const { data } = await getInvitationInbox();
+  return data?.pendingCount ?? null;
 }

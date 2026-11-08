@@ -1,3 +1,4 @@
+import { sendCourseInvitationEmail } from '../../../auth/src/services/emailService';
 import {
   prepareRevisionSources,
   SourceIntegrityError,
@@ -47,8 +48,8 @@ import {
   StaleRevisionError,
   HierarchyValidationError
 } from '../services/courseDraft';
-import {
 import { reviewCourseDraft } from '../services/courseReview';
+import {
   publishCourseRevision,
   getPublishedCourseContext,
   resolveCourseSource,
@@ -74,6 +75,8 @@ import {
   revokeInstructorAssignment,
   issueCourseInvitation,
   acceptCourseInvitation,
+  acceptAddressedCourseInvitation,
+  listAddressedCourseInvitations,
   enrollStudentDirectly,
   listCourseEnrollments,
   withdrawOrRevokeEnrollment,
@@ -576,6 +579,15 @@ router.post(
 );
 
 // Get a specific course
+router.get('/invitations/inbox', async (req: DomainRequest, res: Response) => {
+  try {
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.json(await listAddressedCourseInvitations(req.user?.email));
+  } catch (error) {
+    handleEnrollmentError(res, error);
+  }
+});
+
 router.get('/:courseId', async (req: DomainRequest, res: Response) => {
   try {
     const { courseId } = req.params;
@@ -679,18 +691,6 @@ router.put('/:courseId/draft', async (req: DomainRequest, res: Response) => {
   }
 });
 
-router.post('/:courseId/draft/sources/prepare', async (req: DomainRequest, res: Response) => {
-  try {
-    const result = await prepareRevisionSources(
-      req.user!.userId,
-      String(req.params.courseId),
-      String(req.body?.expectedRevisionTag || '')
-    );
-    res.status(200).json(result);
-  } catch (error) {
-    const status = (error as { status?: number }).status;
-    res.status(status === 403 ? 403 : status === 409 ? 409 : 503).json({
-      error:
 // Advisory automated review of the editable draft. Read-only: it never saves,
 // acknowledges source review or publishes.
 router.post('/:courseId/draft/review', async (req: DomainRequest, res: Response) => {
@@ -712,6 +712,18 @@ router.post('/:courseId/draft/review', async (req: DomainRequest, res: Response)
   }
 });
 
+router.post('/:courseId/draft/sources/prepare', async (req: DomainRequest, res: Response) => {
+  try {
+    const result = await prepareRevisionSources(
+      req.user!.userId,
+      String(req.params.courseId),
+      String(req.body?.expectedRevisionTag || '')
+    );
+    res.status(200).json(result);
+  } catch (error) {
+    const status = (error as { status?: number }).status;
+    res.status(status === 403 ? 403 : status === 409 ? 409 : 503).json({
+      error:
         status === 409
           ? 'STALE_REVISION'
           : status === 403
@@ -1579,10 +1591,24 @@ router.post('/:courseId/invitations', async (req: DomainRequest, res: Response) 
   try {
     const actorUserId = req.user!.userId;
     const courseId = param(req, 'courseId');
-    const { role, expiresInHours } = req.body || {};
-
-    const result = await issueCourseInvitation(actorUserId, courseId, { role, expiresInHours });
-    res.status(201).json(result);
+    const { role, expiresInHours, email } = req.body || {};
+    if (email !== undefined && (role === 'instructor' || typeof email !== 'string' ||
+      email.length > 254 || !/^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+$/i.test(email))) {
+      return res.status(400).json({ error: 'Enter one valid student email address' });
+    }
+    const recipientEmail = typeof email === 'string' ? email.toLowerCase() : undefined;
+    const result = await issueCourseInvitation(actorUserId, courseId, { role, expiresInHours, recipientEmail });
+    let emailSent = false;
+    if (recipientEmail) {
+      try {
+        const course = await Course.findById(result.courseId).select('title').lean();
+        await sendCourseInvitationEmail(recipientEmail, course?.title || 'your course', result.token);
+        emailSent = true;
+      } catch {
+        // Return the same invitation so the instructor can share it manually.
+      }
+    }
+    res.status(201).json({ ...result, emailSent });
   } catch (error) {
     handleEnrollmentError(res, error);
   }
@@ -1592,9 +1618,10 @@ router.post('/:courseId/invitations', async (req: DomainRequest, res: Response) 
 router.post('/invitations/accept', async (req: DomainRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
-    const { token } = req.body || {};
-
-    const result = await acceptCourseInvitation(userId, token);
+    const { token, invitationId } = req.body || {};
+    const result = invitationId === undefined
+      ? await acceptCourseInvitation(userId, token, req.user?.email)
+      : await acceptAddressedCourseInvitation(userId, req.user?.email, invitationId);
     res.status(200).json(result);
   } catch (error) {
     handleEnrollmentError(res, error);

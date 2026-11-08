@@ -80,7 +80,7 @@ router.post('/invitations/accept', async (req: DomainRequest, res: Response) => 
     const userId = req.user!.userId;
     const { token } = req.body || {};
 
-    const result = await acceptCourseInvitation(userId, token);
+    const result = await acceptCourseInvitation(userId, token, req.user?.email);
     res.status(200).json(result);
   } catch (error) {
     handleError(res, error);

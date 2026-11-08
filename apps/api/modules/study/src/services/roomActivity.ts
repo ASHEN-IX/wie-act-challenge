@@ -1,4 +1,4 @@
-import { getPublishedCourseContext } from './coursePublication';
+import { getPublishedCourseContext, UnpublishedCourseError } from './coursePublication';
 import { resolveStoredActivity, ActivityBoundaryError } from './activityResolution';
 import { activityDigest } from './activityIdentity';
 import type { IStudyRoom } from '../models/StudyRoom';
@@ -48,6 +48,22 @@ export async function validateRoomRevision(
     return getPublishedCourseContext(actor, room.courseId, room.revisionId);
   }
   return null;
+}
+
+/** Resolve an explicit pin or use the currently published course revision. */
+export async function resolveRoomSourceRevision(
+  actor: string,
+  room: Pick<IStudyRoom, 'courseId' | 'revisionId'>
+) {
+  if (room.revisionId) return (await validateRoomRevision(actor, room))?.revisionId;
+  if (!room.courseId) return undefined;
+  try {
+    return (await getPublishedCourseContext(actor, room.courseId)).revisionId;
+  } catch (error) {
+    // Older API clients may still create discussion rooms for unpublished courses.
+    if (error instanceof UnpublishedCourseError) return undefined;
+    throw error;
+  }
 }
 export function sameActivityPin(a: unknown, b: unknown) {
   return activityDigest(a) === activityDigest(b);
