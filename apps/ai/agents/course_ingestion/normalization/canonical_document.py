@@ -301,6 +301,22 @@ def build_canonical_document(
     }
 
 
+def _bounded_pieces(part: str, limit: int = 2000) -> List[str]:
+    if len(part) <= limit:
+        return [part]
+    pieces: List[str] = []
+    offset = 0
+    while offset < len(part):
+        end = min(len(part), offset + limit)
+        last_space = part.rfind(" ", 0, end + 1)
+        split = last_space if last_space > offset + limit // 2 else end
+        piece = part[offset:split].strip()
+        if piece:
+            pieces.append(piece)
+        offset = split
+    return pieces
+
+
 def retrieval_units(document: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Deterministically derive searchable units from canonical block text.
 
@@ -325,7 +341,11 @@ def retrieval_units(document: Dict[str, Any]) -> List[Dict[str, Any]]:
             if not parts:
                 continue
             # Split only at paragraph boundaries, and only if a single source
-            # lesson would exceed the embedding window.
+            # lesson would exceed the embedding window. Extracted PDF text can
+            # hold a whole lesson in one "paragraph", so an oversized paragraph
+            # is cut at a space (as the API index builder does) to keep every
+            # unit inside the grounding excerpt limit.
+            parts = [piece for part in parts for piece in _bounded_pieces(part)]
             if len(text) <= 2000:
                 groups = [parts]
             else:

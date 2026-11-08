@@ -8,6 +8,13 @@ import { TextField, LongField } from "@/components/shared/form-field";
 import { FieldGroup } from "@/components/ui/field";
 import { acceptInstitutionInvitation } from "@/features/institutions/actions";
 import { getInstitutionContexts } from "@/features/institutions/queries";
+import { LearningPreferencesForm } from "@/features/onboarding/learning-preferences-form";
+import { resetLearningPreferences } from "@/features/onboarding/actions";
+import {
+  defaultLearningProfile,
+  normalizeLearningProfile,
+  type LearningProfile,
+} from "@ednova/shared/ednova/learningProfile";
 export const metadata = { title: "Settings" };
 const roleLabels = {
   university_admin: "University administrator",
@@ -15,12 +22,13 @@ const roleLabels = {
   university_student: "University student",
 } as const;
 export default async function Profile() {
-  const [result, institutions, identity] = await Promise.all([
+  const [result, institutions, identity, learning] = await Promise.all([
     load<{ profile: { nickname?: string; bio?: string } }>(
       "/api/v1/users/profile",
     ),
     getInstitutionContexts(),
     requireIdentity(),
+    load<{ learningProfile: LearningProfile }>("/api/v1/users/profile/learning"),
   ]);
   return (
     <>
@@ -53,6 +61,32 @@ export default async function Profile() {
           </FieldGroup>
         </ActionForm>
       </div>
+      <section className="mt-12 border-t pt-8" aria-labelledby="learning-prefs">
+        <h2 id="learning-prefs" className="text-lg font-semibold">
+          Learning preferences
+        </h2>
+        <p className="mt-2 mb-6 max-w-xl text-sm text-muted-foreground">
+          Private to you. They shape suggestions and how the tutor starts; they
+          are not a grade or a measure of ability, and are never shown to other
+          learners.
+        </p>
+        <DataError message={learning.error} />
+        <LearningPreferencesForm
+          mode="settings"
+          initial={
+            learning.data
+              ? normalizeLearningProfile(learning.data.learningProfile)
+              : defaultLearningProfile()
+          }
+        />
+        <div className="mt-6 max-w-xl">
+          <ActionForm
+            action={resetLearningPreferences}
+            submit="Clear my preferences"
+            variant="outline"
+          />
+        </div>
+      </section>
       <section className="mt-12 max-w-xl border-t pt-8">
         <h2 className="text-lg font-semibold">Institutional contexts</h2>
         <p className="mt-2 text-sm text-muted-foreground">

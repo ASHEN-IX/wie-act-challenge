@@ -24,7 +24,29 @@ export type ReaderContext = {
   onSource?: (block: Extract<LessonBlockV2, { type: "paragraph" | "list" | "quote" | "table" | "callout" | "math" }>) => void;
   mathCropHref?: (block: Extract<LessonBlockV2, { type: "math" }>) => string | undefined;
   mappings?: Map<string, { status: "exact" | "inferred_review_required" | "unmapped"; topicId: string | null }>;
+  /** Lesson-step view: formulas show the original crop without the long disclaimer. */
+  compact?: boolean;
 };
+
+function CompactFormula({ block, href }: { block: Extract<LessonBlockV2, { type: "math" }>; href?: string }) {
+  const [failed, setFailed] = useState(false);
+  const page = block.sourceMeta?.page;
+  // eslint-disable-next-line no-control-regex
+  const text = block.expression.replace(/[\u0000-\u001f]/g, " ").trim();
+  const image = href && !failed;
+  return (
+    <figure className="space-y-1">
+      {image && <img src={href} alt={`Formula from the original document${page ? `, page ${page}` : ""}`} loading="lazy" decoding="async" className="max-h-72 max-w-full rounded-md bg-white object-contain p-1" onError={() => setFailed(true)} />}
+      {text && (
+        <details className="text-xs text-muted-foreground">
+          <summary className="cursor-pointer">{image ? "Text version (automatic, unverified)" : "Formula text (automatic, unverified)"}</summary>
+          <pre className="mt-1 whitespace-pre-wrap break-words">{text}</pre>
+        </details>
+      )}
+      {!image && !text && <p role="status" className="text-xs text-muted-foreground">Formula unavailable. Open the original source.</p>}
+    </figure>
+  );
+}
 
 function FormulaSourceFallback({ block, href }: { block: Extract<LessonBlockV2, { type: "math" }>; href?: string }) {
   const [failed, setFailed] = useState(false);
@@ -177,7 +199,23 @@ function Table({ block, context }: { block: Extract<LessonBlockV2, { type: "tabl
   );
 }
 
-function Media({ block }: { block: Extract<LessonBlockV2, { type: "media" }> }) {
+function ImageFigure({ block, compact }: { block: Extract<LessonBlockV2, { type: "media" }>; compact?: boolean }) {
+  const [failed, setFailed] = useState(false);
+  if (failed)
+    return (
+      <p role="status" className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
+        This figure could not be loaded. It is in the original source.
+      </p>
+    );
+  return (
+    <figure className="space-y-2">
+      <img src={block.src} alt={block.alt} loading="lazy" decoding="async" onError={() => setFailed(true)} className={`max-h-[34rem] rounded-xl border object-contain ${compact ? "mx-auto w-auto max-w-full bg-white p-1" : "w-full"}`} />
+      {block.caption && <figcaption className="text-xs text-muted-foreground">{block.caption}</figcaption>}
+    </figure>
+  );
+}
+
+function Media({ block, compact }: { block: Extract<LessonBlockV2, { type: "media" }>; compact?: boolean }) {
   if (!block.src)
     return (
       <figure className="rounded-xl border border-dashed bg-muted/15 p-5">
@@ -189,7 +227,7 @@ function Media({ block }: { block: Extract<LessonBlockV2, { type: "media" }> }) 
   // data URLs are rejected at the renderer boundary.
   if (!block.src.startsWith("/api/v1/"))
     return <div role="alert" className="rounded-xl border p-5 text-sm">This media source is unavailable.</div>;
-  if (block.mediaType === "image") return <figure className="space-y-2"><img src={block.src} alt={block.alt} loading="lazy" decoding="async" className="max-h-[34rem] w-full rounded-xl border object-contain" />{block.caption && <figcaption className="text-xs text-muted-foreground">{block.caption}</figcaption>}</figure>;
+  if (block.mediaType === "image") return <ImageFigure block={block} compact={compact} />;
   if (block.mediaType === "audio") return <figure className="space-y-2 rounded-xl border p-4"><audio controls src={block.src} className="w-full" /><figcaption className="text-xs text-muted-foreground">{block.alt}</figcaption></figure>;
   return <figure className="space-y-2"><video controls src={block.src} aria-label={block.alt} className="w-full rounded-xl border" />{block.caption && <figcaption className="text-xs text-muted-foreground">{block.caption}</figcaption>}</figure>;
 }
@@ -331,7 +369,7 @@ const registry = {
   quote: ({ block, context }: { block: Extract<LessonBlockV2, { type: "quote" }>; context: ReaderContext }) => <Quote block={block} context={context} />,
   code: ({ block }: { block: Extract<LessonBlockV2, { type: "code" }> }) => <CodeBlock block={block} />,
   table: ({ block, context }: { block: Extract<LessonBlockV2, { type: "table" }>; context: ReaderContext }) => <Table block={block} context={context} />,
-  media: ({ block }: { block: Extract<LessonBlockV2, { type: "media" }> }) => <Media block={block} />,
+  media: ({ block, context }: { block: Extract<LessonBlockV2, { type: "media" }>; context: ReaderContext }) => <Media block={block} compact={context.compact} />,
   diagram: ({ block }: { block: Extract<LessonBlockV2, { type: "diagram" }> }) => <Diagram block={block} />,
   callout: ({ block, context }: { block: Extract<LessonBlockV2, { type: "callout" }>; context: ReaderContext }) => <Callout block={block} context={context} />,
   chart: ({ block }: { block: Extract<LessonBlockV2, { type: "chart" }> }) => <Chart block={block} />,
@@ -347,9 +385,9 @@ export function LearningBlockView({ block, context }: { block: LessonBlockV2; co
         {isMath ? (
           <Suspense fallback={<LoadingBlock />}>
             <div className="space-y-2">
-              {!block.review && block.notation === "plain" ? <FormulaSourceFallback block={block} href={context.mathCropHref?.(block)} /> : <MathContent expression={block.expression} notation={block.notation} caption={block.review ? `Instructor-approved ${block.review.state} representation; not independently verified.` : block.caption} />}
+              {!block.review && block.notation === "plain" && context.compact ? <CompactFormula block={block} href={context.mathCropHref?.(block)} /> : !block.review && block.notation === "plain" ? <FormulaSourceFallback block={block} href={context.mathCropHref?.(block)} /> : <MathContent expression={block.expression} notation={block.notation} caption={block.review ? `Instructor-approved ${block.review.state} representation; not independently verified.` : block.caption} />}
               {block.review && <details className="rounded border p-3 text-sm"><summary className="cursor-pointer">Formula review and original extraction</summary><p>Reviewer: {block.review.reviewer}</p><p>Original extraction:</p><pre className="whitespace-pre-wrap break-words">{block.review.originalExpression}</pre><p>Model proposal:</p><pre className="whitespace-pre-wrap break-words">{block.review.modelExpression}</pre></details>}
-              {(block.sourceMeta?.reviewRequired || block.review || block.provenance?.length) && (
+              {!context.compact && (block.sourceMeta?.reviewRequired || block.review || block.provenance?.length) && (
                 <p role="status" className="text-center text-xs text-amber-700 dark:text-amber-300">
                   Original source evidence{block.sourceMeta?.page ? ` · page ${block.sourceMeta.page}` : ""}.
                   {block.provenance?.length && context.onSource ? (

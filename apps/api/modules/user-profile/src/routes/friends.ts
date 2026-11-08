@@ -25,6 +25,23 @@ import { buildInternalHeaders } from '@ednova/shared/auth';
 const router = createContracts();
 
 const NOTIFICATION_URL = 'module://notifications';
+const STUDY_URL = 'module://study';
+const MAX_PENDING_REQUESTS = 20;
+const INVITE_WINDOW_MS = 10 * 60 * 1000;
+const MAX_INVITES_PER_WINDOW = 10;
+const inviteLog = new Map<string, number[]>();
+
+/** Per-inviter sliding window. In-memory is acceptable: the API runs as a single instance. */
+function allowInvite(inviterId: string, now = Date.now()): boolean {
+  const recent = (inviteLog.get(inviterId) || []).filter((t) => now - t < INVITE_WINDOW_MS);
+  if (recent.length >= MAX_INVITES_PER_WINDOW) {
+    inviteLog.set(inviterId, recent);
+    return false;
+  }
+  recent.push(now);
+  inviteLog.set(inviterId, recent);
+  return true;
+}
 
 // Helper: send notification
 async function notify(
@@ -205,6 +222,19 @@ router.post('/request', async (req: DomainRequest, res: Response) => {
     if (!recipientId) return res.status(400).json({ error: 'userId or friendCode required' });
     if (recipientId === requesterId)
       return res.status(400).json({ error: 'Cannot friend yourself' });
+    if (typeof recipientId !== 'string' || recipientId.length > 100)
+      return res.status(400).json({ error: 'Invalid userId' });
+
+    // Spam protection: bound how many requests can sit unanswered at once.
+    const pendingOut = await Friendship.countDocuments({
+      requester: requesterId,
+      status: 'pending'
+    });
+    if (pendingOut >= MAX_PENDING_REQUESTS) {
+      return res
+        .status(429)
+        .json({ error: 'You have too many pending requests. Wait for replies or cancel some.' });
+    }
 
     // Check if blocked
     const blocked = await Friendship.findOne({
@@ -389,10 +419,12 @@ router.post('/block/:userId', async (req: DomainRequest, res: Response) => {
     const blockId = req.params.userId;
 
     // Remove existing friendship if any
-    await Friendship.findOneAndDelete({
+    if (blockId === userId) return res.status(400).json({ error: 'Cannot block yourself' });
+    // Never delete a block the other person placed against us.
+    await Friendship.deleteMany({
       $or: [
         { requester: userId, recipient: blockId },
-        { requester: blockId, recipient: userId }
+        { requester: blockId, recipient: userId, status: { $ne: 'blocked' } }
       ]
     });
 
@@ -440,12 +472,80 @@ router.get('/blocked', async (req: DomainRequest, res: Response) => {
   }
 });
 
+// POST /invite-to-room — Invite an accepted connection to a study room the caller is in.
+// The room is read *as the caller*, so only a participant can invite, and the
+// invite code is taken from the server rather than the request. Course-bound
+// rooms still enforce enrollment on join: an invite never grants course access.
+router.post('/invite-to-room', async (req: DomainRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const { friendId, roomId } = req.body || {};
+    if (
+      typeof friendId !== 'string' ||
+      typeof roomId !== 'string' ||
+      !friendId ||
+      !roomId ||
+      friendId.length > 100 ||
+      roomId.length > 100 ||
+      !/^[a-zA-Z0-9_-]+$/.test(roomId)
+    ) {
+      return res.status(400).json({ error: 'friendId and roomId required' });
+    }
+    if (friendId === userId) return res.status(400).json({ error: 'Cannot invite yourself' });
+
+    const friendship = await Friendship.findOne({
+      $or: [
+        { requester: userId, recipient: friendId, status: 'accepted' },
+        { requester: friendId, recipient: userId, status: 'accepted' }
+      ]
+    });
+    if (!friendship) return res.status(403).json({ error: 'You can only invite your connections' });
+
+    if (!allowInvite(userId)) {
+      return res.status(429).json({ error: 'Too many invitations. Try again in a few minutes.' });
+    }
+
+    let room: { roomId: string; title: string; inviteCode: string; status: string };
+    try {
+      const response = await moduleClient.get<{ room: typeof room }>(
+        `${STUDY_URL}/api/v1/study/rooms/${encodeURIComponent(roomId)}`,
+        { headers: buildInternalHeaders(req.headers.cookie) }
+      );
+      room = response.data.room;
+    } catch {
+      return res.status(403).json({ error: 'You are not in that room' });
+    }
+    if (!room || room.status !== 'active')
+      return res.status(409).json({ error: 'Room is not active' });
+
+    const inviter = await UserProfile.findOne({ userId }).select('nickname').lean();
+    const inviterName = inviter?.nickname || 'A connection';
+    await notify(
+      friendId,
+      'team_invite',
+      'Study room invitation',
+      `${inviterName} invited you to study together: ${room.title}`,
+      {
+        kind: 'study_room',
+        inviteCode: room.inviteCode,
+        roomTitle: room.title,
+        fromUserId: userId
+      },
+      req.headers.cookie
+    );
+    res.json({ message: 'Invitation sent' });
+  } catch (error) {
+    console.error('Error inviting to room:', error);
+    res.status(500).json({ error: 'Failed to send invitation' });
+  }
+});
+
 // GET /search — Search users
 router.get('/search', async (req: DomainRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
     const q = (req.query.q as string) || '';
-    if (q.length < 2) return res.json({ results: [] });
+    if (q.length < 3 || q.length > 50) return res.json({ results: [] });
 
     // Get blocked users to exclude
     const blockedDocs = await Friendship.find({
@@ -460,7 +560,10 @@ router.get('/search', async (req: DomainRequest, res: Response) => {
     const query = {
       userId: { $nin: blockedIds },
       $or: [
-        { nickname: { $regex: '^' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } },
+        {
+          nickname: { $regex: '^' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' },
+          'privacy.allowRequests': { $ne: 'nobody' }
+        },
         { friendCode: q.toUpperCase() }
       ]
     };

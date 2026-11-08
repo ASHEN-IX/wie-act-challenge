@@ -32,6 +32,16 @@ export default async function LearnPage({
       discoverConcepts(courseId, revisionId),
     ]);
     const concepts = visual.data?.concepts ?? [];
+    // In-lesson help uses the same published objective the practice tutor does.
+    const firstTopic = catalog.context.topics.find((t) => t.objectives.length > 0);
+    const tutor = firstTopic
+      ? {
+          courseId,
+          revisionId: document.revisionId,
+          topicId: firstTopic.topicId,
+          objectiveId: firstTopic.objectives[0].objectiveId,
+        }
+      : null;
     return (
       <div className="mx-auto max-w-6xl">
         <div className="mb-5 space-y-3">
@@ -50,7 +60,7 @@ export default async function LearnPage({
             </Link>
           </p>
         </div>
-        <CourseReader document={document} practiceHref="#practice-and-tutor" />
+        <CourseReader document={document} practiceHref="#practice-and-tutor" tutor={tutor} />
         {concepts.length > 0 && (
           <section
             id="explore-visually"

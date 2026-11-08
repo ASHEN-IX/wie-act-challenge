@@ -175,6 +175,9 @@ const nullableInt = (value: unknown) => {
   if (!Number.isSafeInteger(value) || (value as number) < 1) fail();
   return value as number;
 };
+// A section is a whole chapter: it holds every lesson's blocks, so its bound sits
+// above the per-lesson bound in canonicalDocument.ts.
+const MAX_SECTION_BLOCKS = 5000;
 const list = <T>(value: unknown, check: (v: unknown) => T, max: number) => {
   if (!Array.isArray(value) || value.length > max) fail();
   return (value as unknown[]).map(check);
@@ -321,7 +324,7 @@ export function parseReadingDocumentV2(value: unknown): ReadingDocumentV2 {
   const sections = list(v.sections, (entry) => {
     const s = exact(entry, ['id', 'title', 'summary', 'blocks', 'evidence', 'mappingStatus']);
     if (!['exact', 'inferred_review_required', 'unmapped'].includes(String(s.mappingStatus))) fail();
-    return { id: str(s.id, 128), title: str(s.title, 500), summary: str(s.summary, 700), blocks: list(s.blocks, block, 400), evidence: list(s.evidence, sourceEvidence, 128), mappingStatus: s.mappingStatus as 'exact' | 'inferred_review_required' | 'unmapped' };
+    return { id: str(s.id, 128), title: str(s.title, 500), summary: str(s.summary, 700), blocks: list(s.blocks, block, MAX_SECTION_BLOCKS), evidence: list(s.evidence, sourceEvidence, 128), mappingStatus: s.mappingStatus as 'exact' | 'inferred_review_required' | 'unmapped' };
   }, 500);
   if (!sections.length) fail();
   const sources = list(v.sources, (entry) => {

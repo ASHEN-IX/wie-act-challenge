@@ -184,3 +184,15 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Focus Mode: hide EdNova's own navigation chrome while a session is active.
+   The session bar and the learning content stay visible. */
+html[data-focus="on"] [data-focus-hide] {
+  display: none !important;
+}
+html[data-focus="on"] [data-focus-shell] {
+  padding-left: 0 !important;
+}
+html[data-focus="on"] #main-content {
+  padding-top: 4.5rem;
+}

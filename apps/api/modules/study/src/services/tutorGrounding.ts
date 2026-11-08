@@ -8,7 +8,12 @@
  * - Validation of GroundingContext against Contract 03.
  */
 
+import mongoose from 'mongoose';
 import { CourseRevision } from '../models';
+import {
+  normalizeLearningProfile,
+  tutorPreferenceHints
+} from '../../../../shared/ednova/learningProfile';
 import { verifyRevisionArtifact } from './revisionSources';
 import aiClient from '../../../../shared/aiClient';
 import logger from '../../../../shared/logger';
@@ -68,6 +73,23 @@ export class TutorServiceUnavailableError extends Error {
   }
 }
 
+/**
+ * The learner's stated explanation preferences, or null. Only the closed hint
+ * fields leave this function: never goals, subjects or anything free-text. A
+ * failure here must not block the tutor, so it degrades to "no preferences".
+ */
+export async function loadTutorStyle(userId: string) {
+  try {
+    const doc = await mongoose.connection
+      .collection('user_profiles')
+      .findOne({ userId }, { projection: { learningProfile: 1 } });
+    if (!doc?.learningProfile) return null;
+    return tutorPreferenceHints(normalizeLearningProfile(doc.learningProfile));
+  } catch {
+    return null;
+  }
+}
+
 export async function askGroundedTutor(
   actorUserId: string,
   courseId: string,
@@ -99,9 +121,11 @@ export async function askGroundedTutor(
   }).lean();
   if (!revision) throw new TutorServiceUnavailableError();
   const artifact = await verifyRevisionArtifact(revision);
+  const style = await loadTutorStyle(actorUserId);
   // 3. Dispatch to AI service for grounded retrieval and verified answer generation
   try {
     const aiRes = await aiClient.post('/api/ai/tutor/ask', {
+      ...(style ? { style } : {}),
       courseId,
       revisionId: pubContext.revisionId,
       contentHash: pubContext.contentHash,

@@ -4,6 +4,29 @@ import { parseLearningDocument } from '../../../../shared/ednova/learningDocumen
 import { canonicalBlocks, sourceBlocks } from '../services/courseReader';
 
 describe('universal learning source adapter', () => {
+  it('accepts a chapter section with hundreds of blocks, as produced by real PDFs', () => {
+    const blocks: LessonBlockV2[] = Array.from({ length: 470 }, (_, i) => ({
+      type: 'paragraph' as const, id: `blk_${i}`, text: `Paragraph ${i}`, evidence: ['chunk'],
+    }));
+    const document = (sectionBlocks: LessonBlockV2[]) => ({
+      schemaVersion: '2.0.0',
+      courseId: 'a'.repeat(24),
+      revisionId: 'rev_test',
+      contentHash: 'sha256:' + 'a'.repeat(64),
+      title: 'Long chapter',
+      canonical: { extraction: 'deterministic', projectionVersion: '2.0.0', passages: [], mappings: [] },
+      generated: { summary: '', objectives: [], outline: [] },
+      sections: [{ id: 'chapter', title: 'Chapter', summary: '', blocks: sectionBlocks, evidence: [], mappingStatus: 'exact' }],
+      sources: [],
+      warnings: [],
+    });
+    expect(parseReadingDocumentV2(document(blocks)).sections[0].blocks).toHaveLength(470);
+    const tooMany = Array.from({ length: 5001 }, (_, i) => ({
+      type: 'paragraph' as const, id: `b_${i}`, text: 'x', evidence: ['chunk'],
+    }));
+    expect(() => parseReadingDocumentV2(document(tooMany))).toThrow('INVALID_LEARNING_DOCUMENT_V2');
+  });
+
   it('turns explicit text structure into typed blocks without interpreting HTML', () => {
     const blocks = sourceBlocks(
       [

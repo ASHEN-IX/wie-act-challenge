@@ -9,9 +9,9 @@ import {
   UseGuards,
   Get,
   Put,
+  Delete,
   Patch,
-  Post,
-  Delete
+  Post
 } from '@nestjs/common';
 import type { Response } from 'express';
 import type { DomainRequest } from '../contracts';
@@ -34,6 +34,27 @@ export class UsersController {
     @Res() res: Response
   ): Promise<void> {
     return this.service.execute('GET /api/v1/users/profile', req, res);
+  }
+  @Get('/api/v1/users/profile/learning')
+  get_api_v1_users_profile_learning_298f0d68(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('GET /api/v1/users/profile/learning', req, res);
+  }
+  @Put('/api/v1/users/profile/learning')
+  put_api_v1_users_profile_learning_e26444f1(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('PUT /api/v1/users/profile/learning', req, res);
+  }
+  @Delete('/api/v1/users/profile/learning')
+  delete_api_v1_users_profile_learning_b472f74c(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('DELETE /api/v1/users/profile/learning', req, res);
   }
   @Put('/api/v1/users/profile')
   put_api_v1_users_profile_23c689c8(
@@ -411,6 +432,13 @@ export class UsersController {
   ): Promise<void> {
     return this.service.execute('GET /api/v1/users/friends/blocked', req, res);
   }
+  @Post('/api/v1/users/friends/invite-to-room')
+  post_api_v1_users_friends_invitetoroom_78b325ef(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('POST /api/v1/users/friends/invite-to-room', req, res);
+  }
   @Get('/api/v1/users/friends/search')
   get_api_v1_users_friends_search_edd7ed3e(
     @Req() req: DomainRequest,
@@ -438,6 +466,70 @@ export class UsersController {
     @Res() res: Response
   ): Promise<void> {
     return this.service.execute('GET /api/v1/users/friends/count', req, res);
+  }
+  @Get('/api/v1/users/groups')
+  get_api_v1_users_groups_a7c86023(@Req() req: DomainRequest, @Res() res: Response): Promise<void> {
+    return this.service.execute('GET /api/v1/users/groups', req, res);
+  }
+  @Post('/api/v1/users/groups')
+  post_api_v1_users_groups_6013870f(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('POST /api/v1/users/groups', req, res);
+  }
+  @Get('/api/v1/users/groups/:groupId')
+  get_api_v1_users_groups_564ca1a2(@Req() req: DomainRequest, @Res() res: Response): Promise<void> {
+    return this.service.execute('GET /api/v1/users/groups/:groupId', req, res);
+  }
+  @Post('/api/v1/users/groups/:groupId/invite')
+  post_api_v1_users_groups_invite_dd827228(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('POST /api/v1/users/groups/:groupId/invite', req, res);
+  }
+  @Post('/api/v1/users/groups/:groupId/accept')
+  post_api_v1_users_groups_accept_55dab134(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('POST /api/v1/users/groups/:groupId/accept', req, res);
+  }
+  @Post('/api/v1/users/groups/:groupId/decline')
+  post_api_v1_users_groups_decline_092d3e83(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('POST /api/v1/users/groups/:groupId/decline', req, res);
+  }
+  @Delete('/api/v1/users/groups/:groupId/members/:memberId')
+  delete_api_v1_users_groups_members_e6d9a0c2(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('DELETE /api/v1/users/groups/:groupId/members/:memberId', req, res);
+  }
+  @Delete('/api/v1/users/groups/:groupId')
+  delete_api_v1_users_groups_18f4860d(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('DELETE /api/v1/users/groups/:groupId', req, res);
+  }
+  @Post('/api/v1/users/groups/:groupId/session')
+  post_api_v1_users_groups_session_4ec595b6(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('POST /api/v1/users/groups/:groupId/session', req, res);
+  }
+  @Get('/api/v1/users/groups/:groupId/session')
+  get_api_v1_users_groups_session_2d409d45(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('GET /api/v1/users/groups/:groupId/session', req, res);
   }
 }
 @Module({

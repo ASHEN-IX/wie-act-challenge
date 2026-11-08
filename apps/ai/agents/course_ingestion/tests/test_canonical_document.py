@@ -91,6 +91,25 @@ def test_retrieval_splits_only_at_paragraph_boundaries():
     assert all("x" * 700 in unit["text"] for unit in units)
 
 
+def test_retrieval_bounds_a_long_lesson_without_paragraph_breaks():
+    # Extracted PDF text often has single newlines only, so the whole lesson is
+    # one "paragraph". Every unit must still fit the grounding excerpt limit.
+    value = lesson()
+    value["full_content"] = "\n".join("Line %d of the extracted lesson text" % i for i in range(1000))
+    canonical = build_canonical_document(
+        "64a000000000000000000001",
+        "Course",
+        [{"id": "topic_1", "title": "Chapter 3", "subtopics": [value]}],
+    )
+    units = retrieval_units(canonical)
+    assert len(value["full_content"]) > 20000
+    assert len(units) > 10
+    assert all(len(unit["text"]) <= 2000 for unit in units)
+    assert "".join("".join(unit["text"].split()) for unit in units) == "".join(
+        value["full_content"].split()
+    )
+
+
 def test_summary_can_never_substitute_for_empty_canonical_body():
     value = lesson()
     value["full_content"] = ""

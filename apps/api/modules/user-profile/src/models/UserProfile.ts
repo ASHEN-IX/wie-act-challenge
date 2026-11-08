@@ -1,5 +1,6 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
 import crypto from 'crypto';
+import type { LearningProfile } from '../../../../shared/ednova/learningProfile';
 
 export interface IUserProfile extends Document {
   userId: string;
@@ -7,6 +8,8 @@ export interface IUserProfile extends Document {
   avatar: string;
   nickname?: string;
   friendCode: string;
+  /** Stated learning preferences; null until the learner answers or skips onboarding. */
+  learningProfile?: LearningProfile | null;
   onlineStatus: 'online' | 'studying' | 'offline';
   lastSeenAt?: Date;
   privacy: {
@@ -105,6 +108,7 @@ const userProfileSchema = new Schema<IUserProfile>(
       default: 'offline'
     },
     lastSeenAt: { type: Date },
+    learningProfile: { type: Schema.Types.Mixed, default: null },
     privacy: {
       showOnlineStatus: { type: Boolean, default: true },
       showStudyActivity: { type: Boolean, default: true },

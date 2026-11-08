@@ -8,16 +8,19 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { logout } from "@/features/auth/actions";
 import { ThemeControl } from "@/features/courses/theme-control";
+import { FocusMode } from "@/features/focus/focus-mode";
 
 export function WorkspaceShell({
   email,
   admin,
   instructor = false,
+  focusMinutes = 25,
   children,
 }: {
   email: string;
   admin: boolean;
   instructor?: boolean;
+  focusMinutes?: number;
   children: React.ReactNode;
 }) {
   const roleLabel = admin
@@ -27,8 +30,8 @@ export function WorkspaceShell({
       : "Learner";
 
   return (
-    <div className="min-h-screen lg:pl-64">
-      <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-sidebar-border bg-sidebar p-5 lg:flex">
+    <div className="min-h-screen lg:pl-64" data-focus-shell>
+      <aside data-focus-hide className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-sidebar-border bg-sidebar p-5 lg:flex">
         <div className="mb-6 flex items-center justify-between px-2">
           <Logo href="/dashboard" />
           <Badge
@@ -69,7 +72,7 @@ export function WorkspaceShell({
           </form>
         </div>
       </aside>
-      <header className="sticky top-0 z-20 flex min-h-16 items-center justify-between gap-3 overflow-x-clip border-b border-border bg-background/80 px-4 backdrop-blur-md sm:px-5 lg:px-8">
+      <header data-focus-hide className="sticky top-0 z-20 flex min-h-16 items-center justify-between gap-3 overflow-x-clip border-b border-border bg-background/80 px-4 backdrop-blur-md sm:px-5 lg:px-8">
         <div className="hidden items-center gap-2 text-sm text-muted-foreground lg:flex">
           <span className="font-medium text-foreground">Noveris Workspace</span>
           <span className="text-border">/</span>
@@ -120,6 +123,7 @@ export function WorkspaceShell({
       >
         {children}
       </main>
+      <FocusMode suggestedMinutes={focusMinutes} />
     </div>
   );
 }
