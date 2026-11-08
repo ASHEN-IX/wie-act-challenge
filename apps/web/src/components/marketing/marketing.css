@@ -1491,6 +1491,11 @@
     background: transparent;
     font-weight: 700;
   }
+  .marketing-root .mobile-nav a.active {
+    color: #c09ff9;
+    background: rgba(192, 159, 249, 0.08);
+    border-radius: 8px;
+  }
   .marketing-root .mobile-nav button {
     background: #7043db;
     border-radius: 10px;

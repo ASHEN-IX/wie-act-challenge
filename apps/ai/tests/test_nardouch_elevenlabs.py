@@ -7,6 +7,7 @@ import pytest
 import requests
 from agents.nardouch import elevenlabs as e
 from agents.nardouch.voice import tts_provider
+from tests.conftest import needs_av
 
 AUDIO = (Path(__file__).parent / "fixtures/elevenlabs-tone.mp3").read_bytes()
 KEY = "a" * 64
@@ -35,6 +36,7 @@ class Response:
         yield AUDIO
 
 
+@needs_av
 def test_payload_auth_and_only_text(monkeypatch):
     seen = []
 
@@ -59,6 +61,7 @@ def test_payload_auth_and_only_text(monkeypatch):
     assert len(seen) == 1
 
 
+@needs_av
 @pytest.mark.parametrize("status", [401, 402, 403, 422, 429, 500, 302])
 def test_safe_provider_failures(monkeypatch, status):
     response = Response()
@@ -99,6 +102,7 @@ def test_budget_and_global_single_flight(monkeypatch):
     assert error.value.category == "budget_exhausted"
 
 
+@needs_av
 def test_timeout_not_retried(monkeypatch):
     calls = []
 
@@ -114,6 +118,7 @@ def test_timeout_not_retried(monkeypatch):
     assert len(calls) == 1
 
 
+@needs_av
 def test_invalid_audio_and_limits(monkeypatch):
     assert e.validate_mp3(AUDIO) > 0
     for data in [b'{"error":"credits"}', b"ID3" + b"x" * 100, b""]:
@@ -135,6 +140,7 @@ def test_identity_preparation_preserves_math_and_code():
     assert e.prepare_text(text) == text
 
 
+@needs_av
 def test_character_budget_fails_before_dispatch(monkeypatch):
     monkeypatch.setenv("NARDOUCH_TTS_DAILY_CHARACTERS", "2")
     monkeypatch.setattr(
@@ -147,6 +153,7 @@ def test_character_budget_fails_before_dispatch(monkeypatch):
     assert error.value.category == "budget_exhausted"
 
 
+@needs_av
 def test_stream_cancellation_consumes_reservation_without_replay(monkeypatch):
     calls = []
 
@@ -172,6 +179,7 @@ def test_supplied_v3_model_is_supported(monkeypatch):
     assert e.settings()[1:] == ("21m00Tcm4TlvDq8ikWAM", "eleven_v3")
 
 
+@needs_av
 def test_structured_free_plan_rejection_is_sanitized(monkeypatch):
     class Rejected(Response):
         status_code = 402

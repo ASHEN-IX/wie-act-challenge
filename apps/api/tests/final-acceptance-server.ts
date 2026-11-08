@@ -8,6 +8,19 @@ import { config } from 'dotenv';
 import bcrypt from 'bcryptjs';
 import { MongoClient, ObjectId } from 'mongodb';
 
+/** The broker container: `rabbitmq` when present, else the QA stack's name. */
+function detectBroker(): string {
+  for (const name of ['rabbitmq', 'ednova-qa-rabbitmq']) {
+    try {
+      execFileSync('docker', ['inspect', name], { stdio: 'ignore' });
+      return name;
+    } catch {
+      // try the next candidate
+    }
+  }
+  return 'rabbitmq';
+}
+
 async function main() {
   config({ path: path.resolve('../../.env') });
   const name = process.env.FINAL_QA_DB!;
@@ -18,11 +31,15 @@ async function main() {
   await fs.chmod(root, 0o777);
   const container = 'ednova-final-qa-' + name.split('_').at(-1);
   const run = (args: string[]) => execFileSync('docker', args, { stdio: 'pipe' });
+  // The broker container is deployable under more than one name (the QA stack
+  // uses ednova-qa-rabbitmq; older harnesses assumed `rabbitmq`). Resolve it
+  // rather than hardcoding, so the harness works against either.
+  const broker = process.env.FINAL_QA_RABBITMQ_CONTAINER || detectBroker();
   const rabbitUser = process.env.RABBITMQ_USER || 'ednova';
-  run(['exec', 'rabbitmq', 'rabbitmqctl', 'add_vhost', name]);
+  run(['exec', broker, 'rabbitmqctl', 'add_vhost', name]);
   run([
     'exec',
-    'rabbitmq',
+    broker,
     'rabbitmqctl',
     'set_permissions',
     '-p',
@@ -173,7 +190,7 @@ async function main() {
     await client.db().dropDatabase();
     await client.close();
     try {
-      run(['exec', 'rabbitmq', 'rabbitmqctl', 'delete_vhost', name]);
+      run(['exec', broker, 'rabbitmqctl', 'delete_vhost', name]);
     } catch {}
     await fs.rm(root, { recursive: true, force: true });
     process.exit(0);

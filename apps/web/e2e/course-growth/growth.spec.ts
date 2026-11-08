@@ -80,6 +80,15 @@ test("real Next landing page serves the new art and describes course-based gradu
       )
       .all()) {
       await node.scrollIntoViewIfNeeded();
+      // Desktop stages reveal as the pinned timeline advances. Scrolling the
+      // character itself into view does not advance that timeline.
+      if (await node.getAttribute("data-stage")) {
+        for (let step = 0; step < 16; step++) {
+          if (await node.evaluate((el) => getComputedStyle(el).opacity === "1")) break;
+          await page.mouse.wheel(0, 250);
+          await page.waitForTimeout(125); // Allow the scrubbed reveal to advance.
+        }
+      }
       await expect(node).toHaveCSS("opacity", "1");
     }
     await page.evaluate(() => window.scrollTo(0, 0));

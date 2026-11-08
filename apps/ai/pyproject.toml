@@ -67,4 +67,7 @@ addopts = "-v --import-mode=importlib"
 asyncio_mode = "auto"
 markers = [
     "integration: marks tests as integration (requires live external services)",
+    "requires_mongo: needs a reachable MongoDB; skipped when none is configured",
+    "optional_elevenlabs: needs the optional `av` decoder for ElevenLabs TTS",
+    "optional_piper: needs the optional `piper` runtime for local TTS",
 ]

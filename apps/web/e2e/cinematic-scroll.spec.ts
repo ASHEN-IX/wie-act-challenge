@@ -314,4 +314,51 @@ test.describe("Cinematic Scroll Animation Implementation", () => {
       ).toHaveCSS("opacity", "1");
     }
   });
+
+  test("8. Navbar accurately highlights active section on initial load, scroll, and anchor click", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("http://localhost:3000");
+    await page.waitForTimeout(500);
+
+    const homeLink = page.locator(".nav-links a[href='#home']");
+    const featuresLink = page.locator(".nav-links a[href='#features']");
+    const howItWorksLink = page.locator(".nav-links a[href='#how-it-works']");
+    const nardouchLink = page.locator(".nav-links a[href='#nardouch']");
+
+    // 1. Initial state at top of page: Home must be active, Nardouch must NOT be active
+    await expect(homeLink).toHaveClass(/active/);
+    await expect(nardouchLink).not.toHaveClass(/active/);
+    await expect(featuresLink).not.toHaveClass(/active/);
+    await expect(howItWorksLink).not.toHaveClass(/active/);
+
+    // 2. Scroll into Features section
+    await page.evaluate(() => window.scrollTo(0, 1750));
+    await page.waitForTimeout(400);
+    await expect(featuresLink).toHaveClass(/active/);
+    await expect(homeLink).not.toHaveClass(/active/);
+
+    // 3. Scroll into How It Works section
+    await page.evaluate(() => window.scrollTo(0, 2100));
+    await page.waitForTimeout(400);
+    await expect(howItWorksLink).toHaveClass(/active/);
+
+    // 4. Scroll into Nardouch Evolution section
+    await page.evaluate(() => window.scrollTo(0, 3000));
+    await page.waitForTimeout(400);
+    await expect(nardouchLink).toHaveClass(/active/);
+
+    // 5. Click Why Noveris (anchor navigation)
+    await featuresLink.click();
+    await page.waitForTimeout(1000);
+    await expect(featuresLink).toHaveClass(/active/);
+    await expect(page.locator("#features")).toBeInViewport();
+
+    // 6. Click Home
+    await homeLink.click();
+    await page.waitForTimeout(1000);
+    await expect(homeLink).toHaveClass(/active/);
+    await expect(nardouchLink).not.toHaveClass(/active/);
+  });
 });

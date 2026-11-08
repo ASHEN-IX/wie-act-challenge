@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { CourseNardouchJourney } from "@ednova/shared/ednova/nardouchGrowth";
+import { nardouchImage, stages } from "@/lib/brand";
+import { NardouchAvatar } from "@/components/brand/nardouch-avatar";
 vi.mock("./course-growth-actions", () => ({
   loadCourseNardouch: vi.fn(),
   finishNardouchLesson: vi.fn(),
@@ -28,6 +30,19 @@ const render = (data = journey) =>
   );
 
 describe("course Nardouch", () => {
+  it.each(stages)("uses the approved $name artwork in the companion and avatar", ({ id }) => {
+    const companion = render({ ...journey, stage: id, graduated: id === "graduate" });
+    const avatar = renderToStaticMarkup(<NardouchAvatar stage={id} />);
+    expect(companion).toContain(`data-nardouch-stage="${id}"`);
+    for (const html of [companion, avatar]) {
+      const images = [...html.matchAll(/<img\b[^>]*\bsrc="([^"]+)"/g)];
+      expect(images).toHaveLength(1);
+      const src = images[0][1].replaceAll("&amp;", "&");
+      const url = new URL(src, "http://localhost");
+      expect(url.searchParams.get("url") ?? url.pathname).toBe(nardouchImage(id));
+    }
+  });
+
   it("starts with the supplied Baby artwork and an explicit lesson action", () => {
     const html = render();
     expect(html).toContain('data-nardouch-stage="baby"');

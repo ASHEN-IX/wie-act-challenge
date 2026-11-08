@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 import { getBadgeKeyForRank } from '../../modules/user-profile/src/services/leaderboardService';
+import { nardouchImage, stages } from '../../../web/src/lib/brand';
 
 describe("badge key regression ('use' key bug, leaderboardService)", () => {
   const getBadgeKey = (rank: Parameters<typeof getBadgeKeyForRank>[0]) => getBadgeKeyForRank(rank);
@@ -46,7 +47,7 @@ describe("badge key regression ('use' key bug, leaderboardService)", () => {
 describe('brand asset coverage (Noveris)', () => {
   const webPublic = path.join(__dirname, '../../../web/public');
 
-  test('every growth stage in the shared contract has a shipped asset', () => {
+  test('frontend artwork covers every growth stage in the shared contract', () => {
     // The stage vocabulary is owned by the shared contract; reading it here
     // keeps this test honest when a stage is added.
     const growth = fs.readFileSync(
@@ -55,14 +56,24 @@ describe('brand asset coverage (Noveris)', () => {
     ) as string;
     const declared = growth.match(/export type NardouchStage =([^;]+);/);
     expect(declared).not.toBeNull();
-    const stages = Array.from(declared![1].matchAll(/'([a-z]+)'/g)).map((m) => m[1]);
-    expect(stages.length).toBeGreaterThan(0);
+    const declaredStages = Array.from(declared![1].matchAll(/'([a-z]+)'/g)).map((m) => m[1]);
+    expect(declaredStages.length).toBeGreaterThan(0);
 
-    const missing = stages.filter(
-      (stage) => !fs.existsSync(path.join(webPublic, 'images', `nardouch-${stage}.png`)),
-    );
-    expect(missing).toEqual([]);
+    expect(stages.map((stage) => stage.id)).toEqual(declaredStages);
   });
+
+  test.each([...stages.map((stage) => stage.id), 'hero'] as const)(
+    '%s resolves through the real mapping to shipped RGBA artwork', (stage) => {
+      const url = nardouchImage(stage);
+      expect(url).toBe(`/images/nardouch-${stage}-transparent.png`);
+      const image = fs.readFileSync(path.join(webPublic, url));
+      expect(image.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+      expect(image.toString('ascii', 12, 16)).toBe('IHDR');
+      expect(image.readUInt32BE(16)).toBe(1254);
+      expect(image.readUInt32BE(20)).toBe(1254);
+      expect(image[25]).toBe(6); // PNG color type 6: truecolor with alpha.
+    },
+  );
 
   test('the Noveris brand marks are present', () => {
     const missing = [

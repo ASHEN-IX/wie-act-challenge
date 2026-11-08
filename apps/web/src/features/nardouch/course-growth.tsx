@@ -171,6 +171,10 @@ export function CourseNardouch({
     (!revisionId || data.revisionId === revisionId)
       ? data
       : null;
+  // A fetch can succeed yet return a journey for a different course or
+  // revision. That is not "still loading": no later event will arrive, so the
+  // loading text would stay forever. Treat it as a terminal mismatch.
+  const mismatched = Boolean(data) && journey === null;
   useEffect(() => {
     let active = true;
     let sequence = 0;
@@ -239,12 +243,15 @@ export function CourseNardouch({
             `/courses/${encodeURIComponent(courseId)}/learn?revisionId=${encodeURIComponent(journey.revisionId)}#practice-and-tutor`
           }
         />
+      ) : error ? null : mismatched ? (
+        <p role="status" className="my-5 text-sm text-muted-foreground">
+          Your course companion is not available for this revision. Your lesson
+          is still available.
+        </p>
       ) : (
-        !error && (
-          <p role="status" className="my-5 text-sm text-muted-foreground">
-            Loading your course companion…
-          </p>
-        )
+        <p role="status" className="my-5 text-sm text-muted-foreground">
+          Loading your course companion…
+        </p>
       )}
       {error && (
         <p role="alert" className="my-4 text-sm">

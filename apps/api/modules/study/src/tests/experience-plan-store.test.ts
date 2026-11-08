@@ -27,12 +27,10 @@ import {
 import {
   experienceContextFingerprint,
   isValidatedExperiencePlan,
-  parseExperiencePlanProposal,
   type ExperiencePlanValidationContext,
 } from '../../../../shared/ednova/experiencePlan';
 import {
   validateExperiencePlan,
-  tryValidateExperiencePlan,
 } from '../../../../shared/ednova/experiencePlanValidator';
 import { planMockExperience, type MockPlannerContext } from '../../../../shared/ednova/mockExperiencePlanner';
 import { projectExperiencePlan } from '../services/experiencePlanning';
@@ -153,51 +151,6 @@ function storedRecord(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** The stored body as the M4.1 proposal shape the validator expects. */
-function proposalFrom(plan: any) {
-  return {
-    schemaVersion: plan.schemaVersion,
-    planId: plan.planId,
-    claims: {
-      courseId: plan.courseId,
-      revisionId: plan.revisionId,
-      contentHash: plan.contentHash,
-      lessonId: plan.lessonId,
-      mode: plan.mode,
-      registryVersion: plan.registryVersion,
-      // The projection drops this field, but the proposal contract requires it.
-      presentationSchemaVersion: '1.0.0',
-      contextFingerprint: plan.contextFingerprint,
-    },
-    planner: plan.planner,
-    placements: [
-      ...plan.canonical.map((entry: any) => ({
-        placementId: entry.placementId,
-        kind: 'canonical',
-        block: { lessonId: plan.lessonId, blockId: entry.blockId },
-        component: entry.component,
-        componentVersion: entry.componentVersion,
-        group: entry.group,
-        disclosure: entry.disclosure,
-        ...(entry.interaction ? { interaction: entry.interaction } : {}),
-        fallback: entry.fallback,
-      })),
-      ...plan.supplemental.map((entry: any) => ({
-        placementId: entry.placementId,
-        kind: 'supplemental',
-        block: { lessonId: plan.lessonId, blockId: entry.blockId },
-        component: entry.component,
-        componentVersion: entry.componentVersion,
-        assetId: entry.assetId,
-        group: entry.group,
-        disclosure: entry.disclosure,
-        fallback: entry.fallback,
-      })),
-    ],
-    ...(plan.disclosure ? { notes: [] } : {}),
-  };
-}
-
 beforeEach(() => {
   jest.clearAllMocks();
   findOneAndUpdate.mockResolvedValue({});
@@ -302,10 +255,9 @@ describe('reading a stored plan', () => {
 
   it('returns the plan when the stored body still validates', async () => {
     const record = storedRecord();
-    // The record's body is the projected plan; re-parse it as the proposal the
-    // validator consumes. This mirrors the real read path.
-    const proposal = proposalFrom(record.plan);
-    findOne.mockReturnValue({ lean: async () => ({ ...record, plan: proposal }) });
+    // Use the exact JSON shape persisted by storeAcceptedPlan, without a
+    // test-only conversion that could conceal a broken reader.
+    findOne.mockReturnValue({ lean: async () => record });
     const outcome = await loadAcceptedPlan({
       courseId,
       revisionId,
@@ -361,9 +313,8 @@ describe('reading a stored plan', () => {
 
   it('rejects a tampered body that drops a canonical block', async () => {
     const record = storedRecord();
-    const proposal = proposalFrom(record.plan);
-    proposal.placements = proposal.placements.slice(0, 1);
-    findOne.mockReturnValue({ lean: async () => ({ ...record, plan: proposal }) });
+    record.plan.canonical = record.plan.canonical.slice(0, 1);
+    findOne.mockReturnValue({ lean: async () => record });
     const outcome = await loadAcceptedPlan({
       courseId,
       revisionId,
@@ -374,7 +325,7 @@ describe('reading a stored plan', () => {
       validationContext: context(),
     });
     expect(outcome.status).toBe('rejected');
-    if (outcome.status === 'rejected') expect(outcome.code).toBe('PLAN_COVERAGE_BLOCK_MISSING');
+    if (outcome.status === 'rejected') expect(outcome.code).toBe('PLAN_SCHEMA_INVALID');
   });
 
   it('rejects a stored plan whose live context no longer covers it', async () => {
@@ -396,7 +347,7 @@ describe('reading a stored plan', () => {
       contextFingerprint: context().contextFingerprint,
     });
     findOne.mockReturnValue({
-      lean: async () => ({ ...record, plan: proposalFrom(record.plan) }),
+      lean: async () => ({ ...record, plan: record.plan }),
     });
     const outcome = await loadAcceptedPlan({
       courseId,
@@ -416,7 +367,7 @@ describe('reading a stored plan', () => {
       lean: async () => ({
         ...record,
         planDigest: 'fnv1a64:0000000000000000',
-        plan: proposalFrom(record.plan),
+        plan: record.plan,
       }),
     });
     const outcome = await loadAcceptedPlan({

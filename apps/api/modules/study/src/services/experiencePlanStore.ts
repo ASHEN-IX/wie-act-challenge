@@ -26,6 +26,7 @@ import {
   type ValidatedLearningExperiencePlan,
 } from '../../../../shared/ednova/experiencePlan';
 import { tryValidateExperiencePlan } from '../../../../shared/ednova/experiencePlanValidator';
+import { parsePublishedExperiencePlan } from '../../../../shared/ednova/publishedExperiencePlan';
 import { recordEvent } from './planningMetrics';
 import type { PublishedExperiencePlanV1 } from './experiencePlanning';
 import { projectExperiencePlan } from './experiencePlanning';
@@ -257,19 +258,90 @@ export async function loadAcceptedPlan(input: {
   if (record.presentationSchemaVersion !== PRESENTATION_SCHEMA_VERSION)
     return { status: 'stale', reason: 'PRESENTATION_SCHEMA_CHANGED' };
 
-  // Re-parse the stored body through the same contract the writer used. A
-  // tampered record fails here rather than reaching a renderer.
-  let proposal;
+  // Re-parse the stored body with the parser for the shape that is actually
+  // stored.
+  //
+  // The record holds a *published* plan (`canonical`/`supplemental`/`digest`/
+  // `disclosure`), not an untrusted *proposal* (`claims`/`placements`/`notes`).
+  // Parsing it with `parseExperiencePlanProposal` rejects it as
+  // PLAN_SCHEMA_UNKNOWN_FIELD, which made this function return `rejected` for
+  // every stored plan — so the learner read route could never serve one. The
+  // published parser also enforces the canonical block order, which the trusted
+  // context supplies.
+  let published;
   try {
-    proposal = parseExperiencePlanProposal(record.plan);
+    published = parsePublishedExperiencePlan(
+      record.plan,
+      input.validationContext.blocks.map((block) => block.blockId),
+    );
   } catch {
     return { status: 'rejected', code: 'PLAN_SCHEMA_INVALID', stage: 'schema' };
   }
 
-  // The validator re-derives identity, coverage, capability and asset/review
-  // authority from the live context. A revoked approval or edited asset now
-  // fails even though the record was accepted earlier.
-  const outcome = tryValidateExperiencePlan(proposal, input.validationContext);
+  // The parsed body must still describe *this* plan, not merely be well formed.
+  if (published.digest !== record.planDigest)
+    return { status: 'stale', reason: 'PLAN_DIGEST_CHANGED' };
+  if (published.contextFingerprint !== input.contextFingerprint)
+    return { status: 'stale', reason: 'CONTEXT_FINGERPRINT_CHANGED' };
+
+  // The validator's contract takes an untrusted *proposal* and re-derives
+  // everything from the live context. Handing it the published shape fails at
+  // its own schema stage, so rebuild the proposal from the stored body. This
+  // is a faithful reverse of `projectExperiencePlan`, and the validator then
+  // re-checks identity, coverage, capability and asset/review authority as it
+  // does for provider output. A revoked approval or edited asset fails here
+  // even though the record was accepted earlier.
+  const outcome = tryValidateExperiencePlan(
+    {
+      schemaVersion: published.schemaVersion,
+      planId: published.planId,
+      claims: {
+        courseId: published.courseId,
+        revisionId: published.revisionId,
+        contentHash: published.contentHash,
+        lessonId: published.lessonId,
+        mode: published.mode,
+        registryVersion: published.registryVersion,
+        presentationSchemaVersion: PRESENTATION_SCHEMA_VERSION,
+        contextFingerprint: published.contextFingerprint,
+      },
+      planner: published.planner,
+      // Reverse the published flattening precisely: a proposal placement nests
+      // its target under `block` and carries `kind`; the published shape is
+      // flat with `blockType` instead. Passing the published objects straight
+      // through fails the proposal parser's key allowlist.
+      placements: [
+        ...published.canonical.map((entry) => ({
+          placementId: entry.placementId,
+          kind: 'canonical' as const,
+          block: { lessonId: published.lessonId, blockId: entry.blockId },
+          component: entry.component,
+          componentVersion: entry.componentVersion,
+          group: entry.group,
+          disclosure: entry.disclosure,
+          ...('interaction' in entry && entry.interaction !== undefined
+            ? { interaction: entry.interaction }
+            : {}),
+          fallback: entry.fallback,
+        })),
+        ...published.supplemental.map((entry) => ({
+          placementId: entry.placementId,
+          kind: 'supplemental' as const,
+          block: { lessonId: published.lessonId, blockId: entry.blockId },
+          component: entry.component,
+          componentVersion: entry.componentVersion,
+          group: entry.group,
+          disclosure: entry.disclosure,
+          ...('interaction' in entry && entry.interaction !== undefined
+            ? { interaction: entry.interaction }
+            : {}),
+          fallback: entry.fallback,
+          assetId: (entry as { assetId?: string }).assetId,
+        })),
+      ],
+    },
+    input.validationContext,
+  );
   if (!outcome.ok) return { status: 'rejected', code: outcome.code, stage: outcome.stage };
 
   // The revalidated plan must be the same plan, not merely a valid one.

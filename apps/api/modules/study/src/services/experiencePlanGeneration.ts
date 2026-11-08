@@ -43,9 +43,9 @@ import {
   reservePlanningBudget,
   PlanningBudgetError,
 } from './planningBudget';
-import { peekStoredPlan, storeAcceptedPlan } from './experiencePlanStore';
+import { loadAcceptedPlan, peekStoredPlan, storeAcceptedPlan } from './experiencePlanStore';
 import { recordEvent } from './planningMetrics';
-import { isLearningMode } from '../../../../shared/ednova/learningModes';
+import { isLearningMode, type LearningMode } from '../../../../shared/ednova/learningModes';
 import {
   buildPlanningContext,
   plannerOutputSchema,
@@ -259,8 +259,49 @@ export async function generateExperiencePlan(input: {
     // registry change), so the accepted plan no longer applies. Regeneration is
     // legitimate — and is separately reserved and reconciled like any attempt.
   }
-  if (row.state === 'uncertain')
+  // An uncertain row is normally terminal: the provider may have been charged,
+  // so the attempt must not be replayed. One case is not normally terminal —
+  // the plan record was committed and the process died before the request was
+  // promoted to `validated`. The plan is durable and stays retrievable, but the
+  // request would otherwise answer PROVIDER_UNCERTAIN_PREVIOUS forever, blocking
+  // an author who is not actually at risk of a second charge.
+  //
+  // Promotion here is a *state repair*, not a dispatch: it reads the existing
+  // plan record, so it cannot produce a second provider call, a second
+  // reservation or a refund. The accounting stays exactly as recovery left it
+  // (reservation retained, no usage claimed), which is the conservative answer.
+  if (row.state === 'uncertain') {
+    // Existence is not validity. `peekStoredPlan` only checks that a row exists,
+    // is not invalidated, and carries compatible version stamps — it does not
+    // check the content hash, the context fingerprint, the re-parsed body, the
+    // live asset/review authority, or the digest. Promoting on that would let a
+    // tampered, stale, wrong-revision or review-revoked plan be advertised as
+    // validated. The repair must use the same trusted contract the learner read
+    // path uses.
+    const adopted = await adoptDurablePlan({
+      validationContext: input.validationContext,
+      lessonId: input.lessonId,
+      mode: input.mode,
+    });
+    if (adopted) {
+      // Single-winner promotion: two callers may both see `uncertain`, but only
+      // one transitions the row. The loser re-reads rather than inventing state.
+      const promoted = await ExperiencePlanRequest.findOneAndUpdate(
+        { _id: row._id, state: 'uncertain' },
+        {
+          $set: { state: 'validated', planDigest: adopted.digest, finishedAt: new Date() },
+          $unset: { code: 1 },
+        },
+        { new: true },
+      ).lean();
+      const current = promoted ?? (await ExperiencePlanRequest.findOne({ _id: row._id }).lean());
+      if (String(current?.state) === 'validated') {
+        recordEvent('already_accepted_reuse');
+        return { status: 'already_accepted', planDigest: adopted.digest, requestId };
+      }
+    }
     return { status: 'failed', code: 'PROVIDER_UNCERTAIN_PREVIOUS', requestId, uncertain: true };
+  }
 
   // ---- reserve -----------------------------------------------------------
   let reservation;
@@ -393,6 +434,46 @@ export async function generateExperiencePlan(input: {
 
   recordEvent('validation_accept');
   recordEvent('provider_dispatch');
+
+  // Persist *before* declaring the attempt validated.
+  //
+  // M4.3 wrote `state: 'validated'` first and stored the plan afterwards. A
+  // crash in between left a request claiming a usable plan while no plan record
+  // existed — reproduced as `state=validated, plan_records=0`. The ordering was
+  // the bug: `validated` must mean "a validated plan exists and is retrievable",
+  // not "validation returned an object".
+  //
+  // Storing first also keeps the recovery rule honest: a crash here leaves the
+  // request in `validating`, which recovery does not treat as reusable, so no
+  // false plan is advertised and no second dispatch is implied.
+  const stored = await storeAcceptedPlan({
+    plan: validation.plan,
+    generatedBy: input.actor,
+    contextFingerprint: context.fingerprint,
+    mode: isLearningMode(input.mode) ? input.mode : 'read',
+  });
+  if (!stored.stored) {
+    // A plan that validated but cannot be stored is not usable to a learner.
+    // Record the failure plainly instead of pretending the plan exists.
+    await ExperiencePlanRequest.updateOne(
+      { _id: row._id },
+      {
+        $set: {
+          state: 'failed',
+          code: 'PLAN_NOT_STORED',
+          planDigest: validation.plan.digest,
+          finishedAt: new Date(),
+        },
+      },
+    );
+    return {
+      status: 'failed',
+      code: 'PLAN_NOT_STORED',
+      requestId,
+      uncertain: false,
+    };
+  }
+
   await ExperiencePlanRequest.updateOne(
     { _id: row._id },
     {
@@ -404,23 +485,6 @@ export async function generateExperiencePlan(input: {
       $unset: { code: 1, stage: 1 },
     },
   );
-  // M4.3: persist the accepted body so a learner can retrieve it without
-  // another inference. Storing does not make it trusted; the read path
-  // revalidates against current records.
-  const stored = await storeAcceptedPlan({
-    plan: validation.plan,
-    generatedBy: input.actor,
-    contextFingerprint: context.fingerprint,
-    mode: isLearningMode(input.mode) ? input.mode : 'read',
-  });
-  if (!stored.stored) {
-    // A plan that validated but cannot be stored is not usable to a learner;
-    // report it rather than pretend it is available.
-    await ExperiencePlanRequest.updateOne(
-      { _id: row._id },
-      { $set: { state: 'validated', planDigest: validation.plan.digest, code: 'PLAN_NOT_STORED' } },
-    );
-  }
 
   return {
     status: 'validated',
@@ -429,6 +493,41 @@ export async function generateExperiencePlan(input: {
     requestId,
     usageReported: accounting.usageReported,
   };
+}
+
+/**
+ * Adopt a durable plan only if it is *currently* valid.
+ *
+ * Runs the same trusted contract the learner read path uses — content hash,
+ * context fingerprint, schema/registry compatibility, a re-parse of the stored
+ * body, the full seven-stage validator against live asset and review authority,
+ * and a digest match. A row that merely exists is not enough: a tampered, stale,
+ * wrong-revision or review-revoked plan must be refused here, leaving the
+ * request `uncertain` rather than advertising an unusable plan.
+ *
+ * Reads only. It cannot dispatch to a provider or take a reservation.
+ */
+async function adoptDurablePlan(input: {
+  validationContext: ExperiencePlanValidationContext;
+  lessonId: string;
+  mode: string;
+}): Promise<{ digest: string } | null> {
+  if (input.mode === 'read') return null;
+  const outcome = await loadAcceptedPlan({
+    courseId: input.validationContext.courseId,
+    revisionId: input.validationContext.revisionId,
+    lessonId: input.lessonId,
+    mode: input.mode as LearningMode,
+    contentHash: input.validationContext.contentHash,
+    contextFingerprint: input.validationContext.contextFingerprint,
+    validationContext: input.validationContext,
+  });
+  if (outcome.status !== 'available') {
+    if (process.env.EXPERIENCE_PLAN_DEBUG)
+      console.error('[adopt] refused', JSON.stringify(outcome).slice(0, 200));
+    return null;
+  }
+  return { digest: outcome.plan.digest };
 }
 
 /**

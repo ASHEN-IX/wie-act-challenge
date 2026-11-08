@@ -25,6 +25,13 @@ afterAll(() => exitSpy.mockRestore());
 import request from 'supertest';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const moduleClient = require('@ednova/shared/moduleClient');
+// Status uses the independent Python HTTP boundary, not moduleClient.
+// Never let a unit test probe whichever service happens to be running locally.
+jest.mock('@ednova/shared/aiClient', () => ({
+  ...jest.requireActual('@ednova/shared/aiClient'),
+  getProviderStatus: jest.fn()
+}));
+const aiClient = require('@ednova/shared/aiClient');
 
 jest.mock('@ednova/shared/auth', () => ({
   authenticate: jest.fn((req, res, next) => {
@@ -311,9 +318,16 @@ describe('POST /api/v1/ai/coach', () => {
 });
 
 describe('GET /api/v1/ai/status', () => {
+  beforeEach(() => aiClient.getProviderStatus.mockReset());
+
+  afterEach(() => {
+    expect(aiClient.getProviderStatus).toHaveBeenCalledTimes(1);
+    expect(aiClient.getProviderStatus).toHaveBeenCalledWith({ timeout: 2000 });
+  });
+
   it('reports the provider state instead of assuming every agent is up', async () => {
-    // The status surface must never claim inference is available when the provider
-    // is unreachable: the product relies on it to show honest fallback status.
+    // No upstream report means both availability and configuration are unknown.
+    aiClient.getProviderStatus.mockRejectedValue(new Error('AI service unreachable'));
     const response = await request(app).get('/api/v1/ai/status').expect(200);
 
     expect(response.body).toHaveProperty('agents');
@@ -321,5 +335,49 @@ describe('GET /api/v1/ai/status', () => {
       expect.objectContaining({ status: 'unavailable', tier: null, model: null })
     );
     expect(response.body.executionMode).toBe('UNAVAILABLE');
+    for (const agent of Object.values(response.body.agents))
+      expect(agent).toEqual({ status: 'unavailable', tier: null, model: null });
+  });
+
+  it('retains configured model metadata without claiming inference is available', async () => {
+    // The authoritative provider contract separates configuration from verified
+    // execution. A reachable status service does not prove an operational model.
+    aiClient.getProviderStatus.mockResolvedValue({
+      status: 'unavailable',
+      execution_mode: 'UNAVAILABLE',
+      agents: { coach: { tier: 'compact', model: 'fixture/coach', available: false } }
+    });
+    const response = await request(app).get('/api/v1/ai/status').expect(200);
+    expect(response.body.agents.coach).toEqual({
+      status: 'unavailable', tier: 'compact', model: 'fixture/coach'
+    });
+    expect(response.body.executionMode).toBe('UNAVAILABLE');
+  });
+
+  it('does not infer coach availability from another operational agent', async () => {
+    aiClient.getProviderStatus.mockResolvedValue({
+      status: 'degraded',
+      execution_mode: 'REAL_APPROVED',
+      agents: { planner: { tier: 'capable', model: 'fixture/planner', available: true } }
+    });
+    const response = await request(app).get('/api/v1/ai/status').expect(200);
+    expect(response.body.agents.planner).toEqual({
+      status: 'available', tier: 'capable', model: 'fixture/planner'
+    });
+    expect(response.body.agents.coach).toEqual({ status: 'unavailable', tier: null, model: null });
+    expect(response.body.executionMode).toBe('REAL_APPROVED');
+  });
+
+  it.each(['REAL_APPROVED', 'MOCK_TEST'])('preserves the %s execution boundary', async (mode) => {
+    aiClient.getProviderStatus.mockResolvedValue({
+      status: 'ok',
+      execution_mode: mode,
+      agents: { coach: { tier: 'compact', model: 'fixture/coach', available: true } }
+    });
+    const response = await request(app).get('/api/v1/ai/status').expect(200);
+    expect(response.body.agents.coach).toEqual({
+      status: 'available', tier: 'compact', model: 'fixture/coach'
+    });
+    expect(response.body.executionMode).toBe(mode);
   });
 });

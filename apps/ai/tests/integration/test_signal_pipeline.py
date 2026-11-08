@@ -12,6 +12,7 @@ are not present (graceful fallback to mock data).
 
 import numpy as np
 import pytest
+from tests.conftest import needs_mongo
 import sys
 from pathlib import Path
 
@@ -117,6 +118,8 @@ class TestFocusDetector:
 # ── Signal Processing Service ────────────────────────────────────
 
 
+@pytest.mark.integration
+@needs_mongo
 class TestSignalProcessingService:
     """Integration test for the orchestrating SignalProcessingService."""
 

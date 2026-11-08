@@ -28,6 +28,7 @@ import re
 from datetime import datetime, timezone
 
 import pytest
+from tests.conftest import needs_mongo
 from bson import ObjectId
 
 from agents.coach.decision.prompt import _DECISION_INSTRUCTIONS, build_user_prompt
@@ -439,6 +440,7 @@ def test_to_coach_context_threads_session_id():
 # --------------------------------------------------------------- orchestrator
 
 
+@needs_mongo
 class TestOrchestratorCatalog:
     def _orch(self, catalog, current_task):
         from services.ai_orchestrator.orchestrator import AIOrchestrator

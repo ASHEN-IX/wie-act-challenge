@@ -220,6 +220,25 @@ class IngestionWorker(BaseAIWorker):
 
         source_files: List[str] = []
         all_sections = []
+        # Fail closed for modern, revision-bound ingestion.
+        #
+        # A request that carries `revisionId` is a modern, source-backed
+        # revision: its publication policy depends on manifest evidence
+        # (chapter identity, source regions, extraction review, formula
+        # review). If the manifest is unavailable — a database outage, a
+        # missing storageRef, a deployment misconfiguration — the legacy text
+        # parser below would silently produce a weaker artifact with no
+        # chapters and no source regions, and that artifact would still be
+        # publishable. Refusing is the only safe outcome: better no revision
+        # than a silently degraded one.
+        #
+        # Genuinely legacy documents remain supported: those arrive without a
+        # `revisionId` and take the else branch by design.
+        if request.revisionId and not manifest:
+            raise TerminalError(
+                "Source manifest unavailable for a revision-bound ingestion; "
+                "refusing to fall back to the legacy parser"
+            )
         if manifest:
             from services.vector_store.revision_artifacts import (
                 extract_documents,

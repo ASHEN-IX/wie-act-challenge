@@ -8,6 +8,7 @@ import pytest
 from agents.nardouch.piper_runtime import load_piper, validate_wav, synthesize_piper
 from agents.nardouch.voice import tts_provider, LocalPiperTTSProvider, VoiceUnavailable
 from agents.nardouch.speech_adaptation import prepare_piper_text
+from tests.conftest import needs_piper
 
 
 def files(tmp_path):
@@ -32,6 +33,7 @@ def test_selection(monkeypatch):
     assert isinstance(tts_provider(), LocalPiperTTSProvider)
 
 
+@needs_piper
 def test_forced_cpu(monkeypatch, tmp_path):
     import piper
 
