@@ -249,8 +249,9 @@ export function FocusMode({ suggestedMinutes = 25 }: { suggestedMinutes?: number
     () =>
       listenGuard((message) => {
         if (message.type === "ready") {
+          // Only note that the extension is present. Never answer with another report:
+          // the extension replies "ready" to every report, so that would loop forever.
           setGuard(true);
-          if (stateRef.current.status === "running" || stateRef.current.status === "paused") reportFocus(true);
         } else {
           // Emergency exit pressed in the extension.
           setSuppressed(true);
