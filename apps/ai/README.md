@@ -54,3 +54,24 @@ server supports resuming. This reduces failures on slow connections to
 `files.pythonhosted.org`. Rebuild normally after a download timeout to reuse
 the existing APT, pip, and Poetry caches; do not use `--no-cache` or prune
 the builder cache to troubleshoot network failures.
+
+### Study Together voice moderator
+
+Run the worker in a separate Python 3.12 environment from the `apps/ai` directory:
+
+```sh
+python3.12 -m venv .venv-voice
+.venv-voice/bin/pip install -r requirements-voice-moderator.txt
+.venv-voice/bin/python -m agents.voice_moderator.worker start
+```
+
+Export `LIVEKIT_URL`, `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET` for the same
+LiveKit server used by the study API. Set `LIVEKIT_MODERATOR_AGENT_NAME` to the
+same name on the worker and API (for example, `ednova-study-moderator`).
+The worker also requires `DEEPGRAM_API_KEY`, `CARTESIA_API_KEY`, and
+`CARTESIA_VOICE_ID`.
+
+When the presenter requests moderation, the worker subscribes to authorized
+microphone tracks. Deepgram transcribes the audio and Cartesia speaks prompts
+selected by EdNova's peer-first policy. The worker keeps a bounded turn
+transcript in memory and does not write room audio or transcripts to disk.

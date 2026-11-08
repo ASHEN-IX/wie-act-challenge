@@ -31,10 +31,10 @@ interface StudyRoomItem {
 export default async function Rooms({
   searchParams,
 }: {
-  searchParams: Promise<{ courseId?: string }>;
+  searchParams: Promise<{ courseId?: string; revisionId?: string }>;
 }) {
   const teaching = await hasTeachingAccess();
-  const { courseId: requestedCourseId } = await searchParams;
+  const { courseId: requestedCourseId, revisionId } = await searchParams;
   const [courses, sessions, studyRooms] = await Promise.all([
     getCourses(),
     load<{
@@ -61,16 +61,18 @@ export default async function Rooms({
         title={teaching ? "Sessions" : "Study Together"}
         description={
           teaching
-            ? "Create a room for your students, or join using an invitation code from a student."
+            ? "Peer study rooms are available to learners. Use your teaching workspace to manage courses."
             : "Study with up to six peers in a shared room. Create one or join with a code."
         }
       />
-      <DataError message={courses.error || sessions.error} />
-      <div className="mb-10 grid max-w-4xl gap-8 md:grid-cols-2">
+      <DataError message={courses.error || sessions.error || studyRooms.error} />
+      {!teaching && <div className="mb-10 grid max-w-4xl gap-8 md:grid-cols-2">
         <section className="rounded-lg border p-6">
           <h2 className="mb-5 text-lg font-semibold">Create a room</h2>
           <ActionForm action={createRoom} submit="Create room">
             <input type="hidden" name="commandId" value={randomUUID()} />
+            {requestedCourseId && revisionId && <input type="hidden" name="revisionId" value={revisionId} />}
+            {requestedCourseId && revisionId && <input type="hidden" name="revisionCourseId" value={requestedCourseId} />}
             <FieldGroup>
               <Field>
                 <FieldLabel htmlFor="courseId">Course (optional)</FieldLabel>
@@ -118,7 +120,7 @@ export default async function Rooms({
             </FieldGroup>
           </ActionForm>
         </section>
-      </div>
+      </div>}
 
       <h2 className="mb-5 text-xl font-semibold">Your rooms</h2>
       {dedicatedRooms.length > 0 || legacyRooms.length > 0 ? (
@@ -169,12 +171,12 @@ export default async function Rooms({
             </div>
           ))}
         </div>
-      ) : (
+      ) : !studyRooms.error && !sessions.error ? (
         <EmptyState
           title="No rooms yet"
           description="Create a room, or enter a peer’s invite code above."
         />
-      )}
+      ) : null}
     </>
   );
 }

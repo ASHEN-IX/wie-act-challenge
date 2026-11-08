@@ -23,4 +23,13 @@ describe("role-specific navigation", () => {
     expect(html).toContain("Study Together");
     expect(html).not.toContain("Instructor insights");
   });
+  it("keeps practice inside the course and out of the sidebar", () => {
+    const html = renderToStaticMarkup(<Navigation />);
+    expect(html).not.toContain(">Practice<");
+    expect(html).not.toContain("Binary search demo");
+    expect(html).not.toContain('href="/practice"');
+    // Standalone helpers stay reachable under More tools.
+    for (const label of ["Visual Lab", "Tasks", "Study plan"])
+      expect(html).toContain(`>${label}<`);
+  });
 });

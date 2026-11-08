@@ -19,7 +19,7 @@ export interface ModeratorDispatchResponse {
   dispatched: boolean;
   roomId: string;
   agentIdentity: string;
-  mode: string;
+  dispatchId: string;
   status: string;
 }
 

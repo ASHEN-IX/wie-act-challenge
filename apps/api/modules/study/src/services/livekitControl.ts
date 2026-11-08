@@ -12,6 +12,14 @@ export interface LiveKitTokenOptions {
   ttlSeconds?: number;
 }
 
+export function isLiveKitConfigured() {
+  return Boolean(
+    process.env.LIVEKIT_API_KEY?.trim() &&
+    process.env.LIVEKIT_API_SECRET?.trim() &&
+    /^wss?:\/\//.test(process.env.LIVEKIT_URL ?? '')
+  );
+}
+
 export function getLiveKitConfig() {
   const apiKey = process.env.LIVEKIT_API_KEY || 'devkey';
   const apiSecret = process.env.LIVEKIT_API_SECRET || 'secret';
@@ -45,7 +53,8 @@ export function generateLiveKitToken(options: LiveKitTokenOptions): string {
       roomJoin: true,
       canPublish: options.canPublishAudio,
       canSubscribe: options.canSubscribeAudio ?? true,
-      canPublishData: true
+      canPublishData: false,
+      canPublishSources: ['microphone']
     }
   };
 
@@ -91,6 +100,7 @@ export async function revokeLiveKitPublishPermissions(
   roomName: string,
   identity: string
 ): Promise<{ success: boolean; error?: string }> {
+  if (!isLiveKitConfigured()) return { success: false };
   const { httpUrl } = getLiveKitConfig();
   const adminToken = generateLiveKitAdminToken(roomName);
 
@@ -138,6 +148,7 @@ export async function removeLiveKitParticipant(
   roomName: string,
   identity: string
 ): Promise<{ success: boolean; error?: string }> {
+  if (!isLiveKitConfigured()) return { success: false };
   const { httpUrl } = getLiveKitConfig();
   const adminToken = generateLiveKitAdminToken(roomName);
 
@@ -169,3 +180,39 @@ export async function removeLiveKitParticipant(
   }
 }
 
+
+interface AgentDispatch {
+  id: string;
+  agent_name?: string;
+  agentName?: string;
+  room: string;
+}
+
+export async function requestLiveKitModerator(room: string, agentName: string) {
+  const { httpUrl } = getLiveKitConfig();
+  const call = async (method: string, body: object) => {
+    const response = await fetch(`${httpUrl}/twirp/livekit.AgentDispatchService/${method}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${generateLiveKitAdminToken(room)}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(3000)
+    });
+    if (!response.ok) throw new Error('LiveKit rejected the moderator request');
+    return response.json();
+  };
+  const existing = (await call('ListDispatch', { room })) as {
+    agent_dispatches?: AgentDispatch[];
+    agentDispatches?: AgentDispatch[];
+  };
+  const current = (existing.agent_dispatches ?? existing.agentDispatches ?? []).find(
+    (entry) => (entry.agent_name ?? entry.agentName) === agentName
+  );
+  const dispatch = current ?? (await call('CreateDispatch', { room, agent_name: agentName }));
+  if (typeof dispatch?.id !== 'string' || dispatch.room !== room) {
+    throw new Error('LiveKit did not return a moderator dispatch');
+  }
+  return dispatch.id as string;
+}

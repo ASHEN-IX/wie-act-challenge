@@ -75,7 +75,7 @@ router.get('/', async (req: DomainRequest, res: Response) => {
 
 router.get('/discover', async (req: DomainRequest, res: Response) => {
   try {
-    return res.status(200).json(await discoverVisualConcepts(req.user!.userId, req.query.courseId));
+    return res.status(200).json(await discoverVisualConcepts(req.user!.userId, req.query.courseId, req.query.revisionId));
   } catch (error) {
     const { status, body } = statusFor(error);
     return res.status(status).json(body);

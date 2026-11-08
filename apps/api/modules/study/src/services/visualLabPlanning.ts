@@ -313,7 +313,7 @@ export async function planVisualLab(actor: string, rawInput: unknown): Promise<P
         kind: 'unsupported',
         message:
           unsupported ||
-          'Neither supported engine can demonstrate this concept accurately, so no simulation was created.'
+          'No supported engine can demonstrate this concept accurately, so no simulation was created.'
       };
     candidate = fallbackCandidate(engine, input.concept);
     generationMode = 'DETERMINISTIC_FALLBACK';
@@ -671,18 +671,21 @@ export interface DiscoveredConcept {
  * can honestly represent. Keyword evidence only: it never invents a concept the
  * course text does not mention, and it says nothing about sections it skips.
  */
-export async function discoverVisualConcepts(actor: string, rawCourseId: unknown) {
+export async function discoverVisualConcepts(actor: string, rawCourseId: unknown, rawRevisionId?: unknown) {
   if (typeof rawCourseId !== 'string' || !/^[a-f\d]{24}$/i.test(rawCourseId))
     throw new VisualLabValidationError('INVALID_INPUT', 'A valid course is required');
   const courseId = rawCourseId;
+  if (rawRevisionId !== undefined && (typeof rawRevisionId !== 'string' || !rawRevisionId || rawRevisionId.length > 64))
+    throw new VisualLabValidationError('INVALID_INPUT', 'A valid revision is required');
+  const revisionId = rawRevisionId as string | undefined;
   if (!(await canReadCourse(actor, courseId)))
     throw new PublicationForbiddenError('Access to course materials denied');
-  const resolution = await resolveCourseSource(actor, courseId, undefined);
+  const resolution = await resolveCourseSource(actor, courseId, revisionId);
   if (resolution.access.decision !== 'allowed') {
     if (resolution.access.code === 'UNPUBLISHED') throw new UnpublishedCourseError();
     throw new PublicationForbiddenError('Access to course materials denied');
   }
-  const published = await getPublishedCourseContext(actor, courseId, undefined);
+  const published = await getPublishedCourseContext(actor, courseId, revisionId);
   const revision = await CourseRevision.findOne({
     courseId,
     revisionTag: published.revisionId

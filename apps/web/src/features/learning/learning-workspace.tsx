@@ -30,10 +30,13 @@ export function LearningWorkspace({
   catalog,
   userId,
   initialLanguage,
+  visualConcepts = 0,
 }: {
   catalog: Awaited<ReturnType<typeof learningCatalog>>;
   userId: string;
   initialLanguage?: WorkspaceLanguage;
+  /** Concepts in this course's published material the Visual Lab can render. */
+  visualConcepts?: number;
 }) {
   const { context, activities } = catalog;
   const objectives = context.topics.flatMap((t) =>
@@ -416,11 +419,11 @@ export function LearningWorkspace({
             >
               {t.askTutor}
             </Button>
-            <Button variant="outline" asChild>
-              <Link href={`/visual-lab?courseId=${context.courseId}`}>
-                {t.exploreVisually}
-              </Link>
-            </Button>
+            {visualConcepts > 0 && (
+              <Button variant="outline" asChild>
+                <a href="#explore-visually">{t.exploreVisually}</a>
+              </Button>
+            )}
           </div>
         )}
         <details className="text-sm">
@@ -571,11 +574,11 @@ export function LearningWorkspace({
                 {t.askTutor}
               </Button>
             )}
-            <Button variant="outline" asChild>
-              <Link href={`/visual-lab?courseId=${context.courseId}`}>
-                {t.exploreVisually}
-              </Link>
-            </Button>
+            {visualConcepts > 0 && (
+              <Button variant="outline" asChild>
+                <a href="#explore-visually">{t.exploreVisually}</a>
+              </Button>
+            )}
             <Button variant="outline" asChild>
               <Link href={`/study-together?courseId=${context.courseId}`}>
                 {t.studyPeers}

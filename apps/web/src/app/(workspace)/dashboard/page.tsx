@@ -4,13 +4,13 @@ import {
   ArrowRight,
   BookOpen,
   FlaskConical,
-  PencilLine,
   Users,
 } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { DataError } from "@/components/shared/states";
 import { Button } from "@/components/ui/button";
 import { getCourses } from "@/features/courses/queries";
+import { isCourseReady } from "@/features/courses/lifecycle";
 import { load } from "@/lib/api";
 import { TaskList, type Task } from "@/features/tasks/task-list";
 import type { LearningRewards } from "@/features/rewards/types";
@@ -20,16 +20,10 @@ export const metadata = { title: "Overview — Noveris" };
 // One line each: where it goes and what happens there.
 const QUICK_ACTIONS = [
   {
-    href: "/visual-lab",
-    label: "Visual Lab",
-    hint: "See a concept as an experiment",
-    icon: FlaskConical,
-  },
-  {
-    href: "/practice",
-    label: "Practice",
-    hint: "Explain your thinking, get feedback",
-    icon: PencilLine,
+    href: "/courses",
+    label: "My Learning",
+    hint: "Your courses, practice and tutor",
+    icon: BookOpen,
   },
   {
     href: "/study-together",
@@ -38,10 +32,10 @@ const QUICK_ACTIONS = [
     icon: Users,
   },
   {
-    href: "/courses",
-    label: "Courses",
-    hint: "Your library and sources",
-    icon: BookOpen,
+    href: "/visual-lab",
+    label: "Visual Lab",
+    hint: "Standalone experiments, practice only",
+    icon: FlaskConical,
   },
 ] as const;
 
@@ -96,7 +90,9 @@ export default async function Dashboard() {
     load<LearningRewards>("/api/v1/users/learning-rewards"),
   ]);
 
-  const activeCourse = courses.data?.courses?.[0];
+  // The first course that is published for learning. The app does not track
+  // "last opened", so the card says Next course rather than implying history.
+  const activeCourse = courses.data?.courses?.find(isCourseReady);
   const pendingTasks = (tasks.data?.tasks || []).filter(
     (t) => t.status !== "completed",
   );
@@ -105,7 +101,7 @@ export default async function Dashboard() {
     <div className="space-y-10">
       <PageHeader
         title="Overview"
-        description="Pick up where you left off, or join your teacher’s course."
+        description="Open a course to read, practice and study with peers, or join your teacher’s course."
         action={<Button asChild variant="outline"><Link href="/courses#join-course">Join a course</Link></Button>}
       />
 
@@ -116,42 +112,52 @@ export default async function Dashboard() {
           <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border p-6">
             <div className="min-w-0">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Continue
+                Your course
               </p>
               <h2 className="mt-1 truncate text-xl font-semibold tracking-tight">
                 {activeCourse.title}
               </h2>
             </div>
-            <Button asChild>
-              <Link href={`/courses/${activeCourse.id}`}>
-                Open course
-                <ArrowRight className="ml-1.5 size-4" />
-              </Link>
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild>
+                <Link href={`/courses/${activeCourse.id}/learn`}>
+                  Open course
+                  <ArrowRight className="ml-1.5 size-4" />
+                </Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href={`/study-together?courseId=${activeCourse.id}`}>
+                  Study with peers
+                </Link>
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border p-6">
             <div>
               <h2 className="text-xl font-semibold tracking-tight">
-                Start with a concept
+                No course is published for you yet
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Turn any topic into an experiment you can change and explain.
+                Join your teacher’s course with its code. You can also try a
+                standalone experiment while you wait.
               </p>
             </div>
-            <Button asChild>
-              <Link href="/visual-lab">
-                Open Visual Lab
-                <ArrowRight className="ml-1.5 size-4" />
-              </Link>
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild>
+                <Link href="/courses#join-course">Join a course</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href="/visual-lab">Open Visual Lab</Link>
+              </Button>
+            </div>
           </div>
         )}
       </section>
 
       <nav
         aria-label="Quick actions"
-        className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+        className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"
       >
         {QUICK_ACTIONS.map(({ href, label, hint, icon: Icon }) => (
           <Link

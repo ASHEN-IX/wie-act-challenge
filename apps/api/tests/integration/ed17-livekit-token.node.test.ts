@@ -13,10 +13,18 @@ test('ED-17 & ED-25: LiveKit token issuance, explicit voice consent and AI moder
 
   const prevApiKey = process.env.LIVEKIT_API_KEY;
   const prevApiSecret = process.env.LIVEKIT_API_SECRET;
+  const prevUrl = process.env.LIVEKIT_URL;
+  const prevAgent = process.env.LIVEKIT_MODERATOR_AGENT_NAME;
+  delete process.env.LIVEKIT_MODERATOR_AGENT_NAME;
+  process.env.LIVEKIT_URL = 'ws://127.0.0.1:7880';
   process.env.LIVEKIT_API_KEY = 'test_lk_key';
   process.env.LIVEKIT_API_SECRET = 'test_lk_secret_1234567890';
 
   t.after(async () => {
+    if (prevAgent === undefined) delete process.env.LIVEKIT_MODERATOR_AGENT_NAME;
+    else process.env.LIVEKIT_MODERATOR_AGENT_NAME = prevAgent;
+    if (prevUrl === undefined) delete process.env.LIVEKIT_URL;
+    else process.env.LIVEKIT_URL = prevUrl;
     process.env.LIVEKIT_API_KEY = prevApiKey;
     process.env.LIVEKIT_API_SECRET = prevApiSecret;
     try {
@@ -134,16 +142,57 @@ test('ED-17 & ED-25: LiveKit token issuance, explicit voice consent and AI moder
     }
   );
 
-  await t.test('AI moderator dispatch activates facilitator and returns ready status', async () => {
-    currentActor = { userId: learnerConsentTrue, name: 'Learner Two' };
+  await t.test('AI moderator dispatch reports unavailable without changing room state', async () => {
+    currentActor = { userId: learnerConsentFalse, name: 'Host' };
     const res = await request(app).post(`/api/v1/study/rooms/${roomId}/ai-moderator/dispatch`);
-    assert.equal(res.status, 200);
-    assert.equal(res.body.dispatched, true);
-    assert.equal(res.body.agentIdentity, 'agent-ednova-moderator');
-    assert.equal(res.body.status, 'ready');
+    assert.equal(res.status, 503);
+    assert.equal(res.body.error, 'Voice moderator dispatch is unavailable');
 
     const updatedRoom = await StudyRoom.findOne({ roomId }).lean();
-    assert.equal(updatedRoom?.facilitatorActive, true);
+    assert.notEqual(updatedRoom?.facilitatorActive, true);
+  });
+
+  await t.test('host requests one dispatch and peers cannot dispatch a moderator', async () => {
+    const livekit = express();
+    livekit.use(express.json());
+    let created = 0;
+    const dispatch = { id: 'dispatch-test', room: roomId, agent_name: 'ednova-test' };
+    livekit.post('/twirp/livekit.AgentDispatchService/ListDispatch', (_req, res) => {
+      res.json({ agent_dispatches: created ? [dispatch] : [] });
+    });
+    livekit.post('/twirp/livekit.AgentDispatchService/CreateDispatch', (req, res) => {
+      assert.equal(req.body.room, roomId);
+      assert.equal(req.body.agent_name, 'ednova-test');
+      assert.match(req.headers.authorization ?? '', /^Bearer /);
+      created++;
+      res.json(dispatch);
+    });
+    const server = livekit.listen(0, '127.0.0.1');
+    try {
+      await new Promise<void>((resolve, reject) => {
+        server.once('listening', resolve);
+        server.once('error', reject);
+      });
+      const address = server.address();
+      assert.ok(address && typeof address === 'object');
+      process.env.LIVEKIT_URL = 'ws://127.0.0.1:' + address.port;
+      process.env.LIVEKIT_MODERATOR_AGENT_NAME = 'ednova-test';
+      const dispatchPath = `/api/v1/study/rooms/${roomId}/ai-moderator/dispatch`;
+      currentActor = { userId: learnerConsentTrue, name: 'Peer' };
+      assert.equal((await request(app).post(dispatchPath)).status, 403);
+      currentActor = { userId: learnerConsentFalse, name: 'Host' };
+      for (let i = 0; i < 2; i++) {
+        const result = await request(app).post(dispatchPath);
+        assert.equal(result.status, 202);
+        assert.equal(result.body.status, 'requested');
+        assert.equal(result.body.dispatchId, dispatch.id);
+      }
+      assert.equal(created, 1);
+    } finally {
+      process.env.LIVEKIT_URL = 'ws://127.0.0.1:7880';
+      delete process.env.LIVEKIT_MODERATOR_AGENT_NAME;
+      server.close();
+    }
   });
 
   await t.test(

@@ -413,6 +413,11 @@ test(
       assert.ok(concepts.length >= 1);
       assert.equal(concepts[0].engine, 'weighted_graph');
       assert.equal(found.body.revisionId, published);
+      const pinned = await request(student, 'GET', `/api/v1/study/visual-lab/discover?courseId=${courseId}&revisionId=${encodeURIComponent(published)}`);
+      assert.equal(pinned.status, 200);
+      assert.equal(pinned.body.revisionId, published);
+      const missing = await request(student, 'GET', `/api/v1/study/visual-lab/discover?courseId=${courseId}&revisionId=revision_that_does_not_exist`);
+      assert.notEqual(missing.status, 200);
       const denied = await request(
         outsider,
         'GET',

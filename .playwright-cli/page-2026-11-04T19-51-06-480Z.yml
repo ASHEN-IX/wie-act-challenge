@@ -1,0 +1,45 @@
+- generic [active] [ref=f5e1]:
+  - link "Skip to main content" [ref=f5e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - generic [ref=f5e3]:
+    - complementary [ref=f5e4]:
+      - link "EdNova" [ref=f5e6] [cursor=pointer]:
+        - /url: /dashboard
+      - generic [ref=f5e8]:
+        - generic [ref=f5e9]:
+          - generic [ref=f5e10]: Workspace
+          - combobox "Workspace" [ref=f5e11]:
+            - option "Personal Workspace"
+            - option "EdNova Learning Demo · Instructor" [selected]
+        - navigation "Workspace navigation" [ref=f5e12]:
+          - generic [ref=f5e13]:
+            - link "Home" [ref=f5e14] [cursor=pointer]:
+              - /url: /dashboard
+            - link "Courses" [ref=f5e22] [cursor=pointer]:
+              - /url: /courses
+            - link "Study Together" [ref=f5e27] [cursor=pointer]:
+              - /url: /study-together
+          - generic [ref=f5e35]:
+            - generic [ref=f5e36]: Teaching
+            - link "Instructor insights" [ref=f5e37] [cursor=pointer]:
+              - /url: /instructor-insights
+          - link "Settings" [ref=f5e43] [cursor=pointer]:
+            - /url: /profile
+      - generic [ref=f5e48]:
+        - generic [ref=f5e49]:
+          - generic [ref=f5e50]: IN
+          - generic [ref=f5e52]:
+            - paragraph [ref=f5e53]: instructor
+            - paragraph [ref=f5e54]: instructor@ednova.test
+        - button "Sign out" [ref=f5e56] [cursor=pointer]
+    - banner [ref=f5e57]:
+      - generic [ref=f5e58]:
+        - generic [ref=f5e59]: EdNova Learning Demo
+        - generic [ref=f5e60]: /
+        - generic [ref=f5e61]: Instructor
+      - generic [ref=f5e62]:
+        - button "Use dark theme" [ref=f5e63] [cursor=pointer]
+        - textbox "Search courses" [ref=f5e65]:
+          - /placeholder: Search courses…
+    - main [ref=f5e66]:
+      - status [ref=f5e67]: Loading authorized course insights…

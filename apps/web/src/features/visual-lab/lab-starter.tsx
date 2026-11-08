@@ -36,18 +36,21 @@ export interface Suggestion {
   engine: keyof typeof ENGINE_LABEL;
 }
 
-function SuggestionRow({
+export function SuggestionRow({
   courseId,
   suggestion,
+  revisionId,
 }: {
   courseId: string;
   suggestion: Suggestion;
+  revisionId?: string;
 }) {
   const [state, action, pending] = useActionState(createCourseLab, initial);
   return (
     <li>
       <form action={action} className="flex flex-col gap-2 px-4 py-3">
         <input type="hidden" name="courseId" value={courseId} />
+        {revisionId && <input type="hidden" name="revisionId" value={revisionId} />}
         <input type="hidden" name="topicId" value={suggestion.sectionId} />
         <input type="hidden" name="concept" value={suggestion.concept} />
         <div className="flex flex-wrap items-start justify-between gap-3">

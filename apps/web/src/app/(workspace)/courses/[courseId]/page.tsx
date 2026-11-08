@@ -12,6 +12,7 @@ import { TextField } from "@/components/shared/form-field";
 import { getCourse } from "@/features/courses/queries";
 import { deleteCourse } from "@/features/courses/actions";
 import { requireIdentity } from "@/server/identity";
+import { discoverConcepts } from "@/features/visual-lab/queries";
 import { courseStage, courseStageLabel } from "@/features/courses/lifecycle";
 export default async function CoursePage({
   params,
@@ -24,6 +25,9 @@ export default async function CoursePage({
   if (!course)
     return <DataError message={result.error || "Course not found."} />;
   const stage = courseStage(course);
+  // Only offer the visual step when this course's material has something to show.
+  const visual = stage === "ready" ? await discoverConcepts(courseId) : undefined;
+  const visualCount = visual?.data?.concepts.length ?? 0;
   // Presentation only: the API enforces who may author or delete. Learners on an
   // institutional course they do not teach should not be offered those actions.
   const identity = await requireIdentity();
@@ -57,9 +61,16 @@ export default async function CoursePage({
                 <Button asChild>
                   <Link href={`/courses/${course.id}/learn`}>Open course</Link>
                 </Button>
+                {visualCount > 0 && (
+                  <Button variant="outline" asChild>
+                    <Link href={`/courses/${course.id}/learn#explore-visually`}>
+                      Explore visually
+                    </Link>
+                  </Button>
+                )}
                 <Button variant="outline" asChild>
-                  <Link href={`/visual-lab?courseId=${course.id}`}>
-                    Explore visually
+                  <Link href={`/study-together?courseId=${course.id}`}>
+                    Study with peers
                   </Link>
                 </Button>
               </>

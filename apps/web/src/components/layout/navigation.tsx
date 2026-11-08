@@ -4,7 +4,6 @@ import { usePathname } from "next/navigation";
 import {
   BookOpen,
   LayoutDashboard,
-  PencilLine,
   Users,
   ListTodo,
   ChartNoAxesCombined,
@@ -12,7 +11,6 @@ import {
   Search,
   Settings,
   ShieldCheck,
-  Sparkles,
   GraduationCap,
   Building2,
   FlaskConical,
@@ -40,8 +38,10 @@ export function Navigation({
 }) {
   const pathname = usePathname();
 
-  // Learn something, study with others, track what you've learned. Everything
-  // else stays reachable under "More tools" so existing bookmarks keep working.
+  // Learn something, study with others, track what you've learned. Practice
+  // and the tutor live inside each course (My Learning), and the course page
+  // links to the visual experiments for its own material. "More tools" keeps
+  // only standalone helpers; /practice and /visualizer remain valid URLs.
   const teaching = instructor || admin;
   const sections: NavSection[] = [
     {
@@ -70,8 +70,6 @@ export function Navigation({
     ? []
     : [
         { href: "/visual-lab", label: "Visual Lab", icon: FlaskConical },
-        { href: "/practice", label: "Practice", icon: PencilLine },
-        { href: "/visualizer", label: "Binary search demo", icon: Sparkles },
         { href: "/tasks", label: "Tasks", icon: ListTodo },
         { href: "/planner", label: "Study plan", icon: CalendarDays },
         { href: "/search", label: "Explore sources", icon: Search },

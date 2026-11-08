@@ -97,6 +97,19 @@ export default async function Progress() {
           </Button>
         </EmptyState>
       )}
+      {competency.data?.competencies.length ? (
+        <nav
+          aria-label="Next steps"
+          className="mt-4 flex flex-wrap gap-3 border-t pt-6 text-sm font-medium"
+        >
+          <Link href="/courses" className="rounded-lg border px-4 py-2 hover:bg-muted/50">
+            Continue a course
+          </Link>
+          <Link href="/study-together" className="rounded-lg border px-4 py-2 hover:bg-muted/50">
+            Explain it with peers
+          </Link>
+        </nav>
+      ) : null}
     </>
   );
 }

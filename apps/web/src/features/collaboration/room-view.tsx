@@ -340,7 +340,7 @@ export function RoomView({
         ? "Start the discussion when your group is ready."
         : "Waiting for the presenter to start."
       : room.currentPhase === "peer_discussion"
-        ? "Talk it through together. The AI helps if a misconception appears."
+        ? "Talk it through together. Request a hint or ask for guidance when needed."
         : room.currentPhase === "individual_attempt"
           ? "Answer on your own first. Others cannot see your answer yet."
           : "Compare answers and discuss what you learned.";
@@ -552,7 +552,7 @@ export function RoomView({
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm font-semibold">
-                  Ask the AI facilitator
+                  Ask for group guidance
                 </span>
                 <Button
                   size="sm"
@@ -566,6 +566,9 @@ export function RoomView({
                     : `Request Hint (L${hintLevel})`}
                 </Button>
               </div>
+              <p className="text-xs text-muted-foreground">
+                Guidance may use built-in rules when AI is unavailable. Chat is not automatically monitored.
+              </p>
 
               {activeIntervention && (
                 <div className="rounded-md border bg-muted/40 p-3 text-sm">
@@ -657,10 +660,6 @@ export function RoomView({
           >
             <VoiceModeratorControls
               roomId={room.roomId}
-              initialVoiceConsent={
-                participants.find((p) => p.userId === currentUserId)
-                  ?.hasVoiceConsent ?? false
-              }
               isPresenterOrHost={isPresenter}
             />
           </div>

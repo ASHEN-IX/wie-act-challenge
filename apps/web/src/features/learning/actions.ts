@@ -1,42 +1,9 @@
 "use server";
 import { unstable_rethrow } from "next/navigation";
 import { requireIdentity } from "@/server/identity";
-import crypto from "node:crypto";
 import { api, segment } from "@/lib/api";
-import { text, integer, optionalText } from "@/lib/validation";
+import { text } from "@/lib/validation";
 import type { ActionState } from "@/lib/action-state";
-
-export async function submitPractice(
-  _state: ActionState,
-  form: FormData,
-): Promise<ActionState> {
-  await requireIdentity();
-  try {
-    // The evaluation worker rejects unknown fields, so the question travels
-    // inside the answer text. Together they stay under its 5,000 character limit.
-    const question = text(form, "question", 1000);
-    const answer = text(form, "answer", 3500);
-    const result = await api<{ jobId: string }>("/api/v1/eval/step", {
-      method: "POST",
-      body: JSON.stringify({
-        sessionId: optionalText(form, "sessionId", 64) || crypto.randomUUID(),
-        step: integer(form, "step", 1, 100),
-        contextId: "individual-practice",
-        studentAnswer: `Question: ${question}\n\nAnswer: ${answer}`,
-      }),
-    });
-    return {
-      jobId: result.jobId,
-      success: "Your answer is queued for feedback.",
-    };
-  } catch (error) {
-    unstable_rethrow(error);
-    return {
-      error:
-        error instanceof Error ? error.message : "Unable to submit answer.",
-    };
-  }
-}
 
 export async function searchSources(
   _state: ActionState,

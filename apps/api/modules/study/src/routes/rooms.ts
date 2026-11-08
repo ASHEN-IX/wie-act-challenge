@@ -40,6 +40,9 @@ import { runRoomCommand } from '../services/roomCommands';
 import { canReadCourse } from '../services/resourceAccess';
 import {
   generateLiveKitToken,
+  getLiveKitConfig,
+  isLiveKitConfigured,
+  requestLiveKitModerator,
   revokeLiveKitPublishPermissions,
   removeLiveKitParticipant
 } from '../services/livekitControl';
@@ -492,9 +495,11 @@ router.post(
     const canPublishAudio = hasVoiceConsent;
     const canSubscribeAudio = true;
 
-    const apiKey = process.env.LIVEKIT_API_KEY || 'devkey';
-    const apiSecret = process.env.LIVEKIT_API_SECRET || 'secret';
-    const livekitUrl = process.env.LIVEKIT_URL || 'wss://ednova-livekit.cloud.livekit.io';
+    if (!isLiveKitConfigured()) {
+      return res.status(503).json({ error: 'Voice service is not configured' });
+    }
+    const { apiKey, apiSecret, livekitUrl } = getLiveKitConfig();
+    res.setHeader('Cache-Control', 'private, no-store');
 
     const token = generateLiveKitToken({
       apiKey,
@@ -504,7 +509,7 @@ router.post(
       name: participant?.name || actor,
       canPublishAudio,
       canSubscribeAudio,
-      ttlSeconds: 3600
+      ttlSeconds: 300
     });
 
     return res.json({
@@ -513,7 +518,7 @@ router.post(
       roomName: room.roomId,
       participantIdentity: actor,
       participantName: participant?.name || actor,
-      expiresInSeconds: 3600,
+      expiresInSeconds: 300,
       canPublishAudio,
       canSubscribeAudio
     });
@@ -538,18 +543,25 @@ router.post(
       return res.status(403).json({ error: 'Room course authorization lost' });
     }
 
-    await StudyRoom.updateOne(
-      { roomId: room.roomId },
-      { $set: { facilitatorActive: true }, $inc: { seq: 1 } }
-    );
-
-    return res.json({
-      dispatched: true,
-      roomId: room.roomId,
-      agentIdentity: 'agent-ednova-moderator',
-      mode: 'peer_first_facilitator',
-      status: 'ready'
-    });
+    if (actor !== room.hostUserId && actor !== room.presenterUserId) {
+      return res.status(403).json({ error: 'Only the host or presenter can request a voice moderator' });
+    }
+    const agentName = process.env.LIVEKIT_MODERATOR_AGENT_NAME?.trim();
+    if (!isLiveKitConfigured() || !agentName) {
+      return res.status(503).json({ error: 'Voice moderator dispatch is unavailable' });
+    }
+    try {
+      const dispatchId = await requestLiveKitModerator(room.roomId, agentName);
+      return res.status(202).json({
+        dispatched: true,
+        roomId: room.roomId,
+        agentIdentity: agentName,
+        dispatchId,
+        status: 'requested'
+      });
+    } catch {
+      return res.status(503).json({ error: 'Could not request the voice moderator' });
+    }
   }
 );
 
@@ -573,7 +585,10 @@ function durableRoomCommand(kind: Parameters<typeof runRoomCommand>[0]): DomainM
       typeof req.params.roomId === 'string' ? req.params.roomId : undefined,
       (courseId) => verifyCourseAccess(courseId, req)
     );
-    if (result.changedRoom) await broadcastRoomState(result.changedRoom, req);
+    if (result.changedRoom) {
+      if (kind === 'leave') await removeLiveKitParticipant(result.changedRoom.roomId, actor.userId);
+      await broadcastRoomState(result.changedRoom, req);
+    }
     return res.status(result.status).json(result.body);
   };
 }

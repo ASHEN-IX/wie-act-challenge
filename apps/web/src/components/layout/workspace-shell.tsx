@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { Search, Sparkles } from "lucide-react";
+import { Search } from "lucide-react";
 import { Navigation } from "./navigation";
 import { Logo, LogoMark } from "@/components/brand/logo";
 import { Input } from "@/components/ui/input";
@@ -107,18 +106,10 @@ export function WorkspaceShell({
             <Input
               name="q"
               aria-label="Search courses"
-              placeholder="Search concepts or courses…"
+              placeholder="Search courses…"
               className="h-9 pl-9 text-xs sm:text-sm"
             />
           </form>
-          {!instructor && !admin && (
-            <Button asChild size="sm" variant="default" className="hidden sm:inline-flex gap-1.5 shadow-xs">
-              <Link href="/practice">
-                <Sparkles className="size-3.5" />
-                <span>Practice</span>
-              </Link>
-            </Button>
-          )}
         </div>
       </header>
       <main

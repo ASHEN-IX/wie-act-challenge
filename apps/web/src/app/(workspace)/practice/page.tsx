@@ -1,43 +1,45 @@
-import crypto from "node:crypto";
+import Link from "next/link";
+import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/shared/page-header";
-import { LongField } from "@/components/shared/form-field";
-import { FieldGroup } from "@/components/ui/field";
-import { JobForm } from "@/features/learning/job-form";
-import { submitPractice } from "@/features/learning/actions";
+import { DataError, EmptyState } from "@/components/shared/states";
+import { Button } from "@/components/ui/button";
+import { getCourses } from "@/features/courses/queries";
+import { isCourseReady } from "@/features/courses/lifecycle";
+
 export const metadata = { title: "Practice" };
-export default function Practice() {
+
+/**
+ * Practice is course-grounded: feedback is checked against a published revision
+ * and the result becomes learner evidence. This legacy URL therefore forwards to
+ * the course's practice section instead of offering an ungrounded free-text box.
+ */
+export default async function Practice({
+  searchParams,
+}: {
+  searchParams: Promise<{ courseId?: string }>;
+}) {
+  const { courseId: requested } = await searchParams;
+  const courses = await getCourses();
+  const ready = (courses.data?.courses ?? []).filter(isCourseReady);
+  const target = requested ? ready.find((course) => course.id === requested) : ready.length === 1 ? ready[0] : undefined;
+  if (target) redirect(`/courses/${target.id}/learn#practice-and-tutor`);
   return (
     <>
       <PageHeader
         title="Practice"
-        description="Write a question and your explanation. You get private feedback you can check against your sources."
+        description="Practice happens inside a course, so feedback is checked against its published material."
       />
-      <div className="max-w-2xl">
-        <JobForm action={submitPractice} kind="eval" submit="Get feedback">
-          <FieldGroup>
-            <input type="hidden" name="sessionId" value={crypto.randomUUID()} />
-            <input type="hidden" name="step" value="1" />
-            <LongField
-              label="Question or problem"
-              name="question"
-              required
-              maxLength={1000}
-              rows={3}
-            />
-            <LongField
-              label="Your explanation"
-              name="answer"
-              required
-              maxLength={3500}
-              rows={7}
-              placeholder="Explain how you arrived at your answer…"
-            />
-          </FieldGroup>
-        </JobForm>
-        <p className="mt-8 text-xs leading-6 text-muted-foreground">
-          AI feedback can be mistaken. Check it against your course sources.
-        </p>
-      </div>
+      <DataError message={courses.error} />
+      {!courses.error && (
+        <EmptyState
+          title={requested ? "Course unavailable" : ready.length ? "Choose a course to practice" : "No course to practice yet"}
+          description={requested ? "This course is unavailable or not ready for practice. Choose an available course." : ready.length ? "Open a course to practice its published material." : "Join a teacher's course, or wait until one is published, then practice from its learning page."}
+        >
+          <Button asChild size="sm">
+            <Link href="/courses">Go to your courses</Link>
+          </Button>
+        </EmptyState>
+      )}
     </>
   );
 }

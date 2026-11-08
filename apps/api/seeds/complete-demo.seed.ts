@@ -59,6 +59,23 @@ const DEMO_SOURCE_TEXT = [
   ''
 ].join('\n');
 
+/** Synthetic source text for the second demo course. It describes a weighted
+ * graph and shortest paths so the Visual Lab can discover a concept that its
+ * registered engine really supports. Labelled as demo content everywhere. */
+const DEMO_GRAPH_TEXT = [
+  'EdNova demo source: Shortest paths in weighted graphs',
+  '',
+  'A weighted graph is a set of nodes joined by edges, and each edge carries a',
+  'weight such as a distance or a cost. The shortest path between a source node',
+  'and a target node is the route whose total edge weight is smallest.',
+  '',
+  "Dijkstra's algorithm finds the shortest path from a source node to every other",
+  'node when all edge weights are positive. It repeatedly settles the unvisited node',
+  'with the smallest known distance and relaxes the weights of its neighbouring edges.',
+  'Changing one edge weight can change which path is shortest.',
+  ''
+].join('\n');
+
 /**
  * Writes the original source blob plus a deterministic FAISS artifact for a
  * revision, then pins the manifest on the revision. Mirrors what the ingestion
@@ -67,13 +84,15 @@ const DEMO_SOURCE_TEXT = [
 async function materializeSourceArtifact(
   courseId: string,
   revisionTag: string,
-  storedContentHash: string
+  storedContentHash: string,
+  sourceText: string = DEMO_SOURCE_TEXT,
+  filename = 'relational-normalization.txt'
 ): Promise<SourceDocument> {
   const roots = sourceRoots();
-  const hash = contentHash(DEMO_SOURCE_TEXT);
+  const hash = contentHash(sourceText);
   const document: SourceDocument = {
     documentId: 'doc_' + hash.slice(7, 23),
-    filename: 'relational-normalization.txt',
+    filename,
     contentHash: hash,
     storageRef: 'originals/' + hash.slice(7),
     mediaType: 'text/plain',
@@ -84,7 +103,7 @@ async function materializeSourceArtifact(
   // stale copy from an earlier run before rewriting it.
   const blobPath = path.join(roots.uploads, document.storageRef);
   await fs.rm(blobPath, { force: true });
-  await fs.writeFile(blobPath, DEMO_SOURCE_TEXT, { mode: 0o444 });
+  await fs.writeFile(blobPath, sourceText, { mode: 0o444 });
   const pinHash = 'sha256:' + storedContentHash.replace(/^sha256:/, '');
   const digest = manifestDigest(courseId, revisionTag, pinHash, [document]);
 
@@ -138,7 +157,7 @@ async function materializeSourceArtifact(
         documents: [document],
         manifestDigest: digest,
         indexHash: contentHash(index),
-        chunks: [DEMO_SOURCE_TEXT],
+        chunks: [sourceText],
         metas: [
           {
             course_id: courseId,
@@ -647,7 +666,7 @@ async function main() {
       task = await Task.create({
         userId: learnerId,
         title: 'Master 1NF Normalization',
-        description: 'Complete the 1NF challenge and practice Socratic reasoning.',
+        description: 'Demo task (synthetic): complete the 1NF challenge and practice Socratic reasoning.',
         courseId: courseId.toString(),
         topicId: 'top_1nf',
         priority: 'high',
@@ -658,20 +677,216 @@ async function main() {
       console.log('  ✓ Created Study Task for Learner');
     }
 
-    // Update Learner XP and Streak
-    await db.collection('users').updateOne(
-      { email: 'learner@ednova.test' },
+    // Progress, XP and streaks are never seeded: they must come from accepted
+    // learner activity so the Progress page reflects real evidence only.
+
+    // 6. Second demo course whose material the Visual Lab can actually render.
+    console.log('\n[6/6] Seeding the visual-ready demo course (shortest paths)...');
+    const GRAPH_TITLE = 'Demo: Shortest paths in weighted graphs';
+    let graphCourse = await Course.findOne({ title: GRAPH_TITLE });
+    const graphCourseExists = !!graphCourse;
+    if (graphCourse && (String(graphCourse.ownerUserId) !== String(instructorId) || !graphCourse.description?.startsWith('Synthetic demo course (not real course material):'))) {
+      throw new Error('A course with the demo title already exists and is not the seed-owned demo; refusing to modify it.');
+    }
+    if (!graphCourse) {
+      graphCourse = await Course.create({
+        userId: instructorId,
+        ownerUserId: instructorId,
+        assignedInstructorIds: [instructorId],
+        subjectId: 'computer-science',
+        title: GRAPH_TITLE,
+        description:
+          'Synthetic demo course (not real course material): weighted graphs and Dijkstra, written so the Visual Lab can build a matching experiment.',
+        status: 'completed',
+        ingestProgress: 1,
+        ingestDetail: 'Published and reviewed by instructor',
+        scope: 'institutional',
+        institutionId: institution?._id
+      });
+    }
+    const graphCourseId = graphCourse._id;
+    let graphRevision = await CourseRevision.findOne({
+      courseId: graphCourseId,
+      revisionTag: 'rev_demo_graph_v1'
+    });
+    const graphRevisionExists = !!graphRevision;
+    if (graphCourseExists && !graphRevisionExists) {
+      throw new Error('The existing demo course has no seed revision; refusing to replace its published content.');
+    }
+    if (graphRevision && (graphRevision.status !== 'published' || graphRevision.contentHash !== contentHash(DEMO_GRAPH_TEXT).replace(/^sha256:/, ''))) {
+      throw new Error('The demo graph revision already exists with different content or status; refusing to overwrite it.');
+    }
+    if (!graphRevision) {
+      graphRevision = await CourseRevision.create({
+        courseId: graphCourseId,
+        revisionTag: 'rev_demo_graph_v1',
+        contentHash: contentHash(DEMO_GRAPH_TEXT).replace(/^sha256:/, ''),
+        status: 'published',
+        activationState: 'committed',
+        publishedByUserId: instructorId,
+        publishedAt: new Date(),
+        summary: 'Synthetic demo revision: shortest paths in weighted graphs.',
+        isInstructorReviewed: true,
+        topics: [
+          {
+            id: 'top_shortest_path',
+            title: 'Weighted graphs and shortest paths',
+            description: 'Edge weights, path cost and how Dijkstra settles nodes.',
+            subtopics: [
+              {
+                id: 'sub_dijkstra',
+                title: "Dijkstra's algorithm",
+                learning_objectives: [
+                  {
+                    id: 'obj_shortest_path',
+                    statement: 'Find the shortest path between two nodes of a weighted graph',
+                    bloomLevel: 'apply'
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      });
+      graphCourse.activeRevisionId = graphRevision.revisionTag;
+      await graphCourse.save();
+    }
+    if (!graphRevisionExists) {
+    const graphSource = await materializeSourceArtifact(
+      graphCourseId.toString(),
+      graphRevision.revisionTag,
+      graphRevision.contentHash,
+      DEMO_GRAPH_TEXT,
+      'shortest-paths.txt'
+    );
+    const graphPin = 'sha256:' + graphRevision.contentHash.replace(/^sha256:/, '');
+    const graphActivityBase = {
+      schemaVersion: '1.0.0',
+      activityRevision: 'ar_1',
+      componentVersion: '1.0.0',
+      courseId: graphCourseId.toString(),
+      revisionId: graphRevision.revisionTag,
+      contentHash: graphPin,
+      visibility: 'public',
+      language: 'en',
+      sourceRefs: [
+        {
+          documentId: graphSource.documentId,
+          contentHash: graphSource.contentHash,
+          pageNumber: null,
+          locationKnown: false,
+          provenance: 'extracted' as const
+        }
+      ]
+    };
+    const graphPublic = {
+      ...graphActivityBase,
+      activityId: 'act_graph_quiz_01',
+      activityType: 'InteractiveQuiz',
+      objectiveId: 'obj_shortest_path',
+      title: 'Pick the shortest route',
+      instructions: 'Add up the edge weights along each route and choose the smallest total.',
+      timeLimitSeconds: 180,
+      constraints: { maxAttempts: 3, allowCalculator: false },
+      presentationData: {
+        question:
+          'Edges: A-B weight 4, A-C weight 1, C-B weight 2. Which route from A to B has the smallest total weight?',
+        options: [
+          { id: 'opt_a', label: 'A to B directly (total 4)' },
+          { id: 'opt_b', label: 'A to C to B (total 3)' }
+        ],
+        isMultiSelect: false
+      }
+    };
+    const graphServer = {
+      schemaVersion: '1.0.0',
+      visibility: 'server_only',
+      activity: {
+        courseId: graphCourseId.toString(),
+        revisionId: graphRevision.revisionTag,
+        contentHash: graphPin,
+        activityId: 'act_graph_quiz_01',
+        activityRevision: 'ar_1',
+        activityType: 'InteractiveQuiz'
+      },
+      evaluationRef: 'ref_graph_eval',
+      evaluatorType: 'deterministic_rubric',
+      rubricVersion: 'exact-options-v1',
+      rubric: 'The route through C costs 1 + 2 = 3, which is less than the direct edge of 4.',
+      answerKey: ['opt_b']
+    };
+    if (
+      !(await ActivityRecord.findOne({
+        activityId: graphPublic.activityId,
+        courseId: graphCourseId.toString()
+      }))
+    ) {
+      await ActivityRecord.create({
+        courseId: graphCourseId.toString(),
+        revisionId: graphRevision.revisionTag,
+        contentHash: graphPin,
+        activityId: graphPublic.activityId,
+        activityRevision: 'ar_1',
+        activityType: graphPublic.activityType,
+        objectiveId: graphPublic.objectiveId,
+        publicDefinition: graphPublic,
+        serverEvaluation: graphServer
+      });
+    }
+    await CourseRevision.collection.updateOne(
+      { _id: graphRevision._id },
       {
         $set: {
-          xp: 450,
-          level: 3,
-          streak: 5,
-          totalStudyMinutes: 180,
-          updatedAt: new Date()
+          approvedActivities: [
+            {
+              activityId: graphPublic.activityId,
+              activityRevision: 'ar_1',
+              definitionHash: activityDigest(graphPublic),
+              evaluationHash: activityDigest(graphServer)
+            }
+          ]
         }
       }
     );
-    console.log('  ✓ Initialized Learner Gamification: 450 XP, Level 3, 5-Day Streak');
+    await LearningObjective.updateOne(
+      {
+        documentId: graphSource.documentId,
+        topicId: 'top_shortest_path',
+        textHash: contentHash('Find the shortest path between two nodes of a weighted graph')
+      },
+      {
+        $setOnInsert: {
+          userId: instructorId,
+          documentId: graphSource.documentId,
+          objectiveId: 'obj_shortest_path',
+          topicId: 'top_shortest_path',
+          knowledgeType: 'procedural',
+          bloomLevel: 'apply',
+          verb: 'apply',
+          text: 'Find the shortest path between two nodes of a weighted graph',
+          textHash: contentHash('Find the shortest path between two nodes of a weighted graph'),
+          version: 1,
+          isActive: true
+        }
+      },
+      { upsert: true, runValidators: true }
+    );
+    graphCourse.topics = (await CourseRevision.findById(graphRevision._id))!.topics as never;
+    await graphCourse.save();
+    }
+    for (const learner of ['learner@ednova.test', 'peer@ednova.test']) {
+      const uid = userIds.get(learner)!;
+      if (!(await CourseEnrollment.findOne({ courseId: graphCourseId, userId: uid }))) {
+        await CourseEnrollment.create({
+          courseId: graphCourseId,
+          institutionId: graphCourse.institutionId,
+          userId: uid,
+          enrolledAt: new Date(),
+          status: 'active'
+        });
+      }
+    }
+    console.log('  ✓ Seeded ' + GRAPH_TITLE + ' (labelled demo content, no learner activity)');
 
     console.log('\n========================================================');
     console.log('🎉 Complete Demo Seeding Finished Successfully!');

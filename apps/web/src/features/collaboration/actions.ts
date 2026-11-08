@@ -28,6 +28,8 @@ export async function createRoom(
   let id: string;
   try {
     const courseId = optionalText(form, "courseId", 64);
+    const revisionId = optionalText(form, "revisionId", 64);
+    const revisionCourseId = optionalText(form, "revisionCourseId", 64);
     if (courseId) await api(`/api/v1/study/courses/${segment(courseId)}`);
 
     try {
@@ -36,6 +38,7 @@ export async function createRoom(
         method: "POST",
         body: JSON.stringify({
           ...(courseId ? { courseId } : {}),
+          ...(courseId && courseId === revisionCourseId && revisionId ? { revisionId } : {}),
           maxParticipants: 6,
           moderatorMode: "guided",
           enableVoice: false,

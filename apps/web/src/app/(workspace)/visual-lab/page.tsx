@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { PageHeader } from "@/components/shared/page-header";
 import { DataError } from "@/components/shared/states";
 import { getCourses } from "@/features/courses/queries";
@@ -29,8 +30,19 @@ export default async function VisualLabIndexPage({
     <>
       <PageHeader
         title="Visual Lab"
-        description="Pick a concept, change the experiment, then check what you understood. All numbers are computed by the app, not the AI."
+        description="Pick a concept, change the experiment, then check what you understood. All numbers are computed by the app, not the AI. Labs are practice only and never count as mastery."
       />
+      <p className="-mt-4 mb-8 text-sm text-muted-foreground">
+        Studying a course? Open its lesson to explore the concepts from that
+        course in place. Another example:{" "}
+        <Link
+          href="/visualizer"
+          className="font-medium text-primary underline-offset-4 hover:underline"
+        >
+          binary search, step by step
+        </Link>
+        .
+      </p>
       <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_340px]">
         <LabStarter
           courses={list.map((c) => ({ id: c.id, title: c.title }))}

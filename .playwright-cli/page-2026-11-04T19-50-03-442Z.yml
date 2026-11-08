@@ -1,0 +1,170 @@
+- generic [active] [ref=f1e1]:
+  - link "Skip to main content" [ref=f1e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - generic [ref=f1e3]:
+    - complementary [ref=f1e4]:
+      - link "EdNova" [ref=f1e6] [cursor=pointer]:
+        - /url: /dashboard
+      - generic [ref=f1e8]:
+        - generic [ref=f1e9]:
+          - generic [ref=f1e10]: Workspace
+          - combobox "Workspace" [ref=f1e11]:
+            - option "Personal Workspace" [selected]
+            - option "EdNova Learning Demo · Student"
+        - navigation "Workspace navigation" [ref=f1e12]:
+          - generic [ref=f1e13]:
+            - link "Home" [ref=f1e14] [cursor=pointer]:
+              - /url: /dashboard
+            - link "My Learning" [ref=f1e22] [cursor=pointer]:
+              - /url: /courses
+            - link "Study Together" [ref=f1e27] [cursor=pointer]:
+              - /url: /study-together
+            - link "Explore courses" [ref=f1e35] [cursor=pointer]:
+              - /url: /explore
+          - generic [ref=f1e41]:
+            - generic [ref=f1e42]: Learning
+            - link "Practice" [ref=f1e43] [cursor=pointer]:
+              - /url: /practice
+            - link "Visual Lab" [ref=f1e49] [cursor=pointer]:
+              - /url: /visual-lab
+            - link "Progress" [ref=f1e54] [cursor=pointer]:
+              - /url: /progress
+            - link "Study tasks" [ref=f1e59] [cursor=pointer]:
+              - /url: /tasks
+          - generic [ref=f1e64]:
+            - generic [ref=f1e65]: Create
+            - link "Create course" [ref=f1e66] [cursor=pointer]:
+              - /url: /courses/new
+          - link "Settings" [ref=f1e73] [cursor=pointer]:
+            - /url: /profile
+      - generic [ref=f1e78]:
+        - generic [ref=f1e79]:
+          - generic [ref=f1e80]: LE
+          - generic [ref=f1e82]:
+            - paragraph [ref=f1e83]: learner
+            - paragraph [ref=f1e84]: learner@ednova.test
+        - button "Sign out" [ref=f1e86] [cursor=pointer]
+    - banner [ref=f1e87]:
+      - generic [ref=f1e88]:
+        - generic [ref=f1e89]: Personal Workspace
+        - generic [ref=f1e90]: /
+        - generic [ref=f1e91]: Learning & teaching
+      - generic [ref=f1e92]:
+        - button "Use dark theme" [ref=f1e93] [cursor=pointer]
+        - textbox "Search courses" [ref=f1e95]:
+          - /placeholder: Search courses…
+        - link "Practice" [ref=f1e96] [cursor=pointer]:
+          - /url: /practice
+    - main [ref=f1e98]:
+      - generic [ref=f1e99]:
+        - generic [ref=f1e100]:
+          - generic [ref=f1e101]: Read your course, then practice what you learned.
+          - link "Presentation view" [ref=f1e102] [cursor=pointer]:
+            - /url: /courses/6aeb8c0ec3de27455c653564/present
+        - generic [ref=f1e104]:
+          - article [ref=f1e105]:
+            - generic [ref=f1e106]:
+              - generic [ref=f1e107]: Course reader
+              - 'heading "Demo: Introduction to arithmetic" [level=1] [ref=f1e109]'
+              - paragraph [ref=f1e110]: Practice the basics of addition.
+              - paragraph [ref=f1e111]:
+                - strong [ref=f1e112]: Source mapping notice.
+                - text: Some source passages are not linked to an exact lesson yet. They remain in their original order below.
+              - generic [ref=f1e113]:
+                - link "Read source material" [ref=f1e114] [cursor=pointer]:
+                  - /url: "#course-source"
+                - link "Practice and tutor" [ref=f1e115] [cursor=pointer]:
+                  - /url: "#practice-and-tutor"
+            - region [ref=f1e116]:
+              - heading "What you will learn" [level=2] [ref=f1e117]
+              - list [ref=f1e118]:
+                - listitem [ref=f1e119]: Explain why two plus two equals four.
+            - region [ref=f1e122]:
+              - generic [ref=f1e123]:
+                - generic [ref=f1e124]: Lesson 1
+                - generic [ref=f1e125]: Outline only
+              - heading "Arithmetic" [level=2] [ref=f1e126]
+              - generic [ref=f1e127]:
+                - heading "Addition" [level=3] [ref=f1e130]
+                - complementary [ref=f1e133]:
+                  - generic [ref=f1e134]: Learning objective
+                  - paragraph [ref=f1e136]: Explain why two plus two equals four.
+            - generic [ref=f1e137]:
+              - paragraph [ref=f1e138]: Source audit
+              - heading "Original course material" [level=2] [ref=f1e139]
+              - paragraph [ref=f1e140]: Revision-bound source passages, including any labelled instructor-reviewed representations, preserved for inspection.
+              - group [ref=f1e141]:
+                - generic "Open the extracted source 1 passage" [ref=f1e142] [cursor=pointer]:
+                  - generic [ref=f1e143]: Open the extracted source
+                  - generic [ref=f1e144]: 1 passage
+            - generic [ref=f1e146]:
+              - generic [ref=f1e147]:
+                - heading "Keep learning" [level=2] [ref=f1e148]
+                - paragraph [ref=f1e149]: Apply this material with reviewed practice, hints, and source-grounded questions.
+              - link "Open practice" [ref=f1e150] [cursor=pointer]:
+                - /url: "#practice-and-tutor"
+          - complementary [ref=f1e151]:
+            - generic [ref=f1e152]:
+              - generic [ref=f1e153]:
+                - generic [ref=f1e154]: Course outline
+                - navigation "Course outline" [ref=f1e158]:
+                  - link "Arithmetic" [ref=f1e159] [cursor=pointer]:
+                    - /url: "#arithmetic"
+                  - link "Original course material" [ref=f1e160] [cursor=pointer]:
+                    - /url: "#course-source"
+              - generic [ref=f1e161]:
+                - generic [ref=f1e162]:
+                  - generic [ref=f1e163]: Reading progress
+                  - generic [ref=f1e164]: 0%
+                - paragraph [ref=f1e166]: Tracks sections viewed in this visit. It is not a grade or mastery record.
+              - generic [ref=f1e167]:
+                - link "Original source 1" [ref=f1e168] [cursor=pointer]:
+                  - /url: /api/v1/study/courses/6aeb8c0ec3de27455c653564/revisions/rev_preview_arithmetic/sources/doc_91d5900f7325eba8
+                - link "Ask from sources" [ref=f1e172] [cursor=pointer]:
+                  - /url: "#practice-and-tutor"
+        - generic [ref=f1e176]:
+          - generic [ref=f1e177]:
+            - heading "Practice and feedback" [level=2] [ref=f1e178]
+            - paragraph [ref=f1e179]: Practice the lesson and get private feedback. Ask the tutor when you need help.
+          - generic [ref=f1e180]:
+            - generic [ref=f1e181]:
+              - heading "Practice" [level=2] [ref=f1e183]
+              - generic [ref=f1e184]:
+                - generic [ref=f1e185]: "Language:"
+                - combobox "Interface language" [ref=f1e186]:
+                  - option "English (en)" [selected]
+                  - option "Français (fr)"
+                  - option "العربية (ar)"
+                  - option "الدارجة (ary)"
+            - paragraph [ref=f1e187]: Formulas, code blocks, and source quotes remain in their canonical notation.
+            - region "Your next step" [ref=f1e188]:
+              - generic [ref=f1e189]:
+                - paragraph [ref=f1e190]: Your next step
+                - heading "Explain why two plus two equals four." [level=2] [ref=f1e191]
+              - generic [ref=f1e192]:
+                - text: Objective
+                - combobox "Learning objective" [ref=f1e193]:
+                  - option "Explain why two plus two equals four." [selected]
+              - generic [ref=f1e194]:
+                - button "Start practice" [disabled]
+                - button "Ask the tutor" [ref=f1e195] [cursor=pointer]
+              - status [ref=f1e196]: There is no reviewed practice activity for this objective yet. Ask the tutor, or explore it visually.
+              - group [ref=f1e197]:
+                - generic "More options" [ref=f1e198] [cursor=pointer]
+                - option "Practice" [selected]
+                - option "Check understanding"
+                - option "Explain from sources"
+                - option "Any (recommended)" [selected]
+                - option "InteractiveQuiz"
+                - option "GuidedProblem"
+            - generic [ref=f1e199]:
+              - heading "Source-grounded tutor" [level=2] [ref=f1e200]
+              - generic [ref=f1e201]:
+                - text: Your question
+                - textbox "Tutor question" [ref=f1e202]
+              - button "Ask from sources" [disabled]
+            - generic [ref=f1e203]:
+              - heading "Private progress and attempt history" [level=2] [ref=f1e204]
+              - button "Refresh private history" [ref=f1e205] [cursor=pointer]
+              - paragraph
+              - paragraph [ref=f1e206]: "Objectives with accepted mastery evidence: None"

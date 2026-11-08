@@ -1,0 +1,1 @@
+livekit-agents[deepgram,cartesia]==1.8.11

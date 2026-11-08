@@ -17,7 +17,7 @@ export interface LabActionState {
 
 const LAB_ERRORS: Record<string, string> = {
   UNSUPPORTED_CONCEPT:
-    "The lab can't represent that concept accurately yet. It supports weighted graphs and shortest paths, and Newton's second law. Try one of those.",
+    "The lab can't represent that concept accurately yet. It supports weighted graphs and shortest paths, Newton's second law, projectile motion and quadratic functions. Try one of those.",
   INVALID_SCENARIO:
     "A valid experiment could not be built for that concept. Try rephrasing it.",
   VISUAL_LAB_UNAVAILABLE:

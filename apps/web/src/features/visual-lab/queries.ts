@@ -23,13 +23,13 @@ export interface DiscoveredConcept {
 export const getMyLabs = () =>
   load<{ labs: LabSummary[] }>("/api/v1/study/visual-lab");
 
-export const discoverConcepts = (courseId: string) =>
+export const discoverConcepts = (courseId: string, revisionId?: string) =>
   load<{
     courseId: string;
     revisionId: string;
     sectionsScanned: number;
     concepts: DiscoveredConcept[];
-  }>(`/api/v1/study/visual-lab/discover?courseId=${segment(courseId)}`);
+  }>(`/api/v1/study/visual-lab/discover?courseId=${segment(courseId)}${revisionId ? `&revisionId=${encodeURIComponent(revisionId)}` : ""}`);
 
 export const ENGINE_LABEL: Record<LabSummary["engine"], string> = {
   weighted_graph: "Graph · 2D",

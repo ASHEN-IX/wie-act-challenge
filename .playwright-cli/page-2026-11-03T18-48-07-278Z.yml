@@ -1,0 +1,58 @@
+- generic [ref=f1e1]:
+  - link "Skip to main content" [ref=f1e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - alert [ref=f1e159]: EdNova Learning Demo · Courses
+  - generic [ref=f1e160]:
+    - banner [ref=f1e220]:
+      - group [ref=f1e250]:
+        - generic "EdNova Menu" [active] [ref=f1e251] [cursor=pointer]:
+          - text: EdNova
+          - generic [ref=f1e253]: Menu
+        - generic [ref=f1e255]:
+          - generic [ref=f1e256]:
+            - generic [ref=f1e257]: Workspace
+            - combobox "Workspace" [ref=f1e258]:
+              - option "Personal Workspace"
+              - option "EdNova Learning Demo · Instructor" [selected]
+          - navigation "Workspace navigation" [ref=f1e259]:
+            - generic [ref=f1e260]:
+              - link "Home" [ref=f1e261] [cursor=pointer]:
+                - /url: /dashboard
+              - link "Courses" [ref=f1e269] [cursor=pointer]:
+                - /url: /courses
+              - link "Study Together" [ref=f1e274] [cursor=pointer]:
+                - /url: /study-together
+            - generic [ref=f1e282]:
+              - generic [ref=f1e283]: Teaching
+              - link "Course Studio" [ref=f1e284] [cursor=pointer]:
+                - /url: /courses/new
+              - link "Instructor insights" [ref=f1e290] [cursor=pointer]:
+                - /url: /instructor-insights
+            - link "Settings" [ref=f1e296] [cursor=pointer]:
+              - /url: /profile
+          - button "Sign out" [ref=f1e302] [cursor=pointer]
+      - generic [ref=f1e254]: EdNova Learning Demo · Instructor
+      - button "Use dark theme" [ref=f1e226] [cursor=pointer]
+    - main [ref=f1e229]:
+      - generic [ref=f1e230]:
+        - generic [ref=f1e231]:
+          - heading "EdNova Learning Demo · Courses" [level=1] [ref=f1e232]
+          - paragraph [ref=f1e233]: Upload, review and publish your course material.
+        - generic [ref=f1e234]:
+          - link "Explore public courses" [ref=f1e235] [cursor=pointer]:
+            - /url: /explore
+          - link "Upload course" [ref=f1e236] [cursor=pointer]:
+            - /url: /courses/new
+      - navigation "Course filters" [ref=f1e237]:
+        - link "All courses" [ref=f1e238] [cursor=pointer]:
+          - /url: /courses
+        - link "Processing" [ref=f1e239] [cursor=pointer]:
+          - /url: /courses?status=processing
+        - link "Ready to study" [ref=f1e240] [cursor=pointer]:
+          - /url: /courses?status=ready
+      - generic [ref=f1e243]:
+        - generic [ref=f1e244]:
+          - generic [ref=f1e246]: Upload your first class course
+          - generic [ref=f1e247]: Choose your institution when uploading, review the lessons, then invite your students.
+        - link "Upload a course" [ref=f1e249] [cursor=pointer]:
+          - /url: /courses/new

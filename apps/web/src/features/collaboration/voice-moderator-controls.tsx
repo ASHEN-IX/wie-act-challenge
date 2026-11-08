@@ -1,233 +1,153 @@
 "use client";
 
-import React, { useState } from "react";
-import { Badge } from "@/components/ui/badge";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
+  dispatchAiModerator,
   getLiveKitToken,
   updateVoiceConsent,
-  dispatchAiModerator,
-  type LiveKitTokenResponse,
 } from "./livekit-voice-actions";
-
-export interface VoiceModeratorControlsProps {
-  roomId: string;
-  initialVoiceConsent?: boolean;
-  initialFacilitatorActive?: boolean;
-  isPresenterOrHost?: boolean;
-  onConsentChange?: (hasConsent: boolean) => void;
-  onMuteToggle?: (isMuted: boolean) => void;
-}
+import type { Room } from "livekit-client";
 
 export function VoiceModeratorControls({
   roomId,
-  initialVoiceConsent = false,
-  initialFacilitatorActive = false,
-  isPresenterOrHost = false,
-  onConsentChange,
-  onMuteToggle,
-}: VoiceModeratorControlsProps) {
-  const [hasVoiceConsent, setHasVoiceConsent] = useState(initialVoiceConsent);
-  const [isConnected, setIsConnected] = useState(false);
-  const [isMuted, setIsMuted] = useState(true);
-  const [facilitatorActive, setFacilitatorActive] = useState(
-    initialFacilitatorActive,
-  );
-  const [tokenData, setTokenData] = useState<LiveKitTokenResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  isPresenterOrHost,
+}: {
+  roomId: string;
+  isPresenterOrHost?: boolean;
+}) {
+  const room = useRef<Room | null>(null);
+  const audio = useRef<HTMLDivElement>(null);
+  const attempt = useRef(0);
+  const [consent, setConsent] = useState(false);
+  const [state, setState] = useState("disconnected");
+  const [busy, setBusy] = useState(false);
+  const [mic, setMic] = useState(false);
+  const [playbackBlocked, setPlaybackBlocked] = useState(false);
+  const [message, setMessage] = useState("");
+  const [moderatorOnline, setModeratorOnline] = useState(false);
 
-  const handleToggleConsent = async () => {
-    setLoading(true);
-    const nextConsent = !hasVoiceConsent;
+  useEffect(() => () => {
+    attempt.current++;
+    const current = room.current;
+    room.current = null;
+    void current?.disconnect();
+  }, []);
+
+  async function join() {
+    const id = ++attempt.current;
+    setBusy(true);
+    setMessage("");
     try {
-      const res = await updateVoiceConsent(roomId, nextConsent);
-      if (res.data) {
-        setHasVoiceConsent(res.data.hasVoiceConsent);
-        onConsentChange?.(res.data.hasVoiceConsent);
-        if (!res.data.hasVoiceConsent && isConnected) {
-          // Consent revoked: immediately cease publishing audio
-          setIsMuted(true);
-          setStatusMessage("Voice consent withdrawn. Microphone disabled.");
-        } else {
-          setStatusMessage("Voice consent updated.");
+      const { Room, RoomEvent, Track } = await import("livekit-client");
+      if (id !== attempt.current) return;
+      const saved = await updateVoiceConsent(roomId, consent);
+      if (id !== attempt.current) return;
+      if (!saved.data) throw new Error(saved.error ?? "Could not save voice consent.");
+      const grant = await getLiveKitToken(roomId);
+      if (id !== attempt.current) return;
+      if (!grant.data) throw new Error(grant.error ?? "Voice is unavailable.");
+      const current = new Room();
+      room.current = current;
+      current.on(RoomEvent.ConnectionStateChanged, (next) => {
+        if (room.current === current) setState(next);
+      });
+      current.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+        if (room.current === current && track.kind === Track.Kind.Audio) {
+          audio.current?.append(track.attach());
+          if (participant.isAgent && publication.trackName === "Study moderator") setModeratorOnline(true);
         }
-      } else if (res.error) {
-        setStatusMessage(res.error);
+      });
+      current.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
+        track.detach().forEach((element) => element.remove());
+        if (room.current === current && participant.isAgent && publication.trackName === "Study moderator") setModeratorOnline(false);
+      });
+      current.on(RoomEvent.AudioPlaybackStatusChanged, () => {
+        if (room.current === current) setPlaybackBlocked(!current.canPlaybackAudio);
+      });
+      current.on(RoomEvent.Disconnected, () => {
+        if (room.current !== current) return;
+        room.current = null;
+        audio.current?.replaceChildren();
+        setState("disconnected");
+        setMic(false);
+        setPlaybackBlocked(false);
+        setModeratorOnline(false);
+      });
+      setState("connecting");
+      await current.connect(grant.data.livekitUrl, grant.data.token);
+      if (id !== attempt.current) await current.disconnect();
+    } catch (error) {
+      if (id === attempt.current) {
+        await room.current?.disconnect();
+        setState("disconnected");
+        setMessage(error instanceof Error ? error.message : "Could not join voice.");
       }
     } finally {
-      setLoading(false);
+      if (id === attempt.current) setBusy(false);
     }
-  };
+  }
 
-  const handleConnectAudio = async () => {
-    setLoading(true);
-    setStatusMessage(null);
+  async function run(action: () => Promise<void>) {
+    setBusy(true);
+    setMessage("");
     try {
-      const res = await getLiveKitToken(roomId);
-      if (res.data) {
-        setTokenData(res.data);
-        setIsConnected(true);
-        // If server granted publish, default to unmuted; otherwise muted
-        setIsMuted(!res.data.canPublishAudio);
-        setStatusMessage(
-          res.data.canPublishAudio
-            ? "Connected to voice room. Microphone active."
-            : "Connected in listen-only mode (consent required to speak).",
-        );
-      } else if (res.error) {
-        setStatusMessage(res.error);
-      }
+      await action();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Voice action failed.");
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
-  };
-
-  const handleDisconnectAudio = () => {
-    setIsConnected(false);
-    setTokenData(null);
-    setIsMuted(true);
-    setStatusMessage("Disconnected from voice room.");
-  };
-
-  const handleToggleMute = () => {
-    if (!tokenData?.canPublishAudio) {
-      setStatusMessage("Cannot unmute: microphone voice consent is required.");
-      return;
-    }
-    const nextMute = !isMuted;
-    setIsMuted(nextMute);
-    onMuteToggle?.(nextMute);
-    setStatusMessage(nextMute ? "Microphone muted." : "Microphone active.");
-  };
-
-  const handleDispatchModerator = async () => {
-    setLoading(true);
-    try {
-      const res = await dispatchAiModerator(roomId);
-      if (res.data?.dispatched) {
-        setFacilitatorActive(true);
-        setStatusMessage("AI Voice Moderator dispatched (Peer-First mode).");
-      } else if (res.error) {
-        setStatusMessage(res.error);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+  }
 
   return (
-    <section
-      aria-label="LiveKit Voice & AI Moderator"
-      className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm"
-    >
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
-        <div>
-          <h3 className="text-base font-semibold">Live Voice Discussion</h3>
-          <p className="text-xs text-muted-foreground">
-            Zero audio retention: raw PCM frames are processed in streaming
-            memory only. No audio is ever written to disk.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {isConnected ? (
-            <Badge variant="outline" className="border-emerald-600 text-emerald-600">
-              Voice Connected
-            </Badge>
-          ) : (
-            <Badge variant="secondary">Voice Inactive</Badge>
+    <section aria-label="Voice discussion" className="space-y-3 rounded-lg border bg-card p-4">
+      <h3 className="font-semibold">Voice discussion</h3>
+      <p className="text-sm text-muted-foreground" role="status">
+        {message || (state === "connected" ? (mic ? "Microphone on" : "Microphone muted") : state === "reconnecting" ? "Reconnecting voice…" : state === "connecting" ? "Connecting voice…" : "Join to listen. Your microphone starts muted.")}
+      </p>
+      {moderatorOnline && <p className="text-sm">Voice moderator joined</p>}
+      <div ref={audio} />
+      {state === "disconnected" ? (
+        <>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={consent} disabled={busy} onChange={(event) => setConsent(event.target.checked)} />
+            Allow microphone use and transcription when a voice moderator joins
+          </label>
+          <Button size="sm" disabled={busy} onClick={() => void join()}>Join voice</Button>
+        </>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {consent && (
+            <Button size="sm" disabled={busy || state !== "connected"} onClick={() => void run(async () => {
+              const current = room.current;
+              if (!current) return;
+              await current.localParticipant.setMicrophoneEnabled(!mic);
+              if (room.current === current) setMic(!mic);
+            })}>{mic ? "Mute microphone" : "Turn on microphone"}</Button>
           )}
-
-          {facilitatorActive ? (
-            <Badge variant="outline" className="border-indigo-600 text-indigo-600">
-              AI Facilitator: Active
-            </Badge>
-          ) : (
-            <Badge variant="secondary">AI Facilitator: Idle</Badge>
+          {playbackBlocked && (
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => void run(async () => {
+              await room.current?.startAudio();
+            })}>Enable audio playback</Button>
           )}
-        </div>
-      </div>
-
-      <div className="mt-4 flex flex-col gap-3">
-        {/* Consent row */}
-        <div className="flex items-center justify-between rounded-md bg-muted/40 p-2.5">
-          <div className="flex flex-col">
-            <span className="text-sm font-medium">Microphone Voice Consent</span>
-            <span className="text-xs text-muted-foreground">
-              Explicit consent is required to publish audio tracks to the room.
-            </span>
-          </div>
-          <Button
-            type="button"
-            size="sm"
-            variant={hasVoiceConsent ? "outline" : "default"}
-            onClick={handleToggleConsent}
-            disabled={loading}
-            aria-pressed={hasVoiceConsent}
-          >
-            {hasVoiceConsent ? "Revoke Consent" : "Grant Consent"}
-          </Button>
-        </div>
-
-        {/* Media Controls */}
-        <div className="flex flex-wrap items-center gap-2">
-          {!isConnected ? (
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleConnectAudio}
-              disabled={loading}
-            >
-              Join Voice Room
-            </Button>
-          ) : (
-            <>
-              <Button
-                type="button"
-                size="sm"
-                variant={isMuted ? "secondary" : "default"}
-                onClick={handleToggleMute}
-                disabled={loading || !tokenData?.canPublishAudio}
-                aria-label={isMuted ? "Unmute microphone" : "Mute microphone"}
-              >
-                {isMuted ? "Unmute Mic" : "Mute Mic"}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="destructive"
-                onClick={handleDisconnectAudio}
-                disabled={loading}
-              >
-                Leave Voice
-              </Button>
-            </>
-          )}
-
-          {/* AI Moderator dispatch (presenter/host only) */}
-          {!facilitatorActive && isPresenterOrHost && (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={handleDispatchModerator}
-              disabled={loading}
-            >
-              Dispatch AI Moderator
-            </Button>
+          <Button size="sm" variant="outline" disabled={busy} onClick={() => void run(async () => {
+            await room.current?.disconnect();
+            setConsent(false);
+            if (consent) {
+              const result = await updateVoiceConsent(roomId, false);
+              if (!result.data) throw new Error(result.error ?? "Could not clear microphone consent.");
+            }
+          })}>Leave voice</Button>
+          {isPresenterOrHost && state === "connected" && !moderatorOnline && (
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => void run(async () => {
+              const result = await dispatchAiModerator(roomId);
+              if (!result.data) throw new Error(result.error ?? "Could not request the moderator.");
+              setMessage("Moderator requested. It can speak once its worker joins.");
+            })}>Request voice moderator</Button>
           )}
         </div>
-
-        {/* Status announcement */}
-        {statusMessage && (
-          <p
-            role="status"
-            className="text-xs font-medium text-muted-foreground mt-1"
-          >
-            {statusMessage}
-          </p>
-        )}
-      </div>
+      )}
     </section>
   );
 }

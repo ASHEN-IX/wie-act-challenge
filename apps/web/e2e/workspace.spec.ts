@@ -147,11 +147,11 @@ test("student pages exclude instructor insights and resume feedback tracking aft
   await page.goto("/progress");
   await expect(page.getByRole("heading", { name: "Progress", exact: true })).toBeVisible();
   // A missing/foreign job must remain unavailable, never produce a passing score.
-  await page.goto("/practice?job=job_missing_review_fixture&jobKind=eval");
-  await expect(page.getByRole("heading", { name: "Your feedback" })).toBeVisible();
+  await page.goto("/search?job=job_missing_review_fixture&jobKind=search");
+  await expect(page.getByRole("heading", { name: "Results" })).toBeVisible();
   await expect(page.getByText("Unable to check this job. Try again later.")).toBeVisible();
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Your feedback" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Results" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Check status", exact: true })).toBeVisible();
   await expect(page.getByText("Unable to check this job. Try again later.")).toBeVisible();
   await expect(page.getByText("Assessment verified.", { exact: false })).toHaveCount(0);
