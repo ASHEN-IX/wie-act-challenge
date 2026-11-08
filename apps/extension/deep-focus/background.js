@@ -34,6 +34,22 @@ async function stop() {
   await unblock();
 }
 
+// Chrome refuses tab changes while the mouse is still down on the tab strip
+// ("Tabs cannot be edited right now"), so keep trying for a moment.
+async function returnToStudy(state) {
+  for (let attempt = 0; attempt < 12; attempt++) {
+    try {
+      await chrome.tabs.update(state.tabId, { active: true });
+      if (state.windowId != null) await chrome.windows.update(state.windowId, { focused: true });
+      return;
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      const current = await getState();
+      if (!current.active) return; // exited meanwhile
+    }
+  }
+}
+
 // Emergency exit: unblock and tell the EdNova tab to end its session.
 async function emergencyExit() {
   const state = await getState();
@@ -65,10 +81,7 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
       await emergencyExit();
     } else if (message.type === "back") {
       const state = await getState();
-      if (state.tabId != null) {
-        await chrome.tabs.update(state.tabId, { active: true }).catch(() => {});
-        if (state.windowId != null) await chrome.windows.update(state.windowId, { focused: true }).catch(() => {});
-      }
+      if (state.tabId != null) await returnToStudy(state);
     }
     reply((await getState()));
   })();
@@ -87,8 +100,7 @@ chrome.tabs.onActivated.addListener(async ({ tabId }) => {
     /* non-URL tab */
   }
   if (sameHost) return;
-  await chrome.tabs.update(state.tabId, { active: true }).catch(() => {});
-  if (state.windowId != null) await chrome.windows.update(state.windowId, { focused: true }).catch(() => {});
+  await returnToStudy(state);
 });
 
 // Fail open if the EdNova tab stops reporting (closed, crashed, navigated away).
