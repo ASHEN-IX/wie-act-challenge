@@ -1420,6 +1420,24 @@
 }
 
 /* Responsive */
+/* Pinned scenes must cover the viewport so their spacers do not leave gaps. */
+@media (min-width: 801px) {
+  .marketing-root .hero-section,
+  .marketing-root .evolution-section {
+    min-height: 100svh;
+  }
+  .marketing-root .evolution-section {
+    display: flex;
+    align-items: center;
+  }
+}
+
+@media (min-width: 851px) {
+  .marketing-root .hero-grid {
+    min-height: calc(100svh - 82px);
+  }
+}
+
 @media (max-width: 1100px) {
   .marketing-root .nav-links {
     gap: 19px;
