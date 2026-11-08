@@ -292,6 +292,13 @@ export class StudyController {
   ): Promise<void> {
     return this.service.execute('POST /api/v1/study/courses', req, res);
   }
+  @Get('/api/v1/study/courses/invitations/inbox')
+  get_api_v1_study_courses_invitations_inbox_ed8def0a(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('GET /api/v1/study/courses/invitations/inbox', req, res);
+  }
   @Get('/api/v1/study/courses/:courseId')
   get_api_v1_study_courses_7b6e05af(
     @Req() req: DomainRequest,

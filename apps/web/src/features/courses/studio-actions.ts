@@ -74,3 +74,42 @@ export async function controlStudioIngestion(
     body: JSON.stringify({ expectedJobId }),
   });
 }
+
+export interface DraftReviewFinding {
+  code: string;
+  severity: "blocker" | "warning" | "info";
+  message: string;
+  topicId?: string;
+  subtopicId?: string;
+}
+export interface DraftReviewProposal {
+  chapters: Array<{ id: string; title: string }>;
+  lessons: Array<{
+    id: string;
+    title: string;
+    objectives: Array<{ statement: string; bloomLevel: string }>;
+  }>;
+  notes: string[];
+}
+export interface DraftReviewResult {
+  revisionTag: string;
+  verdict: "ready" | "needs_attention" | "blocked";
+  findings: DraftReviewFinding[];
+  counts: { chapters: number; lessons: number; objectives: number };
+  ai: {
+    status: "proposed" | "unavailable" | "invalid" | "skipped";
+    reason?: string;
+    executionMode?: string;
+    proposal?: DraftReviewProposal;
+  };
+}
+
+/** Advisory review of the last saved draft. Never saves or attests anything. */
+export async function reviewDraft(courseId: string, useAi: boolean) {
+  await requireIdentity();
+  const { review } = await api<{ review: DraftReviewResult }>(
+    `/api/v1/study/courses/${segment(courseId)}/draft/review`,
+    { method: "POST", body: JSON.stringify({ useAi }) },
+  );
+  return review;
+}

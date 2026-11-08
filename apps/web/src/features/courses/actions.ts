@@ -237,7 +237,7 @@ export async function updateDraftAction(
   try {
     const courseId = text(form, "courseId", 50);
     const expectedRevisionTag = text(form, "expectedRevisionTag", 100);
-    const topicsRaw = optionalText(form, "topicsJson");
+    const topicsRaw = optionalText(form, "topicsJson", 2_000_000);
     const summary = optionalText(form, "summary");
     const isInstructorReviewed = form.get("isInstructorReviewed") === "true";
     const extractionReviewAcknowledged =

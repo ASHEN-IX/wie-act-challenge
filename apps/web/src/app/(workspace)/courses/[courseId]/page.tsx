@@ -13,6 +13,7 @@ import { getCourse } from "@/features/courses/queries";
 import { deleteCourse } from "@/features/courses/actions";
 import { requireIdentity } from "@/server/identity";
 import { discoverConcepts } from "@/features/visual-lab/queries";
+import { AutoRefresh } from "@/features/courses/auto-refresh";
 import { courseStage, courseStageLabel } from "@/features/courses/lifecycle";
 export default async function CoursePage({
   params,
@@ -90,12 +91,12 @@ export default async function CoursePage({
         {courseStageLabel(stage)}
       </Badge>
       {course.status === "processing" && (
-        <Alert className="mt-5">
+        <Alert className="mt-5" role="status">
+          <AutoRefresh />
           <AlertTitle>Preparing your course</AlertTitle>
           <AlertDescription>
-            Noveris is reading your sources and building the course outline. This
-            usually takes a few minutes; you can safely leave this page and
-            check back later.
+            Noveris is reading your sources and building the course outline.
+            This page updates by itself{canAuthor ? " and opens Course Studio when the draft is ready" : ""}; you can also leave and come back later.
           </AlertDescription>
         </Alert>
       )}
@@ -148,7 +149,7 @@ export default async function CoursePage({
               title="No extracted topics yet"
               description={
                 course.status === "processing"
-                  ? "Processing is queued. Refresh this page after the ingestion worker finishes."
+                  ? "Processing is under way. The outline appears here when it finishes."
                   : stage === "review"
                     ? "Open Course Studio to review the draft and publish it."
                     : "Your source files are available below. Processing may need to be retried by the course owner."

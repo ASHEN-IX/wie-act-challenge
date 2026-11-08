@@ -37,6 +37,8 @@ import {
 } from "./studio-actions";
 import { approveStudioPublication } from "./formula-actions";
 import { FormulaReview } from "./formula-review";
+import { CourseReviewPanel } from "./course-review-panel";
+import type { DraftReviewProposal } from "./studio-actions";
 import { cn } from "@/lib/utils";
 
 interface CourseStudioProps {
@@ -217,6 +219,49 @@ export function CourseStudio({
             },
       ),
     );
+  };
+
+  /** Apply an AI proposal to the editor state only. Returns the number of items changed. */
+  const applyReviewProposal = (
+    proposal: DraftReviewProposal,
+  ) => {
+    const chapterTitles = new Map(proposal.chapters.map((c) => [c.id, c.title]));
+    const lessons = new Map(proposal.lessons.map((l) => [l.id, l]));
+    let changed = 0;
+    setTopics(
+      topics.map((topic, index) => {
+        const title = chapterTitles.get(topic.id || `ch_${index}`);
+        if (title && title !== topic.title) changed += 1;
+        return {
+          ...topic,
+          title: title ?? topic.title,
+          subtopics: topic.subtopics?.map((sub) => {
+            const next = lessons.get(sub.id);
+            if (!next) return sub;
+            changed += 1;
+            return {
+              ...sub,
+              title: next.title,
+              learning_objectives: next.objectives.map((o) => ({
+                id:
+                  "obj_" +
+                  crypto.randomUUID().replace(/-/g, "").slice(0, 12),
+                statement: o.statement,
+                text: o.statement,
+                bloomLevel: o.bloomLevel,
+                provenance: "ai_generated" as const,
+              })),
+            };
+          }),
+        };
+      }),
+    );
+    if (changed) {
+      setDirty(true);
+      setIsInstructorReviewed(false);
+      setActivityProposal(null);
+    }
+    return changed;
   };
 
   const handleSaveDraft = () => {
@@ -824,6 +869,13 @@ export function CourseStudio({
           </Card>
         </div>
       </details>
+      {topics.length > 0 && (
+        <CourseReviewPanel
+          courseId={courseId}
+          dirty={dirty}
+          onApply={applyReviewProposal}
+        />
+      )}
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <Card>
           <CardHeader className="border-b">

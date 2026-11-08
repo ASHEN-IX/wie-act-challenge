@@ -119,6 +119,15 @@ model_list:
     max_tokens: 2048
     drop_params: true
 
+# COURSE REVIEW — proposes clearer titles and objectives for an extracted draft.
+- model_name: course_review
+  litellm_params:
+    model: groq/openai/gpt-oss-120b
+    api_key: os.environ/GROQ_API_KEY
+    temperature: 0.2
+    max_tokens: 3000
+    drop_params: true
+
 # ————————————————— shared fallback providers —————————————————————
 
 - model_name: groq-main
@@ -154,3 +163,4 @@ router_settings:
     - facilitator: [nvidia-main]
     - visual_lab_selector: [groq-main]
     - visual_lab_planner: [groq-main, nvidia-main]
+    - course_review: [groq-main, nvidia-main]

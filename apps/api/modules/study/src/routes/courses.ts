@@ -48,6 +48,7 @@ import {
   HierarchyValidationError
 } from '../services/courseDraft';
 import {
+import { reviewCourseDraft } from '../services/courseReview';
   publishCourseRevision,
   getPublishedCourseContext,
   resolveCourseSource,
@@ -690,6 +691,27 @@ router.post('/:courseId/draft/sources/prepare', async (req: DomainRequest, res: 
     const status = (error as { status?: number }).status;
     res.status(status === 403 ? 403 : status === 409 ? 409 : 503).json({
       error:
+// Advisory automated review of the editable draft. Read-only: it never saves,
+// acknowledges source review or publishes.
+router.post('/:courseId/draft/review', async (req: DomainRequest, res: Response) => {
+  try {
+    const review = await reviewCourseDraft(req.user!.userId, String(req.params.courseId), {
+      useAi: req.body?.useAi === true
+    });
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.status(200).json({ review });
+  } catch (error) {
+    if (error instanceof DraftForbiddenError) {
+      return res.status(403).json({ error: 'FORBIDDEN', message: error.message });
+    }
+    if (error instanceof DraftNotFoundError) {
+      return res.status(404).json({ error: 'NOT_FOUND', message: error.message });
+    }
+    console.error('Error reviewing course draft:', error);
+    res.status(500).json({ error: 'Failed to review course draft' });
+  }
+});
+
         status === 409
           ? 'STALE_REVISION'
           : status === 403

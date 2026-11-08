@@ -10,7 +10,6 @@ import {
 } from "react";
 import {
   ArrowRight,
-  ArrowLeft,
   CheckCircle2,
   FileText,
   LoaderCircle,
@@ -19,7 +18,6 @@ import {
   UploadCloud,
   X,
 } from "lucide-react";
-import { ActionForm } from "@/components/shared/action-form";
 import { TextField, LongField } from "@/components/shared/form-field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -168,6 +166,12 @@ function CourseUploader({
 
     for (const file of incoming) {
       if (next.some((item) => fileKey(item) === fileKey(file))) continue;
+      if (next.some((item) => item.name === file.name)) {
+        skipped.push(
+          `${file.name} is already in the list. Rename the file or remove the earlier one first.`,
+        );
+        continue;
+      }
       if (!ACCEPTED_FILE.test(file.name)) {
         skipped.push(`${file.name} is not a PDF, TXT or Markdown file`);
         continue;
@@ -243,7 +247,7 @@ function CourseUploader({
         <div className="flex flex-col gap-3 p-6 sm:p-8">
           <Button asChild size="lg" className="justify-between">
             <Link href={state.destination}>
-              Open course and check progress
+              Open course and follow progress
               <ArrowRight data-icon="inline-end" />
             </Link>
           </Button>

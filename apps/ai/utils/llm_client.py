@@ -51,6 +51,8 @@ AGENT_GROUPS = (
     # scenario planning must reason about the concept (capable).
     "visual_lab_selector",
     "visual_lab_planner",
+    # Instructor draft review: rewrites titles/objectives from verified excerpts.
+    "course_review",
     "nardouch_compact",
     "nardouch_capable",
 )
@@ -83,6 +85,7 @@ AGENT_TIERS: Dict[str, ModelTier] = {
     "facilitator": ModelTier.CAPABLE,
     "visual_lab_selector": ModelTier.COMPACT,
     "visual_lab_planner": ModelTier.CAPABLE,
+    "course_review": ModelTier.CAPABLE,
     "nardouch_compact": ModelTier.COMPACT,
     "nardouch_capable": ModelTier.CAPABLE,
 }
