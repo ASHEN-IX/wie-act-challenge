@@ -25,7 +25,69 @@ async function block(host) {
   });
 }
 
-const unblock = () => chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: [RULE_ID] });
+const unblock = async () => {
+  await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: [RULE_ID] });
+  await uncoverAll();
+};
+
+// ---- In-place blocking of other tabs -------------------------------------------------
+// Runs inside the other page (isolated world). Must be self-contained.
+function coverPage() {
+  const ID = "ednova-deep-focus-overlay";
+  if (document.getElementById(ID)) return;
+  document.querySelectorAll("video,audio").forEach((media) => media.pause());
+  const host = document.createElement("div");
+  host.id = ID;
+  host.style.cssText = "position:fixed;inset:0;z-index:2147483647;";
+  const root = host.attachShadow({ mode: "closed" });
+  root.innerHTML = `
+    <style>
+      .wrap{position:fixed;inset:0;display:grid;place-items:center;background:#0f1226;color:#e8eaf6;font:16px/1.5 system-ui,sans-serif}
+      main{max-width:28rem;padding:2rem}
+      h1{font-size:1.5rem;margin:0 0 .5rem}
+      p{color:#aab0d0;margin:.5rem 0 1.25rem}
+      button{font:inherit;padding:.6rem 1rem;border-radius:.5rem;border:1px solid #5560a8;background:#7c5cff;color:#fff;cursor:pointer;margin:0 .5rem .5rem 0}
+      button.ghost{background:transparent;color:#e8eaf6}
+    </style>
+    <div class="wrap" role="alertdialog" aria-modal="true" aria-label="Deep Focus is on">
+      <main>
+        <h1>Deep Focus is on</h1>
+        <p>This tab is paused while your EdNova study session is active. Nothing here is lost.</p>
+        <button id="back">Back to my session</button>
+        <button id="exit" class="ghost">Emergency exit: turn off Deep Focus</button>
+      </main>
+    </div>`;
+  root.getElementById("back").addEventListener("click", () => chrome.runtime.sendMessage({ type: "back" }));
+  root.getElementById("exit").addEventListener("click", () => chrome.runtime.sendMessage({ type: "exit" }));
+  document.documentElement.appendChild(host);
+  if (document.body) document.body.inert = true;
+  document.documentElement.style.overflow = "hidden";
+}
+
+function uncoverPage() {
+  document.getElementById("ednova-deep-focus-overlay")?.remove();
+  if (document.body) document.body.inert = false;
+  document.documentElement.style.overflow = "";
+}
+
+async function cover(tabId) {
+  try {
+    await chrome.scripting.executeScript({ target: { tabId }, func: coverPage });
+    return true;
+  } catch {
+    return false; // chrome://, the Web Store, the new-tab page, ...
+  }
+}
+
+async function uncoverAll() {
+  const tabs = await chrome.tabs.query({});
+  await Promise.all(
+    tabs.map((tab) =>
+      chrome.scripting.executeScript({ target: { tabId: tab.id }, func: uncoverPage }).catch(() => {}),
+    ),
+  );
+}
+
 
 async function stop() {
   const state = await getState();
@@ -88,7 +150,7 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
   return true;
 });
 
-// Discourage tab switching: any tab on another site sends you straight back.
+// Any tab on another site is covered the moment you open it.
 chrome.tabs.onActivated.addListener(async ({ tabId }) => {
   const state = await getState();
   if (!state.active || tabId === state.tabId) return;
@@ -100,7 +162,21 @@ chrome.tabs.onActivated.addListener(async ({ tabId }) => {
     /* non-URL tab */
   }
   if (sameHost) return;
-  await returnToStudy(state);
+  // Cover the page in place; only pages Chrome won't let us touch get sent back.
+  if (!(await cover(tabId))) await returnToStudy(state);
+});
+
+// A page that finishes loading while a session is active gets covered too.
+chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
+  if (info.status !== "complete" || !tab.url) return;
+  const state = await getState();
+  if (!state.active || tabId === state.tabId) return;
+  try {
+    if (new URL(tab.url).hostname === state.host) return;
+  } catch {
+    return;
+  }
+  if (tab.active) await cover(tabId);
 });
 
 // Fail open if the EdNova tab stops reporting (closed, crashed, navigated away).

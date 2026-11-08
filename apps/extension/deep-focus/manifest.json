@@ -3,18 +3,42 @@
   "name": "EdNova Deep Focus",
   "version": "0.1.0",
   "description": "While an EdNova Deep Focus session is active, blocks other websites and brings you back to your study tab. Off whenever the session ends.",
-  "permissions": ["declarativeNetRequest", "storage", "alarms"],
-  "host_permissions": ["<all_urls>"],
-  "background": { "service_worker": "background.js" },
+  "permissions": [
+    "declarativeNetRequest",
+    "storage",
+    "alarms",
+    "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
-      "matches": ["http://localhost:3000/*"],
-      "js": ["content.js"],
+      "matches": [
+        "http://localhost:3000/*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_start"
     }
   ],
-  "action": { "default_title": "EdNova Deep Focus", "default_popup": "popup.html" },
+  "action": {
+    "default_title": "EdNova Deep Focus",
+    "default_popup": "popup.html"
+  },
   "web_accessible_resources": [
-    { "resources": ["blocked.html", "blocked.js"], "matches": ["<all_urls>"] }
+    {
+      "resources": [
+        "blocked.html",
+        "blocked.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
   ]
 }

@@ -28,7 +28,7 @@ Status labels: **Implemented** (code + automated tests), **Verified in browser**
 - Not stored on the server: sessions live in the browser only.
 
 ### What can and cannot be blocked
-A web page cannot block other sites, tabs or apps. Best reliable in-page measures: counting only active time, a tab-title nudge ("Your study session is waiting") and a welcome-back notice. The optional MV3 extension (`apps/extension/deep-focus/README.md`) adds real blocking of other sites and returns the learner to the study tab, and fails open (heartbeat timeout, browser restart, three emergency exits). It does not block other apps, other browsers or incognito (unless allowed), and only works in Chromium.
+A web page cannot block other sites, tabs or apps. Best reliable in-page measures: counting only active time, a tab-title nudge ("Your study session is waiting") and a welcome-back notice. The optional MV3 extension (`apps/extension/deep-focus/README.md`) adds real blocking of other sites and covers other tabs in place (falling back to returning the learner to the study tab for pages Chrome won't let extensions touch), and fails open (heartbeat timeout, browser restart, three emergency exits). It does not block other apps, other browsers or incognito (unless allowed), and only works in Chromium.
 
 ## B. Onboarding and learning preferences
 - One store: `UserProfile.learningProfile` (normalised by `apps/api/shared/ednova/learningProfile.ts`). The sign-up `onboardingDraft` is a one-time capture and is not read afterwards.
