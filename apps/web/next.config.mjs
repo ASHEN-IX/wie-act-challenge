@@ -1,5 +1,6 @@
 import path from "node:path";
 export default {
+  allowedDevOrigins: process.env.EDNOVA_DEV_ORIGINS?.split(",").map((origin) => origin.trim()).filter(Boolean) ?? [],
   distDir: process.env.EDNOVA_NEXT_DIST_DIR || ".next",
   outputFileTracingRoot: path.resolve(process.cwd(), "../.."),
   output: "standalone",
