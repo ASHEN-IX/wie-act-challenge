@@ -7,6 +7,7 @@ One documentation folder, one task register. Start with the team plan and backlo
 | [Team plan](team-delivery-plan.md) | Habib/Tasnim/Aziz ownership, shared contracts, reviews and integration gates |
 | [Backlog](sprint-backlog.md) | All 36 task owners, current gaps, technical steps, dependencies and acceptance |
 | [Development](development.md) | Local setup, Python/workers, testing and troubleshooting |
+| [Environment](environment.md) | Which `.env` belongs to which app, how web, API, AI and the database connect, values that must match |
 | [Architecture Decisions (ADRs)](architecture-decisions.md) | 16 authoritative decisions: 3 execution planes, LiveKit, STT/TTS, Next.js 16, NestJS, Mongo, Redis, RabbitMQ |
 | [Technical Contracts](contracts/technical-contracts.md) | 18 implementation-ready contracts across Control, Media, and Intelligence planes |
 | [Current architecture](architecture.md) | Existing services, frameworks and data flow |

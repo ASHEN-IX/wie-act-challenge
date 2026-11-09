@@ -69,3 +69,6 @@ htmlcov/
 *.tmp
 *.temp
 Thumbs.db
+
+# Scratch screenshots and temp output written by local verification
+/apps/var/
