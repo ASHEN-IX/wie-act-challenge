@@ -1,57 +1,29 @@
 import json
 import numpy as np
 import pytest
-from pathlib import Path
 
 from services.vector_store.adapter import (
     VectorStoreAdapter,
-    validate_course_id,
     validate_revision_id,
     get_relative_index_path,
-    FAISS_INDEX_DIR,
 )
 
 
-class FakeMongoCollection:
+class FakeStore:
+    """In-memory stand-in for `ChunkEmbeddingStore`, keyed like the table."""
+
     def __init__(self):
-        self.docs = []
+        self.rows = {}
 
-    def update_one(self, filter_query, update, upsert=False):
-        doc = update.get("$set", {})
-        # Replace or append
-        existing_idx = None
-        for i, d in enumerate(self.docs):
-            matches = True
-            for k, v in filter_query.items():
-                if d.get(k) != v:
-                    matches = False
-                    break
-            if matches:
-                existing_idx = i
-                break
-        if existing_idx is not None:
-            self.docs[existing_idx] = doc
-        else:
-            self.docs.append(doc)
+    def save(self, course_id, revision_id, chunks, metas, embeddings):
+        self.rows[(course_id, revision_id or "")] = {
+            "chunks": chunks,
+            "metas": metas,
+            "embeddings": np.asarray(embeddings, dtype="float32"),
+        }
 
-    def find_one(self, filter_query):
-        for d in self.docs:
-            matches = True
-            for k, v in filter_query.items():
-                if d.get(k) != v:
-                    matches = False
-                    break
-            if matches:
-                return d
-        return None
-
-
-class FakeMongoDB:
-    def __init__(self):
-        self.col = FakeMongoCollection()
-
-    def __getitem__(self, item):
-        return self.col
+    def load(self, course_id, revision_id):
+        return self.rows.get((course_id, revision_id or ""))
 
 
 def test_validate_revision_id_security():
@@ -75,8 +47,8 @@ def test_get_relative_index_path():
 def test_vector_store_revision_indexing_and_search(tmp_path, monkeypatch):
     monkeypatch.setattr("services.vector_store.adapter.FAISS_INDEX_DIR", tmp_path)
 
-    db = FakeMongoDB()
-    vs = VectorStoreAdapter(db=db)
+    store = FakeStore()
+    vs = VectorStoreAdapter(store=store)
 
     course_id = "course-123"
     rev1 = "rev_20261023_v1"
@@ -117,10 +89,9 @@ def test_vector_store_revision_indexing_and_search(tmp_path, monkeypatch):
     assert meta_content["metas"][0]["provenance"] == "extracted"
     assert meta_content["metas"][0]["page_number"] == 1
 
-    # Check mongo storage
-    doc1 = db.col.find_one({"course_id": course_id, "revision_id": rev1})
+    # Check durable storage
+    doc1 = store.load(course_id, rev1)
     assert doc1 is not None
-    assert doc1["revision_id"] == rev1
     assert len(doc1["chunks"]) == 2
 
     # Now index revision 2 with distinct content

@@ -121,10 +121,7 @@ def test_title_without_stable_course_id_cannot_address_shared_cache(planner, mon
 @pytest.mark.asyncio
 async def test_planning_api_does_not_log_private_source_or_goal(monkeypatch, capsys):
     from services.api.routers import planning
-    from agents.course_ingestion.services.database_service import DatabaseService
     course = {"_id": "course-a", "course_title": "PRIVATE_COURSE_TITLE", "topics": [{"subtopics": [{"tokenized_chunks": ["PRIVATE_CHUNK_TEXT"], "summary": "PRIVATE_SUMMARY_TEXT"}]}]}
-    monkeypatch.setattr(DatabaseService, "__init__", lambda _self: None)
-    monkeypatch.setattr(DatabaseService, "get_course_by_id", lambda _self, _id: course)
     output = SimpleNamespace(task_graph=SimpleNamespace(tasks=[]), warning=None)
     monkeypatch.setattr(planning, "get_planner_agent", lambda: SimpleNamespace(plan=lambda _: output))
     result = await planning.create_study_plan(planning.PlannerRequest(user_id="a", goal="PRIVATE_USER_GOAL", available_time_minutes=30, course_id="course-a", course_knowledge=course))
@@ -137,12 +134,10 @@ async def test_planning_api_does_not_log_private_source_or_goal(monkeypatch, cap
 async def test_raw_course_id_without_authorized_context_is_unavailable(monkeypatch):
     from fastapi import HTTPException
     from services.api.routers import planning
-    from agents.course_ingestion.services.database_service import DatabaseService
 
     def forbidden(*_args):
-        raise AssertionError("Raw course ID must not trigger unscoped database lookup")
+        raise AssertionError("Raw course ID must not trigger unscoped lookup")
 
-    monkeypatch.setattr(DatabaseService, "__init__", forbidden)
     monkeypatch.setattr(planning, "get_planner_agent", forbidden)
     with pytest.raises(HTTPException) as error:
         await planning.create_study_plan(planning.PlannerRequest(

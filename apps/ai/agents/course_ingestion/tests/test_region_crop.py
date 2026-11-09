@@ -29,7 +29,7 @@ def _manifest(tmp_path, monkeypatch, pages=2):
     (root / "originals" / digest[7:]).write_bytes(value)
     monkeypatch.setenv("INGEST_UPLOADS_DIR", str(root))
     manifest = {
-        "courseId": "a" * 24,
+        "courseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         "revisionId": "rev_crop",
         "contentHash": digest,
         "documents": [{

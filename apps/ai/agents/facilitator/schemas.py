@@ -67,6 +67,7 @@ class FacilitatorInterventionProposal(BaseModel):
     """Contract 15: Output proposal for peer-first facilitation."""
 
     interventionId: str
+    executionMode: str = "DETERMINISTIC_FALLBACK"
     roomId: str
     strategy: FacilitatorStrategy
     trigger: FacilitatorTrigger

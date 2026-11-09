@@ -78,9 +78,10 @@ def run_facilitator(
                 user_prompt,
                 mock_fn=lambda _: _generate_mock_response(obs),
                 trace_id=trace_id,
+                return_metadata=True,
             )
 
-            parsed = _parse_llm_json(response)
+            parsed = _parse_llm_json(response.text)
             if parsed and parsed.get("shouldIntervene", True):
                 strategy_val = parsed.get("strategy", "PEER_CHALLENGE")
                 try:
@@ -93,6 +94,7 @@ def run_facilitator(
 
                 return FacilitatorInterventionProposal(
                     interventionId=f"int_{uuid.uuid4().hex[:12]}",
+                    executionMode=response.execution_mode,
                     roomId=obs.roomId,
                     strategy=strategy,
                     trigger=FacilitatorTrigger.EXPLICIT_ASK if obs.actionType == "ask_facilitator" else FacilitatorTrigger.MISCONCEPTION_DETECTED,

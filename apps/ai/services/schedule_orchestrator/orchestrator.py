@@ -2,15 +2,14 @@
 
 This service bridges the gap between Coach decisions and task scheduling,
 implementing autonomous schedule adjustments based on ML signals and coaching.
-Uses MongoDB transactions to ensure atomic writes across collections.
+Uses PostgreSQL transactions to ensure atomic writes across tables.
 """
 
 from typing import Optional
 from datetime import datetime, timedelta
-from pymongo import MongoClient
-import os
 
 from agents.coach.models.schemas import CoachAction, ScheduleChange
+from services import pg, schedule_store
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -23,23 +22,11 @@ class ScheduleOrchestrator:
     This service:
     1. Monitors CoachAction outputs
     2. Implements schedule changes (breaks, rescheduling, task adjustments)
-    3. Updates task_scheduling collection in MongoDB
+    3. Updates the ai.task_scheduling table in PostgreSQL
     4. Provides feedback loop between detection → coaching → scheduling
 
-    All multi-collection writes use MongoDB sessions/transactions for atomicity.
+    All multi-table writes share one PostgreSQL transaction for atomicity.
     """
-
-    def __init__(self):
-        """Initialize the schedule orchestrator with MongoDB connection."""
-        mongo_uri = os.getenv("MONGODB_URI", "mongodb://localhost:27017/")
-        db_name = os.getenv("DB_NAME", "ednova")
-
-        self.client = MongoClient(mongo_uri)
-        self.db = self.client[db_name]
-        self.task_scheduling_collection = self.db["task_scheduling"]
-        self.study_plan_collection = self.db["studyplans"]
-        self.schedule_history_collection = self.db["schedule_history"]
-        self.schedule_snapshots_collection = self.db["schedule_snapshots"]
 
     def process_schedule_change(
         self,
@@ -112,14 +99,10 @@ class ScheduleOrchestrator:
         self, user_id: str, change: ScheduleChange, current_time: datetime
     ) -> dict:
         """Insert a break into the current schedule (transactional)."""
-        with self.client.start_session() as session:
+        with pg.connection() as session:
             try:
-                with session.start_transaction():
-                    schedule_doc = self.task_scheduling_collection.find_one(
-                        {"user_id": user_id},
-                        sort=[("_id", -1)],
-                        session=session,
-                    )
+                with session.transaction():
+                    schedule_doc = schedule_store.latest(session, user_id, lock=True)
 
                     if not schedule_doc:
                         return {
@@ -165,15 +148,13 @@ class ScheduleOrchestrator:
 
                     sessions_list.insert(current_session_idx, break_session)
 
-                    self.task_scheduling_collection.update_one(
-                        {"_id": schedule_doc["_id"]},
+                    schedule_store.update(
+                        session,
+                        schedule_doc["_id"],
                         {
-                            "$set": {
-                                "sessions": sessions_list,
-                                "updated_at": current_time,
-                            }
+                            "sessions": sessions_list,
+                            "updated_at": current_time,
                         },
-                        session=session,
                     )
 
                     self._log_schedule_change(
@@ -206,14 +187,10 @@ class ScheduleOrchestrator:
         self, user_id: str, change: ScheduleChange, current_time: datetime
     ) -> dict:
         """Extend the duration of the current task (transactional)."""
-        with self.client.start_session() as session:
+        with pg.connection() as session:
             try:
-                with session.start_transaction():
-                    schedule_doc = self.task_scheduling_collection.find_one(
-                        {"user_id": user_id},
-                        sort=[("_id", -1)],
-                        session=session,
-                    )
+                with session.transaction():
+                    schedule_doc = schedule_store.latest(session, user_id, lock=True)
 
                     if not schedule_doc:
                         return {
@@ -245,15 +222,13 @@ class ScheduleOrchestrator:
                         sessions_list[idx]["start_datetime"] += extension
                         sessions_list[idx]["end_datetime"] += extension
 
-                    self.task_scheduling_collection.update_one(
-                        {"_id": schedule_doc["_id"]},
+                    schedule_store.update(
+                        session,
+                        schedule_doc["_id"],
                         {
-                            "$set": {
-                                "sessions": sessions_list,
-                                "updated_at": current_time,
-                            }
+                            "sessions": sessions_list,
+                            "updated_at": current_time,
                         },
-                        session=session,
                     )
 
                     self._log_schedule_change(
@@ -287,14 +262,10 @@ class ScheduleOrchestrator:
         self, user_id: str, change: ScheduleChange, current_time: datetime
     ) -> dict:
         """Reschedule a specific task to a new time (transactional)."""
-        with self.client.start_session() as session:
+        with pg.connection() as session:
             try:
-                with session.start_transaction():
-                    schedule_doc = self.task_scheduling_collection.find_one(
-                        {"user_id": user_id},
-                        sort=[("_id", -1)],
-                        session=session,
-                    )
+                with session.transaction():
+                    schedule_doc = schedule_store.latest(session, user_id, lock=True)
 
                     if not schedule_doc or not change.affected_task_ids:
                         return {
@@ -339,15 +310,13 @@ class ScheduleOrchestrator:
 
                     sessions_list.insert(insert_idx, task_session)
 
-                    self.task_scheduling_collection.update_one(
-                        {"_id": schedule_doc["_id"]},
+                    schedule_store.update(
+                        session,
+                        schedule_doc["_id"],
                         {
-                            "$set": {
-                                "sessions": sessions_list,
-                                "updated_at": current_time,
-                            }
+                            "sessions": sessions_list,
+                            "updated_at": current_time,
                         },
-                        session=session,
                     )
 
                     self._log_schedule_change(
@@ -382,14 +351,10 @@ class ScheduleOrchestrator:
         self, user_id: str, change: ScheduleChange, current_time: datetime
     ) -> dict:
         """Cancel a specific task from the schedule (transactional)."""
-        with self.client.start_session() as session:
+        with pg.connection() as session:
             try:
-                with session.start_transaction():
-                    schedule_doc = self.task_scheduling_collection.find_one(
-                        {"user_id": user_id},
-                        sort=[("_id", -1)],
-                        session=session,
-                    )
+                with session.transaction():
+                    schedule_doc = schedule_store.latest(session, user_id, lock=True)
 
                     if not schedule_doc or not change.affected_task_ids:
                         return {"status": "error", "message": "Invalid cancel request"}
@@ -401,15 +366,13 @@ class ScheduleOrchestrator:
                         s for s in sessions_list if s["task_id"] != task_id
                     ]
 
-                    self.task_scheduling_collection.update_one(
-                        {"_id": schedule_doc["_id"]},
+                    schedule_store.update(
+                        session,
+                        schedule_doc["_id"],
                         {
-                            "$set": {
-                                "sessions": sessions_list,
-                                "updated_at": current_time,
-                            }
+                            "sessions": sessions_list,
+                            "updated_at": current_time,
                         },
-                        session=session,
                     )
 
                     self._log_schedule_change(
@@ -440,14 +403,10 @@ class ScheduleOrchestrator:
         self, user_id: str, change: ScheduleChange, current_time: datetime
     ) -> dict:
         """Suspend the current study session (transactional)."""
-        with self.client.start_session() as session:
+        with pg.connection() as session:
             try:
-                with session.start_transaction():
-                    schedule_doc = self.task_scheduling_collection.find_one(
-                        {"user_id": user_id},
-                        sort=[("_id", -1)],
-                        session=session,
-                    )
+                with session.transaction():
+                    schedule_doc = schedule_store.latest(session, user_id, lock=True)
 
                     if not schedule_doc:
                         return {
@@ -455,16 +414,14 @@ class ScheduleOrchestrator:
                             "message": "No active schedule found",
                         }
 
-                    self.task_scheduling_collection.update_one(
-                        {"_id": schedule_doc["_id"]},
+                    schedule_store.update(
+                        session,
+                        schedule_doc["_id"],
                         {
-                            "$set": {
-                                "status": "suspended",
-                                "suspended_at": current_time,
-                                "suspension_reason": change.reasoning,
-                            }
+                            "status": "suspended",
+                            "suspended_at": current_time,
+                            "suspension_reason": change.reasoning,
                         },
-                        session=session,
                     )
 
                     self._log_schedule_change(
@@ -485,9 +442,9 @@ class ScheduleOrchestrator:
 
     def get_schedule_status(self, user_id: str) -> dict:
         """Return current schedule status and latest snapshot metadata."""
-        schedule_doc = self.task_scheduling_collection.find_one(
-            {"user_id": user_id}, sort=[("_id", -1)]
-        )
+        with pg.connection() as conn:
+            schedule_doc = schedule_store.latest(conn, user_id)
+            latest_snapshot = schedule_store.latest_snapshot(conn, user_id)
         if not schedule_doc:
             return {
                 "status": "missing",
@@ -499,16 +456,10 @@ class ScheduleOrchestrator:
         sessions = schedule_doc.get("sessions", [])
         now = datetime.now()
         upcoming_count = sum(
-            1
-            for s in sessions
-            if s.get("start_datetime") and s["start_datetime"] > now
+            1 for s in sessions if s.get("start_datetime") and s["start_datetime"] > now
         )
         completed_count = sum(
             1 for s in sessions if s.get("end_datetime") and s["end_datetime"] < now
-        )
-
-        latest_snapshot = self.schedule_snapshots_collection.find_one(
-            {"user_id": user_id}, sort=[("created_at", -1)]
         )
 
         return {
@@ -522,18 +473,18 @@ class ScheduleOrchestrator:
             "updated_at": schedule_doc.get("updated_at"),
             "latest_snapshot": {
                 "reason": latest_snapshot.get("reason") if latest_snapshot else None,
-                "created_at": latest_snapshot.get("created_at") if latest_snapshot else None,
+                "created_at": (
+                    latest_snapshot.get("created_at") if latest_snapshot else None
+                ),
             },
             "sessions": sessions,
         }
 
     def optimize_schedule(self, user_id: str, reason: str = "manual_optimize") -> dict:
         """Perform a lightweight schedule optimization by ordering sessions by start time."""
-        with self.client.start_session() as session:
-            with session.start_transaction():
-                schedule_doc = self.task_scheduling_collection.find_one(
-                    {"user_id": user_id}, sort=[("_id", -1)], session=session
-                )
+        with pg.connection() as session:
+            with session.transaction():
+                schedule_doc = schedule_store.latest(session, user_id, lock=True)
 
                 if not schedule_doc:
                     return {
@@ -548,15 +499,13 @@ class ScheduleOrchestrator:
                     key=lambda s: s.get("start_datetime") or datetime.max,
                 )
 
-                self.task_scheduling_collection.update_one(
-                    {"_id": schedule_doc["_id"]},
+                schedule_store.update(
+                    session,
+                    schedule_doc["_id"],
                     {
-                        "$set": {
-                            "sessions": sorted_sessions,
-                            "updated_at": datetime.now(),
-                        }
+                        "sessions": sorted_sessions,
+                        "updated_at": datetime.now(),
                     },
-                    session=session,
                 )
 
                 self._persist_schedule_snapshot(
@@ -592,7 +541,7 @@ class ScheduleOrchestrator:
             "affected_task_ids": change.affected_task_ids,
             "timestamp": timestamp,
         }
-        self.schedule_history_collection.insert_one(log_entry, session=session)
+        schedule_store.add_history(session, log_entry)
 
     def _persist_schedule_snapshot(
         self,
@@ -611,4 +560,4 @@ class ScheduleOrchestrator:
             "sessions": sessions,
             "created_at": timestamp,
         }
-        self.schedule_snapshots_collection.insert_one(doc, session=session)
+        schedule_store.add_snapshot(session, doc, timestamp)

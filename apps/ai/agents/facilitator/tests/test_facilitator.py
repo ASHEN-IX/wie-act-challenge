@@ -121,3 +121,24 @@ class TestFacilitatorAgent(unittest.TestCase):
 if __name__ == "__main__":
     unittest.main()
 
+
+
+def test_model_execution_mode_is_returned(monkeypatch):
+    from types import SimpleNamespace
+    from agents.facilitator import agent
+    from utils import llm_client
+
+    monkeypatch.setattr(agent, "evaluate_rules", lambda _: None)
+    monkeypatch.setattr(
+        llm_client,
+        "ask",
+        lambda *args, **kwargs: SimpleNamespace(
+            text='{"shouldIntervene": true, "strategy": "SOCRATIC_NUDGE", "messageText": "What would your peer try?"}',
+            execution_mode="REAL_APPROVED",
+        ),
+    )
+    result = run_facilitator(FacilitatorObservationInput(
+        roomId="room", actionType="ask_facilitator", transcriptText="How should we start?"
+    ))
+    assert result.executionMode == "REAL_APPROVED"
+    assert result.messageText == "What would your peer try?"

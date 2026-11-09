@@ -12,7 +12,7 @@ are not present (graceful fallback to mock data).
 
 import numpy as np
 import pytest
-from tests.conftest import needs_mongo
+from tests.conftest import needs_postgres
 import sys
 from pathlib import Path
 
@@ -119,7 +119,8 @@ class TestFocusDetector:
 
 
 @pytest.mark.integration
-@needs_mongo
+@needs_postgres
+@pytest.mark.usefixtures("ai_db")
 class TestSignalProcessingService:
     """Integration test for the orchestrating SignalProcessingService."""
 

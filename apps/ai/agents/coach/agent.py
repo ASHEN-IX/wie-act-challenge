@@ -35,9 +35,9 @@ def run_coach(
         },
     )
 
-    # Fetch scheduled tasks from MongoDB
+    # Fetch this learner's scheduled tasks (empty when none are known)
     repo = PlannerRepository()
-    scheduled_tasks = repo.get_scheduled_tasks()
+    scheduled_tasks = repo.get_scheduled_tasks(user_id)
     input_data.scheduled_tasks = scheduled_tasks
 
     # Load recent coaching history so the LLM avoids repetitive interventions

@@ -7,7 +7,6 @@ from agents.course_ingestion.extraction.ocr import ocr_pdf
 from agents.course_ingestion.parsing.layout_parser import detect_sections
 from agents.course_ingestion.parsing.section_builder import build_subtopics
 from agents.course_ingestion.normalization.normalizer import normalize_course
-from agents.course_ingestion.services.database_service import DatabaseService
 from agents.course_ingestion.normalization.tokenizer import tokenize_subtopics
 from agents.course_ingestion.enrichment.llm_enricher import (
     enrich_subtopic_with_llm,
@@ -129,9 +128,7 @@ def ingest_course(course_title: str, pdf_files: list):
     # Step 6: normalize JSON
     course_json = normalize_course(course_title, subtopics, pdf_files)
 
-    # Step 7: save to MongoDB
-    db = DatabaseService()
-    course_id = db.save_course(course_json.dict())
-
-    logger.info("ingest_course_done", extra={"course_id": str(course_id)})
-    return course_id
+    # The course document is owned and persisted by the API (the async ingestion
+    # worker path is canonical); this synchronous path only returns the result.
+    logger.info("ingest_course_done", extra={"title": course_title})
+    return course_json

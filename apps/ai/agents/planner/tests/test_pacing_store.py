@@ -1,136 +1,109 @@
 """
-Unit tests for PacingStore.
+Tests for PacingStore against real PostgreSQL (the `ai_db` fixture).
 
 Run with:
-    pytest agents/planner/tests/test_pacing_store.py -v
+    AI_TEST_DATABASE_URL=postgresql://... pytest agents/planner/tests/test_pacing_store.py -v
 """
-
-from unittest.mock import MagicMock, patch, call
-from datetime import datetime, timezone
 
 import pytest
 
-from agents.planner.memory.pacing_store import PacingStore, MIN_RECORDS, DEFAULT_FACTOR
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _make_store(documents=None):
-    """Return a PacingStore with a mocked MongoDB collection."""
-    col = MagicMock()
-    if documents is not None:
-        col.find.return_value.sort.return_value.limit.return_value = documents
-    store = PacingStore.__new__(PacingStore)
-    store._db = {"pacing_data": col}
-    return store, col
+from agents.planner.memory.pacing_store import (
+    DEFAULT_FACTOR,
+    MAX_RECORDS,
+    MIN_RECORDS,
+    PacingStore,
+)
 
 
-# ---------------------------------------------------------------------------
-# Tests: get_user_pacing_factor
-# ---------------------------------------------------------------------------
+def _record(store, ratios, subject_tag="", user_id="u1"):
+    """Record completions whose actual/estimated ratio is each of `ratios`."""
+    for index, ratio in enumerate(ratios):
+        store.record_task_completion(user_id, f"t{index}", 100, int(ratio * 100), subject_tag)
 
 
 class TestGetUserPacingFactor:
+    def test_returns_default_when_no_user_id(self, ai_db):
+        assert PacingStore().get_user_pacing_factor("") == DEFAULT_FACTOR
 
-    def test_returns_default_when_no_user_id(self):
-        store, _ = _make_store()
-        assert store.get_user_pacing_factor("") == DEFAULT_FACTOR
+    def test_returns_default_when_no_db(self, monkeypatch):
+        monkeypatch.delenv("AI_DATABASE_URL", raising=False)
+        assert PacingStore().get_user_pacing_factor("u1") == DEFAULT_FACTOR
 
-    def test_returns_default_when_no_db(self):
-        store = PacingStore.__new__(PacingStore)
-        store._db = None
+    def test_returns_default_with_insufficient_records(self, ai_db):
+        store = PacingStore()
+        _record(store, [1.2] * (MIN_RECORDS - 1))
         assert store.get_user_pacing_factor("u1") == DEFAULT_FACTOR
 
-    def test_returns_default_with_insufficient_records(self):
-        # Fewer than MIN_RECORDS
-        docs = [{"ratio": 1.2}] * (MIN_RECORDS - 1)
-        store, _ = _make_store(docs)
+    def test_computes_median_with_enough_records(self, ai_db):
+        store = PacingStore()
+        _record(store, [1.5, 1.0, 2.0, 1.5, 1.0])  # median = 1.5
+        assert store.get_user_pacing_factor("u1") == pytest.approx(1.5)
+
+    def test_clamps_to_maximum(self, ai_db):
+        store = PacingStore()
+        _record(store, [10.0] * (MIN_RECORDS + 1))
+        assert store.get_user_pacing_factor("u1") == 3.0
+
+    def test_clamps_to_minimum(self, ai_db):
+        store = PacingStore()
+        _record(store, [0.1] * (MIN_RECORDS + 1))
+        assert store.get_user_pacing_factor("u1") == 0.5
+
+    def test_falls_back_to_global_when_subject_has_no_history(self, ai_db):
+        store = PacingStore()
+        _record(store, [1.2] * (MIN_RECORDS + 1), subject_tag="")
+        assert store.get_user_pacing_factor("u1", "math") == pytest.approx(1.2)
+
+    def test_uses_subject_history_when_present(self, ai_db):
+        store = PacingStore()
+        _record(store, [2.0] * MIN_RECORDS, subject_tag="math")
+        _record(store, [1.0] * (MIN_RECORDS + 2), subject_tag="")
+        assert store.get_user_pacing_factor("u1", "math") == pytest.approx(2.0)
+
+    def test_history_is_per_user(self, ai_db):
+        store = PacingStore()
+        _record(store, [2.5] * MIN_RECORDS, user_id="someone-else")
         assert store.get_user_pacing_factor("u1") == DEFAULT_FACTOR
-
-    def test_computes_median_with_enough_records(self):
-        docs = [{"ratio": r} for r in [1.5, 1.0, 2.0, 1.5, 1.0]]  # median = 1.5
-        store, _ = _make_store(docs)
-        factor = store.get_user_pacing_factor("u1")
-        assert factor == pytest.approx(1.5)
-
-    def test_clamps_to_maximum(self):
-        docs = [{"ratio": 10.0}] * (MIN_RECORDS + 1)
-        store, _ = _make_store(docs)
-        assert store.get_user_pacing_factor("u1") == 3.0  # capped
-
-    def test_clamps_to_minimum(self):
-        docs = [{"ratio": 0.0}] * (MIN_RECORDS + 1)
-        store, _ = _make_store(docs)
-        assert store.get_user_pacing_factor("u1") == 0.5  # capped
-
-    def test_falls_back_to_global_when_subject_empty(self):
-        global_docs = [{"ratio": 1.2}] * (MIN_RECORDS + 1)
-        store, col = _make_store()
-
-        call_results = [
-            [],  # subject-specific: empty
-            global_docs,  # global fallback
-        ]
-        call_count = [0]
-
-        def fake_find(query, projection):
-            result = MagicMock()
-            result.sort.return_value.limit.return_value = call_results[call_count[0]]
-            call_count[0] += 1
-            return result
-
-        col.find = fake_find
-        factor = store.get_user_pacing_factor("u1", "math")
-        assert factor == pytest.approx(1.2)
-
-
-# ---------------------------------------------------------------------------
-# Tests: record_task_completion
-# ---------------------------------------------------------------------------
 
 
 class TestRecordTaskCompletion:
+    def test_inserts_row(self, ai_db):
+        PacingStore().record_task_completion("u1", "t1", 30, 45, "math")
+        with ai_db.connection() as conn:
+            row = conn.execute("SELECT * FROM ai.pacing_data").fetchone()
+        assert (row["user_id"], row["estimated"], row["actual"], row["subject_tag"]) == (
+            "u1",
+            30,
+            45,
+            "math",
+        )
+        assert abs(row["ratio"] - 1.5) < 0.001
 
-    def test_inserts_document(self):
-        store, col = _make_store([])
-        col.find.return_value.sort.return_value.limit.return_value = []
+    def test_skips_when_no_db(self, monkeypatch):
+        monkeypatch.delenv("AI_DATABASE_URL", raising=False)
+        PacingStore().record_task_completion("u1", "t1", 30, 45)  # must not raise
 
-        store.record_task_completion("u1", "t1", 30, 45, "math")
+    def test_skips_invalid_times(self, ai_db):
+        PacingStore().record_task_completion("u1", "t1", 0, 45)
+        with ai_db.connection() as conn:
+            assert conn.execute("SELECT count(*) AS n FROM ai.pacing_data").fetchone()["n"] == 0
 
-        col.insert_one.assert_called_once()
-        doc = col.insert_one.call_args[0][0]
-        assert doc["user_id"] == "u1"
-        assert doc["estimated"] == 30
-        assert doc["actual"] == 45
-        assert abs(doc["ratio"] - 1.5) < 0.001
-        assert doc["subject_tag"] == "math"
+    def test_prunes_to_the_rolling_window_per_user_and_subject(self, ai_db):
+        store = PacingStore()
+        _record(store, [1.0] * (MAX_RECORDS + 5), subject_tag="math")
+        _record(store, [1.0] * 2, subject_tag="art")
+        with ai_db.connection() as conn:
+            counts = {
+                r["subject_tag"]: r["n"]
+                for r in conn.execute(
+                    "SELECT subject_tag, count(*) AS n FROM ai.pacing_data GROUP BY 1"
+                ).fetchall()
+            }
+        assert counts == {"math": MAX_RECORDS, "art": 2}
 
-    def test_skips_when_no_db(self):
-        store = PacingStore.__new__(PacingStore)
-        store._db = None
-        # Should not raise
-        store.record_task_completion("u1", "t1", 30, 45)
-
-    def test_skips_invalid_times(self):
-        store, col = _make_store()
-        store.record_task_completion("u1", "t1", 0, 45)
-        col.insert_one.assert_not_called()
-
-    def test_prunes_old_records(self):
-        old_docs = [{"_id": f"id_{i}"} for i in range(5)]
-        col = MagicMock()
-        col.find.return_value.sort.return_value.limit.return_value = (
-            []
-        )  # for find in record
-        col.aggregate.return_value = old_docs
-
-        store = PacingStore.__new__(PacingStore)
-        store._db = {"pacing_data": col}
-
-        store.record_task_completion("u1", "t1", 30, 45)
-
-        col.delete_many.assert_called_once()
-        delete_ids = col.delete_many.call_args[0][0]["_id"]["$in"]
-        assert delete_ids == ["id_0", "id_1", "id_2", "id_3", "id_4"]
+    def test_prune_keeps_the_newest_records(self, ai_db):
+        store = PacingStore()
+        _record(store, [float(i + 1) for i in range(MAX_RECORDS + 3)])
+        with ai_db.connection() as conn:
+            kept = {r["task_id"] for r in conn.execute("SELECT task_id FROM ai.pacing_data")}
+        assert "t0" not in kept and f"t{MAX_RECORDS + 2}" in kept

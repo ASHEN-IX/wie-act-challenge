@@ -1,83 +1,67 @@
-import os
-from pymongo import MongoClient
-from agents.coach.models.schemas import ScheduledTask
+"""The learner's scheduled tasks, for the coach prompt.
 
-MONGO_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
-DB_NAME = os.getenv("DB_NAME", "ednova")
-TASK_SCHEDULING_COLLECTION = os.getenv("TASK_SCHEDULING_COLLECTION", "task_scheduling")
-# The study plan lives in the API's PostgreSQL `studyplans` table now. This
-# reader cannot join across engines, so it yields no scheduled tasks and the
-# coach falls back to the plan text it already has. Point it at a served
-# endpoint before relying on task-level scheduling here.
-STUDY_PLAN_COLLECTION = os.getenv("STUDY_PLAN_COLLECTION", "studyplans")
+The schedule itself is AI-owned (`ai.task_scheduling`). Task titles and
+difficulty come from the study plan, which the API owns, so they are read
+through `services.api_service`. When anything is missing the result is an empty
+list — never invented tasks, because these titles go straight into the prompt.
+"""
+
+from datetime import datetime
+from typing import Any, Dict, Optional
+
+from agents.coach.models.schemas import ScheduledTask
+from services import api_service, pg, schedule_store
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+def _as_datetime(value: Any) -> datetime:
+    return value if isinstance(value, datetime) else datetime.fromisoformat(value)
 
 
 class PlannerRepository:
-    def __init__(self):
-        self.client = MongoClient(MONGO_URI)
-        self.db = self.client[DB_NAME]
-        self.task_collection = self.db[TASK_SCHEDULING_COLLECTION]
-        self.study_plan_collection = self.db[STUDY_PLAN_COLLECTION]
+    def get_scheduled_tasks(self, user_id: Optional[str] = None) -> list[ScheduledTask]:
+        """The user's latest schedule as tasks, or `[]` when there is none.
 
-    def get_scheduled_tasks(self) -> list[ScheduledTask]:
+        Scoped to `user_id` — one learner's schedule never reaches another
+        learner's prompt.
+        """
+        if not user_id or not pg.configured():
+            return []
         try:
-            # Fetch the latest scheduling document
-            doc = self.task_collection.find_one(sort=[("_id", -1)])
+            with pg.connection() as conn:
+                doc = schedule_store.latest(conn, user_id)
             if not doc:
-                # Fallback to mock data for testing
-                return self._get_mock_tasks()
+                return []
 
-            study_plan_id = doc.get("study_plan_id")
-            if not study_plan_id:
-                return self._get_mock_tasks()
+            tasks_by_id: Dict[str, Dict[str, Any]] = {}
+            plans = api_service.planner_plans(user_id) or []
+            for plan in plans:
+                if str(plan.get("id")) == str(doc.get("study_plan_id")):
+                    graph = plan.get("taskGraph") or {}
+                    tasks_by_id = {
+                        t["id"]: t for t in graph.get("tasks", []) if t.get("id")
+                    }
+                    break
 
-            # Study plans moved to PostgreSQL; the collection is no longer written.
-            study_plan = self.study_plan_collection.find_one({"_id": study_plan_id})
-            if not study_plan:
-                return self._get_mock_tasks()
-
-            task_graph = study_plan.get("task_graph", {})
-            atomic_tasks = task_graph.get("atomic_tasks", [])
-            task_dict = {task["id"]: task for task in atomic_tasks}
-
-            sessions = doc.get("sessions", [])
             tasks = []
-            for session in sessions:
+            for session in doc.get("sessions", []):
                 task_id = session["task_id"]
-                task_info = task_dict.get(task_id, {})
-                title = task_info.get("title", task_id)
-                priority = task_info.get("difficulty", 0.5) * 10  # Rough priority
-
-                task = ScheduledTask(
-                    task_id=task_id,
-                    title=title,
-                    start_time=session["start_datetime"],
-                    end_time=session["end_datetime"],
-                    priority=int(priority),
+                info = tasks_by_id.get(task_id, {})
+                difficulty = info.get("difficulty")
+                tasks.append(
+                    ScheduledTask(
+                        task_id=task_id,
+                        title=info.get("title", task_id),
+                        start_time=_as_datetime(session["start_datetime"]),
+                        end_time=_as_datetime(session["end_datetime"]),
+                        priority=int((difficulty if difficulty is not None else 0.5) * 10),
+                    )
                 )
-                tasks.append(task)
             return tasks
-        except Exception:
-            # If MongoDB is not available, return mock data
-            return self._get_mock_tasks()
-
-    def _get_mock_tasks(self) -> list[ScheduledTask]:
-        """Return mock scheduled tasks for testing when DB is unavailable."""
-        from datetime import datetime, timedelta
-
-        return [
-            ScheduledTask(
-                task_id="math_001",
-                title="Algebra Fundamentals",
-                start_time=datetime.now(),
-                end_time=datetime.now() + timedelta(minutes=45),
-                priority=1,
-            ),
-            ScheduledTask(
-                task_id="physics_002",
-                title="Newton's Laws",
-                start_time=datetime.now() + timedelta(hours=2),
-                end_time=datetime.now() + timedelta(hours=2, minutes=30),
-                priority=2,
-            ),
-        ]
+        except Exception as exc:
+            logger.warning(
+                "planner_repository_read_failed", extra={"error_type": type(exc).__name__}
+            )
+            return []

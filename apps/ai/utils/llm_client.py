@@ -134,248 +134,47 @@ def _reserve_durable_budget(approval):
     Each approval ID is bound to its original task, model, limit and expiry.
     Supports request caps, token caps, monetary caps and explicit revocation.
     Attempts are consumed even if the process crashes or the provider fails.
+
+    The ledger (`llm_approval_budgets`) belongs to the API, which performs the
+    reservation as one conditional update; this only asks.
     """
-    uri = os.getenv("LLM_BUDGET_MONGODB_URI")
-    database = os.getenv("LLM_BUDGET_DB_NAME")
-    if not uri or not database:
-        return False
-    client = None
-    try:
-        from pymongo import MongoClient, ReturnDocument
-        from pymongo.errors import DuplicateKeyError
-        from pymongo.write_concern import WriteConcern
+    from services import api_service
 
-        client = MongoClient(
-            uri,
-            serverSelectionTimeoutMS=2000,
-            connectTimeoutMS=2000,
-            socketTimeoutMS=3000,
-            retryWrites=False,
-        )
-        records = client[database].get_collection(
-            "llm_approval_budgets",
-            write_concern=WriteConcern(w="majority", j=True, wtimeout=2000),
-        )
-        identity = {
-            "_id": approval["approvalId"],
-            "task": approval["task"],
-            "model": approval["model"],
-            "limit": approval["maxRequests"],
-            "expiresAt": float(approval["expiresAt"]),
-        }
-        max_tokens = approval.get("maxTokens")
-        max_cost_usd = approval.get("maxCostUsd")
-
-        insert_doc: Dict[str, Any] = {
-            **identity,
-            "used": 0,
-            "usedTokens": 0,
-            "usedCostUsd": 0.0,
-        }
-        if max_tokens is not None:
-            insert_doc["maxTokens"] = max_tokens
-        if max_cost_usd is not None:
-            insert_doc["maxCostUsd"] = float(max_cost_usd)
-
-        try:
-            records.update_one(
-                {"_id": identity["_id"]},
-                {"$setOnInsert": insert_doc},
-                upsert=True,
-            )
-        except DuplicateKeyError:
-            # A concurrent process created the same ID; the exact identity
-            # predicate below still rejects conflicting approval records.
-            pass
-
-        filter_query: Dict[str, Any] = {
-            **identity,
-            "expiresAt": {"$eq": identity["expiresAt"], "$gt": time.time()},
-            "used": {"$lt": identity["limit"]},
-            "revokedAt": {"$exists": False},
-        }
-        if max_tokens is not None:
-            filter_query["usedTokens"] = {"$lt": max_tokens}
-        if max_cost_usd is not None:
-            filter_query["usedCostUsd"] = {"$lt": float(max_cost_usd)}
-
-        return bool(
-            records.find_one_and_update(
-                filter_query,
-                {"$inc": {"used": 1}},
-                return_document=ReturnDocument.AFTER,
-            )
-        )
-    except Exception:
-        # Do not log MongoDB URIs or credentials; failure denies dispatch.
-        logger.warning("llm_budget_reservation_unavailable")
-        return False
-    finally:
-        if client is not None:
-            client.close()
+    return api_service.budget_reserve(approval)
 
 
 def record_durable_usage(approval_id: str, tokens: int = 0, cost_usd: float = 0.0) -> bool:
-    """Record durable token count and monetary cost to MongoDB after execution."""
-    uri = os.getenv("LLM_BUDGET_MONGODB_URI")
-    database = os.getenv("LLM_BUDGET_DB_NAME")
-    if not uri or not database or not approval_id:
+    """Record durable token count and monetary cost after execution."""
+    if not approval_id:
         return False
-    client = None
-    try:
-        from pymongo import MongoClient
-        from pymongo.write_concern import WriteConcern
+    from services import api_service
 
-        client = MongoClient(
-            uri,
-            serverSelectionTimeoutMS=2000,
-            connectTimeoutMS=2000,
-            socketTimeoutMS=3000,
-            retryWrites=False,
-        )
-        records = client[database].get_collection(
-            "llm_approval_budgets",
-            write_concern=WriteConcern(w="majority", j=True, wtimeout=2000),
-        )
-        update_inc: Dict[str, Any] = {}
-        if tokens > 0:
-            update_inc["usedTokens"] = tokens
-        if cost_usd > 0.0:
-            update_inc["usedCostUsd"] = float(cost_usd)
-        if not update_inc:
-            return True
-        records.update_one({"_id": approval_id}, {"$inc": update_inc})
-        return True
-    except Exception:
-        logger.warning("llm_budget_usage_record_unavailable")
-        return False
-    finally:
-        if client is not None:
-            client.close()
+    return api_service.budget_record_usage(approval_id, tokens, float(cost_usd))
 
 
 def revoke_operator_approval(approval_id: str, reason: str = "operator_revocation") -> bool:
     """Explicitly revoke an active operator approval, stopping further requests immediately."""
-    uri = os.getenv("LLM_BUDGET_MONGODB_URI")
-    database = os.getenv("LLM_BUDGET_DB_NAME")
-    if not uri or not database or not approval_id:
+    if not approval_id:
         return False
-    client = None
-    try:
-        from pymongo import MongoClient
-        from pymongo.write_concern import WriteConcern
+    from services import api_service
 
-        client = MongoClient(
-            uri,
-            serverSelectionTimeoutMS=2000,
-            connectTimeoutMS=2000,
-            socketTimeoutMS=3000,
-            retryWrites=False,
-        )
-        records = client[database].get_collection(
-            "llm_approval_budgets",
-            write_concern=WriteConcern(w="majority", j=True, wtimeout=2000),
-        )
-        res = records.update_one(
-            {"_id": approval_id, "revokedAt": {"$exists": False}},
-            {"$set": {"revokedAt": time.time(), "revocationReason": reason}},
-        )
-        return bool(res.modified_count > 0)
-    except Exception:
-        logger.warning("llm_approval_revocation_unavailable")
-        return False
-    finally:
-        if client is not None:
-            client.close()
+    return api_service.budget_revoke(approval_id, reason)
 
 
 def get_approval_budget_status(approval_id: str) -> Optional[dict]:
     """Inspect durable budget usage and revocation state."""
-    uri = os.getenv("LLM_BUDGET_MONGODB_URI")
-    database = os.getenv("LLM_BUDGET_DB_NAME")
-    if not uri or not database or not approval_id:
+    if not approval_id:
         return None
-    client = None
-    try:
-        from pymongo import MongoClient
-        from pymongo.read_concern import ReadConcern
+    from services import api_service
 
-        client = MongoClient(
-            uri,
-            serverSelectionTimeoutMS=2000,
-            connectTimeoutMS=2000,
-            socketTimeoutMS=3000,
-        )
-        records = client[database].get_collection(
-            "llm_approval_budgets", read_concern=ReadConcern("majority")
-        )
-        doc = records.find_one({"_id": approval_id})
-        if not doc:
-            return None
-        return {
-            "approvalId": doc.get("_id"),
-            "task": doc.get("task"),
-            "model": doc.get("model"),
-            "usedRequests": doc.get("used", 0),
-            "limitRequests": doc.get("limit", 0),
-            "usedTokens": doc.get("usedTokens", 0),
-            "limitTokens": doc.get("maxTokens"),
-            "usedCostUsd": doc.get("usedCostUsd", 0.0),
-            "limitCostUsd": doc.get("maxCostUsd"),
-            "revoked": "revokedAt" in doc,
-            "revocationReason": doc.get("revocationReason"),
-            "expiresAt": doc.get("expiresAt"),
-        }
-    except Exception:
-        return None
-    finally:
-        if client is not None:
-            client.close()
+    return api_service.budget_status(approval_id)
 
 
 def _budget_still_active(approval):
     """Read the shared revocation state before dispatch and result delivery."""
-    uri = os.getenv("LLM_BUDGET_MONGODB_URI")
-    database = os.getenv("LLM_BUDGET_DB_NAME")
-    if not uri or not database:
-        return False
-    client = None
-    try:
-        from pymongo import MongoClient
-        from pymongo.read_concern import ReadConcern
+    from services import api_service
 
-        client = MongoClient(
-            uri,
-            serverSelectionTimeoutMS=2000,
-            connectTimeoutMS=2000,
-            socketTimeoutMS=3000,
-        )
-        records = client[database].get_collection(
-            "llm_approval_budgets", read_concern=ReadConcern("majority")
-        )
-        return bool(
-            records.find_one(
-                {
-                    "_id": approval["approvalId"],
-                    "task": approval["task"],
-                    "model": approval["model"],
-                    "limit": approval["maxRequests"],
-                    "expiresAt": {
-                        "$eq": float(approval["expiresAt"]),
-                        "$gt": time.time(),
-                    },
-                    "used": {"$gte": 1},
-                    "revokedAt": {"$exists": False},
-                },
-                {"_id": 1},
-            )
-        )
-    except Exception:
-        logger.warning("llm_budget_status_unavailable")
-        return False
-    finally:
-        if client is not None:
-            client.close()
+    return api_service.budget_active(approval)
 
 
 def get_model_tier(agent: str) -> str:

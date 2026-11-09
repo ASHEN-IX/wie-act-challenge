@@ -85,7 +85,7 @@ class AIOrchestrator:
         elif current_time.tzinfo is not None:
             # COACH-11: bus payloads carry an offset-aware ISO instant (e.g.
             # Node `.toISOString()`). Downstream comparisons (planner tasks,
-            # pymongo timestamps) use naive UTC, so normalize here to avoid
+            # stored timestamps) use naive UTC, so normalize here to avoid
             # naive/aware TypeError during is_late / staleness checks.
             current_time = current_time.astimezone(timezone.utc).replace(tzinfo=None)
 
@@ -113,10 +113,10 @@ class AIOrchestrator:
                 extra={"user_id": user_id, "trace_id": trace_id},
             )
             # Only fetch scheduled tasks
-            scheduled_tasks = self._fetch_scheduled_tasks()
+            scheduled_tasks = self._fetch_scheduled_tasks(user_id)
         else:
             with ThreadPoolExecutor(max_workers=2) as pool:
-                fut_tasks = pool.submit(self._fetch_scheduled_tasks)
+                fut_tasks = pool.submit(self._fetch_scheduled_tasks, user_id)
                 fut_signals = pool.submit(self._fetch_signal_snapshot, user_id)
 
                 for fut in as_completed([fut_tasks, fut_signals]):
@@ -166,7 +166,7 @@ class AIOrchestrator:
         )
         return coach_action
 
-    def _fetch_scheduled_tasks(self) -> list[ScheduledTask]:
+    def _fetch_scheduled_tasks(self, user_id: str) -> list[ScheduledTask]:
         """
         Fetch scheduled tasks for the user.
 
@@ -174,7 +174,7 @@ class AIOrchestrator:
             List of scheduled tasks (may be empty)
         """
         try:
-            tasks = self.planner_repo.get_scheduled_tasks()
+            tasks = self.planner_repo.get_scheduled_tasks(user_id)
             return tasks if tasks else []
         except Exception as e:
             logger.warning("orchestrator_fetch_tasks_error", extra={"error": str(e)})

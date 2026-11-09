@@ -1,13 +1,16 @@
-"""Repository for persisting and retrieving signal snapshots from MongoDB.
+"""Repository for persisting and retrieving signal snapshots from PostgreSQL.
 
-This module handles all database operations for user signals.
+This module handles all database operations for user signals. Rows live in
+``ai.signals`` with a ``kind``: ``snapshot`` (the fused SignalSnapshot the coach
+reads) or ``frame_analysis`` (the per-frame analyze endpoint's result).
 """
 
-from pymongo import MongoClient, DESCENDING
-from typing import Dict, List, Optional
 from datetime import datetime, timedelta, timezone
-import os
+from typing import Any, Dict, List, Optional
 
+from psycopg.types.json import Jsonb
+
+from services import pg
 from services.signal_processing_service.signal_snapshot import SignalSnapshot
 from utils.logger import get_logger
 
@@ -15,33 +18,28 @@ logger = get_logger(__name__)
 
 
 class SignalRepository:
-    """Handles persistence of SignalSnapshot data in MongoDB."""
-
-    def __init__(self):
-        """Initialize MongoDB connection."""
-        mongo_uri = os.getenv("MONGODB_URI", "mongodb://localhost:27017/")
-        db_name = os.getenv("DB_NAME", "ednova")
-
-        self.client = MongoClient(mongo_uri)
-        self.db = self.client[db_name]
-        self.collection = self.db["signals"]
-
-        # Create index on user_id and timestamp for efficient queries
-        self.collection.create_index([("user_id", 1), ("timestamp", DESCENDING)])
+    """Handles persistence of signal data in PostgreSQL."""
 
     def save_signal_snapshot(self, snapshot: SignalSnapshot) -> str:
         """
-        Save a signal snapshot to MongoDB.
+        Save a signal snapshot.
 
         Args:
             snapshot: The SignalSnapshot to persist
 
         Returns:
-            The MongoDB document ID as a string
+            The row id as a string
         """
         snapshot_dict = snapshot.model_dump()
-        result = self.collection.insert_one(snapshot_dict)
-        return str(result.inserted_id)
+        with pg.connection() as conn:
+            row = conn.execute(
+                """
+                INSERT INTO ai.signals (user_id, kind, ts, doc)
+                VALUES (%s, 'snapshot', %s, %s) RETURNING seq
+                """,
+                (snapshot.user_id, snapshot.timestamp, Jsonb(snapshot_dict)),
+            ).fetchone()
+        return str(row["seq"])
 
     def get_latest_signal_snapshot(self, user_id: str) -> Optional[SignalSnapshot]:
         """
@@ -53,18 +51,16 @@ class SignalRepository:
         Returns:
             The latest SignalSnapshot, or None if no signals exist
         """
-        # Use _id descending for more reliable ordering (ObjectIds are monotonically increasing)
-        document = self.collection.find_one(
-            {"user_id": user_id}, sort=[("_id", DESCENDING)]
-        )
-
-        if document is None:
-            return None
-
-        # Remove MongoDB's _id field before parsing
-        document.pop("_id", None)
-
-        return SignalSnapshot(**document)
+        with pg.connection() as conn:
+            row = conn.execute(
+                """
+                SELECT doc FROM ai.signals
+                 WHERE user_id = %s AND kind = 'snapshot'
+                 ORDER BY seq DESC LIMIT 1
+                """,
+                (user_id,),
+            ).fetchone()
+        return SignalSnapshot(**row["doc"]) if row else None
 
     def get_signal_history(self, user_id: str, limit: int = 10) -> list[SignalSnapshot]:
         """
@@ -77,16 +73,40 @@ class SignalRepository:
         Returns:
             List of SignalSnapshot objects, ordered by timestamp (newest first)
         """
-        documents = self.collection.find(
-            {"user_id": user_id}, sort=[("timestamp", DESCENDING)], limit=limit
-        )
+        with pg.connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT doc FROM ai.signals
+                 WHERE user_id = %s AND kind = 'snapshot'
+                 ORDER BY ts DESC LIMIT %s
+                """,
+                (user_id, limit),
+            ).fetchall()
+        return [SignalSnapshot(**row["doc"]) for row in rows]
 
-        snapshots = []
-        for doc in documents:
-            doc.pop("_id", None)
-            snapshots.append(SignalSnapshot(**doc))
+    def save_frame_analysis(self, analysis: Dict[str, Any]) -> None:
+        """Persist one analyze-frame result (JSON-safe dict with a user_id)."""
+        with pg.connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO ai.signals (user_id, kind, ts, doc)
+                VALUES (%s, 'frame_analysis', %s, %s)
+                """,
+                (analysis["user_id"], datetime.now(tz=timezone.utc), Jsonb(analysis)),
+            )
 
-        return snapshots
+    def get_frame_analyses(self, user_id: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """The user's most recent frame analyses, newest first, with an `_id`."""
+        with pg.connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT seq, doc FROM ai.signals
+                 WHERE user_id = %s AND kind = 'frame_analysis'
+                 ORDER BY ts DESC LIMIT %s
+                """,
+                (user_id, limit),
+            ).fetchall()
+        return [{**row["doc"], "_id": str(row["seq"])} for row in rows]
 
     # ------------------------------------------------------------------ #
     # Productivity / trend analytics                                       #
@@ -101,7 +121,7 @@ class SignalRepository:
         Return a mapping of {hour_of_day: avg_focus_score} built from historical
         signal data for *user_id* over the last *days_back* days.
 
-        Uses a MongoDB aggregation pipeline that:
+        Uses a SQL aggregation that:
           1. Filters to the relevant time window.
           2. Projects the hour-of-day from the timestamp.
           3. Groups and averages focus_score per hour.
@@ -115,33 +135,22 @@ class SignalRepository:
             Missing hours (no data) are omitted from the dict.
         """
         since = datetime.now(tz=timezone.utc) - timedelta(days=days_back)
-        pipeline = [
-            {
-                "$match": {
-                    "user_id": user_id,
-                    "timestamp": {"$gte": since},
-                }
-            },
-            {
-                "$project": {
-                    "hour": {"$hour": "$timestamp"},
-                    "focus_score": 1,
-                }
-            },
-            {
-                "$group": {
-                    "_id": "$hour",
-                    "avg_focus": {"$avg": "$focus_score"},
-                    "count": {"$sum": 1},
-                }
-            },
-        ]
         try:
-            results = list(self.collection.aggregate(pipeline))
+            with pg.connection() as conn:
+                results = conn.execute(
+                    """
+                    SELECT EXTRACT(HOUR FROM ts AT TIME ZONE 'UTC')::int AS hour,
+                           AVG((doc->>'focus_score')::float8) AS avg_focus
+                      FROM ai.signals
+                     WHERE user_id = %s AND kind = 'snapshot' AND ts >= %s
+                     GROUP BY 1
+                    """,
+                    (user_id, since),
+                ).fetchall()
             profile: Dict[int, float] = {
-                int(r["_id"]): round(r["avg_focus"], 4)
+                int(r["hour"]): round(r["avg_focus"], 4)
                 for r in results
-                if r["_id"] is not None
+                if r["hour"] is not None and r["avg_focus"] is not None
             }
             logger.info(
                 "hourly_focus_profile_built",
@@ -175,12 +184,16 @@ class SignalRepository:
         """
         since = datetime.now(tz=timezone.utc) - timedelta(minutes=window_minutes)
         try:
-            docs = list(
-                self.collection.find(
-                    {"user_id": user_id, "timestamp": {"$gte": since}},
-                    {"timestamp": 1, "focus_score": 1, "_id": 0},
-                ).sort("timestamp", 1)
-            )
+            with pg.connection() as conn:
+                docs = conn.execute(
+                    """
+                    SELECT ts AS timestamp, (doc->>'focus_score')::float8 AS focus_score
+                      FROM ai.signals
+                     WHERE user_id = %s AND kind = 'snapshot' AND ts >= %s
+                     ORDER BY ts ASC
+                    """,
+                    (user_id, since),
+                ).fetchall()
         except Exception as exc:
             logger.warning(
                 "focus_trend_query_error",

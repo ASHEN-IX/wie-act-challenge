@@ -1,7 +1,7 @@
 """Three-crop Gemini research harness; never called by ingestion or publication.
 
 Requires a fresh operator-created, key-bound free-tier attestation AND the
-shared LLM operator approval and durable MongoDB budget. No fallback calls.
+shared LLM operator approval and durable budget. No fallback calls.
 """
 from __future__ import annotations
 
@@ -63,29 +63,16 @@ def _check_attestation(path: Path, key: str, now: float | None = None) -> None:
 
 
 def _reserve_tokens(approval: dict) -> bool:
-    """Atomically reserve a conservative token allowance in the existing budget."""
+    """Reserve a conservative token allowance in the existing budget.
+
+    The API owns the ledger and makes the reservation atomic; anything but a
+    clear yes denies the call.
+    """
     if type(approval.get("maxTokens")) is not int or approval["maxTokens"] < RESERVED_TOKENS:
         return False
-    client = None
-    try:
-        from pymongo import MongoClient, ReturnDocument
-        from pymongo.write_concern import WriteConcern
-        client = MongoClient(os.environ["LLM_BUDGET_MONGODB_URI"], serverSelectionTimeoutMS=2000,
-                             connectTimeoutMS=2000, socketTimeoutMS=3000, retryWrites=False)
-        records = client[os.environ["LLM_BUDGET_DB_NAME"]].get_collection(
-            "llm_approval_budgets", write_concern=WriteConcern(w="majority", j=True, wtimeout=2000))
-        match = {"_id": approval["approvalId"], "task": ALIAS, "model": approval["model"],
-                 "limit": approval["maxRequests"], "maxTokens": approval["maxTokens"],
-                 "expiresAt": {"$eq": float(approval["expiresAt"]), "$gt": time.time()},
-                 "revokedAt": {"$exists": False},
-                 "usedTokens": {"$lte": approval["maxTokens"] - RESERVED_TOKENS}}
-        return bool(records.find_one_and_update(match, {"$inc": {"usedTokens": RESERVED_TOKENS}},
-                                                return_document=ReturnDocument.AFTER))
-    except Exception:
-        return False
-    finally:
-        if client is not None:
-            client.close()
+    from services import api_service
+
+    return api_service.budget_reserve_tokens(approval, RESERVED_TOKENS)
 
 
 def _load_cases():
@@ -126,8 +113,7 @@ def _run_locked(attestation: Path, output: Path) -> None:
     _check_attestation(attestation, key)
     approval = llm_client._approval(ALIAS)
     if (not approval or approval["maxRequests"] > 3 or
-        type(approval.get("maxTokens")) is not int or
-        not os.getenv("LLM_BUDGET_MONGODB_URI") or not os.getenv("LLM_BUDGET_DB_NAME")):
+        type(approval.get("maxTokens")) is not int):
         raise ResearchUnavailable("Operator approval or durable budget unavailable")
     route = llm_client._deployment(ALIAS)["model"]
     if not route.startswith("gemini/") or route != approval["model"]:

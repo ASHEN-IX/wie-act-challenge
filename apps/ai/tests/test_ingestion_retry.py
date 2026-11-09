@@ -1,4 +1,4 @@
-"""INGEST-08 — ingestion retry / DLQ policy (no broker, no Mongo, no FAISS).
+"""INGEST-08 — ingestion retry / DLQ policy (no broker, no database, no FAISS).
 
 The retry backoff / DLQ machinery lives in ``BaseAIWorker`` (AI-COM-06); these
 tests pin the four INGEST-08 acceptance criteria AT the ingestion boundary:
@@ -9,7 +9,7 @@ tests pin the four INGEST-08 acceptance criteria AT the ingestion boundary:
    attempt 0, no retry is ever scheduled.
 3. The DLQ replay path re-runs an ingest job with a fresh messageId and gets a
    full retry budget again (validated on the Node side by dlq-replay.test.js).
-4. ``VectorStoreAdapter.add_course`` is idempotent on replay — Mongo upserts by
+4. ``VectorStoreAdapter.add_course`` is idempotent on replay — the store upserts by
    course_id with ``$set`` (replace, never append) and FAISS rebuilds per
    course, so a replayed job never duplicates embeddings.
 """
@@ -17,7 +17,6 @@ tests pin the four INGEST-08 acceptance criteria AT the ingestion boundary:
 from __future__ import annotations
 
 import sys
-import types
 import uuid
 from typing import Dict, List, Optional
 
@@ -25,6 +24,7 @@ import numpy as np
 import pytest
 
 from messaging.failures import FailureClass, TerminalError, classify_failure
+from services import api_service
 from tests.test_base_worker import FakeMessage
 from workers.idempotency import InMemoryIdempotencyStore
 from workers.ingestion_worker import IngestionWorker
@@ -62,6 +62,14 @@ def ingest_envelope(**overrides) -> dict:
     }
     base.update(overrides)
     return base
+
+
+@pytest.fixture(autouse=True)
+def operation_is_current(monkeypatch):
+    """The fencing check is an API call; default to a still-current dispatch."""
+    monkeypatch.setattr(
+        api_service, "ingestion_operation_is_current", lambda *a, **k: True
+    )
 
 
 @pytest.fixture
@@ -239,42 +247,39 @@ class _FakeFaiss:
     def write_index(index, path) -> None:  # pragma: no cover - no-op fake
         return None
 
-
-class _FakeColl:
-    def __init__(self):
-        self.docs: Dict[str, dict] = {}
-
-    def find_one(self, query: dict) -> Optional[dict]:
-        return self.docs.get(query.get("course_id"))
-
-    def update_one(self, query: dict, update: dict, upsert: bool = False) -> None:
-        cid = query["course_id"]
-        merged = {**self.docs.get(cid, {}), **update.get("$set", {})}
-        self.docs[cid] = merged
+    @staticmethod
+    def serialize_index(index):
+        return np.zeros(1, dtype="uint8")
 
 
-class _FakeDB:
-    _COLL = "chunk_embeddings"
+class _FakeStore:
+    """In-memory `ChunkEmbeddingStore`: one row per (course, revision)."""
 
     def __init__(self):
-        self.colls = {self._COLL: _FakeColl()}
+        self.rows: Dict[tuple, dict] = {}
 
-    def __getitem__(self, key):
-        return self.colls[key]
+    def save(self, course_id, revision_id, chunks, metas, embeddings) -> None:
+        self.rows[(course_id, revision_id or "")] = {
+            "chunks": chunks,
+            "embeddings": np.asarray(embeddings, dtype="float32"),
+        }
+
+    def load(self, course_id, revision_id) -> Optional[dict]:
+        return self.rows.get((course_id, revision_id or ""))
 
 
 def test_add_course_rebuilds_idempotently_on_replay(tmp_path, monkeypatch):
     """Simulate original ingest job then a DLQ replay of the same course:
-    the second add_course (fresh messageId, same course) REPLACES the Mongo
-    document and rebuilds the FAISS index — no duplicate embeddings."""
+    the second add_course (fresh messageId, same course) REPLACES the stored
+    row and rebuilds the FAISS index — no duplicate embeddings."""
     monkeypatch.setitem(sys.modules, "faiss", _FakeFaiss())
 
     import services.vector_store.adapter as adapter
 
     monkeypatch.setattr(adapter, "FAISS_INDEX_DIR", tmp_path)
 
-    db = _FakeDB()
-    vs = adapter.VectorStoreAdapter(db)
+    store = _FakeStore()
+    vs = adapter.VectorStoreAdapter(store)
 
     first = np.ones((2, 384), dtype="float32")
     vs.add_course("course-1", ["c1", "c2"], first, [{"course_id": "course-1"}] * 2)
@@ -285,7 +290,7 @@ def test_add_course_rebuilds_idempotently_on_replay(tmp_path, monkeypatch):
     vs.add_course("course-1", ["c1", "c2"], replay, [{"course_id": "course-1"}] * 2)
 
     assert vs._indices["course-1"]["index"].ntotal == 2  # rebuilt, not accumulated
-    assert len(db.colls["chunk_embeddings"].docs) == 1  # single Mongo doc
-    stored = db.colls["chunk_embeddings"].find_one({"course_id": "course-1"})
+    assert len(store.rows) == 1  # a single stored row
+    stored = store.load("course-1", None)
     assert stored["chunks"] == ["c1", "c2"]
-    assert (np.asarray(stored["embeddings"], dtype="float32") == first).all()
+    assert (stored["embeddings"] == first).all()

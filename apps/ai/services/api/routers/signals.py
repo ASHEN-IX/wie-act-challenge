@@ -2,7 +2,6 @@
 
 import time
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
@@ -12,8 +11,8 @@ from services.api.deps import (
     get_focus_detector,
     get_fatigue_detector,
     get_signal_service,
-    signals_collection,
 )
+from services.signal_processing_service.repository import SignalRepository
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -187,8 +186,8 @@ async def analyze_frame(user_id: str = Form(...), frame: UploadFile = File(...))
             },
         }
 
-        # Save to MongoDB signals collection
-        signals_collection.insert_one(analysis)
+        # Persist to the AI database's signals table
+        SignalRepository().save_frame_analysis(analysis)
 
         return analysis
 
@@ -210,15 +209,7 @@ async def get_latest_signals(user_id: str, limit: int = 10):
         List of recent signal analyses
     """
     try:
-        signals = list(
-            signals_collection.find({"user_id": user_id})
-            .sort("timestamp", -1)
-            .limit(limit)
-        )
-
-        # Convert ObjectId to string
-        for signal in signals:
-            signal["_id"] = str(signal["_id"])
+        signals = SignalRepository().get_frame_analyses(user_id, limit)
 
         return {"signals": signals}
 

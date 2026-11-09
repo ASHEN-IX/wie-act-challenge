@@ -17,10 +17,8 @@ Nothing here validates a plan. The output is untrusted JSON by contract; the
 caller must run the M4.1 validator before anything reaches a reader.
 """
 
-import hashlib
 import os
 import time
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
@@ -93,31 +91,18 @@ def _propagated_reservation(approval: dict, request_id: str) -> bool:
     This is a read-only verification of a reservation somebody else owns. It
     creates no second reservation and adds no third accounting implementation.
     """
-    uri = os.getenv("MONGODB_URI", "")
-    if not uri or not request_id:
+    if not request_id:
         return False
-    from pymongo import MongoClient
+    from services import api_service
 
-    client = None
-    try:
-        client = MongoClient(uri, serverSelectionTimeoutMS=2000, connectTimeoutMS=2000, socketTimeoutMS=3000)
-        db = client[os.environ["DB_NAME"]] if os.getenv("DB_NAME") else client.get_default_database()
-        row = db["experience_plan_requests"].find_one(
-            {"requestId": request_id}
-        )
-        if not row:
-            return False
-        return (
-            row.get("approvalId") == approval["approvalId"]
-            and int(row.get("reservedTokens") or 0) == RESERVED_TOKENS
-            and row.get("state") in ("dispatched", "validating")
-            and str(row.get("model", approval["model"])) == approval["model"]
-        )
-    except Exception:
+    row = api_service.experience_reservation(request_id)
+    if not row:
         return False
-    finally:
-        if client is not None:
-            client.close()
+    return (
+        row.get("approvalId") == approval["approvalId"]
+        and int(row.get("reservedTokens") or 0) == RESERVED_TOKENS
+        and row.get("state") in ("dispatched", "validating")
+    )
 
 
 def _ledger_permits_dispatch(approval: dict) -> bool:
@@ -129,36 +114,24 @@ def _ledger_permits_dispatch(approval: dict) -> bool:
     """
     if type(approval.get("maxTokens")) is not int or approval["maxTokens"] < RESERVED_TOKENS:
         return False
-    uri = os.getenv("LLM_BUDGET_MONGODB_URI", "")
-    db_name = os.getenv("LLM_BUDGET_DB_NAME", "")
-    if not uri or not db_name:
-        return False
-    from pymongo import MongoClient
+    from services import api_service
 
-    client = None
-    try:
-        client = MongoClient(uri, serverSelectionTimeoutMS=2000, connectTimeoutMS=2000, socketTimeoutMS=3000)
-        row = client[db_name]["llm_approval_budgets"].find_one(
-            {
-                "_id": approval["approvalId"],
-                "task": PLANNER_TASK,
-                "model": approval["model"],
-                "maxTokens": approval["maxTokens"],
-                "expiresAt": {"$eq": float(approval["expiresAt"]), "$gt": time.time()},
-                "revokedAt": {"$exists": False},
-            }
-        )
-        if not row:
-            return False
-        used = int(row.get("usedTokens", 0))
-        # The attempt's own reservation is already counted in `used`, so the
-        # ledger is merely required to be within its limit.
-        return used <= approval["maxTokens"]
-    except Exception:
+    row = api_service.budget_status(approval["approvalId"])
+    if not row:
         return False
-    finally:
-        if client is not None:
-            client.close()
+    if (
+        row.get("task") != PLANNER_TASK
+        or row.get("model") != approval["model"]
+        or row.get("limitTokens") != approval["maxTokens"]
+        or float(row.get("expiresAt", 0)) != float(approval["expiresAt"])
+        or float(approval["expiresAt"]) <= time.time()
+        or row.get("revoked")
+    ):
+        return False
+    used = int(row.get("usedTokens", 0))
+    # The attempt's own reservation is already counted in `used`, so the
+    # ledger is merely required to be within its limit.
+    return used <= approval["maxTokens"]
 
 
 def _has_headroom(approval: dict, request_id: str = "") -> bool:

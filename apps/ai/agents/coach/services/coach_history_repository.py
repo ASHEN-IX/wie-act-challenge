@@ -1,7 +1,7 @@
 """
-CoachHistoryRepository — persist and retrieve coach actions from MongoDB.
+CoachHistoryRepository — persist and retrieve coach actions from PostgreSQL.
 
-Collection: `coach_actions`
+Table: `ai.coach_actions` (unique `trace_id`)
 
 Document schema:
   {
@@ -26,58 +26,29 @@ rows (COACH-09 AC#2).
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from typing import Dict, List
 
+from services import pg
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-COACH_ACTIONS_COLLECTION = "coach_actions"
-COACH_ACTIONS_TRACE_INDEX = "uniq_coach_actions_trace_id"
 DEFAULT_HISTORY_LIMIT = 5
 
 
 class CoachHistoryRepository:
     """
-    Thin wrapper around the `coach_actions` MongoDB collection.
+    Thin wrapper around the `ai.coach_actions` table.
 
-    Falls back gracefully to no-ops when MongoDB is unavailable.
+    Falls back gracefully to no-ops when the AI database is unavailable. The
+    unique constraint on `trace_id` (the COACH-09 key) is the database-level
+    guarantee that a race cannot write a duplicate history row for one
+    correlation id.
     """
-
-    def __init__(self) -> None:
-        self._db = None
-        try:
-            from services.database import get_db
-
-            self._db = get_db()
-        except Exception as exc:
-            logger.warning("coach_history_no_db", extra={"error": str(exc)})
-        self._ensure_index()
 
     # ------------------------------------------------------------------ #
     # Public API                                                           #
     # ------------------------------------------------------------------ #
-
-    def _ensure_index(self) -> None:
-        """Best-effort unique index on `trace_id` — the COACH-09 key.
-
-        The upsert in `save_action` is logically idempotent; the unique index
-        is the database-level guarantee against a race writing a duplicate
-        history row for the same correlation id.
-        """
-        if self._db is None:
-            return
-        try:
-            self._db[COACH_ACTIONS_COLLECTION].create_index(
-                [("trace_id", 1)],
-                unique=True,
-                name=COACH_ACTIONS_TRACE_INDEX,
-            )
-        except Exception as exc:
-            logger.warning(
-                "coach_history_index_error",
-                extra={"error": str(exc)},
-            )
 
     def save_action(
         self,
@@ -102,30 +73,34 @@ class CoachHistoryRepository:
             correlation_id: Optional explicit correlation id; defaults to
                             `trace_id` when empty.
         """
-        if self._db is None:
+        if not pg.configured():
             return
         try:
             correlation_id = correlation_id or trace_id
-            doc: Dict = {
-                "user_id": user_id,
-                "trace_id": trace_id,
-                "correlation_id": correlation_id,
-                "ts": datetime.now(tz=timezone.utc),
-                "action_type": action.action_type,
-                "message": action.message,
-                "reasoning": action.reasoning,
-                "focus_state": coach_input.focus_state.state,
-                "fatigue_state": coach_input.fatigue_state.state,
-                "affective_state": coach_input.affective_state,
-            }
-            col = self._db[COACH_ACTIONS_COLLECTION]
             # Insert only when no record with the same trace_id exists yet;
-            # a match is a no-op (the original write is preserved).
-            col.update_one(
-                {"trace_id": trace_id},
-                {"$setOnInsert": doc},
-                upsert=True,
-            )
+            # a conflict is a no-op (the original write is preserved).
+            with pg.connection() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO ai.coach_actions
+                        (user_id, trace_id, correlation_id, ts, action_type, message,
+                         reasoning, focus_state, fatigue_state, affective_state)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (trace_id) DO NOTHING
+                    """,
+                    (
+                        user_id,
+                        trace_id,
+                        correlation_id,
+                        datetime.now(tz=timezone.utc),
+                        action.action_type,
+                        action.message,
+                        action.reasoning,
+                        coach_input.focus_state.state,
+                        coach_input.fatigue_state.state,
+                        coach_input.affective_state,
+                    ),
+                )
             logger.info(
                 "coach_action_saved",
                 extra={
@@ -153,27 +128,21 @@ class CoachHistoryRepository:
             List of dicts (newest first), each with keys:
             ts, action_type, message, focus_state, fatigue_state, affective_state.
         """
-        if self._db is None or not user_id:
+        if not pg.configured() or not user_id:
             return []
         try:
-            col = self._db[COACH_ACTIONS_COLLECTION]
-            docs = list(
-                col.find(
-                    {"user_id": user_id},
-                    {
-                        "_id": 0,
-                        "ts": 1,
-                        "action_type": 1,
-                        "message": 1,
-                        "focus_state": 1,
-                        "fatigue_state": 1,
-                        "affective_state": 1,
-                    },
-                )
-                .sort("ts", -1)
-                .limit(limit)
-            )
-            return docs
+            with pg.connection() as conn:
+                return conn.execute(
+                    """
+                    SELECT ts, action_type, message, focus_state, fatigue_state,
+                           affective_state
+                      FROM ai.coach_actions
+                     WHERE user_id = %s
+                     ORDER BY ts DESC
+                     LIMIT %s
+                    """,
+                    (user_id, limit),
+                ).fetchall()
         except Exception as exc:
             logger.warning(
                 "coach_history_read_error",

@@ -1,40 +1,34 @@
-"""Course catalog reader for the coach (F03 / COACH-14).
+"""Course context for the coach (F03 / COACH-14).
 
-Reads the shared course catalog directly from Mongo — the same `ednova`
-DB that `PlannerRepository` and `CoachHistoryRepository` use — so the coach
-can ground nudges in the student's enrolled courses and subjects instead of
-reasoning from task titles alone:
+The catalog and the learner's current task are read **through the Node API**, not
+from a database. `courses`, `subjects` and `studysessions` are owned by the API
+(PostgreSQL), and it exposes bounded read endpoints on
+`/api/v1/study/internal/coach/*` for exactly this purpose.
 
-- `fetch_catalog` — the user's NEWEST ≤ `COURSE_CATALOG_MAX` (10) courses,
-  each reduced to subject title + course title + ≤ `KEY_CONCEPTS_MAX` (15)
-  key concepts (flattened from `topics[].subtopics[].key_concepts`). No files,
-  URLs, descriptions, ids or any other field leaves the DB — nothing but
-  subject/title/concepts can reach the prompt, and those are user-supplied
-  content wrapped as UNTRUSTED DATA at prompt-build time (COACH-03/12).
+This replaces the previous direct MongoDB reads. Those returned nothing once the
+collections moved to PostgreSQL, so the coach silently lost its grounding; the
+API call restores it and keeps the schema in one owner.
+
+What leaves the system is bounded, as before:
+
+- `fetch_catalog` — the user's NEWEST ≤ `COURSE_CATALOG_MAX` (10) courses, each
+  reduced to subject title + course title + ≤ `KEY_CONCEPTS_MAX` (15) key
+  concepts (flattened from `topics[].subtopics[].key_concepts`). No files, URLs,
+  descriptions, ids or any other field reaches the prompt, and those are
+  user-supplied content wrapped as UNTRUSTED DATA at prompt-build time
+  (COACH-03/12).
 - `fetch_current_task` — the live StudySession's in-progress task
-  (`taskProgress.tasks[currentTaskIndex]`), mapped to its course subject via
-  the session's `courseId` → `courses.subjectId` → `subjects.name`. This is
-  the COACH-14 AC#2 "current task → its course/subject" mapping.
+  (`taskProgress.tasks[currentTaskIndex]`), mapped to its course subject. This
+  is the COACH-14 AC#2 "current task → its course/subject" mapping.
 
-Every read is failure-safe: a catalog outage yields `[]`/`None` and the
-orchestrator degrades to task-title-only context — the coach job never fails.
-Identity (user_id, session_id) always comes from trusted callers, never from
-pasted catalog content.
+Every read is failure-safe: an API outage yields `[]`/`None` and the orchestrator
+degrades to task-title-only context — the coach job never fails.
 """
 
-import os
-from typing import List, Optional, Dict
-
-from bson import ObjectId
-from pymongo import MongoClient
+from typing import Any, Dict, List, Optional
 
 from agents.coach.models.schemas import CourseContext
-
-MONGO_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
-DB_NAME = os.getenv("DB_NAME", "ednova")
-COURSES_COLLECTION = os.getenv("COURSES_COLLECTION", "courses")
-SUBJECTS_COLLECTION = os.getenv("SUBJECTS_COLLECTION", "subjects")
-STUDY_SESSIONS_COLLECTION = os.getenv("STUDY_SESSIONS_COLLECTION", "studysessions")
+from services import api_service
 
 COURSE_CATALOG_MAX = 10
 KEY_CONCEPTS_MAX = 15
@@ -42,163 +36,72 @@ CONCEPT_MAX_CHARS = 100
 SUBJECT_MAX_CHARS = 60
 TITLE_MAX_CHARS = 100
 
-_COURSE_PROJECTION = {"title": 1, "subjectId": 1, "topics": 1}
-_SESSION_PROJECTION = {"courseId": 1, "taskProgress": 1}
-_SUBJECT_PROJECTION = {"name": 1}
-_COURSE_SUBJECT_PROJECTION = {"subjectId": 1}
+
+def _text(value: Any, maximum: int) -> str:
+    return value.strip()[:maximum] if isinstance(value, str) else ""
+
+
+def _concepts(values: Any) -> List[str]:
+    if not isinstance(values, list):
+        return []
+    out: List[str] = []
+    for value in values[:KEY_CONCEPTS_MAX]:
+        concept = _text(value, CONCEPT_MAX_CHARS)
+        if concept:
+            out.append(concept)
+    return out
 
 
 class CourseRepository:
-    def __init__(self, client: Optional[MongoClient] = None, db=None):
-        if db is not None:  # tests inject a fake in-memory DB
-            self._db = db
-            return
-        self._client = client or MongoClient(MONGO_URI)
-        self._db = self._client[DB_NAME]
+    """Thin, failure-safe wrapper over the API's coach context endpoints."""
 
-    # ------------------------------------------------------------------ catalog
+    def __init__(self, client: Any = None, db: Any = None):
+        # `client`/`db` are accepted for compatibility with callers that used to
+        # inject a Mongo handle; they are no longer used.
+        del client, db
 
     def fetch_catalog(self, user_id: str) -> List[CourseContext]:
-        """The user's newest ≤ COURSE_CATALOG_MAX courses, bounded to
-        subject/title/key_concepts. Any failure → `[]` (task-title-only)."""
+        """The user's newest ≤ COURSE_CATALOG_MAX courses. Any failure → `[]`."""
+        if not user_id:
+            return []
         try:
-            courses = list(
-                self._db[COURSES_COLLECTION]
-                .find({COURSES_USER_ID_FIELD: user_id}, _COURSE_PROJECTION)
-                .sort([("createdAt", -1)])
-                .limit(COURSE_CATALOG_MAX)
-            )
+            courses = api_service.coach_catalog(user_id, COURSE_CATALOG_MAX)
         except Exception:
             return []
+        if not courses:
+            return []
 
-        subject_names = self._subject_names(courses)
         contexts: List[CourseContext] = []
         for course in courses:
-            sid = course.get("subjectId")
-            subject = "Unknown"
-            if sid:
-                subject = subject_names.get(str(sid)) or "Unknown"
+            if not isinstance(course, dict):
+                continue
             contexts.append(
                 CourseContext(
-                    subject=subject[:SUBJECT_MAX_CHARS],
-                    title=(course.get("title") or "Untitled")[:TITLE_MAX_CHARS],
-                    key_concepts=self._key_concepts(course),
+                    subject=_text(course.get("subject"), SUBJECT_MAX_CHARS) or "Unknown",
+                    title=_text(course.get("title"), TITLE_MAX_CHARS),
+                    key_concepts=_concepts(course.get("keyConcepts")),
                 )
             )
         return contexts
 
-    def _subject_names(self, courses: List[dict]) -> Dict[str, str]:
-        """Map `str(subjectId)` → subject name for the courses at hand."""
-        ids = [self._as_object_id(c.get("subjectId")) for c in courses]
-        ids = [i for i in ids if i is not None]
-        if not ids:
-            return {}
-        try:
-            docs = list(
-                self._db[SUBJECTS_COLLECTION].find(
-                    {"_id": {"$in": ids}}, _SUBJECT_PROJECTION
-                )
-            )
-        except Exception:
-            return {}
-        return {str(d.get("_id")): d.get("name") or "" for d in docs}
-
-    def _key_concepts(self, course: dict) -> List[str]:
-        """Flatten + dedupe topics[].subtopics[].key_concepts, capped + trimmed."""
-        concepts: List[str] = []
-        seen = set()
-        for topic in course.get("topics") or []:
-            for sub in topic.get("subtopics") or []:
-                for kc in sub.get("key_concepts") or []:
-                    if not isinstance(kc, str) or not kc.strip():
-                        continue
-                    k = kc.strip()
-                    if k not in seen:
-                        seen.add(k)
-                        concepts.append(k[:CONCEPT_MAX_CHARS])
-                    if len(concepts) >= KEY_CONCEPTS_MAX:
-                        return concepts
-        return concepts
-
-    # ------------------------------------------------------------ current task
-
-    def fetch_current_task(self, session_id: Optional[str]) -> Optional[dict]:
+    def fetch_current_task(self, session_id: Optional[str]) -> Optional[Dict[str, Any]]:
         """The session's current task mapped to its course subject.
 
-        Returns `{task_id, title, course_id, subject}` or None when the
-        session is unreachable/unparseable. `title` may be None when the
-        session has no tasks yet — the orchestrator then logs task-title-only.
+        Returns `{task_id, title, course_id, subject}` or None when the session
+        is unreachable. `title` may be None when the session has no tasks yet —
+        the orchestrator then logs task-title-only.
         """
         if not session_id:
             return None
-        doc = self._find_session(session_id)
-        if not doc:
+        try:
+            task = api_service.coach_current_task(session_id)
+        except Exception:
             return None
-
-        tp = doc.get("taskProgress") or {}
-        tasks = tp.get("tasks") or []
-        idx = tp.get("currentTaskIndex") or 0
-        task = tasks[idx] if 0 <= idx < len(tasks) else (tasks[0] if tasks else None)
-
-        course_id = doc.get("courseId")
-        subject = "Unknown"
-        if course_id:
-            subject = self._subject_for_course(course_id)
+        if not isinstance(task, dict):
+            return None
         return {
-            "task_id": (task or {}).get("taskId"),
-            "title": (task or {}).get("title"),
-            "course_id": course_id,
-            "subject": subject,
+            "task_id": task.get("task_id"),
+            "title": _text(task.get("title"), 200) or None,
+            "course_id": task.get("course_id"),
+            "subject": _text(task.get("subject"), SUBJECT_MAX_CHARS) or "Unknown",
         }
-
-    def _find_session(self, session_id: str) -> Optional[dict]:
-        try:
-            return self._db[STUDY_SESSIONS_COLLECTION].find_one(
-                {"_id": self._as_object_id(session_id)}, _SESSION_PROJECTION
-            )
-        except Exception:
-            return None
-
-    def _subject_for_course(self, course_id) -> str:
-        try:
-            course = self._db[COURSES_COLLECTION].find_one(
-                {"_id": self._as_object_id(course_id)}, _COURSE_SUBJECT_PROJECTION
-            )
-            if not course or not course.get("subjectId"):
-                return "Unknown"
-            subj = self._db[SUBJECTS_COLLECTION].find_one(
-                {"_id": self._as_object_id(course.get("subjectId"))},
-                _SUBJECT_PROJECTION,
-            )
-            if not subj or not subj.get("name"):
-                return "Unknown"
-            return str(subj["name"])[:SUBJECT_MAX_CHARS]
-        except Exception:
-            return "Unknown"
-
-    # ------------------------------------------------------------- id helpers
-
-    @staticmethod
-    def _as_object_id(value):
-        if isinstance(value, ObjectId):
-            return value
-        if isinstance(value, str):
-            s = value.strip()
-            if (
-                len(s) == 24
-                and all(ch in "0123456789abcdefABCDEF" for ch in s)
-            ):
-                try:
-                    return ObjectId(s)
-                except Exception:
-                    return s
-            return s
-        return value
-
-
-COURSES_USER_ID_FIELD = "userId"
-
-# The API now owns `courses`, `subjects` and `studysessions` in PostgreSQL, so
-# these lookups find nothing and every caller already degrades to
-# task-title-only context. Replace this repository with an API call when the
-# coach needs catalog context again.

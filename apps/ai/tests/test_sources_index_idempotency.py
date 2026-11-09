@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from services.api.routers import sources
 
 
-COURSE_ID = "a" * 24
+COURSE_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 REVISION_ID = "rev_source_test"
 MANIFEST_DIGEST = "sha256:" + "b" * 64
 

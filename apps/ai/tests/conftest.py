@@ -7,9 +7,9 @@ suite that silently skips its way to green is worse than one that fails.
 
 Groups map to pytest markers declared in pyproject.toml:
 
-    -m "not integration and not requires_mongo and not optional_elevenlabs and not optional_piper"   # core
-    -m optional_elevenlabs                                                                          # optional feature
-    -m "integration or requires_mongo"                                                               # live services
+    -m "not integration and not requires_postgres and not optional_elevenlabs and not optional_piper"   # core
+    -m optional_elevenlabs                                                                              # optional feature
+    -m "integration or requires_postgres"                                                                # live services
 """
 
 from __future__ import annotations
@@ -47,32 +47,28 @@ needs_piper = _conditional_marker(
 
 # --- live services ------------------------------------------------------------
 
-def _mongo_configured() -> bool:
-    """A MongoDB URI is configured *and* a socket accepts a connection.
+def _postgres_configured() -> bool:
+    """`AI_TEST_DATABASE_URL` is set *and* a socket accepts a connection.
 
-    Checking the URI alone is not enough: a stale URI pointing at a container
-    that is not running is exactly the case that produced four confusing
-    failures in the whole-tree run.
+    Checking the URL alone is not enough: a stale URL pointing at a container
+    that is not running is exactly the case that produced confusing failures in
+    whole-tree runs.
     """
-    uri = os.environ.get("MONGODB_URI") or os.environ.get("P0_DATABASE_TEST_MONGODB_URI")
-    if not uri:
+    url = os.environ.get("AI_TEST_DATABASE_URL")
+    if not url:
         return False
-    host_port = uri.split("://", 1)[-1].split("/")[0]
-    if "@" in host_port:
-        host_port = host_port.rsplit("@", 1)[-1]
-    if host_port.startswith("mongodb+srv"):
-        return True
-    host, _, port = host_port.partition(":")
     try:
         import socket
+        from urllib.parse import urlsplit
 
-        with socket.create_connection((host or "127.0.0.1", int(port or 27017)), timeout=1):
+        parts = urlsplit(url)
+        with socket.create_connection((parts.hostname or "127.0.0.1", parts.port or 5432), timeout=1):
             return True
     except OSError:
         return False
 
 
-needs_mongo = _conditional_marker(
-    "requires_mongo", not _mongo_configured(),
-    "no reachable MongoDB; set MONGODB_URI to run database-backed tests",
+needs_postgres = _conditional_marker(
+    "requires_postgres", not _postgres_configured(),
+    "no reachable PostgreSQL; set AI_TEST_DATABASE_URL to run database-backed tests",
 )

@@ -125,11 +125,17 @@ async def create_study_plan(request: PlannerRequest):
 async def get_user_plans(user_id: str):
     """Get all study plans for a user."""
     try:
-        from agents.planner.rag.prompt_builder import SchedulingService
+        from services import api_service
 
-        scheduling_service = SchedulingService()
-        plans = scheduling_service.get_user_plans(user_id)
+        # Study plans are owned by the API; read them through it.
+        plans = api_service.planner_plans(user_id)
+        if plans is None:
+            raise HTTPException(
+                status_code=503, detail="Plans are temporarily unavailable."
+            )
         return {"plans": plans}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("get_user_plans_failed", extra={"error": str(e)})
         raise HTTPException(status_code=500, detail="Failed to fetch plans. Please try again later.")

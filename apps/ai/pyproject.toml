@@ -15,7 +15,7 @@ faiss-cpu = {version = ">=1.7.0,<2.0.0"}
 pytesseract = {version = ">=0.3.10,<1.0.0"}
 Pillow = {version = ">=10.0.0,<11.0.0"}
 PyMuPDF = {version = ">=1.23.0,<2.0.0"}
-pymongo = {version = ">=4.6.0,<5.0.0"}
+psycopg = {version = ">=3.2,<4", extras = ["binary", "pool"]}
 aio-pika = {version = ">=9.6.0,<10.0.0"}
 redis = {version = ">=5.0.0,<6.0.0"}
 python-multipart = {version = ">=0.0.9,<1.0.0"}
@@ -67,7 +67,7 @@ addopts = "-v --import-mode=importlib"
 asyncio_mode = "auto"
 markers = [
     "integration: marks tests as integration (requires live external services)",
-    "requires_mongo: needs a reachable MongoDB; skipped when none is configured",
+    "requires_postgres: needs AI_TEST_DATABASE_URL (a reachable PostgreSQL); skipped otherwise",
     "optional_elevenlabs: needs the optional `av` decoder for ElevenLabs TTS",
     "optional_piper: needs the optional `piper` runtime for local TTS",
 ]

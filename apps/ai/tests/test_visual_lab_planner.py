@@ -182,14 +182,14 @@ def test_parameter_engine_selection(monkeypatch):
 
 def test_request_rejects_forged_course_claims_and_oversized_passages():
     with pytest.raises(ValueError):
-        PlanRequest(mode="topic", concept="x", courseId="a" * 24)
+        PlanRequest(mode="topic", concept="x", courseId="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
     with pytest.raises(ValueError):
         PlanRequest(mode="course", concept="x")
     with pytest.raises(ValueError):
         PlanRequest(
             mode="course",
             concept="x",
-            courseId="a" * 24,
+            courseId="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
             revisionId="rev_1",
             passages=[{"documentId": "d", "pageNumber": 1, "sectionId": "s", "text": "  "}],
         )
@@ -197,7 +197,7 @@ def test_request_rejects_forged_course_claims_and_oversized_passages():
         PlanRequest(
             mode="course",
             concept="x",
-            courseId="a" * 24,
+            courseId="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
             revisionId="rev_1",
             passages=[{"documentId": "d", "pageNumber": 1, "sectionId": "s", "text": "t", "rubric": "x"}],
         )
@@ -207,7 +207,7 @@ def test_course_request_carries_only_minimized_passages():
     req = PlanRequest(
         mode="course",
         concept="Routing",
-        courseId="a" * 24,
+        courseId="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         revisionId="rev_1",
         passages=[{"documentId": "doc_1", "pageNumber": 2, "sectionId": "sec", "text": "text"}],
     )

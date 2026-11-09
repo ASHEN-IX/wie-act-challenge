@@ -1,8 +1,8 @@
 """
 PacingStore — personalised pacing factor derived from historical task completions.
 
-Stores individual task completion ratios (actual / estimated) in MongoDB
-collection `pacing_data` and returns a rolling median as the pacing factor
+Stores individual task completion ratios (actual / estimated) in PostgreSQL
+table `ai.pacing_data` and returns a rolling median as the pacing factor
 used by the Planner to scale task durations.
 
 Schema (one document per completion record):
@@ -23,11 +23,11 @@ import statistics
 from datetime import datetime, timezone
 from typing import Optional
 
+from services import pg
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-PACING_COLLECTION = "pacing_data"
 MAX_RECORDS = 20  # rolling window per (user, subject)
 DEFAULT_FACTOR = 1.0
 MIN_RECORDS = 3  # minimum records needed before we trust the estimate
@@ -35,20 +35,11 @@ MIN_RECORDS = 3  # minimum records needed before we trust the estimate
 
 class PacingStore:
     """
-    Stores and retrieves pacing factors from MongoDB.
+    Stores and retrieves pacing factors from PostgreSQL.
 
-    Falls back gracefully to DEFAULT_FACTOR (1.0) when MongoDB is unavailable
+    Falls back gracefully to DEFAULT_FACTOR (1.0) when the AI database is unavailable
     or there is insufficient history.
     """
-
-    def __init__(self) -> None:
-        self._db = None
-        try:
-            from services.database import get_db
-
-            self._db = get_db()
-        except Exception as exc:
-            logger.warning("pacing_store_no_db", extra={"error": str(exc)})
 
     # ------------------------------------------------------------------ #
     # Public API                                                           #
@@ -72,7 +63,7 @@ class PacingStore:
             Pacing factor ≥ 0.5.  Values > 1.0 mean the user is slower
             than estimated; < 1.0 means faster.
         """
-        if not user_id or self._db is None:
+        if not user_id or not pg.configured():
             return DEFAULT_FACTOR
 
         factor = self._compute_factor(user_id, subject_tag)
@@ -102,34 +93,42 @@ class PacingStore:
             actual_minutes:    How long it actually took.
             subject_tag:       Subject area (used for subject-specific pacing).
         """
-        if not user_id or self._db is None:
+        if not user_id or not pg.configured():
             return
         if estimated_minutes <= 0 or actual_minutes <= 0:
             return
 
         ratio = actual_minutes / estimated_minutes
-        doc = {
-            "user_id": user_id,
-            "task_id": task_id,
-            "subject_tag": subject_tag,
-            "estimated": estimated_minutes,
-            "actual": actual_minutes,
-            "ratio": ratio,
-            "ts": datetime.now(tz=timezone.utc),
-        }
         try:
-            col = self._db[PACING_COLLECTION]
-            col.insert_one(doc)
-            # Prune: keep only the last MAX_RECORDS per (user, subject)
-            pipeline = [
-                {"$match": {"user_id": user_id, "subject_tag": subject_tag}},
-                {"$sort": {"ts": -1}},
-                {"$skip": MAX_RECORDS},
-            ]
-            old_docs = list(col.aggregate(pipeline))
-            if old_docs:
-                old_ids = [d["_id"] for d in old_docs]
-                col.delete_many({"_id": {"$in": old_ids}})
+            with pg.connection() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO ai.pacing_data
+                        (user_id, task_id, subject_tag, estimated, actual, ratio, ts)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        user_id,
+                        task_id,
+                        subject_tag,
+                        estimated_minutes,
+                        actual_minutes,
+                        ratio,
+                        datetime.now(tz=timezone.utc),
+                    ),
+                )
+                # Prune: keep only the last MAX_RECORDS per (user, subject)
+                conn.execute(
+                    """
+                    DELETE FROM ai.pacing_data WHERE seq IN (
+                        SELECT seq FROM ai.pacing_data
+                         WHERE user_id = %s AND subject_tag = %s
+                         ORDER BY ts DESC, seq DESC
+                        OFFSET %s
+                    )
+                    """,
+                    (user_id, subject_tag, MAX_RECORDS),
+                )
             logger.info(
                 "pacing_store_recorded",
                 extra={
@@ -163,17 +162,20 @@ class PacingStore:
 
     def _compute_factor(self, user_id: str, subject_tag: str) -> Optional[float]:
         """
-        Query MongoDB and compute the median ratio.  Returns None if
+        Query PostgreSQL and compute the median ratio.  Returns None if
         fewer than MIN_RECORDS documents exist for this (user, subject).
         """
         try:
-            col = self._db[PACING_COLLECTION]
-            query: dict = {"user_id": user_id}
-            if subject_tag:
-                query["subject_tag"] = subject_tag
-            records = list(
-                col.find(query, {"ratio": 1}).sort("ts", -1).limit(MAX_RECORDS)
-            )
+            with pg.connection() as conn:
+                records = conn.execute(
+                    """
+                    SELECT ratio FROM ai.pacing_data
+                     WHERE user_id = %s AND (%s = '' OR subject_tag = %s)
+                     ORDER BY ts DESC, seq DESC
+                     LIMIT %s
+                    """,
+                    (user_id, subject_tag, subject_tag, MAX_RECORDS),
+                ).fetchall()
             if len(records) < MIN_RECORDS:
                 return None
             ratios = [r["ratio"] for r in records]

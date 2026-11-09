@@ -23,7 +23,7 @@ Minimum ease factor: 1.3
 Maximum ease factor: 3.5
 Default ease factor: 2.5
 
-MongoDB Collection: review_schedule
+PostgreSQL table: ai.review_schedule
 Schema:
   {
     user_id:            str,
@@ -48,11 +48,34 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
+from psycopg.types.json import Jsonb
+
+from services import pg
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-REVIEW_COLLECTION = "review_schedule"
+_INSERT_REVIEW = """
+    INSERT INTO ai.review_schedule
+        (review_id, user_id, original_task_id, original_task_title, subject_tag,
+         key_concepts, review_number, ease_factor, interval_days, next_review_date,
+         last_review_date, quality_history, status, created_at)
+    VALUES (%(review_id)s, %(user_id)s, %(original_task_id)s, %(original_task_title)s,
+            %(subject_tag)s, %(key_concepts)s, %(review_number)s, %(ease_factor)s,
+            %(interval_days)s, %(next_review_date)s, %(last_review_date)s,
+            %(quality_history)s, %(status)s, %(created_at)s)
+"""
+
+
+def _insert_review(conn, doc: Dict) -> None:
+    conn.execute(
+        _INSERT_REVIEW,
+        {
+            **doc,
+            "key_concepts": Jsonb(doc["key_concepts"]),
+            "quality_history": Jsonb(doc["quality_history"]),
+        },
+    )
 
 # Modified Fibonacci intervals (days) for the first 6 reviews
 BASE_INTERVALS = [1, 3, 5, 8, 13, 21]
@@ -70,15 +93,6 @@ class ReviewInserter:
     Uses a modified SM-2 algorithm with Fibonacci-like base intervals
     that adapt based on user recall quality.
     """
-
-    def __init__(self) -> None:
-        self._db = None
-        try:
-            from services.database import get_db
-
-            self._db = get_db()
-        except Exception as exc:
-            logger.warning("review_inserter_no_db", extra={"error": str(exc)})
 
     # ------------------------------------------------------------------ #
     # Public API                                                           #
@@ -110,7 +124,7 @@ class ReviewInserter:
         Returns:
             Dict with the scheduled review info, or None if DB unavailable.
         """
-        if self._db is None:
+        if not pg.configured():
             logger.warning("review_inserter_no_db_skip")
             return None
 
@@ -148,7 +162,8 @@ class ReviewInserter:
         }
 
         try:
-            self._db[REVIEW_COLLECTION].insert_one(review_doc)
+            with pg.connection() as conn:
+                _insert_review(conn, review_doc)
             logger.info(
                 "review_scheduled",
                 extra={
@@ -187,83 +202,85 @@ class ReviewInserter:
         Returns:
             Dict with updated review info and next schedule, or None.
         """
-        if self._db is None:
+        if not pg.configured():
             return None
 
         quality_score = max(0, min(5, quality_score))
 
         try:
-            review = self._db[REVIEW_COLLECTION].find_one(
-                {
-                    "review_id": review_id,
-                    "user_id": user_id,
-                }
-            )
+            with pg.connection() as conn:
+                review = conn.execute(
+                    """
+                    SELECT * FROM ai.review_schedule
+                     WHERE review_id = %s AND user_id = %s
+                       FOR UPDATE
+                    """,
+                    (review_id, user_id),
+                ).fetchone()
 
-            if not review:
-                logger.warning("review_not_found", extra={"review_id": review_id})
-                return None
+                if not review:
+                    logger.warning("review_not_found", extra={"review_id": review_id})
+                    return None
 
-            now = datetime.now(timezone.utc)
-            old_ease = review["ease_factor"]
-            old_review_number = review["review_number"]
+                now = datetime.now(timezone.utc)
+                old_ease = review["ease_factor"]
+                old_review_number = review["review_number"]
 
-            # Calculate new ease factor based on quality
-            new_ease = self._calculate_ease_factor(old_ease, quality_score)
+                # Calculate new ease factor based on quality
+                new_ease = self._calculate_ease_factor(old_ease, quality_score)
 
-            # Calculate next interval
-            if quality_score < 2:
-                # Failed recall: reset to beginning
-                new_review_number = 1
-                new_interval = BASE_INTERVALS[0]
-                logger.info(
-                    "review_reset",
-                    extra={
-                        "review_id": review_id,
-                        "quality": quality_score,
-                    },
+                # Calculate next interval
+                if quality_score < 2:
+                    # Failed recall: reset to beginning
+                    new_review_number = 1
+                    new_interval = BASE_INTERVALS[0]
+                    logger.info(
+                        "review_reset",
+                        extra={
+                            "review_id": review_id,
+                            "quality": quality_score,
+                        },
+                    )
+                else:
+                    new_review_number = old_review_number + 1
+                    new_interval = self._calculate_interval(new_review_number, new_ease)
+
+                next_review = now + timedelta(days=new_interval)
+
+                # Update quality history
+                quality_history = list(review.get("quality_history") or [])
+                quality_history.append(quality_score)
+
+                # Mark current review as completed and schedule next
+                conn.execute(
+                    """
+                    UPDATE ai.review_schedule
+                       SET status = 'completed', last_review_date = %s,
+                           quality_history = %s
+                     WHERE review_id = %s
+                    """,
+                    (now, Jsonb(quality_history), review_id),
                 )
-            else:
-                new_review_number = old_review_number + 1
-                new_interval = self._calculate_interval(new_review_number, new_ease)
 
-            next_review = now + timedelta(days=new_interval)
+                # Create next review document
+                next_review_doc = {
+                    "review_id": f"rev_{uuid.uuid4().hex[:12]}",
+                    "user_id": user_id,
+                    "original_task_id": review["original_task_id"],
+                    "original_task_title": review["original_task_title"],
+                    "subject_tag": review["subject_tag"],
+                    "key_concepts": review["key_concepts"],
+                    "review_number": new_review_number,
+                    "ease_factor": new_ease,
+                    "interval_days": new_interval,
+                    "next_review_date": next_review,
+                    "last_review_date": now,
+                    "quality_history": quality_history,
+                    "status": "scheduled",
+                    "created_at": now,
+                }
 
-            # Update quality history
-            quality_history = review.get("quality_history", [])
-            quality_history.append(quality_score)
-
-            # Mark current review as completed and schedule next
-            self._db[REVIEW_COLLECTION].update_one(
-                {"review_id": review_id},
-                {
-                    "$set": {
-                        "status": "completed",
-                        "last_review_date": now,
-                        "quality_history": quality_history,
-                    }
-                },
-            )
-
-            # Create next review document
-            next_review_doc = {
-                "review_id": f"rev_{uuid.uuid4().hex[:12]}",
-                "user_id": user_id,
-                "original_task_id": review["original_task_id"],
-                "original_task_title": review["original_task_title"],
-                "subject_tag": review["subject_tag"],
-                "key_concepts": review["key_concepts"],
-                "review_number": new_review_number,
-                "ease_factor": new_ease,
-                "interval_days": new_interval,
-                "next_review_date": next_review,
-                "last_review_date": now,
-                "quality_history": quality_history,
-                "status": "scheduled",
-                "created_at": now,
-            }
-
-            self._db[REVIEW_COLLECTION].insert_one(next_review_doc)
+                _insert_review(conn, next_review_doc)
 
             logger.info(
                 "review_completed_next_scheduled",
@@ -309,44 +326,40 @@ class ReviewInserter:
         Returns:
             List of review documents sorted by next_review_date (oldest first).
         """
-        if self._db is None:
+        if not pg.configured():
             return []
 
         try:
             now = datetime.now(timezone.utc)
 
-            # Mark overdue reviews
-            self._db[REVIEW_COLLECTION].update_many(
-                {
-                    "user_id": user_id,
-                    "status": "scheduled",
-                    "next_review_date": {"$lt": now},
-                },
-                {"$set": {"status": "overdue"}},
-            )
-
-            # Fetch pending and overdue reviews
-            reviews = list(
-                self._db[REVIEW_COLLECTION]
-                .find(
-                    {
-                        "user_id": user_id,
-                        "status": {"$in": ["scheduled", "overdue"]},
-                    }
+            with pg.connection() as conn:
+                # Mark overdue reviews
+                conn.execute(
+                    """
+                    UPDATE ai.review_schedule SET status = 'overdue'
+                     WHERE user_id = %s AND status = 'scheduled'
+                       AND next_review_date < %s
+                    """,
+                    (user_id, now),
                 )
-                .sort("next_review_date", 1)
-                .limit(limit)
-            )
 
-            # Convert ObjectId to string for JSON serialization
+                # Fetch pending and overdue reviews
+                reviews = conn.execute(
+                    """
+                    SELECT * FROM ai.review_schedule
+                     WHERE user_id = %s AND status IN ('scheduled', 'overdue')
+                     ORDER BY next_review_date ASC
+                     LIMIT %s
+                    """,
+                    (user_id, limit),
+                ).fetchall()
+
+            # JSON-safe: the row id as `_id`, timestamps as ISO strings.
             for review in reviews:
-                review["_id"] = str(review["_id"])
-                if review.get("next_review_date"):
-                    review["next_review_date"] = review["next_review_date"].isoformat()
-                if review.get("last_review_date"):
-                    review["last_review_date"] = review["last_review_date"].isoformat()
-                if review.get("created_at"):
-                    review["created_at"] = review["created_at"].isoformat()
+                review["_id"] = str(review.pop("seq"))
+                for key in ("next_review_date", "last_review_date", "created_at"):
+                    if review.get(key):
+                        review[key] = review[key].isoformat()
 
             return reviews
 
@@ -361,7 +374,7 @@ class ReviewInserter:
         Returns:
             Dict with review counts and performance metrics.
         """
-        if self._db is None:
+        if not pg.configured():
             return {
                 "total": 0,
                 "pending": 0,
@@ -374,47 +387,37 @@ class ReviewInserter:
             }
 
         try:
-            collection = self._db[REVIEW_COLLECTION]
             now = datetime.now(timezone.utc)
 
-            total = collection.count_documents({"user_id": user_id})
-            pending = collection.count_documents(
-                {
-                    "user_id": user_id,
-                    "status": "scheduled",
-                    "next_review_date": {"$gte": now},
-                }
-            )
-            overdue = collection.count_documents(
-                {
-                    "user_id": user_id,
-                    "status": {"$in": ["scheduled", "overdue"]},
-                    "next_review_date": {"$lt": now},
-                }
-            )
-            completed = collection.count_documents(
-                {
-                    "user_id": user_id,
-                    "status": "completed",
-                }
-            )
-            mastered = collection.count_documents(
-                {
-                    "user_id": user_id,
-                    "review_number": {"$gte": 4},
-                }
-            )
-
-            # Calculate average quality score
-            completed_reviews = list(
-                collection.find(
-                    {
-                        "user_id": user_id,
-                        "status": "completed",
-                        "quality_history": {"$ne": []},
-                    }
-                ).limit(100)
-            )
+            with pg.connection() as conn:
+                counts = conn.execute(
+                    """
+                    SELECT
+                      count(*) AS total,
+                      count(*) FILTER (WHERE status = 'scheduled'
+                                         AND next_review_date >= %(now)s) AS pending,
+                      count(*) FILTER (WHERE status IN ('scheduled', 'overdue')
+                                         AND next_review_date < %(now)s) AS overdue,
+                      count(*) FILTER (WHERE status = 'completed') AS completed,
+                      count(*) FILTER (WHERE review_number >= 4) AS mastered
+                    FROM ai.review_schedule WHERE user_id = %(user_id)s
+                    """,
+                    {"now": now, "user_id": user_id},
+                ).fetchone()
+                completed_reviews = conn.execute(
+                    """
+                    SELECT quality_history FROM ai.review_schedule
+                     WHERE user_id = %s AND status = 'completed'
+                       AND quality_history <> '[]'::jsonb
+                     LIMIT 100
+                    """,
+                    (user_id,),
+                ).fetchall()
+            total = counts["total"]
+            pending = counts["pending"]
+            overdue = counts["overdue"]
+            completed = counts["completed"]
+            mastered = counts["mastered"]
 
             all_qualities = []
             for review in completed_reviews:

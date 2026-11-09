@@ -35,6 +35,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from pydantic import ValidationError
 
 from messaging.failures import TerminalError
+from services import api_service
 from workers.base import BaseAIWorker
 from workers.schemas import IngestionRequest
 
@@ -86,17 +87,11 @@ class IngestionWorker(BaseAIWorker):
         self._course_title = request.courseTitle
         await asyncio.to_thread(self._ensure_current_operation, request, envelope)
         revision_manifest = None
-        db = getattr(self.vector_store, "_db", None)
-        if db is not None and request.revisionId:
-            from bson import ObjectId
+        if request.revisionId:
             from services.vector_store.revision_artifacts import manifest_digest
 
-            revision = db.course_revisions.find_one(
-                {
-                    "courseId": ObjectId(request.courseId),
-                    "revisionTag": request.revisionId,
-                    "status": "draft",
-                }
+            revision = await asyncio.to_thread(
+                api_service.ingestion_revision, request.courseId, request.revisionId
             )
             if (
                 not revision
@@ -109,7 +104,7 @@ class IngestionWorker(BaseAIWorker):
                 "courseId": request.courseId,
                 "revisionId": request.revisionId,
                 "contentHash": "sha256:"
-                + revision["contentHash"].removeprefix("sha256:"),
+                + str(revision["contentHash"]).removeprefix("sha256:"),
                 "documents": revision["sourceManifest"],
             }
             revision_manifest["manifestDigest"] = manifest_digest(revision_manifest)
@@ -175,35 +170,18 @@ class IngestionWorker(BaseAIWorker):
         """Cooperative cancellation/fencing between bounded blocking stages.
 
         Existing legacy envelopes without an operation record retain their
-        behavior. New operations must match the current server-owned pointer.
+        behavior. New operations must match the current server-owned pointer; the
+        API owns that state, so an unreachable API fails closed.
         Running blocking work is bounded but is not claimed to be hard-cancelled.
         """
-        db = getattr(self.vector_store, "_db", None)
-        if db is None:
-            return
-        operations = getattr(db, "course_ingestion_operations", None)
-        if operations is None:
-            return
-        operation = operations.find_one({"_id": envelope.messageId})
-        if not operation:
-            return
-        from bson import ObjectId
-
-        if (
-            operation.get("state") not in ("prepared", "queued", "processing")
-            or str(operation.get("courseId")) != request.courseId
-            or operation.get("revisionId") != request.revisionId
-            or operation.get("userId") != envelope.userId
+        if not api_service.ingestion_operation_is_current(
+            envelope.messageId,
+            course_id=request.courseId,
+            revision_id=request.revisionId,
+            user_id=envelope.userId,
+            job_id=envelope.messageId,
+            correlation_id=envelope.correlationId,
         ):
-            raise TerminalError("Ingestion operation cancelled, superseded or resolved")
-        current = db.courses.find_one(
-            {
-                "_id": ObjectId(request.courseId),
-                "jobId": envelope.messageId,
-                "correlationId": envelope.correlationId,
-            }
-        )
-        if not current or current.get("ingestDetail") == "cancelled":
             raise TerminalError("Ingestion operation is no longer current")
 
     def _parse_stage(
@@ -449,7 +427,6 @@ class IngestionWorker(BaseAIWorker):
         if manifest:
             from services.vector_store.revision_artifacts import (
                 canonical_units_for_index,
-                extract_documents,
             )
             from services.vector_store.embedder import get_embedder
 

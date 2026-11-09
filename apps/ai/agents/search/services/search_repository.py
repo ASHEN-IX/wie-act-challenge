@@ -1,6 +1,6 @@
-"""SearchRepository — persist and retrieve search exchanges from MongoDB.
+"""SearchRepository — persist and retrieve search exchanges from PostgreSQL.
 
-Collection: ``search_history``
+Table: ``ai.search_history``
 
 Document schema::
 
@@ -17,31 +17,19 @@ Document schema::
 
 from __future__ import annotations
 
-import os
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
+from psycopg.types.json import Jsonb
+
+from services import pg
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-MONGO_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
-DB_NAME = os.getenv("DB_NAME", "ednova")
-COLLECTION = "search_history"
-
 
 class SearchRepository:
-    """Thin wrapper around the ``search_history`` MongoDB collection."""
-
-    def __init__(self) -> None:
-        self._col = None
-        try:
-            from pymongo import MongoClient
-
-            client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=3000)
-            self._col = client[DB_NAME][COLLECTION]
-        except Exception as exc:
-            logger.warning("search_repo_no_db", extra={"error": str(exc)})
+    """Thin wrapper around the ``ai.search_history`` table."""
 
     # ------------------------------------------------------------------ #
 
@@ -54,41 +42,53 @@ class SearchRepository:
         session_id: str = "",
         trace_id: str = "",
     ) -> None:
-        if self._col is None or not user_id:
+        if not pg.configured() or not user_id:
             return
         try:
-            self._col.insert_one(
-                {
-                    "user_id": user_id,
-                    "session_id": session_id,
-                    "trace_id": trace_id,
-                    "ts": datetime.now(tz=timezone.utc),
-                    "question": question,
-                    "answer": answer,
-                    "sources": sources or [],
-                }
-            )
+            with pg.connection() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO ai.search_history
+                        (user_id, session_id, trace_id, ts, question, answer, sources)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        user_id,
+                        session_id,
+                        trace_id,
+                        datetime.now(tz=timezone.utc),
+                        question,
+                        answer,
+                        Jsonb(sources or []),
+                    ),
+                )
         except Exception as exc:
             logger.warning("search_repo_save_error", extra={"error": str(exc)})
 
     def get_history(self, user_id: str, limit: int = 20) -> List[Dict]:
-        if self._col is None or not user_id:
+        if not pg.configured() or not user_id:
             return []
         try:
-            cursor = (
-                self._col.find({"user_id": user_id}, {"_id": 0})
-                .sort("ts", -1)
-                .limit(limit)
-            )
-            return list(cursor)
+            with pg.connection() as conn:
+                return conn.execute(
+                    """
+                    SELECT user_id, session_id, trace_id, ts, question, answer, sources
+                      FROM ai.search_history
+                     WHERE user_id = %s
+                     ORDER BY ts DESC
+                     LIMIT %s
+                    """,
+                    (user_id, limit),
+                ).fetchall()
         except Exception as exc:
             logger.warning("search_repo_get_error", extra={"error": str(exc)})
             return []
 
     def clear_history(self, user_id: str) -> None:
-        if self._col is None or not user_id:
+        if not pg.configured() or not user_id:
             return
         try:
-            self._col.delete_many({"user_id": user_id})
+            with pg.connection() as conn:
+                conn.execute("DELETE FROM ai.search_history WHERE user_id = %s", (user_id,))
         except Exception as exc:
             logger.warning("search_repo_clear_error", extra={"error": str(exc)})

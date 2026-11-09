@@ -1,11 +1,10 @@
 """Reflection, progress, review, and evaluation endpoints."""
 
-from typing import List, Optional
+from typing import List
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from services.api.deps import convert_objectid_to_str
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -50,7 +49,7 @@ async def schedule_review(request: ScheduleReviewRequest):
         )
         if result is None:
             raise HTTPException(status_code=500, detail="Failed to schedule review")
-        return {"status": "ok", "review": convert_objectid_to_str(result)}
+        return {"status": "ok", "review": result}
     except HTTPException:
         raise
     except Exception as e:

@@ -35,7 +35,7 @@ def artifacts(tmp_path, monkeypatch):
     monkeypatch.setattr(adapter, "get_embedder", lambda: Embedder())
 
     def build(
-        course="a" * 24,
+        course="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         revision="rev_one",
         text="Arithmetic source says addition combines quantities.",
         pdf=False,
@@ -139,7 +139,7 @@ def test_two_courses_two_revisions_and_restart(artifacts):
     build, tmp = artifacts
     store, req, _, _ = build(text="Old revision defines addition with quantities.")
     build(revision="rev_two", text="New revision defines subtraction with differences.")
-    build(course="b" * 24, text="Foreign course defines unrelated financial concepts.")
+    build(course="bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", text="Foreign course defines unrelated financial concepts.")
     restarted = adapter.VectorStoreAdapter(None)
     result = answer_grounded_question(req, restarted)
     assert (

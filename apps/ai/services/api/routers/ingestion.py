@@ -42,7 +42,6 @@ async def ingest_course_endpoint(
     """
     try:
         from agents.course_ingestion.agent import ingest_course
-        from agents.course_ingestion.services.database_service import DatabaseService
 
         # Save uploaded files temporarily
         temp_files = []
@@ -54,16 +53,15 @@ async def ingest_course_endpoint(
                 temp_files.append(tmp.name)
 
         try:
-            # Process course ingestion synchronously
-            course_id = ingest_course(course_title, temp_files)
-
-            # Get the processed course data
-            db = DatabaseService()
-            course_data = db.get_course_by_id(course_id)
+            # Process course ingestion synchronously. The API owns the course
+            # document, so nothing is persisted here: the processed result is
+            # returned and the caller (or the async worker path) stores it.
+            course = ingest_course(course_title, temp_files)
+            course_data = course.dict()
 
             # Return course data with topics
             return {
-                "course_id": course_id,
+                "course_id": None,
                 "user_id": user_id,
                 "subject_id": subject_id,
                 "files_count": len(temp_files),

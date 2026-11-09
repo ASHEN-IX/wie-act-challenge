@@ -7,8 +7,6 @@ classifies an outcome it cannot prove was free.
 No live provider call is made, and none is authorized by this milestone.
 """
 
-import hashlib
-import os
 from types import SimpleNamespace
 
 import pytest
@@ -52,8 +50,6 @@ def _approval(**overrides):
 def controls(monkeypatch):
     """Present credentials, an approval and a healthy budget by default."""
     monkeypatch.setenv("GEMINI_API_KEY", KEY)
-    monkeypatch.setenv("LLM_BUDGET_MONGODB_URI", "mongodb://budget.test/")
-    monkeypatch.setenv("LLM_BUDGET_DB_NAME", "budget")
     monkeypatch.setattr(planner, "_approval", lambda model: _approval())
     monkeypatch.setattr(planner, "_budget_active", lambda approval: True)
     monkeypatch.setattr(planner, "_has_headroom", lambda approval, request_id="": True)
@@ -232,98 +228,51 @@ def test_python_never_adjusts_the_budget_ledger(monkeypatch):
     """NestJS owns the reservation, so this service must not touch the ledger.
 
     M4.2 had both services reserve and both reconcile, which charged one logical
-    attempt twice. The guard is structural: there is no ledger write here at all.
+    attempt twice. The guard is structural: reconcile makes no call at all.
     """
-    writes = []
+    from services import api_service
 
-    class FakeCollection:
-        def update_one(self, *args, **kwargs):
-            writes.append(args)
+    def forbidden(*args, **kwargs):
+        raise AssertionError("the Python boundary must never write the budget ledger")
 
-        def find_one_and_update(self, *args, **kwargs):
-            writes.append(args)
+    for name in ("budget_reserve", "budget_reserve_tokens", "budget_record_usage", "budget_revoke"):
+        monkeypatch.setattr(api_service, name, forbidden)
+    monkeypatch.setattr(api_service, "_call", forbidden)
 
-    class FakeDb:
-        def get_collection(self, name):
-            return FakeCollection()
-
-    class FakeClient:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        def __getitem__(self, name):
-            return FakeDb()
-
-        def close(self):
-            pass
-
-    monkeypatch.setenv("LLM_BUDGET_MONGODB_URI", "mongodb://budget.test/")
-    monkeypatch.setenv("LLM_BUDGET_DB_NAME", "budget")
-    import pymongo
-
-    monkeypatch.setattr(pymongo, "MongoClient", FakeClient)
-
-    planner._reconcile(_approval(), None)
-    planner._reconcile(_approval(), 150)
-    assert writes == [], "the Python boundary must never write the budget ledger"
+    assert planner._reconcile(_approval(), None) is None
+    assert planner._reconcile(_approval(), 150) is None
 
 
-def _fake_clients(ledger_row, request_row):
-    """Both collections the planner reads, behind one fake MongoClient."""
-
-    class FakeCollection:
-        def __init__(self, row):
-            self.row = row
-
-        def find_one(self, query):
-            return self.row
-
-    class FakeDb:
-        def __init__(self):
-            self.colls = {
-                "llm_approval_budgets": FakeCollection(ledger_row),
-                "experience_plan_requests": FakeCollection(request_row),
-            }
-
-        def __getitem__(self, name):
-            return self.colls[name]
-
-        def get_collection(self, name):
-            return self.colls[name]
-
-    class FakeClient:
-        def __init__(self, *args, **kwargs):
-            self.db = FakeDb()
-
-        def __getitem__(self, name):
-            return self.db
-
-        def get_default_database(self):
-            return self.db
-
-        def close(self):
-            pass
-
-    return FakeClient
-
-
-def _env(monkeypatch):
-    monkeypatch.setenv("MONGODB_URI", "mongodb://app.test/ednova")
-    monkeypatch.setenv("DB_NAME", "ednova")
-    monkeypatch.setenv("LLM_BUDGET_MONGODB_URI", "mongodb://budget.test/")
-    monkeypatch.setenv("LLM_BUDGET_DB_NAME", "budget")
+def _ledger(approval, **overrides):
+    row = {
+        "approvalId": approval["approvalId"],
+        "task": planner.PLANNER_TASK,
+        "model": approval["model"],
+        "limitTokens": approval["maxTokens"],
+        "expiresAt": approval["expiresAt"],
+        "usedTokens": 0,
+        "revoked": False,
+    }
+    row.update(overrides)
+    return row
 
 
 def _request_row(approval, **overrides):
     row = {
-        "requestId": "req-1",
         "approvalId": approval["approvalId"],
         "reservedTokens": planner.RESERVED_TOKENS,
         "state": "dispatched",
-        "model": approval["model"],
     }
     row.update(overrides)
     return row
+
+
+def _api(monkeypatch, ledger_row, request_row):
+    """The two reads the planner makes, answered by the API in place of Mongo."""
+    from services import api_service
+
+    monkeypatch.setattr(api_service, "budget_status", lambda approval_id: ledger_row)
+    monkeypatch.setattr(api_service, "experience_reservation", lambda request_id: request_row)
 
 
 def test_exactly_sufficient_budget_permits_dispatch(monkeypatch):
@@ -334,105 +283,58 @@ def test_exactly_sufficient_budget_permits_dispatch(monkeypatch):
     exactly-funded attempt.
     """
     approval = _approval(maxTokens=1_000_000)
-    _env(monkeypatch)
-    import pymongo
-
-    monkeypatch.setattr(
-        pymongo, "MongoClient", _fake_clients(
-            {"usedTokens": 1_000_000, "maxTokens": 1_000_000}, _request_row(approval)
-        )
-    )
+    _api(monkeypatch, _ledger(approval, usedTokens=1_000_000), _request_row(approval))
     assert planner._has_headroom(approval, "req-1") is True
 
 
 def test_insufficient_budget_refuses_dispatch(monkeypatch):
     approval = _approval(maxTokens=1_000_000)
-    _env(monkeypatch)
-    import pymongo
-
-    monkeypatch.setattr(
-        pymongo, "MongoClient", _fake_clients(
-            {"usedTokens": 1_100_000, "maxTokens": 1_000_000}, _request_row(approval)
-        )
-    )
+    _api(monkeypatch, _ledger(approval, usedTokens=1_100_000), _request_row(approval))
     assert planner._has_headroom(approval, "req-1") is False
 
 
 def test_dispatch_without_an_owned_reservation_is_refused(monkeypatch):
     """A ledger with room is not enough: this attempt must have funded itself."""
     approval = _approval(maxTokens=1_000_000)
-    _env(monkeypatch)
-    import pymongo
-
-    monkeypatch.setattr(
-        pymongo, "MongoClient", _fake_clients(
-            {"usedTokens": 0, "maxTokens": 1_000_000}, None
-        )
-    )
+    _api(monkeypatch, _ledger(approval), None)
     assert planner._has_headroom(approval, "req-1") is False
 
 
 def test_reservation_for_another_approval_is_refused(monkeypatch):
     approval = _approval(maxTokens=1_000_000)
-    _env(monkeypatch)
-    import pymongo
-
-    monkeypatch.setattr(
-        pymongo, "MongoClient", _fake_clients(
-            {"usedTokens": 0, "maxTokens": 1_000_000},
-            _request_row(approval, approvalId="someone-else"),
-        )
-    )
+    _api(monkeypatch, _ledger(approval), _request_row(approval, approvalId="someone-else"))
     assert planner._has_headroom(approval, "req-1") is False
 
 
 def test_reservation_with_the_wrong_amount_is_refused(monkeypatch):
     approval = _approval(maxTokens=1_000_000)
-    _env(monkeypatch)
-    import pymongo
-
-    monkeypatch.setattr(
-        pymongo, "MongoClient", _fake_clients(
-            {"usedTokens": 0, "maxTokens": 1_000_000},
-            _request_row(approval, reservedTokens=1),
-        )
-    )
+    _api(monkeypatch, _ledger(approval), _request_row(approval, reservedTokens=1))
     assert planner._has_headroom(approval, "req-1") is False
 
 
 def test_reservation_no_longer_in_flight_is_refused(monkeypatch):
     approval = _approval(maxTokens=1_000_000)
-    _env(monkeypatch)
-    import pymongo
-
-    monkeypatch.setattr(
-        pymongo, "MongoClient", _fake_clients(
-            {"usedTokens": 0, "maxTokens": 1_000_000},
-            _request_row(approval, state="failed"),
-        )
-    )
+    _api(monkeypatch, _ledger(approval), _request_row(approval, state="failed"))
     assert planner._has_headroom(approval, "req-1") is False
 
 
 def test_unknown_approval_is_refused(monkeypatch):
     approval = _approval(maxTokens=1_000_000)
-    _env(monkeypatch)
-    import pymongo
-
-    monkeypatch.setattr(
-        pymongo, "MongoClient", _fake_clients(None, _request_row(approval))
-    )
+    _api(monkeypatch, None, _request_row(approval))
     assert planner._has_headroom(approval, "req-1") is False
 
 
-def test_unreadable_ledger_is_refused(monkeypatch):
+def test_revoked_or_mismatched_ledger_is_refused(monkeypatch):
     approval = _approval(maxTokens=1_000_000)
-    _env(monkeypatch)
-    import pymongo
+    for override in ({"revoked": True}, {"model": "other"}, {"task": "other"}, {"limitTokens": 5}):
+        _api(monkeypatch, _ledger(approval, **override), _request_row(approval))
+        assert planner._has_headroom(approval, "req-1") is False, override
 
-    class Boom:
-        def __init__(self, *a, **k):
-            raise RuntimeError("unreachable")
 
-    monkeypatch.setattr(pymongo, "MongoClient", Boom)
+def test_unreachable_api_is_refused(monkeypatch):
+    """With no API configured, nothing can be proven, so nothing is dispatched."""
+    approval = _approval(maxTokens=1_000_000)
+    monkeypatch.delenv("API_SERVICE_URL", raising=False)
+    monkeypatch.delenv("INTERNAL_API_SECRET", raising=False)
     assert planner._has_headroom(approval, "req-1") is False
+    assert planner._has_headroom(approval, "") is False

@@ -1,8 +1,6 @@
 import hashlib
 import json
-import os
 import time
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -76,8 +74,6 @@ def test_approved_research_path_is_bounded_and_keeps_proposals_pending(tmp_path,
     path = tmp_path / "proof.json"
     attest(path)
     monkeypatch.setenv("GEMINI_API_KEY", "test-secret")
-    monkeypatch.setenv("LLM_BUDGET_MONGODB_URI", "test-uri")
-    monkeypatch.setenv("LLM_BUDGET_DB_NAME", "test-db")
     approval = {"approvalId": "test", "model": "gemini/test", "task": research.ALIAS,
                 "maxRequests": 3, "maxTokens": 3 * research.RESERVED_TOKENS, "expiresAt": time.time() + 3600}
     monkeypatch.setattr(research.llm_client, "_approval", lambda _: approval)

@@ -224,7 +224,7 @@ def test_reference_regions_survive_manifest_sections_and_canonical(tmp_path, mon
     (root / "originals" / digest[7:]).write_bytes(value)
     monkeypatch.setenv("INGEST_UPLOADS_DIR", str(root))
     manifest = {
-        "courseId": "a" * 24, "revisionId": "rev_benchmark", "contentHash": digest,
+        "courseId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "revisionId": "rev_benchmark", "contentHash": digest,
         "documents": [{"documentId": "doc_reference", "contentHash": digest,
                        "storageRef": "originals/" + digest[7:], "mediaType": "application/pdf"}],
     }
@@ -235,7 +235,7 @@ def test_reference_regions_survive_manifest_sections_and_canonical(tmp_path, mon
     lessons = build_subtopics(sections)
     assert len(lessons) == 16
     assert not any(lesson["title"].startswith("# f") for lesson in lessons)
-    document = build_canonical_document("a" * 24, "Reference", [
+    document = build_canonical_document("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "Reference", [
         {"id": "chapter", "title": "Source", "subtopics": lessons}
     ])
     blocks = [block for chapter in document["chapters"] for lesson in chapter["lessons"] for block in lesson["blocks"]]

@@ -23,6 +23,7 @@ import pytest
 
 from messaging.envelope import validate_job_envelope
 from messaging.failures import TerminalError
+from services import api_service
 from workers.idempotency import InMemoryIdempotencyStore
 from workers.ingestion_worker import (
     IngestionWorker,
@@ -163,6 +164,18 @@ def test_index_stage_uses_canonical_units_when_source_manifest_exists(worker, mo
     assert result["stats"]["indexedChunks"] == 1
 
 
+def _envelope():
+    return SimpleNamespace(messageId=str(uuid.uuid4()), correlationId="c", userId="u")
+
+
+@pytest.fixture(autouse=True)
+def operation_is_current(monkeypatch):
+    """The fencing check is an API call; default to a still-current dispatch."""
+    monkeypatch.setattr(
+        api_service, "ingestion_operation_is_current", lambda *a, **k: True
+    )
+
+
 @pytest.fixture
 def worker(tmp_path):
     return RecordingIngestionWorker(tmp_path)
@@ -182,7 +195,7 @@ async def test_pipeline_completes_and_emits_progress_in_order(worker, tmp_path):
     )
     worker._embed_stage = lambda st: (st, 2)
 
-    env = SimpleNamespace()
+    env = _envelope()
     result = await worker.handle(dict(INGEST_PAYLOAD), env)
 
     assert [p["stage"] for p in worker.progress] == [
@@ -221,25 +234,21 @@ async def test_no_dedup_defaults_when_stages_produce_nothing(worker, tmp_path):
     worker._embed_stage = lambda st: (st, 0)
 
     with pytest.raises(TerminalError):
-        await worker.handle(dict(INGEST_PAYLOAD), SimpleNamespace())
+        await worker.handle(dict(INGEST_PAYLOAD), _envelope())
 
 
-async def test_concurrent_jobs_keep_their_own_revision_manifest(worker):
-    from bson import ObjectId
+async def test_concurrent_jobs_keep_their_own_revision_manifest(worker, monkeypatch):
+    first, second = str(uuid.uuid4()), str(uuid.uuid4())
 
-    first, second = "a" * 24, "b" * 24
+    def revision(course_id, revision_tag):
+        return {
+            "contentHash": "sha256:" + course_id[0] * 64,
+            "sourceManifest": [
+                {"documentId": course_id, "storageRef": "originals/example"}
+            ],
+        }
 
-    class Revisions:
-        def find_one(self, query):
-            course = str(query["courseId"])
-            return {
-                "contentHash": "sha256:" + course[0] * 64,
-                "sourceManifest": [
-                    {"documentId": course, "storageRef": "originals/example"}
-                ],
-            }
-
-    worker.vector_store._db = SimpleNamespace(course_revisions=Revisions())
+    monkeypatch.setattr(api_service, "ingestion_revision", revision)
     arrived = 0
     ready = asyncio.Event()
     observed = []
@@ -265,13 +274,12 @@ async def test_concurrent_jobs_keep_their_own_revision_manifest(worker):
     worker._enrich_stage = lambda subtopics, _title=None: (subtopics, {}, {})
     worker._embed_stage = lambda subtopics: (subtopics, 0)
     worker._index_stage = index
-    assert ObjectId.is_valid(first) and ObjectId.is_valid(second)
     payloads = [
         {**INGEST_PAYLOAD, "courseId": course, "revisionId": "rev_1"}
         for course in (first, second)
     ]
     results = await asyncio.gather(
-        *(worker.handle(p, SimpleNamespace()) for p in payloads)
+        *(worker.handle(p, _envelope()) for p in payloads)
     )
     assert {r["courseId"] for r in results} == {first, second}
     assert len(observed) == 4
@@ -467,7 +475,6 @@ def normalize_course_wrapped():
 
 
 async def test_real_progress_publish_uses_progress_routing_key(tmp_path):
-    from messaging.envelope import PROGRESS_STAGES
 
     worker = IngestionWorker(
         uploads_root=str(tmp_path),
@@ -504,53 +511,33 @@ async def test_real_progress_publish_uses_progress_routing_key(tmp_path):
     assert body["type"] == "study.ingest.course"
 
 
-def test_server_operation_cancellation_and_supersession_fence_stages(worker):
-    """New operation IDs must match both durable operation and current course."""
-    from bson import ObjectId
-
-    course_id = str(ObjectId())
-    request = SimpleNamespace(courseId=course_id, revisionId="rev_current")
+def test_server_operation_fencing_asks_the_api_and_fails_closed(worker, monkeypatch):
+    """The API owns operation state; a "not current" answer or an outage rejects."""
+    request = SimpleNamespace(courseId=str(uuid.uuid4()), revisionId="rev_current")
     envelope = SimpleNamespace(
         messageId=str(uuid.uuid4()), correlationId=UUID_B, userId="owner"
     )
-    operation = {
-        "state": "queued",
-        "courseId": ObjectId(course_id),
-        "revisionId": "rev_current",
-        "userId": "owner",
-    }
-    course = {
-        "_id": ObjectId(course_id),
-        "jobId": envelope.messageId,
-        "correlationId": UUID_B,
-    }
+    calls = []
+    answer = {"value": True}
 
-    class Collection:
-        def __init__(self, row):
-            self.row = row
+    def current(message_id, **kwargs):
+        calls.append((message_id, kwargs))
+        return answer["value"]
 
-        def find_one(self, query):
-            return (
-                self.row
-                if self.row and all(self.row.get(k) == v for k, v in query.items())
-                else None
-            )
-
-    operation["_id"] = envelope.messageId
-    operations, courses = Collection(operation), Collection(course)
-    worker.vector_store._db = SimpleNamespace(
-        course_ingestion_operations=operations, courses=courses
-    )
+    monkeypatch.setattr(api_service, "ingestion_operation_is_current", current)
     worker._ensure_current_operation(request, envelope)
-    for state in ("cancelled", "superseded", "completed", "failed"):
-        operation["state"] = state
-        with pytest.raises(TerminalError, match="cancelled, superseded or resolved"):
-            worker._ensure_current_operation(request, envelope)
-    operation["state"] = "queued"
-    course["jobId"] = "new-operation"
-    with pytest.raises(TerminalError, match="no longer current"):
-        worker._ensure_current_operation(request, envelope)
-    course["jobId"] = envelope.messageId
-    course["ingestDetail"] = "cancelled"
+    assert calls == [
+        (
+            envelope.messageId,
+            {
+                "course_id": request.courseId,
+                "revision_id": "rev_current",
+                "user_id": "owner",
+                "job_id": envelope.messageId,
+                "correlation_id": UUID_B,
+            },
+        )
+    ]
+    answer["value"] = False  # cancelled, superseded, resolved, or API unreachable
     with pytest.raises(TerminalError, match="no longer current"):
         worker._ensure_current_operation(request, envelope)

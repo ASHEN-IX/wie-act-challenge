@@ -202,11 +202,14 @@ async def reschedule(request: RescheduleRequest):
     Returns updated schedule.
     """
     try:
-        from agents.course_ingestion.services.database_service import DatabaseService
+        from services import api_service
 
-        db_svc = DatabaseService()
-        study_plan = db_svc.get_latest_study_plan(request.user_id)
-        if study_plan is None:
+        plans = api_service.planner_plans(request.user_id, limit=1)
+        if plans is None:
+            raise HTTPException(
+                status_code=503, detail="Study plans are temporarily unavailable."
+            )
+        if not plans:
             raise HTTPException(status_code=404, detail="No study plan found")
         return {
             "status": "ok",

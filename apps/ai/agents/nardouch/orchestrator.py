@@ -98,8 +98,16 @@ def _respond(req, vector_store):
             {"id": i + 1, "text": p["text"][:6000]} for i, p in enumerate(passages)
         ],
     }
-    # No production mock or synthetic answer. One dispatch, no automatic retry;
-    # every user retry needs a new reservation in the shared durable budget.
+    def mock_answer(_prompt: str) -> str:
+        return json.dumps({
+            "displayText": "Mock tutor response. " + (
+                "See the attached course excerpt." if passages else "No course excerpt was found."
+            ),
+            "sourceIds": [1] if passages else [],
+            "followups": [],
+        })
+
+    # Real inference dispatches once; a user retry needs a fresh budget reservation.
     result = ask(
         agent=agent,
         system_prompt=system,
@@ -109,6 +117,7 @@ def _respond(req, vector_store):
         max_tokens=2400,
         trace_id=req.traceId,
         return_metadata=True,
+        mock_fn=mock_answer,
     )
     answer = GeneratedAnswer.model_validate_json(result.text)
     if not answer.displayText.strip() or any(

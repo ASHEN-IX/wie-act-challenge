@@ -1,8 +1,8 @@
 """
-Vector store adapter — FAISS IndexFlatIP backed by MongoDB embedding storage.
+Vector store adapter — FAISS IndexFlatIP backed by PostgreSQL embedding storage.
 
 Responsibilities:
-  - Store raw chunk vectors in MongoDB (collection: chunk_embeddings)
+  - Store raw chunk vectors in PostgreSQL (table: ai.chunk_embeddings)
   - Build an in-memory FAISS IndexFlatIP per course
   - Persist FAISS indices to disk (FAISS_INDEX_DIR)
   - Search: encode a query → retrieve top-k chunks with metadata
@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import os
 import tempfile
-import hashlib
 import json
 import re
 import numpy as np
@@ -27,6 +26,9 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from functools import lru_cache
 
+from psycopg.types.json import Jsonb
+
+from services import pg
 from services.vector_store.embedder import get_embedder
 from services.vector_store.revision_artifacts import validate_artifact, byte_hash
 from utils.logger import get_logger
@@ -34,7 +36,6 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 FAISS_INDEX_DIR = Path(os.getenv("FAISS_INDEX_DIR", "/tmp/ednova_faiss"))
-CHUNK_EMBED_COLLECTION = "chunk_embeddings"
 
 # course_id is used to build filesystem paths (<id>.faiss) — restrict to a
 # safe charset to prevent path traversal.
@@ -82,9 +83,67 @@ def _get_paths(course_id: str, revision_id: Optional[str] = None) -> Tuple[Path,
     )
 
 
+class ChunkEmbeddingStore:
+    """Durable raw embeddings in ``ai.chunk_embeddings``.
+
+    One row per (course, revision); a missing revision is stored as ''. The
+    vectors are packed as float32 bytes — a JSON number list is several times
+    larger and slower to parse for a full course.
+    """
+
+    def save(
+        self,
+        course_id: str,
+        revision_id: Optional[str],
+        chunks: List[str],
+        metas: List[Dict[str, Any]],
+        embeddings: np.ndarray,
+    ) -> None:
+        vectors = np.ascontiguousarray(embeddings, dtype="float32")
+        with pg.connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO ai.chunk_embeddings
+                    (course_id, revision_id, chunks, metas, dim, embeddings)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (course_id, revision_id) DO UPDATE
+                   SET chunks = EXCLUDED.chunks, metas = EXCLUDED.metas,
+                       dim = EXCLUDED.dim, embeddings = EXCLUDED.embeddings
+                """,
+                (
+                    course_id,
+                    revision_id or "",
+                    Jsonb(chunks),
+                    Jsonb(metas),
+                    int(vectors.shape[1]) if vectors.ndim == 2 else 0,
+                    vectors.tobytes(),
+                ),
+            )
+
+    def load(
+        self, course_id: str, revision_id: Optional[str]
+    ) -> Optional[Dict[str, Any]]:
+        with pg.connection() as conn:
+            row = conn.execute(
+                """
+                SELECT chunks, metas, dim, embeddings FROM ai.chunk_embeddings
+                 WHERE course_id = %s AND revision_id = %s
+                """,
+                (course_id, revision_id or ""),
+            ).fetchone()
+        if row is None:
+            return None
+        flat = np.frombuffer(bytes(row["embeddings"]), dtype="float32")
+        return {
+            "chunks": row["chunks"],
+            "metas": row["metas"],
+            "embeddings": flat.reshape(-1, row["dim"] or VectorStoreAdapter.DIM).copy(),
+        }
+
+
 class VectorStoreAdapter:
     """
-    Per-course FAISS index with MongoDB persistence for the raw embeddings.
+    Per-course FAISS index with PostgreSQL persistence for the raw embeddings.
 
     Index layout:
         _indices[course_id] = {
@@ -96,12 +155,12 @@ class VectorStoreAdapter:
 
     DIM = 384
 
-    def __init__(self, db) -> None:
+    def __init__(self, store: Optional["ChunkEmbeddingStore"] = None) -> None:
         """
         Args:
-            db: pymongo Database object (pass None for test / offline mode).
+            store: durable embedding store (None for test / offline mode).
         """
-        self._db = db
+        self._store = store
         self._indices: Dict[str, Dict[str, Any]] = {}
         FAISS_INDEX_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -122,7 +181,7 @@ class VectorStoreAdapter:
         Build (or rebuild) the FAISS index for *course_id* from pre-computed embeddings.
 
         Side-effects:
-          - Persists embeddings to MongoDB (upsert by course_id and optional revision_id).
+          - Persists embeddings to PostgreSQL (upsert by course_id and optional revision_id).
           - Saves the FAISS index to FAISS_INDEX_DIR/<course_id>.faiss or
             FAISS_INDEX_DIR/<course_id>/<revision_id>.faiss + .meta.json.
 
@@ -160,10 +219,8 @@ class VectorStoreAdapter:
         self._save_index(course_id, revision_id)
 
         # Persist raw embeddings to MongoDB
-        if self._db is not None:
-            self._save_embeddings_to_mongo(
-                course_id, chunks, embeddings, metadatas, revision_id
-            )
+        if self._store is not None:
+            self._save_embeddings(course_id, chunks, embeddings, metadatas, revision_id)
 
         logger.info(
             "vector_store_course_indexed",
@@ -290,8 +347,10 @@ class VectorStoreAdapter:
         if self._load_index_from_disk(course_id, revision_id):
             return self._indices[key]
 
-        # Try MongoDB
-        if self._db is not None and self._load_index_from_mongo(course_id, revision_id):
+        # Try the durable store
+        if self._store is not None and self._load_index_from_store(
+            course_id, revision_id
+        ):
             return self._indices[key]
 
         logger.warning(
@@ -414,9 +473,9 @@ class VectorStoreAdapter:
             )
             return False
 
-    # -- MongoDB I/O ----------------------------------------------------- #
+    # -- durable store I/O ------------------------------------------------ #
 
-    def _save_embeddings_to_mongo(
+    def _save_embeddings(
         self,
         course_id: str,
         chunks: List[str],
@@ -424,33 +483,18 @@ class VectorStoreAdapter:
         metadatas: List[Dict[str, Any]],
         revision_id: Optional[str] = None,
     ) -> None:
-        col = self._db[CHUNK_EMBED_COLLECTION]
-        doc = {
-            "course_id": course_id,
-            "chunks": chunks,
-            "metas": metadatas,
-            "embeddings": embeddings.tolist(),
-        }
-        filter_query = {"course_id": course_id, "revision_id": revision_id}
-        if revision_id:
-            doc["revision_id"] = revision_id
-            filter_query["revision_id"] = revision_id
-        col.update_one(filter_query, {"$set": doc}, upsert=True)
+        self._store.save(course_id, revision_id, chunks, metadatas, embeddings)
 
-    def _load_index_from_mongo(
+    def _load_index_from_store(
         self, course_id: str, revision_id: Optional[str] = None
     ) -> bool:
         try:
-            col = self._db[CHUNK_EMBED_COLLECTION]
-            filter_query = {"course_id": course_id, "revision_id": revision_id}
-            if revision_id:
-                filter_query["revision_id"] = revision_id
-            doc = col.find_one(filter_query)
+            doc = self._store.load(course_id, revision_id)
             if doc is None:
                 return False
             chunks = doc["chunks"]
             metas = doc["metas"]
-            embeddings = np.array(doc["embeddings"], dtype="float32")
+            embeddings = doc["embeddings"]
 
             index = faiss.IndexFlatIP(self.DIM)
             index.add(embeddings)
@@ -463,7 +507,7 @@ class VectorStoreAdapter:
             # Cache to disk for next restart
             self._save_index(course_id, revision_id)
             logger.info(
-                "vector_store_loaded_from_mongo",
+                "vector_store_loaded_from_store",
                 extra={
                     "course_id": course_id,
                     "revision_id": revision_id,
@@ -473,7 +517,7 @@ class VectorStoreAdapter:
             return True
         except Exception as exc:
             logger.warning(
-                "vector_store_mongo_load_failed",
+                "vector_store_store_load_failed",
                 extra={
                     "course_id": course_id,
                     "revision_id": revision_id,
@@ -485,15 +529,5 @@ class VectorStoreAdapter:
 
 @lru_cache(maxsize=1)
 def get_vector_store() -> VectorStoreAdapter:
-    """
-    Process-level singleton.  Imports MongoDB connection lazily to avoid
-    circular imports at module load time.
-    """
-    from services.database import get_db  # noqa: PLC0415
-
-    db = None
-    try:
-        db = get_db()
-    except Exception:
-        logger.warning("vector_store_no_db", extra={"reason": "could not connect"})
-    return VectorStoreAdapter(db)
+    """Process-level singleton backed by the AI database when it is configured."""
+    return VectorStoreAdapter(ChunkEmbeddingStore() if pg.configured() else None)

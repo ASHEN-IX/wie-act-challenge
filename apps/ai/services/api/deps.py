@@ -4,9 +4,6 @@ import os
 import sys
 from pathlib import Path
 
-from bson import ObjectId
-from pymongo import MongoClient
-
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -43,25 +40,6 @@ for _key in _OPTIONAL_ENV:
             },
         )
 
-
-def convert_objectid_to_str(obj):
-    """Recursively convert ObjectId to string in nested dictionaries and lists."""
-    if isinstance(obj, ObjectId):
-        return str(obj)
-    elif isinstance(obj, dict):
-        return {key: convert_objectid_to_str(value) for key, value in obj.items()}
-    elif isinstance(obj, list):
-        return [convert_objectid_to_str(item) for item in obj]
-    else:
-        return obj
-
-
-# MongoDB connection (only for AI-specific data)
-MONGO_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
-DB_NAME = os.getenv("DB_NAME", "ednova")
-mongo_client = MongoClient(MONGO_URI)
-db = mongo_client[DB_NAME]
-signals_collection = db["signals"]
 
 # Per-user timing gate for analyze-frame endpoint
 _frame_last_request: dict[str, float] = {}

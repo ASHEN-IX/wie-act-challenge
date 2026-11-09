@@ -6,8 +6,6 @@ Run with:
 """
 
 from datetime import datetime, timezone
-from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -17,29 +15,11 @@ from agents.coach.models.schemas import (
     FocusState,
     FatigueState,
 )
-from agents.coach.services.coach_history_repository import (
-    COACH_ACTIONS_TRACE_INDEX,
-)
+from agents.coach.services.coach_history_repository import CoachHistoryRepository
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-class _FakeCol:
-    """Stateful stand-in for a pymongo Collection (keyed on the filter)."""
-
-    def __init__(self):
-        self.docs = {}
-
-    def update_one(self, flt, update, upsert=True):
-        key = flt["trace_id"]
-        if key in self.docs:
-            return SimpleNamespace(matched_count=1, upserted_id=None)
-        if upsert:
-            self.docs[key] = dict(update["$setOnInsert"])
-            return SimpleNamespace(matched_count=0, upserted_id="obj-1")
-        raise AssertionError("upsert must be enabled")
 
 
 def _make_coach_input(**overrides):
@@ -65,145 +45,90 @@ def _make_action(**overrides):
 
 
 # ---------------------------------------------------------------------------
-# Tests
+# Tests (real PostgreSQL via the `ai_db` fixture)
 # ---------------------------------------------------------------------------
 
 
 class TestCoachHistoryRepository:
-
-    def _make_repo(self, collection):
-        """Return a repo instance with its MongoDB collection mocked (bypasses __init__)."""
-        from agents.coach.services.coach_history_repository import (
-            CoachHistoryRepository,
+    def test_save_action_inserts_row(self, ai_db):
+        CoachHistoryRepository().save_action(
+            "u1", _make_action(), _make_coach_input(), trace_id="t-1", correlation_id="c-1"
         )
-
-        repo = CoachHistoryRepository.__new__(CoachHistoryRepository)
-        repo._db = {"coach_actions": collection}
-        return repo
-
-    def test_save_action_inserts_document(self):
-        col = MagicMock()
-        col.update_one.return_value = SimpleNamespace(
-            matched_count=0, upserted_id="obj-1"
+        with ai_db.connection() as conn:
+            row = conn.execute("SELECT * FROM ai.coach_actions").fetchone()
+        assert (row["user_id"], row["trace_id"], row["correlation_id"]) == ("u1", "t-1", "c-1")
+        assert (row["action_type"], row["focus_state"], row["fatigue_state"]) == (
+            "nudge",
+            "Drifting",
+            "Moderate",
         )
-        repo = self._make_repo(col)
+        assert row["affective_state"] == "engaged"
 
-        action = _make_action()
-        coach_input = _make_coach_input()
-
-        repo.save_action(
-            "user_1", action, coach_input, trace_id="t-123", correlation_id="c-123"
+    def test_correlation_id_defaults_to_trace_id(self, ai_db):
+        CoachHistoryRepository().save_action(
+            "u1", _make_action(), _make_coach_input(), trace_id="t-2"
         )
+        with ai_db.connection() as conn:
+            assert conn.execute("SELECT correlation_id FROM ai.coach_actions").fetchone()[
+                "correlation_id"
+            ] == "t-2"
 
-        col.update_one.assert_called_once()
-        flt, update, kwargs = (
-            col.update_one.call_args[0][0],
-            col.update_one.call_args[0][1],
-            col.update_one.call_args[1],
+    def test_save_action_idempotent_by_trace_id(self, ai_db):
+        repo = CoachHistoryRepository()
+        repo.save_action("u1", _make_action(message="first"), _make_coach_input(), trace_id="t-3")
+        repo.save_action("u1", _make_action(message="second"), _make_coach_input(), trace_id="t-3")
+        with ai_db.connection() as conn:
+            rows = conn.execute("SELECT message FROM ai.coach_actions").fetchall()
+        assert [r["message"] for r in rows] == ["first"]  # the original write is preserved
+
+    def test_trace_id_is_unique_at_the_database(self, ai_db):
+        """The constraint, not just the upsert, is the COACH-09 guarantee."""
+        import psycopg
+
+        insert = (
+            "INSERT INTO ai.coach_actions (user_id, trace_id, correlation_id, ts) "
+            "VALUES ('u', 'dup', 'dup', now())"
         )
-        assert flt == {"trace_id": "t-123"}
-        assert kwargs.get("upsert") is True
-        doc = update["$setOnInsert"]
-        assert doc["user_id"] == "user_1"
-        assert doc["action_type"] == "nudge"
-        assert doc["trace_id"] == "t-123"
-        assert doc["correlation_id"] == "c-123"
+        with ai_db.connection() as conn:
+            conn.execute(insert)
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            with ai_db.connection() as conn:
+                conn.execute(insert)
 
-    def test_save_action_idempotent_by_trace_id(self):
-        col = _FakeCol()
-        repo = self._make_repo(col)
-        coach_input = _make_coach_input()
+    def test_save_action_no_db_silently_skips(self, monkeypatch):
+        monkeypatch.delenv("AI_DATABASE_URL", raising=False)
+        CoachHistoryRepository().save_action(
+            "u1", _make_action(), _make_coach_input(), trace_id="t-4"
+        )  # must not raise
 
-        repo.save_action("user_1", _make_action(), coach_input, trace_id="job-1")
-        # Same correlation id redelivered (retry succeeded after an earlier
-        # attempt) → no duplicate row; the first write wins.
-        repo.save_action(
-            "user_1",
-            _make_action(action_type="encourage"),
-            coach_input,
-            trace_id="job-1",
-            correlation_id="job-1",
-        )
+    def test_get_recent_actions_newest_first_and_limited(self, ai_db):
+        repo = CoachHistoryRepository()
+        for index in range(4):
+            repo.save_action(
+                "u1", _make_action(message=f"m{index}"), _make_coach_input(), trace_id=f"t-{index}"
+            )
+        repo.save_action("other", _make_action(message="x"), _make_coach_input(), trace_id="o-1")
+        history = repo.get_recent_actions("u1", limit=3)
+        assert [h["message"] for h in history] == ["m3", "m2", "m1"]
+        assert set(history[0]) == {
+            "ts",
+            "action_type",
+            "message",
+            "focus_state",
+            "fatigue_state",
+            "affective_state",
+        }
 
-        assert len(col.docs) == 1
-        assert col.docs["job-1"]["action_type"] == "nudge"
-        assert col.docs["job-1"]["correlation_id"] == "job-1"
+    def test_get_recent_actions_empty_user_returns_empty(self, ai_db):
+        assert CoachHistoryRepository().get_recent_actions("") == []
 
-        repo.save_action("user_1", _make_action(), coach_input, trace_id="job-2")
-        assert len(col.docs) == 2
+    def test_get_recent_actions_no_db_returns_empty(self, monkeypatch):
+        monkeypatch.delenv("AI_DATABASE_URL", raising=False)
+        assert CoachHistoryRepository().get_recent_actions("u1") == []
 
-    def test_ensures_unique_trace_id_index(self):
-        col = MagicMock()
-        repo = self._make_repo(col)
+    def test_get_recent_actions_swallows_database_errors(self, ai_db, monkeypatch):
+        def boom(*args, **kwargs):
+            raise RuntimeError("down")
 
-        repo._ensure_index()
-
-        col.create_index.assert_called_once()
-        args, kwargs = col.create_index.call_args
-        assert args[0] == [("trace_id", 1)]
-        assert kwargs.get("unique") is True
-        assert kwargs.get("name") == COACH_ACTIONS_TRACE_INDEX
-
-    def test_save_action_no_db_silently_skips(self):
-        from agents.coach.services.coach_history_repository import (
-            CoachHistoryRepository,
-        )
-
-        repo = CoachHistoryRepository.__new__(CoachHistoryRepository)
-        repo._db = None
-
-        # Should not raise
-        repo.save_action("u", _make_action(), _make_coach_input())
-
-    def test_get_recent_actions_returns_list(self):
-        col = MagicMock()
-        expected = [
-            {
-                "ts": datetime.now(tz=timezone.utc),
-                "action_type": "encourage",
-                "message": "Great!",
-                "focus_state": "Focused",
-                "fatigue_state": "Alert",
-                "affective_state": "confident",
-            },
-        ]
-        col.find.return_value.sort.return_value.limit.return_value = expected
-
-        repo = self._make_repo(col)
-        result = repo.get_recent_actions("user_1", limit=5)
-
-        assert result == expected
-        col.find.assert_called_once_with(
-            {"user_id": "user_1"},
-            {
-                "_id": 0,
-                "ts": 1,
-                "action_type": 1,
-                "message": 1,
-                "focus_state": 1,
-                "fatigue_state": 1,
-                "affective_state": 1,
-            },
-        )
-
-    def test_get_recent_actions_empty_user_returns_empty(self):
-        from agents.coach.services.coach_history_repository import (
-            CoachHistoryRepository,
-        )
-
-        repo = CoachHistoryRepository.__new__(CoachHistoryRepository)
-        repo._db = MagicMock()
-
-        result = repo.get_recent_actions("")
-        assert result == []
-
-    def test_get_recent_actions_no_db_returns_empty(self):
-        from agents.coach.services.coach_history_repository import (
-            CoachHistoryRepository,
-        )
-
-        repo = CoachHistoryRepository.__new__(CoachHistoryRepository)
-        repo._db = None
-
-        result = repo.get_recent_actions("user_1")
-        assert result == []
+        monkeypatch.setattr(ai_db, "connection", boom)
+        assert CoachHistoryRepository().get_recent_actions("u1") == []
