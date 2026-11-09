@@ -49,6 +49,8 @@ interface CourseStudioProps {
   initialDraft: CourseDraft;
   currentUserId: string;
   originalFiles?: Array<{ filename: string; originalName?: string }>;
+  /** A published revision already exists: never auto-publish a follow-up draft. */
+  hasPublishedRevision?: boolean;
 }
 
 const LESSONS_PER_PAGE = 8;
@@ -59,6 +61,7 @@ export function CourseStudio({
   initialDraft,
   currentUserId,
   originalFiles = [],
+  hasPublishedRevision = false,
 }: CourseStudioProps) {
   const [dirty, setDirty] = useState(false);
   const [draft, setDraft] = useState(initialDraft);
@@ -309,6 +312,7 @@ export function CourseStudio({
     message?: string;
   }>({ phase: "idle" });
   const autoRan = useRef<string | null>(null);
+  const autoBusy = useRef(false);
   useEffect(() => {
     try {
       if (localStorage.getItem(AUTO_KEY) === "off") setAutoEnabled(false);
@@ -319,10 +323,19 @@ export function CourseStudio({
 
   /** Check, fix what is clearly fixable, then publish, with no manual steps. */
   const runAuto = async () => {
+    if (autoBusy.current) return;
+    autoBusy.current = true;
+    try {
+      await runAutoOnce();
+    } finally {
+      autoBusy.current = false;
+    }
+  };
+  const runAutoOnce = async () => {
     setErrorMsg(null);
     setSuccessMsg(null);
     let tag = draft.revisionTag;
-    const acknowledged = sourceState?.extractionReview?.acknowledged === true;
+    let acknowledged = sourceState?.extractionReview?.acknowledged === true;
     const result = await autoReviewAndPublish({
       topics,
       needsSave:
@@ -345,6 +358,7 @@ export function CourseStudio({
       refresh: async () => {
         const state = await refreshStudio();
         tag = state.draft.revisionTag;
+        acknowledged = state.extractionReview?.acknowledged === true;
         return { revisionTag: tag, topics: state.draft.topics || [] };
       },
       review: (useAi) => reviewDraft(courseId, useAi),
@@ -380,7 +394,9 @@ export function CourseStudio({
             : "Published automatically.") +
           (result.remaining
             ? ` ${result.remaining} suggestion${result.remaining === 1 ? "" : "s"} could not be fixed automatically${
-                result.aiStatus === "proposed" ? "" : " because the AI review was unavailable"
+                result.aiStatus === "proposed"
+                  ? ""
+                  : " because the AI review was unavailable"
               }. You can improve ${result.remaining === 1 ? "it" : "them"} in the outline and publish again.`
             : " The checks found nothing left to fix."),
       });
@@ -395,27 +411,35 @@ export function CourseStudio({
     }
   };
 
-  // Start by itself once a processed draft is open and nobody is editing it.
+  // Start by itself for a freshly processed, never-published course. Anything unclear
+  // (still processing, status unknown, already published, being edited) does nothing; the
+  // "Review and publish now" button stays available. One attempt per course per page load,
+  // so the run's own saves (which change the revision tag) cannot start it again.
   useEffect(() => {
     if (
       !autoEnabled ||
-      !sourceState ||
+      hasPublishedRevision ||
       published ||
       dirty ||
       isInstructorReviewed ||
       !topics.length ||
       ingestionStatus?.status === "processing" ||
-      autoRan.current === draft.revisionTag
+      autoRan.current === courseId
     )
       return;
-    autoRan.current = draft.revisionTag;
-    void runAuto();
-    // runAuto reads the latest render's state; run once per draft revision.
+    autoRan.current = courseId;
+    studioIngestStatus(courseId)
+      .then((status) => {
+        if (status.status === "completed") return runAuto();
+      })
+      .catch(() => undefined);
+    // runAuto reads the latest render's state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     autoEnabled,
+    hasPublishedRevision,
     sourceState,
-    draft.revisionTag,
+    courseId,
     topics.length,
     ingestionStatus?.status,
   ]);
