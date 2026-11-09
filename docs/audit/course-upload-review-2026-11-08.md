@@ -38,3 +38,18 @@ Historical evidence from a local dev stack (Mongo, RabbitMQ, API, web :5173, Pyt
 ## Config decision
 
 `LLM_APPROVALS_JSON` in `apps/ai/.env` (git-ignored) now includes `course_review`. Clicking "Review with AI" sends that course's extracted text (bounded excerpts) to Groq. Production needs its own approval.
+
+## Automatic review and publishing (2026-11-09)
+
+Course Studio now reviews, fixes and publishes a processed draft without manual steps (`apps/web/src/features/courses/auto-publish.ts`, banner "Automatic review and publishing" in the studio). Turn it off with the checkbox (stored per browser); "Review and publish now" runs it on demand.
+
+Sequence (all existing server steps, so server-side checks still apply): save if needed → deterministic checks + AI proposal → apply the proposal **only to lessons the checks flagged** (clipped title, missing or placeholder objective) → re-check → save as reviewed → approve → prepare sources → publish.
+
+What it will not do:
+- Confirm low-confidence source regions (`SOURCE_REVIEW_PENDING`). It fixes what it can and stops with that reason.
+- Publish past any other blocker (e.g. an empty draft).
+- Change lesson text; the AI agent can only rename titles and write objectives, as before.
+
+If the AI review is unavailable, only warnings remain, so it publishes and states how many suggestions were left unfixed and why. `isInstructorReviewed` is set by this automation on the signed-in instructor's behalf; there is no separate audit field yet.
+
+Verified locally: two uploaded markdown courses auto-published with no clicks (AI unavailable in that stack: `llm_client_unavailable` for `course_review`, so the AI-fix path is covered by unit tests only). Not run: the real AI fix path, a source-review-required draft end to end, Playwright.

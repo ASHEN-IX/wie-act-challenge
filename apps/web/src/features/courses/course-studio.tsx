@@ -34,10 +34,12 @@ import {
   uploadStudioSource,
   studioIngestStatus,
   controlStudioIngestion,
+  reviewDraft,
 } from "./studio-actions";
 import { approveStudioPublication } from "./formula-actions";
 import { FormulaReview } from "./formula-review";
 import { CourseReviewPanel } from "./course-review-panel";
+import { autoReviewAndPublish, type AutoPublishPhase } from "./auto-publish";
 import type { DraftReviewProposal } from "./studio-actions";
 import { cn } from "@/lib/utils";
 
@@ -47,6 +49,8 @@ interface CourseStudioProps {
   initialDraft: CourseDraft;
   currentUserId: string;
   originalFiles?: Array<{ filename: string; originalName?: string }>;
+  /** A published revision already exists: never auto-publish a follow-up draft. */
+  hasPublishedRevision?: boolean;
 }
 
 const LESSONS_PER_PAGE = 8;
@@ -57,6 +61,7 @@ export function CourseStudio({
   initialDraft,
   currentUserId,
   originalFiles = [],
+  hasPublishedRevision = false,
 }: CourseStudioProps) {
   const [dirty, setDirty] = useState(false);
   const [draft, setDraft] = useState(initialDraft);
@@ -124,7 +129,11 @@ export function CourseStudio({
             setStep(2);
           }
         })
-        .catch(() => setErrorMsg("We could not check processing. Check your connection and reload to try again."));
+        .catch(() =>
+          setErrorMsg(
+            "We could not check processing. Check your connection and reload to try again.",
+          ),
+        );
     }, 2500);
     return () => window.clearInterval(timer);
     // refreshStudio closes over the latest render; only restart on a new job.
@@ -222,10 +231,10 @@ export function CourseStudio({
   };
 
   /** Apply an AI proposal to the editor state only. Returns the number of items changed. */
-  const applyReviewProposal = (
-    proposal: DraftReviewProposal,
-  ) => {
-    const chapterTitles = new Map(proposal.chapters.map((c) => [c.id, c.title]));
+  const applyReviewProposal = (proposal: DraftReviewProposal) => {
+    const chapterTitles = new Map(
+      proposal.chapters.map((c) => [c.id, c.title]),
+    );
     const lessons = new Map(proposal.lessons.map((l) => [l.id, l]));
     let changed = 0;
     setTopics(
@@ -243,9 +252,7 @@ export function CourseStudio({
               ...sub,
               title: next.title,
               learning_objectives: next.objectives.map((o) => ({
-                id:
-                  "obj_" +
-                  crypto.randomUUID().replace(/-/g, "").slice(0, 12),
+                id: "obj_" + crypto.randomUUID().replace(/-/g, "").slice(0, 12),
                 statement: o.statement,
                 text: o.statement,
                 bloomLevel: o.bloomLevel,
@@ -297,6 +304,145 @@ export function CourseStudio({
       }
     });
   };
+
+  const AUTO_KEY = "ednova:auto-publish";
+  const [autoEnabled, setAutoEnabled] = useState(true);
+  const [auto, setAuto] = useState<{
+    phase: "idle" | AutoPublishPhase | "published" | "held";
+    message?: string;
+  }>({ phase: "idle" });
+  const autoRan = useRef<string | null>(null);
+  const autoBusy = useRef(false);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(AUTO_KEY) === "off") setAutoEnabled(false);
+    } catch {
+      /* storage can be blocked; automatic review stays on */
+    }
+  }, []);
+
+  /** Check, fix what is clearly fixable, then publish, with no manual steps. */
+  const runAuto = async () => {
+    if (autoBusy.current) return;
+    autoBusy.current = true;
+    try {
+      await runAutoOnce();
+    } finally {
+      autoBusy.current = false;
+    }
+  };
+  const runAutoOnce = async () => {
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    let tag = draft.revisionTag;
+    let acknowledged = sourceState?.extractionReview?.acknowledged === true;
+    const result = await autoReviewAndPublish({
+      topics,
+      needsSave:
+        dirty || topics.some((t) => t.subtopics?.some((sub) => !sub.id)),
+      onPhase: (phase) => setAuto({ phase }),
+      save: async (next, reviewed) => {
+        const form = new FormData();
+        form.set("courseId", courseId);
+        form.set("expectedRevisionTag", tag);
+        form.set("topicsJson", JSON.stringify(next));
+        form.set("summary", summary);
+        form.set("isInstructorReviewed", reviewed ? "true" : "false");
+        form.set(
+          "extractionReviewAcknowledged",
+          acknowledged ? "true" : "false",
+        );
+        const saved = await updateDraftAction({}, form);
+        if (saved.error) throw new Error(saved.error);
+      },
+      refresh: async () => {
+        const state = await refreshStudio();
+        tag = state.draft.revisionTag;
+        acknowledged = state.extractionReview?.acknowledged === true;
+        return { revisionTag: tag, topics: state.draft.topics || [] };
+      },
+      review: (useAi) => reviewDraft(courseId, useAi),
+      approve: async (revisionTag) => {
+        const approved = await approveStudioPublication(
+          courseId,
+          revisionTag,
+          acknowledged,
+        );
+        return approved.ok
+          ? { ok: true }
+          : { ok: false, error: approved.error };
+      },
+      prepare: async (revisionTag) =>
+        setSourceState(await prepareStudio(courseId, revisionTag)),
+      publish: async (revisionTag) => {
+        const form = new FormData();
+        form.set("courseId", courseId);
+        form.set("expectedRevisionTag", revisionTag);
+        const out = await publishRevisionAction({}, form);
+        return { error: out.error, revisionTag: out.publishedRevisionTag };
+      },
+    });
+    if (result.status === "published") {
+      setIsInstructorReviewed(true);
+      setPublished(result.revisionTag);
+      setStep(3);
+      setAuto({
+        phase: "published",
+        message:
+          (result.fixed
+            ? `Published automatically. ${result.fixed} unclear lesson${result.fixed === 1 ? " was" : "s were"} improved first.`
+            : "Published automatically.") +
+          (result.remaining
+            ? ` ${result.remaining} suggestion${result.remaining === 1 ? "" : "s"} could not be fixed automatically${
+                result.aiStatus === "proposed"
+                  ? ""
+                  : " because the AI review was unavailable"
+              }. You can improve ${result.remaining === 1 ? "it" : "them"} in the outline and publish again.`
+            : " The checks found nothing left to fix."),
+      });
+    } else {
+      setAuto({
+        phase: "held",
+        message:
+          (result.fixed
+            ? `${result.fixed} lesson${result.fixed === 1 ? "" : "s"} improved. `
+            : "") + `Nothing was published: ${result.reason}`,
+      });
+    }
+  };
+
+  // Start by itself for a freshly processed, never-published course. Anything unclear
+  // (still processing, status unknown, already published, being edited) does nothing; the
+  // "Review and publish now" button stays available. One attempt per course per page load,
+  // so the run's own saves (which change the revision tag) cannot start it again.
+  useEffect(() => {
+    if (
+      !autoEnabled ||
+      hasPublishedRevision ||
+      published ||
+      dirty ||
+      isInstructorReviewed ||
+      !topics.length ||
+      ingestionStatus?.status === "processing" ||
+      autoRan.current === courseId
+    )
+      return;
+    autoRan.current = courseId;
+    studioIngestStatus(courseId)
+      .then((status) => {
+        if (status.status === "completed") return runAuto();
+      })
+      .catch(() => undefined);
+    // runAuto reads the latest render's state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    autoEnabled,
+    hasPublishedRevision,
+    sourceState,
+    courseId,
+    topics.length,
+    ingestionStatus?.status,
+  ]);
 
   /** Review, save, prepare and publish the same revision in one command. */
   const handlePrepareAndPublish = () => {
@@ -477,7 +623,9 @@ export function CourseStudio({
           </Button>
           <Button
             onClick={handlePrepareAndPublish}
-            disabled={isPending || !!published || !topics.length || !sourceState}
+            disabled={
+              isPending || !!published || !topics.length || !sourceState
+            }
             title={
               sourceState?.extractionReview?.required &&
               !extractionReviewAcknowledged &&
@@ -531,7 +679,9 @@ export function CourseStudio({
       </ol>
 
       {dirty && (
-        <p role="status">Unsaved changes. Publishing also saves your changes.</p>
+        <p role="status">
+          Unsaved changes. Publishing also saves your changes.
+        </p>
       )}
       {originalFiles.length > 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-lg border p-4">
@@ -553,13 +703,23 @@ export function CourseStudio({
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-4">
           <p className="text-sm font-medium">
             {sourceState.extractionReview.reviewRegionCount} source region
-            {sourceState.extractionReview.reviewRegionCount === 1 ? "" : "s"}{" "}
+            {sourceState.extractionReview.reviewRegionCount === 1
+              ? ""
+              : "s"}{" "}
             need checking against the original
           </p>
-          <a className="mt-2 inline-block text-sm underline" href="#source-review" onClick={() => {
-            const inspector = document.getElementById("source-review") as HTMLDetailsElement | null;
-            if (inspector) inspector.open = true;
-          }}>Review source issues</a>
+          <a
+            className="mt-2 inline-block text-sm underline"
+            href="#source-review"
+            onClick={() => {
+              const inspector = document.getElementById(
+                "source-review",
+              ) as HTMLDetailsElement | null;
+              if (inspector) inspector.open = true;
+            }}
+          >
+            Review source issues
+          </a>
           <p className="mt-1 text-xs text-muted-foreground">
             Unreviewed formulas retain source text and equation images. Check
             equations, figures and tables against the original before
@@ -619,13 +779,15 @@ export function CourseStudio({
 
       {published && (
         <div className="flex flex-wrap gap-4">
-        <a
-          className="underline"
-          href={`/courses/${courseId}/learn?revisionId=${encodeURIComponent(published)}`}
-        >
-          View published course
-        </a>
-        <a className="underline" href={`/courses/${courseId}/students`}>Next: invite students</a>
+          <a
+            className="underline"
+            href={`/courses/${courseId}/learn?revisionId=${encodeURIComponent(published)}`}
+          >
+            View published course
+          </a>
+          <a className="underline" href={`/courses/${courseId}/students`}>
+            Next: invite students
+          </a>
         </div>
       )}
       <details className="rounded-lg border bg-card p-4">
@@ -870,6 +1032,72 @@ export function CourseStudio({
         </div>
       </details>
       {topics.length > 0 && (
+        <section
+          aria-label="Automatic review and publishing"
+          className="flex flex-wrap items-start justify-between gap-3 rounded-xl border bg-card p-4"
+        >
+          <div
+            role="status"
+            aria-live="polite"
+            className="min-w-0 flex-1 text-sm"
+          >
+            <p className="font-medium">
+              {auto.phase === "checking"
+                ? "Checking the draft…"
+                : auto.phase === "fixing"
+                  ? "Improving unclear titles and objectives…"
+                  : auto.phase === "publishing"
+                    ? "Publishing…"
+                    : auto.phase === "published"
+                      ? "Published"
+                      : auto.phase === "held"
+                        ? "Waiting for you"
+                        : autoEnabled
+                          ? "Automatic review is on"
+                          : "Automatic review is off"}
+            </p>
+            <p className="mt-1 text-muted-foreground">
+              {auto.message ??
+                "EdNova checks this draft, fixes unclear lesson titles and objectives, and publishes when nothing blocks it. Source regions with low confidence always wait for your confirmation."}
+            </p>
+          </div>
+          <div className="flex flex-col items-end gap-2">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={autoEnabled}
+                onChange={(event) => {
+                  setAutoEnabled(event.target.checked);
+                  try {
+                    if (event.target.checked) localStorage.removeItem(AUTO_KEY);
+                    else localStorage.setItem(AUTO_KEY, "off");
+                  } catch {
+                    /* ignore */
+                  }
+                }}
+              />
+              Review and publish automatically
+            </label>
+            {!published &&
+              auto.phase !== "checking" &&
+              auto.phase !== "fixing" &&
+              auto.phase !== "publishing" && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={isPending || dirty}
+                  onClick={() => {
+                    autoRan.current = draft.revisionTag;
+                    void runAuto();
+                  }}
+                >
+                  Review and publish now
+                </Button>
+              )}
+          </div>
+        </section>
+      )}
+      {topics.length > 0 && (
         <CourseReviewPanel
           courseId={courseId}
           dirty={dirty}
@@ -921,7 +1149,6 @@ export function CourseStudio({
                   rows={2}
                 />
               </label>
-
             </div>
 
             <div className="flex flex-wrap items-end gap-2 rounded-lg border bg-muted/20 p-3">
@@ -940,7 +1167,10 @@ export function CourseStudio({
               <Button
                 variant="outline"
                 className="w-full sm:w-auto"
-                disabled={!manualObjective.trim() || !topics[selectedChapter]?.subtopics?.length}
+                disabled={
+                  !manualObjective.trim() ||
+                  !topics[selectedChapter]?.subtopics?.length
+                }
                 onClick={() => {
                   const suffix = crypto
                     .randomUUID()
@@ -949,19 +1179,32 @@ export function CourseStudio({
                   setDirty(true);
                   setIsInstructorReviewed(false);
                   const lessonIndex = selectedLesson >= 0 ? selectedLesson : 0;
-                  setTopics(topics.map((topic, index) => index !== selectedChapter ? topic : {
-                    ...topic,
-                    subtopics: topic.subtopics?.map((lesson, index) => index !== lessonIndex ? lesson : {
-                      ...lesson,
-                      learning_objectives: [...(lesson.learning_objectives || []), {
-                        id: "obj_" + suffix,
-                        statement: manualObjective.trim(),
-                        text: manualObjective.trim(),
-                        bloomLevel: "understand",
-                        provenance: "manual",
-                      }],
-                    }),
-                  }));
+                  setTopics(
+                    topics.map((topic, index) =>
+                      index !== selectedChapter
+                        ? topic
+                        : {
+                            ...topic,
+                            subtopics: topic.subtopics?.map((lesson, index) =>
+                              index !== lessonIndex
+                                ? lesson
+                                : {
+                                    ...lesson,
+                                    learning_objectives: [
+                                      ...(lesson.learning_objectives || []),
+                                      {
+                                        id: "obj_" + suffix,
+                                        statement: manualObjective.trim(),
+                                        text: manualObjective.trim(),
+                                        bloomLevel: "understand",
+                                        provenance: "manual",
+                                      },
+                                    ],
+                                  },
+                            ),
+                          },
+                    ),
+                  );
                   setSelectedLesson(lessonIndex);
                   setShowAllLessons(false);
                   setManualObjective("");

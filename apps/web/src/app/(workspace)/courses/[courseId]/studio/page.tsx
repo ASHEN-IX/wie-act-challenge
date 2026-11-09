@@ -51,6 +51,7 @@ export default async function CourseStudioPage({
       initialDraft={draft}
       originalFiles={course.files}
       currentUserId={identity.userId}
+      hasPublishedRevision={Boolean(course.activeRevisionId)}
     />
     <details className="mt-8 border-t pt-5">
       <summary className="cursor-pointer text-sm text-destructive">Delete course</summary>
