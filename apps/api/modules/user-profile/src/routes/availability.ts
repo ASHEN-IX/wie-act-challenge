@@ -3,6 +3,8 @@ import type { Response } from 'express';
 import { createContracts } from '@ednova/shared/domainContracts';
 import Joi from 'joi';
 import AvailabilitySlot from '../models/AvailabilitySlot';
+import { insertCalendarEntries, deleteCalendarEntries } from '../services/calendar';
+import { newId } from '../../../../shared/ids';
 
 const router = createContracts();
 
@@ -26,7 +28,7 @@ const createSlotSchema = Joi.object({
 router.get('/', async (req: DomainRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
-    const slots = await AvailabilitySlot.find({ userId }).sort({ dayOfWeek: 1, startTime: 1 });
+    const slots = await AvailabilitySlot.findMany({ userId }, { orderBy: { dayOfWeek: 'asc' } });
 
     // Convert to frontend format
     const formattedSlots = slots.map((slot) => ({
@@ -59,6 +61,7 @@ router.post('/', async (req: DomainRequest, res: Response) => {
     const userId = req.user!.userId;
 
     const slot = await AvailabilitySlot.create({
+      id: newId(),
       userId,
       dayOfWeek: value.day_of_week,
       startTime: value.start_time,
@@ -70,10 +73,6 @@ router.post('/', async (req: DomainRequest, res: Response) => {
 
     // Also save to calendar collection for the next 4 weeks
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const mongoose = require('mongoose');
-      const calendarColl = mongoose.connection.collection('calendar');
-
       const dayMap: Record<string, number> = {
         Monday: 1,
         Tuesday: 2,
@@ -125,7 +124,7 @@ router.post('/', async (req: DomainRequest, res: Response) => {
       }
 
       if (entries.length > 0) {
-        await calendarColl.insertMany(entries);
+        await insertCalendarEntries(entries);
       }
     } catch (calendarErr) {
       console.error(
@@ -159,7 +158,7 @@ router.delete('/:id', async (req: DomainRequest, res: Response) => {
     const userId = req.user!.userId;
     const slotId = req.params.id;
 
-    const result = await AvailabilitySlot.deleteOne({ _id: slotId, userId });
+    const result = await AvailabilitySlot.deleteOne({ id: String(slotId), userId });
 
     if (result.deletedCount === 0) {
       return res.status(404).json({ error: 'Slot not found' });
@@ -167,15 +166,7 @@ router.delete('/:id', async (req: DomainRequest, res: Response) => {
 
     // Also remove from calendar collection
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const mongoose = require('mongoose');
-      const calendarColl = mongoose.connection.collection('calendar');
-
-      await calendarColl.deleteMany({
-        userId,
-        taskId: slotId,
-        source: 'availability'
-      });
+      await deleteCalendarEntries({ userId, taskId: String(slotId), source: 'availability' });
     } catch (calendarErr) {
       console.error(
         'Failed to remove availability from calendar:',
@@ -197,7 +188,7 @@ router.get('/free-slots', async (req: DomainRequest, res: Response) => {
     const userId = req.user!.userId;
     const durationMinutes = parseInt(req.query.duration_minutes as string) || 60;
 
-    const blockedSlots = await AvailabilitySlot.find({ userId });
+    const blockedSlots = await AvailabilitySlot.findMany({ userId });
 
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     const startHour = 7;

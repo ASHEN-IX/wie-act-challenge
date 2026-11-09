@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import mongoose from 'mongoose';
 import express from 'express';
+import { connectDatabase, disconnectDatabase, prisma } from '../../shared/database';
 import roomsRouter from '../../modules/study/src/routes/rooms';
 import type { DomainRequest } from '../../src/framework/contracts';
 import {
@@ -11,7 +11,8 @@ import {
   ActivityRecord,
   StudentAttempt,
   LearningEvidence,
-  StudyRoom
+  StudyRoom,
+  FacilitatorIntervention
 } from '../../modules/study/src/models';
 import {
   materializeRevisionFixture,
@@ -36,15 +37,32 @@ import {
 } from '../../modules/study/src/services/roomLearning';
 
 test('P0-R3 canonical learning selection, durable pinned rooms, private checks and reviewed proposals', async (t) => {
-  const dbName = 'ednova_p0r3_domain_' + process.pid + '_' + Date.now();
-  await mongoose.connect('mongodb://127.0.0.1:27018/' + dbName);
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
+  await connectDatabase();
+  // The test database is shared; every row this suite owns is run-unique.
+  const run = `${process.pid}_${Date.now()}`;
+  let courseId = '';
+  const roomIds: string[] = [];
   t.after(async () => {
     await cleanupRevisionFixtures();
-    await mongoose.connection.dropDatabase();
-    await mongoose.disconnect();
+    try {
+      if (courseId) {
+        await ActivityRecord.deleteMany({ courseId });
+        await StudentAttempt.deleteMany({ courseId });
+        await LearningEvidence.deleteMany({ userId: { contains: run } });
+        await prisma.learningSupport.deleteMany({ where: { courseId } });
+        await prisma.roomLearningProposal.deleteMany({ where: { roomId: { in: roomIds } } });
+        await prisma.roomLearningCheck.deleteMany({ where: { roomId: { in: roomIds } } });
+        await StudyRoom.deleteMany({ roomId: { in: roomIds } });
+        await Course.deleteMany({ userId: actor });
+      }
+    } finally {
+      await disconnectDatabase().catch(() => {});
+    }
   });
-  const actor = 'r3_owner',
-    peer = 'r3_peer';
+  const actor = `r3_owner_${run}`,
+    peer = `r3_peer_${run}`;
   const course = await Course.create({
     userId: actor,
     ownerUserId: actor,
@@ -53,7 +71,7 @@ test('P0-R3 canonical learning selection, durable pinned rooms, private checks a
     subjectId: 'synthetic',
     status: 'completed'
   });
-  const courseId = course._id.toString();
+  courseId = course._id.toString();
   const topics = [
     {
       id: 'topic_source',
@@ -225,10 +243,9 @@ test('P0-R3 canonical learning selection, durable pinned rooms, private checks a
       assert.deepEqual(room!.activePin, pin);
       assert.equal(room!.revisionId, 'rev_one');
       seq = room!.seq;
-      assert.equal(
-        await mongoose.connection.collection('learning_activities').countDocuments({}),
-        0
-      );
+      roomIds.push(roomId);
+      // Room commands read the reviewed registry; they never write it.
+      assert.equal(await ActivityRecord.countDocuments({ courseId }), 2);
       const invalid = await runRoomCommand(
         'phase',
         { userId: actor },
@@ -281,7 +298,10 @@ test('P0-R3 canonical learning selection, durable pinned rooms, private checks a
   await t.test(
     'server proposals reject malformed and stale decisions, accept/replay only the persisted command',
     async () => {
-      const proposal = await proposeRoomSupport(actor, roomId);
+      const proposal = (await proposeRoomSupport(actor, roomId)) as {
+        proposalId: string;
+        sourceBacked: boolean;
+      };
       assert.equal(proposal.sourceBacked, true);
       await assert.rejects(() =>
         decideRoomSupport(peer, roomId, proposal.proposalId, { decision: 'accept' })
@@ -300,7 +320,7 @@ test('P0-R3 canonical learning selection, durable pinned rooms, private checks a
         (await decideRoomSupport(actor, roomId, proposal.proposalId, { decision: 'accept' })).body,
         accepted.body
       );
-      const stale = await proposeRoomSupport(actor, roomId);
+      const stale = (await proposeRoomSupport(actor, roomId)) as { proposalId: string };
       const room = await StudyRoom.findOne({ roomId }).lean();
       await runRoomCommand(
         'phase',
@@ -326,6 +346,7 @@ test('P0-R3 canonical learning selection, durable pinned rooms, private checks a
         authorize
       );
       const delayedId = String(created.body.roomId);
+      roomIds.push(delayedId);
       const ai = require('../../shared/aiClient');
       const original = ai.post;
       let release!: (value: unknown) => void, started!: () => void;
@@ -370,20 +391,24 @@ test('P0-R3 canonical learning selection, durable pinned rooms, private checks a
           }
         );
         await began;
+        // `participants` is one JSONB column: revoke the host by writing the
+        // whole array back, exactly as the room routes do.
+        const delayedRoom = await StudyRoom.findOne({ roomId: delayedId });
         await StudyRoom.updateOne(
           { roomId: delayedId },
-          { $set: { 'participants.0.leftAt': new Date() } }
+          {
+            $set: {
+              participants: delayedRoom!.participants.map((p, index) =>
+                index === 0 ? { ...p, leftAt: new Date() } : p
+              )
+            }
+          }
         );
         release({
           data: { shouldIntervene: true, strategy: 'PEER_CHALLENGE', messageText: 'Invite a peer.' }
         });
         assert.equal((await response).status, 403);
-        assert.equal(
-          await mongoose.connection
-            .collection('facilitatorinterventions')
-            .countDocuments({ roomId: delayedId }),
-          0
-        );
+        assert.equal(await FacilitatorIntervention.countDocuments({ roomId: delayedId }), 0);
         const fresh = await runRoomCommand(
           'create',
           { userId: actor },
@@ -391,6 +416,7 @@ test('P0-R3 canonical learning selection, durable pinned rooms, private checks a
           undefined,
           authorize
         );
+        roomIds.push(String(fresh.body.roomId));
         ai.post = async () => ({
           data: {
             shouldIntervene: true,

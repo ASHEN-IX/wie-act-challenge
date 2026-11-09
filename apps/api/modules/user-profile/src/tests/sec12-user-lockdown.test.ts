@@ -8,7 +8,8 @@
  */
 process.env.JWT_SECRET = 'sec12-profile-secret';
 process.env.JWT_REFRESH_SECRET = 'sec12-profile-refresh';
-process.env.MONGODB_URI = 'mongodb://localhost:27017/test';
+process.env.DATABASE_URL =
+  process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
 process.env.NODE_ENV = 'test';
 
 import express from 'express';
@@ -21,12 +22,21 @@ import { errorHandler } from '@ednova/shared/middleware';
 jest.mock('@ednova/shared', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() }
 }));
-jest.mock('../models/UserProfile');
+jest.mock('../models/UserProfile', () => ({
+  __esModule: true,
+  default: {
+    findOne: jest.fn(),
+    create: jest.fn(),
+    findOneAndUpdate: jest.fn(),
+    updateOne: jest.fn(),
+    save: jest.fn()
+  }
+}));
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const profileRouter = require('../routes/profile');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const UserProfile = require('../models/UserProfile');
+const UserProfile = require('../models/UserProfile').default;
 
 const app = express();
 app.use(express.json());
@@ -53,11 +63,7 @@ function ownProfile() {
       showStats: true,
       allowRequests: 'everyone'
     },
-    stats: { totalStudyTime: 120, completedTasks: 7 },
-    save: jest.fn().mockResolvedValue(true),
-    toObject() {
-      return { ...this };
-    }
+    stats: { totalStudyTime: 120, completedTasks: 7 }
   };
 }
 
@@ -82,7 +88,7 @@ describe('SEC-12 /privacy operates on the authenticated user only', () => {
     expect(UserProfile.findOne).toHaveBeenCalledWith({ userId: 'user-alice' });
     expect(UserProfile.findOne).not.toHaveBeenCalledWith({ userId: 'user-mallory' });
     expect(res.status).toBe(200);
-    expect(profile.save).toHaveBeenCalled();
+    expect(UserProfile.save).toHaveBeenCalled();
   });
 
   it("cannot look up another user's privacy settings via body userId", async () => {

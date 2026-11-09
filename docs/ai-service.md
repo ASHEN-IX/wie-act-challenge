@@ -8,7 +8,7 @@ cd ..
 pnpm dev:ai
 ```
 
-Configure process environment using the service `.env.example` and root `.env.ai.example` guidance. API needs Mongo settings and `AI_SERVICE_API_KEY` >=32 chars; Node's matching service key authenticates private HTTP requests. Provider keys/model aliases are separate in `litellm/config.yaml`. `LLM_CONFIG` can override YAML. `LLM_MOCK=1` explicitly enables test responders. Otherwise absent recognized usable provider keys raise `LLMUnavailableError` (`UNAVAILABLE`), including with `LLM_MOCK=0`. Mock responses are not approved inference.
+Configure process environment using the service `.env.example` and root `.env.ai.example` guidance. API needs PostgreSQL settings and `AI_SERVICE_API_KEY` >=32 chars; Node's matching service key authenticates private HTTP requests. Provider keys/model aliases are separate in `litellm/config.yaml`. `LLM_CONFIG` can override YAML. `LLM_MOCK=1` explicitly enables test responders. Otherwise absent recognized usable provider keys raise `LLMUnavailableError` (`UNAVAILABLE`), including with `LLM_MOCK=0`. Mock responses are not approved inference.
 
 FastAPI mounts ingest/planning/coaching/signals/search/reflection/schedule routers with service authentication. `/health` is lightweight and does not prove agents/models/workers ready. Broker jobs require separate worker processes using the same broker/vhost/database/upload configuration:
 

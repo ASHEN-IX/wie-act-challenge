@@ -1,6 +1,6 @@
 import { errorDetails } from '@ednova/shared/errors';
 import type { DomainRequest } from '../../../../src/framework/contracts';
-import type { FilterQuery } from 'mongoose';
+import type { Prisma } from '../../../../src/generated/prisma/client';
 import type { IFocusSession } from '../models/FocusSession';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { createContracts } = require('@ednova/shared/domainContracts');
@@ -74,7 +74,7 @@ router.post(
     const { sessionId } = req.params;
     const { focusLevel, isDistracted, gazeData } = req.body;
 
-    const session = await FocusSession.findOne({ _id: sessionId, userId });
+    const session = await FocusSession.findOne({ id: String(sessionId), userId });
 
     if (!session) {
       return res.status(404).json({ error: 'Session not found' });
@@ -91,7 +91,7 @@ router.post(
       gazeData
     });
 
-    await session.save();
+    await FocusSession.save(session);
 
     res.json({
       message: 'Data point added',
@@ -108,7 +108,7 @@ router.post(
     const userId = req.user!.userId;
     const { sessionId } = req.params;
 
-    const session = await FocusSession.findOne({ _id: sessionId, userId });
+    const session = await FocusSession.findOne({ id: String(sessionId), userId });
 
     if (!session) {
       return res.status(404).json({ error: 'Session not found' });
@@ -127,7 +127,7 @@ router.post(
     if (totalPoints > 0) {
       const avgFocusLevel =
         dataPoints.reduce(
-          (sum: number, dp: IFocusSession['dataPoints'][number]) => sum + dp.focusLevel,
+          (sum: number, dp: IFocusSession['dataPoints'][number]) => sum + (dp.focusLevel || 0),
           0
         ) / totalPoints;
       const focusedPoints = dataPoints.filter((dp) => !dp.isDistracted).length;
@@ -167,7 +167,7 @@ router.post(
       };
     }
 
-    await session.save();
+    await FocusSession.save(session);
 
     // Auto-award XP for perfect focus sessions (score > 80)
     if (session.focusScore && session.focusScore > 80) {
@@ -220,7 +220,7 @@ router.get(
     const userId = req.user!.userId;
     const { sessionId } = req.params;
 
-    const session = await FocusSession.findOne({ _id: sessionId, userId });
+    const session = await FocusSession.findOne({ id: String(sessionId), userId });
 
     if (!session) {
       return res.status(404).json({ error: 'Session not found' });
@@ -238,9 +238,11 @@ router.get(
     const userId = req.user!.userId;
     const { limit = 10 } = req.query as { limit?: string | number };
 
-    const sessions = await FocusSession.find({ userId })
-      .sort({ startTime: -1 })
-      .limit(parseInt(String(limit)));
+    const sessions = await FocusSession.findMany(
+      { userId },
+      { startTime: 'desc' },
+      parseInt(String(limit))
+    );
 
     res.json({ sessions });
   })
@@ -254,14 +256,15 @@ router.get(
     const userId = req.user!.userId;
     const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
 
-    const filter: FilterQuery<IFocusSession> = { userId, endTime: { $exists: true } };
+    const filter: Prisma.FocusSessionWhereInput = { userId, endTime: { not: null } };
     if (startDate || endDate) {
-      filter.startTime = {};
-      if (startDate) filter.startTime.$gte = new Date(startDate);
-      if (endDate) filter.startTime.$lte = new Date(endDate);
+      filter.startTime = {
+        ...(startDate ? { gte: new Date(startDate) } : {}),
+        ...(endDate ? { lte: new Date(endDate) } : {})
+      };
     }
 
-    const sessions = await FocusSession.find(filter);
+    const sessions = await FocusSession.findMany(filter, { startTime: 'desc' });
 
     const totalSessions = sessions.length;
     const avgFocusScore =

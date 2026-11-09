@@ -1,7 +1,7 @@
 import { resolveObjectiveContext } from '../services/objectiveContext';
 import { canDeliverJob } from '../services/jobAccess';
 import type { IAiJob } from '../models/AiJob';
-import type { FilterQuery } from 'mongoose';
+import type { Prisma } from '../../../../src/generated/prisma/client';
 /**
  * AI jobs API (F01 / AI-COM-07).
  *
@@ -79,7 +79,7 @@ router.post('/jobs', async (req, res, next) => {
     try {
       await publishAiJob(type, userId, payload, { requestId, correlationId, messageId });
     } catch {
-      await job.deleteOne(); // no silent loss, no orphan PENDING rows
+      await AiJob.deleteOne({ id: job.id }); // no silent loss, no orphan PENDING rows
       logger.error('ai_job_publish_failed_rolling_back', { jobId: job.jobId });
       return res.status(503).json({ error: 'AI job bus unavailable, retry later' });
     }
@@ -105,9 +105,9 @@ router.post('/jobs', async (req, res, next) => {
 
 router.get('/jobs/:jobId', async (req, res, next) => {
   try {
-    const query: FilterQuery<IAiJob> = { jobId: req.params.jobId };
+    const query: Prisma.AiJobWhereInput = { jobId: String(req.params.jobId) };
     query.userId = req.user!.userId;
-    const job = await AiJob.findOne(query).lean();
+    const job = await AiJob.findOne(query);
     if (!job || job.userId !== req.user!.userId || !(await canDeliverJob(job)))
       return res.status(404).json({ error: 'job not found' });
     return res.json({
@@ -128,14 +128,10 @@ router.get('/jobs/:jobId', async (req, res, next) => {
 
 router.get('/jobs', async (req, res, next) => {
   try {
-    const filter: FilterQuery<IAiJob> = { userId: req.user!.userId };
+    const filter: Prisma.AiJobWhereInput = { userId: req.user!.userId };
     if (req.query.status) filter.status = String(req.query.status);
     const limit = Math.min(parseInt(req.query.limit as string, 10) || 20, 100);
-    const jobs = await AiJob.find(filter)
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .select('jobId type status attempts error createdAt updatedAt userId resourceScope')
-      .lean();
+    const jobs = await AiJob.findMany(filter, { createdAt: 'desc' }, limit);
     const authorized = [];
     for (const job of jobs)
       if (await canDeliverJob(job))

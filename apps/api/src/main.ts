@@ -7,16 +7,11 @@ import type { Server } from 'http';
 import { productionApiInstance } from './framework/single-instance';
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
-process.env.MONGODB_URI ||=
-  process.env.DOCKER_MONGODB_URI || 'mongodb://localhost:27017/ednova';
+process.env.DATABASE_URL ||=
+  process.env.DOCKER_DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/ednova';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const {
-  connectDatabase,
-  disconnectDatabase,
-  logger,
-  requireEnv
-} = require('@ednova/shared');
+const { connectDatabase, disconnectDatabase, logger, requireEnv } = require('@ednova/shared');
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const {
@@ -43,7 +38,7 @@ export async function start({
   port = Number(process.env.PORT || 3001),
   workers = true
 }: StartOptions = {}): Promise<StartedApplication> {
-  requireEnv(['MONGODB_URI', 'BETTER_AUTH_SECRET', 'INTERNAL_API_SECRET', 'RABBITMQ_URL'], {
+  requireEnv(['DATABASE_URL', 'BETTER_AUTH_SECRET', 'INTERNAL_API_SECRET', 'RABBITMQ_URL'], {
     serviceName: 'ednova-api'
   });
   registerProcessHandlers('ednova-api');

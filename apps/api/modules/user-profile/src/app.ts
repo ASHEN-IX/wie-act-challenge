@@ -20,7 +20,7 @@ import { authenticate } from '@ednova/shared/auth';
 import path from 'path';
 
 // --- Environment validation (fail-fast on missing secrets) ---
-requireEnv(['MONGODB_URI', 'INTERNAL_API_SECRET'], {
+requireEnv(['DATABASE_URL', 'INTERNAL_API_SECRET'], {
   serviceName: 'user-profile'
 });
 

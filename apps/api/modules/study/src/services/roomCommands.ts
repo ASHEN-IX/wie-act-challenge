@@ -1,8 +1,18 @@
 import { parseBinarySearchState } from '../../../../shared/visualization';
-import { resolveRoomActivity, resolveRoomSourceRevision, validateRoomRevision } from './roomActivity';
+import {
+  resolveRoomActivity,
+  resolveRoomSourceRevision,
+  validateRoomRevision
+} from './roomActivity';
 import { createHash, randomUUID, randomInt } from 'node:crypto';
 import Joi from 'joi';
-import { StudyRoom, type IStudyRoom, type IRoomCommandReceipt } from '../models/StudyRoom';
+import {
+  StudyRoom,
+  applyRoomMutation,
+  createRoomOnce,
+  type IStudyRoom,
+  type IRoomCommandReceipt
+} from '../models/StudyRoom';
 
 export const MAX_ROOM_COMMANDS = 512;
 type Kind = 'create' | 'join' | 'leave' | 'phase' | 'presenter' | 'visualization';
@@ -90,7 +100,6 @@ const schemas = {
   }),
   leave: Joi.object({ commandId: id, expectedSeq: seq })
 };
-const writeConcern = { w: 'majority' as const, j: true };
 
 function hashPayload(kind: Kind, value: Record<string, unknown>): string {
   // Joi rejects unknown fields. Sort keys so JSON property order cannot change identity.
@@ -156,20 +165,13 @@ export async function runRoomCommand(
         if (!access.authorized) throw new CommandError(403, 'Course access is unavailable');
         if (!value.title && access.title) title = `${access.title} Study Group`;
       }
-      // Ensure the required unique index exists even when autoIndex is disabled.
-      // This creates no new collection and never removes existing indexes.
-      await StudyRoom.collection.createIndex(
-        { hostUserId: 1, createCommandId: 1 },
-        {
-          unique: true,
-          partialFilterExpression: { createCommandId: { $type: 'string' } },
-          name: 'room_creation_command'
-        }
-      );
+      // The unique (hostUserId, createCommandId) partial index exists in the
+      // schema migration (`study_rooms_create_command_key`); this read is the
+      // fast replay path and the insert below is the authoritative guard.
       const previous = await StudyRoom.findOne({
         hostUserId: actor.userId,
         createCommandId: commandId
-      }).select('+commandReceipts');
+      });
       if (previous) {
         if (!membership(previous, actor.userId))
           throw new CommandError(403, 'Not an active participant in this room');
@@ -215,19 +217,39 @@ export async function runRoomCommand(
         commandId,
         payloadHash,
         status: 201,
-        response: lifecycleResponse(created)
+        response: lifecycleResponse({
+          ...created,
+          participants: created.participants as IStudyRoom['participants'],
+          moderatorMode: created.moderatorMode as IStudyRoom['moderatorMode'],
+          currentPhase: created.currentPhase as IStudyRoom['currentPhase'],
+          status: created.status as IStudyRoom['status']
+        } as unknown as Room)
       };
       try {
-        const [room] = await StudyRoom.create([{ ...created, commandReceipts: [saved] }], {
-          writeConcern
-        });
-        return { status: 201, body: saved.response, changedRoom: room };
-      } catch {
+        // A duplicate createCommandId for this host raises the unique constraint:
+        // `createRoomOnce` then returns the committed row instead of inserting
+        // a second room, so a retried command is a receipt replay, never a
+        // duplicate mutation.
+        const { room } = await createRoomOnce({ ...created, commandReceipts: [saved] });
+        const recorded = receipt(room, actor.userId, commandId, payloadHash);
+        if (recorded) {
+          return {
+            status: recorded.status === 201 ? 201 : recorded.status,
+            body: recorded.response,
+            changedRoom: room
+          };
+        }
+        if (!membership(room, actor.userId))
+          throw new CommandError(403, 'Not an active participant in this room');
+        await validateRoomRevision(actor.userId, room);
+        throw new CommandError(503, 'Creation receipt unavailable');
+      } catch (error) {
+        if (error instanceof CommandError) throw error;
         // Duplicate key, response loss or uncertain acknowledgement: no second insert.
         const committed = await StudyRoom.findOne({
           hostUserId: actor.userId,
           createCommandId: commandId
-        }).select('+commandReceipts');
+        });
         if (committed && membership(committed, actor.userId)) {
           await validateRoomRevision(actor.userId, committed);
           const recorded = receipt(committed, actor.userId, commandId, payloadHash);
@@ -246,9 +268,11 @@ export async function runRoomCommand(
             ? { inviteCode: value.inviteCode }
             : { roomId: value.roomId }
           : { roomId };
-      const document = await StudyRoom.findOne(selector).select('+commandReceipts');
+      const document = await StudyRoom.findOne(selector);
       if (!document) throw new CommandError(404, 'Room not found');
-      const room = document.toObject() as Room;
+      // Work on a private copy; the guarded write below only lands if the row
+      // is still exactly this snapshot.
+      const room = structuredClone(document) as unknown as Room & IStudyRoom;
       if (room.courseId && !(await authorizeCourse(room.courseId)).authorized)
         throw new CommandError(403, 'Course access is unavailable');
       await validateRoomRevision(actor.userId, room);
@@ -387,41 +411,9 @@ export async function runRoomCommand(
           throw new CommandError(403, 'Course access is unavailable');
         await validateRoomRevision(actor.userId, room);
       }
+      room.commandReceipts.push(recorded);
       try {
-        const updated = await StudyRoom.findOneAndUpdate(
-          {
-            _id: document._id,
-            seq: document.seq,
-            status: 'active',
-            commandReceipts: { $not: { $elemMatch: { actorId: actor.userId, commandId } } },
-            ...(kind !== 'join'
-              ? {
-                  participants: { $elemMatch: { userId: actor.userId, leftAt: { $exists: false } } }
-                }
-              : {}),
-            ...(kind === 'phase' || kind === 'presenter' || kind === 'visualization'
-              ? { presenterUserId: actor.userId }
-              : {}),
-            [`commandReceipts.${receiptLimit - 1}`]: { $exists: false }
-          },
-          {
-            $set: {
-              currentPhase: room.currentPhase,
-              activeActivityId: room.activeActivityId,
-              activePin: room.activePin,
-              revisionId: room.revisionId,
-              activityRound: room.activityRound,
-              ...(room.visualizationState ? { visualizationState: room.visualizationState } : {}),
-              presenterUserId: room.presenterUserId,
-              participants: room.participants,
-              status: room.status,
-              seq: room.seq,
-              ...(room.closedAt ? { closedAt: room.closedAt } : {})
-            },
-            $push: { commandReceipts: recorded }
-          },
-          { new: true, writeConcern }
-        );
+        const updated = await applyRoomMutation(document, room as unknown as IStudyRoom);
         if (updated) return { status: 200, body, ...(changed ? { changedRoom: updated } : {}) };
       } catch {
         // Do not guess whether the server committed; retry through receipt lookup.

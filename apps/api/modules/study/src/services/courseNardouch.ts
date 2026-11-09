@@ -1,4 +1,5 @@
 import { CourseNardouchProgress } from '../models/CourseNardouchProgress';
+import { isDuplicateKey } from '../models/_table';
 import { loadPublishedReading, getLearningDocument } from './courseReader';
 import { learnerProgress } from './learningJourney';
 import { canReadCourse } from './resourceAccess';
@@ -32,7 +33,7 @@ export async function getCourseNardouch(
       userId: actor,
       courseId,
       revisionId: context.revisionId
-    }).lean(),
+    }),
     learnerProgress(actor, courseId, context.revisionId)
   ]);
   if (!(await canReadCourse(actor, courseId))) throw new PublicationForbiddenError();
@@ -71,18 +72,24 @@ export async function completeNardouchLesson(actor: string, courseId: string, in
       'Lesson is not in this course revision'
     );
   if (!(await canReadCourse(actor, courseId))) throw new PublicationForbiddenError();
-  await CourseNardouchProgress.collection.createIndex(
-    { userId: 1, courseId: 1, revisionId: 1 },
-    { unique: true }
-  );
+  // Unique (userId, courseId, revisionId). A completed lesson is only added if
+  // absent, matching the old `$addToSet`, so a concurrent first completion and
+  // a repeat completion both converge on one row with one copy of the id.
   const key = { userId: actor, courseId, revisionId: context.revisionId };
-  const update = { $addToSet: { completedLessonIds: body.lessonId } };
   try {
-    await CourseNardouchProgress.updateOne(key, update, { upsert: true });
+    // Create-if-missing on the unique owner/course/revision key.
+    await CourseNardouchProgress.findOneAndUpdate(
+      key,
+      { $setOnInsert: { ...key, completedLessonIds: [] } },
+      { upsert: true, new: true }
+    );
   } catch (error) {
-    if ((error as { code?: number }).code !== 11000) throw error;
-    // Concurrent first completions converge on the same owner/course/revision row.
-    await CourseNardouchProgress.updateOne(key, update);
+    // A concurrent first completion inserted the same row first; the add below
+    // still applies to it.
+    if (!isDuplicateKey(error)) throw error;
   }
+  // `$addToSet` semantics: the guarded push only appends when the lesson is
+  // absent, so repeated and concurrent completions store it once.
+  await CourseNardouchProgress.addToSet(key, 'completedLessonIds', body.lessonId);
   return getCourseNardouch(actor, courseId, context.revisionId);
 }

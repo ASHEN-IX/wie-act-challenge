@@ -1,12 +1,16 @@
 /** Durable requester-only room tutoring. No public-room or recap projection. */
 import crypto from 'node:crypto';
-import mongoose, { Schema, type Model } from 'mongoose';
+import { Prisma } from '../../../../src/generated/prisma/client';
+import { prisma } from '../../../../shared/database';
+import { table } from '../models/_table';
 import { activeLearningRoom } from './roomLearning';
 import { askGroundedTutor } from './tutorGrounding';
 import { broadcastToUser } from '../../../notification/src/realtime';
 import { ActivityBoundaryError } from './activityResolution';
 import { resolveRoomSourceRevision } from './roomActivity';
-interface HelpRow {
+export interface HelpRow {
+  id: string;
+  _id: string;
   userId: string;
   roomId: string;
   requestId: string;
@@ -15,28 +19,29 @@ interface HelpRow {
   pin: unknown;
   state: string;
   result?: unknown;
-  claim?: string;
-  leaseUntil?: Date;
-  createdAt?: Date;
+  claim?: string | null;
+  leaseUntil?: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
-const schema = new Schema<HelpRow>(
-  {
-    userId: { type: String, required: true },
-    roomId: { type: String, required: true },
-    requestId: { type: String, required: true },
-    question: { type: String, required: true },
-    pinHash: { type: String, required: true },
-    pin: Schema.Types.Mixed,
-    state: { type: String, enum: ['pending', 'completed', 'unavailable'], required: true },
-    result: Schema.Types.Mixed,
-    claim: String,
-    leaseUntil: Date
-  },
-  { timestamps: true, collection: 'private_room_help' }
-);
-schema.index({ userId: 1, roomId: 1, requestId: 1 }, { unique: true });
-const Help: Model<HelpRow> =
-  mongoose.models.PrivateRoomHelp || mongoose.model<HelpRow>('PrivateRoomHelp', schema);
+
+const Help = table<HelpRow>({
+  delegate: () => prisma.privateRoomHelp,
+  jsonColumns: ['pin', 'result'],
+  columns: (row) => ({
+    userId: row.userId,
+    roomId: row.roomId,
+    requestId: row.requestId,
+    question: row.question,
+    pinHash: row.pinHash,
+    pin: row.pin as unknown as Prisma.InputJsonValue,
+    state: row.state,
+    result: row.result as unknown as Prisma.InputJsonValue,
+    claim: row.claim,
+    leaseUntil: row.leaseUntil
+  })
+});
+
 const digest = (v: unknown) => crypto.createHash('sha256').update(JSON.stringify(v)).digest('hex');
 const fail = (status: number, code: string, text: string): never => {
   throw new ActivityBoundaryError(status, code, text);
@@ -46,10 +51,7 @@ async function context(actor: string, roomId: string) {
   const revisionId = room.revisionId || (await resolveRoomSourceRevision(actor, room));
   return {
     room,
-    pin:
-      room.courseId && revisionId
-        ? { courseId: String(room.courseId), revisionId }
-        : null
+    pin: room.courseId && revisionId ? { courseId: String(room.courseId), revisionId } : null
   };
 }
 function project(row: {
@@ -70,7 +72,7 @@ function project(row: {
 }
 export async function privateHelpHistory(actor: string, roomId: string) {
   const before = await context(actor, roomId);
-  const rows = await Help.find({ userId: actor, roomId }).sort({ createdAt: -1 }).limit(30).lean();
+  const rows = await Help.find({ userId: actor, roomId }).sort({ createdAt: -1 }).limit(30);
   const after = await context(actor, roomId);
   if (digest(before.pin) !== digest(after.pin)) fail(409, 'STALE_ROOM', 'Room source changed');
   return {
@@ -107,17 +109,14 @@ export async function askPrivateRoomHelp(
   const pin = before.pin,
     pinHash = digest(pin),
     key = { userId: actor, roomId, requestId };
-  await Help.collection.createIndex({ userId: 1, roomId: 1, requestId: 1 }, { unique: true });
-  try {
-    await Help.updateOne(
-      key,
-      { $setOnInsert: { ...key, question, pin, pinHash, state: 'pending' } },
-      { upsert: true }
-    );
-  } catch (error) {
-    if ((error as { code?: number }).code !== 11000) throw error;
-  }
-  let stored = await Help.findOne(key).lean();
+  // Unique (userId, roomId, requestId): the first insert wins and a retry
+  // converges on the same row instead of creating a second request.
+  await Help.findOneAndUpdate(
+    key,
+    { $setOnInsert: { ...key, question, pin, pinHash, state: 'pending' } },
+    { upsert: true }
+  );
+  let stored = await Help.findOne(key);
   if (!stored || stored.question !== question || stored.pinHash !== pinHash)
     fail(409, 'REQUEST_CONFLICT', 'Request identity already has a different question or source');
   if (stored!.state !== 'completed') {
@@ -125,7 +124,7 @@ export async function askPrivateRoomHelp(
     const claimed = await Help.findOneAndUpdate(
       {
         ...key,
-        state: { $ne: 'completed' },
+        state: { not: 'completed' },
         $or: [{ leaseUntil: { $exists: false } }, { leaseUntil: { $lte: new Date() } }]
       },
       { $set: { claim, state: 'pending', leaseUntil: new Date(Date.now() + 60000) } },
@@ -162,7 +161,7 @@ export async function askPrivateRoomHelp(
         )
           throw error;
       }
-      stored = await Help.findOne(key).lean();
+      stored = await Help.findOne(key);
     }
   }
   const after = await context(actor, roomId);

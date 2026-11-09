@@ -21,8 +21,21 @@ export async function reviewedPublication(actor: string, draft: any): Promise<st
   if (draft.formulaPublication?.sourceDraftId) {
     if (draft.contentDocumentHash !== draft.formulaPublication.projectionHash)
       conflict('Frozen formula publication checksum changed');
-    const source = await CourseRevision.findOne({_id:draft.formulaPublication.sourceDraftId,courseId:draft.courseId,revisionTag:draft.formulaPublication.sourceTag,activationState:'prepared',revokedAt:{$exists:false}}).lean();
-    if (!source || source.__v !== draft.formulaPublication.sourceVersion + 1 || source.formulaPublication?.targetTag !== draft.revisionTag || source.formulaPublication?.projectionHash !== draft.contentDocumentHash || source.contentDocumentHash !== source.formulaPublication?.originalCanonicalHash) conflict('Frozen source revision changed; publication must be reviewed again');
+    const source = await CourseRevision.findOne({
+      _id: draft.formulaPublication.sourceDraftId,
+      courseId: draft.courseId,
+      revisionTag: draft.formulaPublication.sourceTag,
+      activationState: 'prepared',
+      revokedAt: { $exists: false }
+    }).lean();
+    if (
+      !source ||
+      source.__v !== draft.formulaPublication.sourceVersion + 1 ||
+      source.formulaPublication?.targetTag !== draft.revisionTag ||
+      source.formulaPublication?.projectionHash !== draft.contentDocumentHash ||
+      source.contentDocumentHash !== source.formulaPublication?.originalCanonicalHash
+    )
+      conflict('Frozen source revision changed; publication must be reviewed again');
     return null;
   }
   let receipt = draft.formulaPublication;
@@ -145,7 +158,7 @@ export async function reviewedPublication(actor: string, draft: any): Promise<st
       { new: true }
     );
     if (!frozen) conflict('Draft changed while freezing formulas; reload and retry');
-    draft.set(frozen!.toObject());
+    Object.assign(draft, frozen);
   }
   const target = await CourseRevision.findOneAndUpdate(
     { courseId: draft.courseId, revisionTag: receipt.targetTag },

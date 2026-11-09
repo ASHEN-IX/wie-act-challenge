@@ -12,7 +12,11 @@ import { performance } from 'node:perf_hooks';
 import mongoose from 'mongoose';
 import { ExperiencePlanRecord } from '../modules/study/src/models/ExperiencePlanRecord';
 import { checkStoredPlanAvailability } from '../modules/study/src/services/experiencePlanStore';
-import { recordLatency, resetMetrics, summarizeMetrics } from '../modules/study/src/services/planningMetrics';
+import {
+  recordLatency,
+  resetMetrics,
+  summarizeMetrics
+} from '../modules/study/src/services/planningMetrics';
 import { COMPONENT_REGISTRY_VERSION } from '../shared/ednova/componentRegistry';
 
 const URI = process.env.M45_MONGO || 'mongodb://127.0.0.1:27017';
@@ -34,7 +38,7 @@ function sampleProcess(): Snapshot {
   return {
     rssMb: Math.round(memory.rss / 1024 / 1024),
     heapMb: Math.round(memory.heapUsed / 1024 / 1024),
-    eventLoopMs: 0,
+    eventLoopMs: 0
   };
 }
 
@@ -67,10 +71,10 @@ async function seedPlans(count: number) {
       planDigest: `fnv1a64:${String(index).padStart(16, '0')}`,
       plan: {},
       generatedBy: 'load',
-      generatedAt: new Date(),
+      generatedAt: new Date()
     });
   }
-  await ExperiencePlanRecord.insertMany(docs);
+  await ExperiencePlanRecord.createMany(docs);
 }
 
 async function runLevel(concurrency: number, perWorker: number) {
@@ -89,7 +93,7 @@ async function runLevel(concurrency: number, perWorker: number) {
             courseId: COURSE,
             revisionId: 'rev_load',
             lessonId,
-            mode,
+            mode
           });
           recordLatency('availability', performance.now() - t0);
         } catch {
@@ -97,12 +101,13 @@ async function runLevel(concurrency: number, perWorker: number) {
         }
         latencies.push(performance.now() - t0);
       }
-    }),
+    })
   );
 
   const elapsed = performance.now() - start;
   latencies.sort((a, b) => a - b);
-  const pct = (p: number) => latencies[Math.min(latencies.length - 1, Math.floor((p / 100) * latencies.length))];
+  const pct = (p: number) =>
+    latencies[Math.min(latencies.length - 1, Math.floor((p / 100) * latencies.length))];
   const snap = sampleProcess();
   return {
     concurrency,
@@ -115,7 +120,7 @@ async function runLevel(concurrency: number, perWorker: number) {
     errors,
     rss_mb: snap.rssMb,
     heap_mb: snap.heapMb,
-    event_loop_lag_ms: await eventLoopLag(),
+    event_loop_lag_ms: await eventLoopLag()
   };
 }
 
@@ -128,7 +133,7 @@ async function main() {
   for (const [concurrency, perWorker] of [
     [1, 100],
     [10, 20],
-    [25, 8],
+    [25, 8]
   ] as const)
     results.push(await runLevel(concurrency, perWorker));
 

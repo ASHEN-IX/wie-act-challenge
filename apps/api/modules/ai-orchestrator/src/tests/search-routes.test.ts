@@ -20,7 +20,8 @@ const jwt = { sign: require('../../../../tests/sessionFixtures').createSession }
 
 jest.mock('../models/AiJob', () => ({
   createPending: jest.fn(),
-  findOne: jest.fn()
+  findOne: jest.fn(),
+  deleteOne: jest.fn()
 }));
 jest.mock('@ednova/shared/ai-messaging', () => ({
   publishAiJob: jest.fn(),
@@ -50,10 +51,10 @@ const VALID_SEARCH = { query: 'what is recursion' };
 beforeEach(() => {
   jest.clearAllMocks();
   AiJob.createPending.mockResolvedValue({
+    id: 'job-row-s1',
     jobId: 'job-s1',
     status: 'PENDING',
-    correlationId: 'corr-s1',
-    deleteOne: jest.fn().mockResolvedValue(null)
+    correlationId: 'corr-s1'
   });
 });
 
@@ -118,12 +119,11 @@ describe('POST /api/v1/search/query', () => {
 
   test('rolls back the PENDING job + 503 when the bus publish fails', async () => {
     (publishAiJob as jest.Mock).mockRejectedValue(new Error('broker down'));
-    const deleteOne = jest.fn().mockResolvedValue(null);
     AiJob.createPending.mockResolvedValue({
+      id: 'job-row-s1',
       jobId: 'job-s1',
       status: 'PENDING',
-      correlationId: 'corr-s1',
-      deleteOne
+      correlationId: 'corr-s1'
     });
 
     const res = await request(app)
@@ -132,7 +132,7 @@ describe('POST /api/v1/search/query', () => {
       .send(VALID_SEARCH);
 
     expect(res.status).toBe(503);
-    expect(deleteOne).toHaveBeenCalledTimes(1);
+    expect(AiJob.deleteOne).toHaveBeenCalledWith({ id: 'job-row-s1' });
   });
 
   test('rejects invalid payloads via validation (SEARCH-02)', async () => {
@@ -172,22 +172,20 @@ describe('POST /api/v1/search/query', () => {
 
 describe('GET /api/v1/search/jobs/:jobId', () => {
   test('returns status + answer/sources for the owning user', async () => {
-    AiJob.findOne.mockReturnValue({
-      lean: jest.fn().mockResolvedValue({
-        jobId: 'job-s1',
-        type: 'study.search.query',
-        userId: 'user-1',
-        resourceScope: {},
-        status: 'COMPLETED',
-        attempts: 1,
-        result: {
-          answer: 'Recursion is self-reference.',
-          sources: [{ url: 'https://en.wikipedia.org/wiki/Recursion' }]
-        },
-        error: null,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      })
+    AiJob.findOne.mockResolvedValue({
+      jobId: 'job-s1',
+      type: 'study.search.query',
+      userId: 'user-1',
+      resourceScope: {},
+      status: 'COMPLETED',
+      attempts: 1,
+      result: {
+        answer: 'Recursion is self-reference.',
+        sources: [{ url: 'https://en.wikipedia.org/wiki/Recursion' }]
+      },
+      error: null,
+      createdAt: new Date(),
+      updatedAt: new Date()
     });
 
     const res = await request(app).get('/api/v1/search/jobs/job-s1').set(authHeader());
@@ -201,7 +199,7 @@ describe('GET /api/v1/search/jobs/:jobId', () => {
   });
 
   test('scopes the query to the owning user (non-admin)', async () => {
-    AiJob.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) });
+    AiJob.findOne.mockResolvedValue(null);
 
     await request(app).get('/api/v1/search/jobs/job-s1').set(authHeader('user-2'));
 
@@ -213,9 +211,7 @@ describe('GET /api/v1/search/jobs/:jobId', () => {
   });
 
   test('admin job lookup remains actor-scoped', async () => {
-    AiJob.findOne.mockReturnValue({
-      lean: jest.fn().mockResolvedValue({ jobId: 'job-s1', status: 'PENDING' })
-    });
+    AiJob.findOne.mockResolvedValue({ jobId: 'job-s1', status: 'PENDING' });
 
     await request(app).get('/api/v1/search/jobs/job-s1').set(authHeader('admin-1', 'admin'));
 
@@ -227,7 +223,7 @@ describe('GET /api/v1/search/jobs/:jobId', () => {
   });
 
   test('404 for unknown or non-search jobs', async () => {
-    AiJob.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) });
+    AiJob.findOne.mockResolvedValue(null);
 
     const res = await request(app).get('/api/v1/search/jobs/nope').set(authHeader());
 

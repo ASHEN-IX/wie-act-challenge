@@ -18,4 +18,15 @@ export function activityRange(start: unknown, end: unknown, now = new Date()) {
   }
   return { $gte: lower, $lte: upper };
 }
-module.exports = { boundedInteger, activityRange };
+
+/**
+ * The same validated range as Prisma's DateTimeFilter. `activityRange` keeps
+ * returning the `$gte`/`$lte` shape for callers that still build raw filters;
+ * new Prisma queries use this.
+ */
+export function activityRangeFilter(start: unknown, end: unknown, now = new Date()) {
+  const { $gte, $lte } = activityRange(start, end, now);
+  return { gte: $gte, lte: $lte };
+}
+
+module.exports = { boundedInteger, activityRange, activityRangeFilter };

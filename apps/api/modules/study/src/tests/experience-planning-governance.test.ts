@@ -7,15 +7,70 @@
 jest.mock('../models', () => ({ Course: { findById: jest.fn() }, CourseRevision: {} }));
 jest.mock('../services/resourceAccess', () => ({
   canManageCourse: jest.fn(),
-  canAuthorCourse: jest.fn(),
+  canAuthorCourse: jest.fn()
 }));
-jest.mock('mongoose', () => {
-  const actual = jest.requireActual('mongoose');
-  const collection = jest.fn();
+// Consent and eligibility are generic `payload` rows; the test backs the two
+// Prisma delegates with in-memory tables instead of raw Mongo collections.
+const mockTables = {
+  consents: [] as Array<{
+    id: string;
+    userId: string | null;
+    scope: string | null;
+    payload: Record<string, unknown>;
+  }>,
+  eligibility: [] as Array<Record<string, unknown>>
+};
+jest.mock('../../../../shared/database', () => {
+  const actual = jest.requireActual('../../../../shared/database');
+  const uniq = () => Math.random().toString(16).slice(2, 26).padEnd(24, '0');
+  // A JSON `path`/`equals` filter, as the service issues it. `purpose` is
+  // deliberately not honoured: the real query would not find a wrong-purpose
+  // row, and the test supplies one to exercise the second guard.
+  const matchPayloadFilter = (payload: Record<string, unknown>, filter: unknown) => {
+    if (!filter || typeof filter !== 'object') return true;
+    const { path, equals } = filter as { path?: string[]; equals?: unknown };
+    if (!path?.length) return true;
+    if (path[0] === 'purpose') return true;
+    return payload[path[0]] === equals;
+  };
+  const consent = {
+    findMany: jest.fn(async (args: { where?: Record<string, unknown> } = {}) =>
+      mockTables.consents.filter((row) => matchPayloadFilter(row.payload, args.where?.payload))
+    ),
+    create: jest.fn(async ({ data }: { data: Record<string, unknown> }) => {
+      const row = {
+        id: (data.id as string) ?? uniq(),
+        userId: (data.userId as string) ?? null,
+        scope: (data.scope as string) ?? null,
+        payload: data.payload as Record<string, unknown>,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      mockTables.consents.push(row);
+      return row;
+    }),
+    update: jest.fn(
+      async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+        const row = mockTables.consents.find((entry) => entry.id === where.id)!;
+        Object.assign(row, data);
+        return row;
+      }
+    )
+  };
+  const eligibility = {
+    findMany: jest.fn(async (args: { where?: Record<string, unknown> } = {}) =>
+      mockTables.eligibility.filter((row) =>
+        Object.entries(args.where ?? {}).every(([key, value]) =>
+          value && typeof value === 'object' && 'gt' in (value as object)
+            ? (row[key] as Date) > (value as { gt: Date }).gt
+            : row[key] === value
+        )
+      )
+    )
+  };
   return {
-    __esModule: true,
-    default: { ...actual.default, connection: { db: { collection } } },
-    __collection: collection,
+    ...actual,
+    prisma: { experiencePlanningConsent: consent, experiencePlannerEligibility: eligibility }
   };
 });
 
@@ -26,7 +81,7 @@ import {
   grantPlanningConsent,
   revokePlanningConsent,
   PlanningGovernanceError,
-  PLANNING_CONSENT_PURPOSE,
+  PLANNING_CONSENT_PURPOSE
 } from '../services/planningGovernance';
 import {
   buildPlanningContext,
@@ -34,7 +89,7 @@ import {
   plannerTask,
   PLANNER_SYSTEM_POLICY,
   PLANNING_CONTEXT_LIMITS,
-  PlanningContextError,
+  PlanningContextError
 } from '../../../../shared/ednova/planningContext';
 import type { LessonBlockV2 } from '../../../../shared/ednova/learningDocumentV2';
 
@@ -44,21 +99,29 @@ const actor = 'aaaaaaaaaaaaaaaaaaaaaaaa';
 
 const findById = Course.findById as jest.Mock;
 const canManage = canManageCourse as jest.Mock;
-const collection = (jest.requireMock('mongoose') as { __collection: jest.Mock }).__collection;
-
 function mockCollections(rows: Record<string, unknown> = {}) {
-  collection.mockImplementation((name: string) => {
-    if (name === 'experience_planning_consents')
-      return {
-        findOne: jest.fn(async () => rows.consent ?? null),
-        updateOne: jest.fn(async () => ({})),
-        updateMany: jest.fn(async () => ({ modifiedCount: 1 })),
-        createIndex: jest.fn(async () => undefined),
-      };
-    if (name === 'experience_planner_eligibility')
-      return { findOne: jest.fn(async () => rows.eligibility ?? null) };
-    return {};
-  });
+  mockTables.consents.length = 0;
+  mockTables.eligibility.length = 0;
+  if (!('consent' in rows)) rows = { ...rows, consent: consentRow };
+  if (rows.consent) {
+    const consent = rows.consent as Record<string, unknown>;
+    mockTables.consents.push({
+      id: 'consent-1',
+      userId: (consent.owner as string) ?? null,
+      scope: (consent.purpose as string) ?? null,
+      payload: consent
+    });
+  }
+  if (rows.eligibility) {
+    const eligible = rows.eligibility as Record<string, unknown>;
+    mockTables.eligibility.push({
+      id: 'eligibility-1',
+      provider: eligible.provider,
+      model: eligible.model,
+      payload: eligible,
+      revoked: false
+    });
+  }
 }
 
 const eligibleRow = {
@@ -71,7 +134,7 @@ const eligibleRow = {
   verifiedBy: 'operator',
   projectId: 'proj-1',
   approvalId: 'approval-1',
-  maxTokens: 100_000,
+  maxTokens: 100_000
 };
 
 const consentRow = {
@@ -84,13 +147,13 @@ const consentRow = {
   grantedAt: new Date(),
   expiresAt: new Date(Date.now() + 60_000),
   revoked: false,
-  termsVersion: '2026-11',
+  termsVersion: '2026-11'
 };
 
 beforeEach(() => {
   jest.clearAllMocks();
   canManage.mockResolvedValue(true);
-  findById.mockReturnValue({ lean: async () => ({ ownerUserId: actor, userId: actor }) });
+  findById.mockResolvedValue({ ownerUserId: actor, userId: actor });
 });
 
 async function expectRefusal(run: () => Promise<unknown>, code: string) {
@@ -106,7 +169,7 @@ async function expectRefusal(run: () => Promise<unknown>, code: string) {
 
 describe('planning consent', () => {
   it('requires the course owner, not merely an author', async () => {
-    findById.mockReturnValue({ lean: async () => ({ ownerUserId: 'other', userId: 'other' }) });
+    findById.mockResolvedValue({ ownerUserId: 'other', userId: 'other' });
     mockCollections();
     await expectRefusal(
       () =>
@@ -115,9 +178,9 @@ describe('planning consent', () => {
           revisionId,
           provider: 'gemini',
           model: 'gemini/gemini-3.6-flash',
-          termsVersion: '2026-11',
+          termsVersion: '2026-11'
         }),
-      'OWNER_CONSENT_REQUIRED',
+      'OWNER_CONSENT_REQUIRED'
     );
   });
 
@@ -128,7 +191,7 @@ describe('planning consent', () => {
       revisionId,
       provider: 'gemini',
       model: 'gemini/gemini-3.6-flash',
-      termsVersion: '2026-11',
+      termsVersion: '2026-11'
     });
     expect(record.purpose).toBe(PLANNING_CONSENT_PURPOSE);
     expect(record.expiresAt.getTime()).toBeGreaterThan(Date.now());
@@ -141,7 +204,7 @@ describe('planning consent', () => {
     // purpose check must still refuse rather than treat it as authorization.
     mockCollections({
       consent: { ...consentRow, purpose: 'formula_recognition' },
-      eligibility: eligibleRow,
+      eligibility: eligibleRow
     });
     await expectRefusal(
       () =>
@@ -151,9 +214,9 @@ describe('planning consent', () => {
           revisionId,
           provider: 'gemini',
           model: 'gemini/gemini-3.6-flash',
-          keySha256: 'a'.repeat(64),
+          keySha256: 'a'.repeat(64)
         }),
-      'CONSENT_PURPOSE_MISMATCH',
+      'CONSENT_PURPOSE_MISMATCH'
     );
   });
 
@@ -167,16 +230,16 @@ describe('planning consent', () => {
           revisionId,
           provider: 'gemini',
           model: 'gemini/gemini-3.6-flash',
-          keySha256: 'a'.repeat(64),
+          keySha256: 'a'.repeat(64)
         }),
-      'CONSENT_REVOKED',
+      'CONSENT_REVOKED'
     );
   });
 
   it('refuses when consent expired', async () => {
     mockCollections({
       consent: { ...consentRow, expiresAt: new Date(Date.now() - 1000) },
-      eligibility: eligibleRow,
+      eligibility: eligibleRow
     });
     await expectRefusal(
       () =>
@@ -186,9 +249,9 @@ describe('planning consent', () => {
           revisionId,
           provider: 'gemini',
           model: 'gemini/gemini-3.6-flash',
-          keySha256: 'a'.repeat(64),
+          keySha256: 'a'.repeat(64)
         }),
-      'CONSENT_EXPIRED',
+      'CONSENT_EXPIRED'
     );
   });
 
@@ -207,7 +270,7 @@ describe('provider eligibility and billing', () => {
       revisionId,
       provider: 'gemini',
       model: 'gemini/gemini-3.6-flash',
-      keySha256: 'a'.repeat(64),
+      keySha256: 'a'.repeat(64)
     });
 
   it('refuses when no eligibility record exists', async () => {
@@ -218,7 +281,7 @@ describe('provider eligibility and billing', () => {
   it('refuses when billing is attached', async () => {
     mockCollections({
       consent: consentRow,
-      eligibility: { ...eligibleRow, billingAttached: true },
+      eligibility: { ...eligibleRow, billingAttached: true }
     });
     await expectRefusal(authorize, 'BILLING_ATTACHED');
   });
@@ -231,7 +294,7 @@ describe('provider eligibility and billing', () => {
   it('refuses when eligibility expired', async () => {
     mockCollections({
       consent: consentRow,
-      eligibility: { ...eligibleRow, expiresAt: new Date(Date.now() - 1000) },
+      eligibility: { ...eligibleRow, expiresAt: new Date(Date.now() - 1000) }
     });
     await expectRefusal(authorize, 'ELIGIBILITY_EXPIRED');
   });
@@ -251,16 +314,16 @@ describe('provider eligibility and billing', () => {
           revisionId,
           provider: 'gemini',
           model: 'gemini/gemini-3.6-flash',
-          keySha256: 'b'.repeat(64),
+          keySha256: 'b'.repeat(64)
         }),
-      'CREDENTIAL_MISMATCH',
+      'CREDENTIAL_MISMATCH'
     );
   });
 
   it('refuses when the budget approval is missing', async () => {
     mockCollections({
       consent: consentRow,
-      eligibility: { ...eligibleRow, approvalId: '', maxTokens: 0 },
+      eligibility: { ...eligibleRow, approvalId: '', maxTokens: 0 }
     });
     await expectRefusal(authorize, 'BUDGET_UNAVAILABLE');
   });
@@ -278,7 +341,7 @@ describe('bounded planning context', () => {
     type: 'paragraph',
     id,
     text,
-    evidence: ['chunk-1'],
+    evidence: ['chunk-1']
   });
 
   const baseInput = (blocks: Array<{ blockId: string; block: LessonBlockV2 }>) => ({
@@ -294,18 +357,18 @@ describe('bounded planning context', () => {
       render: 'primary' as const,
       hasSourceRegion: false,
       isReviewedFormula: false,
-      hasStructuredFixture: false,
+      hasStructuredFixture: false
     })),
     assets: [],
-    capabilities: [],
+    capabilities: []
   });
 
   it('includes every canonical block identity', () => {
     const context = buildPlanningContext(
       baseInput([
         { blockId: 'b1', block: block('b1', 'First.') },
-        { blockId: 'b2', block: block('b2', 'Second.') },
-      ]),
+        { blockId: 'b2', block: block('b2', 'Second.') }
+      ])
     );
     expect(context.blocks.map((entry) => entry.blockId)).toEqual(['b1', 'b2']);
   });
@@ -314,17 +377,17 @@ describe('bounded planning context', () => {
     const long = 'x'.repeat(PLANNING_CONTEXT_LIMITS.maxBlockCharacters * 4);
     const context = buildPlanningContext(baseInput([{ blockId: 'b1', block: block('b1', long) }]));
     expect(context.lessonCharacters).toBeLessThanOrEqual(
-      PLANNING_CONTEXT_LIMITS.maxLessonCharacters,
+      PLANNING_CONTEXT_LIMITS.maxLessonCharacters
     );
     expect(context.blocks[0].text.length).toBeLessThanOrEqual(
-      PLANNING_CONTEXT_LIMITS.maxBlockCharacters,
+      PLANNING_CONTEXT_LIMITS.maxBlockCharacters
     );
   });
 
   it('marks truncation instead of silently dropping content', () => {
     const blocks = Array.from({ length: 40 }, (_, index) => ({
       blockId: `b${index}`,
-      block: block(`b${index}`, 'y'.repeat(PLANNING_CONTEXT_LIMITS.maxBlockCharacters)),
+      block: block(`b${index}`, 'y'.repeat(PLANNING_CONTEXT_LIMITS.maxBlockCharacters))
     }));
     const context = buildPlanningContext(baseInput(blocks));
     expect(context.truncated).toBe(true);
@@ -344,13 +407,15 @@ describe('bounded planning context', () => {
   it('refuses a lesson beyond the block bound', () => {
     const blocks = Array.from({ length: PLANNING_CONTEXT_LIMITS.maxBlocks + 1 }, (_, index) => ({
       blockId: `b${index}`,
-      block: block(`b${index}`, 'z'),
+      block: block(`b${index}`, 'z')
     }));
     expect(() => buildPlanningContext(baseInput(blocks))).toThrow(PlanningContextError);
   });
 
   it('never includes credentials, tokens or filesystem paths in the task', () => {
-    const context = buildPlanningContext(baseInput([{ blockId: 'b1', block: block('b1', 'Body.') }]));
+    const context = buildPlanningContext(
+      baseInput([{ blockId: 'b1', block: block('b1', 'Body.') }])
+    );
     const task = plannerTask(context, baseInput([{ blockId: 'b1', block: block('b1', 'Body.') }]));
     expect(task).not.toMatch(/GEMINI_API_KEY|Bearer |\/home\/|\.env|password/i);
   });

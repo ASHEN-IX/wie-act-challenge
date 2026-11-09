@@ -63,17 +63,39 @@ jest.mock('../models/index', () => {
     }),
     {
       instances: new Array<CourseFixture>(),
+      // The route creates through `Course.create(...)`; keep the constructor
+      // spy so `Course.instances` still records each created row.
+      create: jest.fn().mockImplementation((data: object) => {
+        const instance: Record<string, unknown> = {};
+        mockCourse.call(instance as unknown as CourseFixture, data);
+        return Promise.resolve(instance);
+      }),
+      save: jest.fn(async (row: CourseFixture) => row),
       find: jest.fn(),
       findOne: jest.fn(),
+      // `findById` returns a promise-like cursor with a chainable `select`.
       findById: jest.fn().mockImplementation((id: string) => {
         const value = mockCourse.findOne({ _id: id, userId: 'user-123' });
-        const result = Promise.resolve(value);
-        return Object.assign(result, { select: () => ({ lean: () => result }) });
+        const result = Promise.resolve(value) as Promise<unknown> & {
+          select: () => Promise<unknown>;
+        };
+        result.select = () => Promise.resolve(value);
+        return result;
       }),
       findOneAndDelete: jest.fn()
     }
   );
   return {
+    // The route applies the old `pre('validate')` normalization explicitly.
+    newCourseDocument: (input: Record<string, unknown>) => {
+      const userId = (input.userId as string) || (input.ownerUserId as string);
+      const ownerUserId = (input.ownerUserId as string) || (input.userId as string);
+      const scope =
+        input.institutionId && (!input.scope || input.scope === 'personal')
+          ? 'institutional'
+          : ((input.scope as string) ?? 'personal');
+      return { ...input, userId, ownerUserId, scope };
+    },
     Course: mockCourse,
     CourseRevision: { create: jest.fn().mockResolvedValue({}) },
     Subject: { findOne: jest.fn() }
@@ -210,7 +232,8 @@ describe('INGEST-01 POST /api/v1/study/courses (file validation)', () => {
     );
 
     const instance = Course.instances[0];
-    expect(instance.save).toHaveBeenCalled();
+    // The route persists through the model static instead of `doc.save()`.
+    expect(Course.save).toHaveBeenCalledWith(instance);
 
     expect(instance.jobId).toBe('job-1');
     expect(instance.correlationId).toBe('corr-1');

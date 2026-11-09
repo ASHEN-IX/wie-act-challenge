@@ -1,114 +1,79 @@
-import mongoose, { Document, Model, Schema } from 'mongoose';
+import type { Prisma, Quest as QuestRow } from '../../../../src/generated/prisma/client';
+import { prisma, toDocument } from '../../../../shared/database';
+import { newId } from '../../../../shared/ids';
 
-export interface IQuest extends Document {
-  userId: string;
-  type: 'daily' | 'weekly';
-  title: string;
-  description: string;
-  icon: string;
-  action: 'task_complete' | 'course_upload' | 'focus_session' | 'study_session' | 'review_complete';
-  targetCount: number;
-  currentCount: number;
-  xpReward: number;
-  status: 'active' | 'completed' | 'expired';
-  completedAt?: Date;
-  expiresAt: Date;
-  createdAt: Date;
-  updatedAt: Date;
-  incrementProgress(amount?: number): {
-    changed: boolean;
-    completed?: boolean;
-    xpReward?: number;
-  };
+export type IQuest = QuestRow & { _id: string };
+
+function hydrate(row: QuestRow): IQuest {
+  return toDocument(row) as unknown as IQuest;
 }
 
-const questSchema = new Schema<IQuest>(
-  {
-    userId: {
-      type: String,
-      required: true,
-      index: true
-    },
-    type: {
-      type: String,
-      enum: ['daily', 'weekly'],
-      required: true
-    },
-    title: {
-      type: String,
-      required: true
-    },
-    description: {
-      type: String,
-      default: ''
-    },
-    icon: {
-      type: String,
-      default: '🎯'
-    },
-    // What action triggers progress
-    action: {
-      type: String,
-      required: true,
-      enum: ['task_complete', 'course_upload', 'focus_session', 'study_session', 'review_complete']
-    },
-    // How many of the action are needed
-    targetCount: {
-      type: Number,
-      required: true,
-      min: 1
-    },
-    currentCount: {
-      type: Number,
-      default: 0,
-      min: 0
-    },
-    xpReward: {
-      type: Number,
-      required: true,
-      min: 0
-    },
-    status: {
-      type: String,
-      enum: ['active', 'completed', 'expired'],
-      default: 'active'
-    },
-    completedAt: {
-      type: Date
-    },
-    expiresAt: {
-      type: Date,
-      required: true,
-      index: true
-    }
+export const Quest = {
+  async findOne(where: Prisma.QuestWhereInput): Promise<IQuest | null> {
+    const row = await prisma.quest.findFirst({ where });
+    return row ? hydrate(row) : null;
   },
-  {
-    timestamps: true
+
+  async findMany(
+    where: Prisma.QuestWhereInput = {},
+    options: { take?: number; orderBy?: Prisma.QuestOrderByWithRelationInput } = {}
+  ): Promise<IQuest[]> {
+    const rows = await prisma.quest.findMany({ where, ...options });
+    return rows.map(hydrate);
+  },
+
+  async countDocuments(where: Prisma.QuestWhereInput = {}): Promise<number> {
+    return prisma.quest.count({ where });
+  },
+
+  async create(
+    data: Omit<Prisma.QuestUncheckedCreateInput, 'id'> & { id?: string }
+  ): Promise<IQuest> {
+    return hydrate(await prisma.quest.create({ data: { ...data, id: data.id ?? newId() } }));
+  },
+
+  async updateOne(where: Prisma.QuestWhereInput, data: Prisma.QuestUpdateInput) {
+    const result = await prisma.quest.updateMany({ where, data });
+    return { matchedCount: result.count };
+  },
+
+  async updateMany(where: Prisma.QuestWhereInput, data: Prisma.QuestUpdateInput) {
+    const result = await prisma.quest.updateMany({ where, data });
+    return { matchedCount: result.count };
+  },
+
+  async findOneAndUpdate(
+    where: Prisma.QuestWhereInput,
+    data: Prisma.QuestUpdateInput
+  ): Promise<IQuest | null> {
+    const existing = await prisma.quest.findFirst({ where, select: { id: true } });
+    if (!existing) return null;
+    return hydrate(await prisma.quest.update({ where: { id: existing.id }, data }));
+  },
+
+  /**
+   * Advance an active quest, completing it at the target.
+   * The conditional update keeps the Mongo `status: 'active'` guard.
+   */
+  async incrementProgress(
+    quest: IQuest,
+    amount = 1
+  ): Promise<{ changed: boolean; completed?: boolean; xpReward?: number }> {
+    if (quest.status !== 'active') return { changed: false };
+    const currentCount = Math.min(quest.currentCount + amount, quest.targetCount);
+    const completed = currentCount >= quest.targetCount;
+    const result = await prisma.quest.updateMany({
+      where: { id: quest.id, status: 'active' },
+      data: {
+        currentCount,
+        ...(completed ? { status: 'completed' as const, completedAt: new Date() } : {})
+      }
+    });
+    if (result.count === 0) return { changed: false };
+    return completed
+      ? { changed: true, completed: true, xpReward: quest.xpReward }
+      : { changed: true, completed: false };
   }
-);
-
-// Compound index for efficient lookup
-questSchema.index({ userId: 1, status: 1, type: 1 });
-
-// Progress a quest by 1 (or more)
-questSchema.methods.incrementProgress = function (amount = 1) {
-  if (this.status !== 'active') return { changed: false };
-
-  this.currentCount = Math.min(this.currentCount + amount, this.targetCount);
-
-  if (this.currentCount >= this.targetCount) {
-    this.status = 'completed';
-    this.completedAt = new Date();
-    return { changed: true, completed: true, xpReward: this.xpReward };
-  }
-
-  return { changed: true, completed: false };
 };
 
-questSchema.index({ userId: 1, status: 1, completedAt: -1 });
-
-const Quest =
-  (mongoose.models.Quest as Model<IQuest>) || mongoose.model<IQuest>('Quest', questSchema);
-
 export default Quest;
-module.exports = Quest;

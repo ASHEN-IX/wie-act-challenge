@@ -1,0 +1,1785 @@
+// EdNova data model — PostgreSQL via Prisma 7.
+//
+// Conventions:
+//   * Primary keys are 24-character lowercase hex ObjectId strings. The public
+//     API still exposes `_id`; shared/database.ts maps `id` back to it.
+//   * Columns keep the existing camelCase names, so the migration script and
+//     every call site translate without field renaming.
+//   * Embedded documents that are read and written whole stay Json. Anything a
+//     query filters on, or that changes per element, becomes a relation.
+//   * MongoDB TTL and partial indexes have no Prisma equivalent; they are
+//     recreated as raw SQL in the migration and swept by maintenance scripts.
+
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "cjs"
+  importFileExtension = "ts"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ── Better Auth ───────────────────────────────────────────────────────────────
+// Owned by better-auth through @better-auth/prisma-adapter.
+
+model AuthUser {
+  id            String   @id
+  name          String
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  image         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  sessions AuthSession[]
+  accounts AuthAccount[]
+
+  @@map("auth_users")
+}
+
+model AuthSession {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+
+  user AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("auth_sessions")
+}
+
+model AuthAccount {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("auth_accounts")
+}
+
+model AuthVerification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("auth_verifications")
+}
+
+model AuthRateLimit {
+  id          String @id
+  key         String @unique
+  count       Int
+  lastRequest BigInt
+
+  @@map("auth_rate_limits")
+}
+
+// ── Users and billing ─────────────────────────────────────────────────────────
+
+model User {
+  id                             String    @id @db.VarChar(24)
+  email                          String    @unique
+  password                       String?
+  name                           String
+  role                           Role      @default(student)
+  isAdmin                        Boolean   @default(false)
+  isActive                       Boolean   @default(true)
+  isVerified                     Boolean   @default(false)
+  lastLogin                      DateTime?
+  tier                           Tier      @default(trial)
+  trialStartedAt                 DateTime? @default(now())
+  trialExpiresAt                 DateTime?
+  tierChangedAt                  DateTime?
+  subscriptionId                 String?
+  subscriptionStartAt            DateTime?
+  subscriptionEndAt              DateTime?
+  subscriptionDurationMonths     Int       @default(0)
+  autoRenew                      Boolean   @default(false)
+  renewalDate                    DateTime?
+  canChangeAfter                 DateTime?
+  subscriptionExpiryNoticeSentAt DateTime?
+  entitlementPurchasedAt         DateTime?
+  stripeCustomerId               String?
+  verificationToken              String?
+  verificationExpires            DateTime?
+  verificationOtp                String?
+  verificationOtpExpires         DateTime?
+  verificationOtpAttempts        Int       @default(0)
+  resetPasswordToken             String?
+  resetPasswordExpires           DateTime?
+  onboardingCompletedAt          DateTime?
+  appliedCheckoutSessionIds      String[]  @default([])
+  appliedCouponIds               String[]  @default([])
+  notificationPreferences        Json
+  onboardingDraft                Json
+  createdAt                      DateTime  @default(now())
+  updatedAt                      DateTime  @updatedAt
+
+  refreshTokens RefreshToken[]
+
+  @@index([isAdmin])
+  @@index([isActive])
+  @@index([subscriptionEndAt])
+  @@index([verificationToken])
+  @@index([resetPasswordToken])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @db.VarChar(24)
+  userId    String   @db.VarChar(24)
+  tokenHash String
+  jti       String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model Coupon {
+  id           String    @id @db.VarChar(24)
+  code         String    @unique
+  targetTier   Tier
+  durationDays Int       @default(30)
+  createdBy    String?   @db.VarChar(24)
+  expiresAt    DateTime?
+  isActive     Boolean   @default(true)
+  maxUses      Int       @default(1)
+  usageCount   Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  usages CouponUsage[]
+
+  @@index([targetTier])
+  @@index([expiresAt])
+  @@index([isActive])
+  @@map("coupons")
+}
+
+model CouponUsage {
+  id         String   @id @db.VarChar(24)
+  couponId   String   @db.VarChar(24)
+  userId     String   @db.VarChar(24)
+  redeemedAt DateTime @default(now())
+
+  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+
+  @@unique([couponId, userId])
+  @@index([userId])
+  @@map("coupon_usages")
+}
+
+model Payment {
+  id                      String        @id @db.VarChar(24)
+  userId                  String        @db.VarChar(24)
+  stripeEventId           String?       @unique
+  stripeCheckoutSessionId String?       @unique
+  stripeSubscriptionId    String?
+  stripeCustomerId        String?
+  tier                    Tier
+  durationMonths          Int           @default(1)
+  monthlyPriceCents       Int?
+  discountPercentage      Int           @default(0)
+  status                  PaymentStatus @default(pending)
+  amount                  Int?
+  currency                String        @default("usd")
+  metadata                Json          @default("{}")
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+
+  @@index([userId])
+  @@index([status, createdAt])
+  @@index([stripeSubscriptionId])
+  @@index([stripeCustomerId])
+  @@map("payments")
+}
+
+// ── Learner profile and social ────────────────────────────────────────────────
+
+model UserProfile {
+  id                             String    @id @db.VarChar(24)
+  userId                         String    @unique
+  bio                            String?   @db.VarChar(500)
+  avatar                         String
+  nickname                       String?
+  friendCode                     String?   @unique
+  learningProfile                Json?
+  onlineStatus                   OnlineStatus @default(offline)
+  lastSeenAt                     DateTime?
+  privacy                        Json
+  level                          Json
+  preferences                    Json
+  stats                          Json
+  goals                          Json      @default("[]")
+  backgroundSettings             Json?
+  animatedBackgroundSettings     Json?
+  teamStats                      Json?
+  createdAt                      DateTime  @default(now())
+  updatedAt                      DateTime  @updatedAt
+
+  @@map("user_profiles")
+}
+
+model Friendship {
+  id        String           @id @db.VarChar(24)
+  requester String
+  recipient String
+  status    FriendshipStatus @default(pending)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([requester, recipient])
+  @@index([requester, status])
+  @@index([recipient, status])
+  @@index([recipient])
+  @@map("friendships")
+}
+
+model StudyGroup {
+  id            String    @id @db.VarChar(24)
+  groupId       String    @unique
+  name          String    @db.VarChar(60)
+  subject       String    @default("") @db.VarChar(60)
+  ownerId       String
+  activeSession Json?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  members StudyGroupMember[]
+  invites StudyGroupInvite[]
+
+  @@index([ownerId])
+  @@map("study_groups")
+}
+
+model StudyGroupMember {
+  id       String   @id @db.VarChar(24)
+  groupId  String   @db.VarChar(24)
+  userId   String
+  joinedAt DateTime @default(now())
+
+  group StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([userId])
+  @@map("study_group_members")
+}
+
+model StudyGroupInvite {
+  id        String   @id @db.VarChar(24)
+  groupId   String   @db.VarChar(24)
+  userId    String
+  invitedBy String
+  createdAt DateTime @default(now())
+
+  group StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([userId])
+  @@map("study_group_invites")
+}
+
+model LearningStyleProfile {
+  id          String   @id @db.VarChar(24)
+  userId      String   @unique
+  primary     String
+  ranking     Json     @default("[]")
+  provisional Boolean  @default(true)
+  completedAt DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("learningstyleprofiles")
+}
+
+model AvailabilitySlot {
+  id          String   @id @db.VarChar(24)
+  userId      String
+  dayOfWeek   String
+  startTime   String
+  endTime     String
+  label       String
+  isRecurring Boolean  @default(true)
+  color       String   @default("#ff6b6b")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, dayOfWeek])
+  @@map("availabilityslots")
+}
+
+model Gamification {
+  id             String   @id @db.VarChar(24)
+  userId         String   @unique
+  totalXp        Int      @default(0)
+  level          Int      @default(1)
+  evidenceAwards Json     @default("[]")
+  xpHistory      Json     @default("[]")
+  achievements   Json     @default("[]")
+  stats          Json
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([totalXp, userId])
+  @@map("gamifications")
+}
+
+model Quest {
+  id           String       @id @db.VarChar(24)
+  userId       String
+  type         QuestType
+  title        String
+  description  String       @default("")
+  icon         String       @default("🎯")
+  action       QuestAction
+  targetCount  Int
+  currentCount Int          @default(0)
+  xpReward     Int
+  status       QuestStatus  @default(active)
+  completedAt  DateTime?
+  expiresAt    DateTime
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([userId, status, type])
+  @@index([userId, status, completedAt])
+  @@index([expiresAt])
+  @@map("quests")
+}
+
+model LearningRewardLedger {
+  id            String              @id @db.VarChar(24)
+  awardId       String              @unique
+  userId        String
+  completionKey String
+  evidenceId    String
+  policyVersion String
+  status        LedgerStatus
+  xp            Int?
+  reason        String?
+  appliedAt     DateTime?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@unique([userId, completionKey])
+  @@index([userId])
+  @@map("learning_reward_ledger")
+}
+
+// ── Ranking ───────────────────────────────────────────────────────────────────
+
+model RankSeason {
+  id           String           @id @db.VarChar(24)
+  seasonCode   String           @unique
+  name         String
+  theme        String?
+  startAt      DateTime         @default(now())
+  endAt        DateTime?
+  status       RankSeasonStatus @default(active)
+  resetPolicy  Json
+  startedBy    String?
+  closedAt     DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  snapshots SeasonResultSnapshot[]
+
+  @@index([startAt])
+  @@index([endAt])
+  @@index([status])
+  @@map("rankseasons")
+}
+
+model UserRankProfile {
+  id                         String    @id @db.VarChar(24)
+  userId                     String    @unique
+  currentSeasonId            String?   @db.VarChar(24)
+  knowledgePoints            Int       @default(0)
+  rankIndex                  Int       @default(3)
+  rankName                   String
+  seasonPeakRankIndex        Int       @default(3)
+  allTimePeakRankIndex       Int       @default(3)
+  seasonPeakKp               Int       @default(450)
+  allTimePeakKp              Int       @default(450)
+  competitiveEventsCountSeason Int     @default(0)
+  learningSkillRating        Int       @default(1000)
+  currentStreak              Int       @default(0)
+  comebackBonusRemaining     Int       @default(0)
+  lastActivityAt             DateTime?
+  lastEventAt                DateTime?
+  lastResetAt                DateTime?
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+
+  @@index([currentSeasonId])
+  @@index([knowledgePoints])
+  @@index([rankIndex])
+  @@index([lastActivityAt])
+  @@map("userrankprofiles")
+}
+
+model SeasonResultSnapshot {
+  id                    String   @id @db.VarChar(24)
+  seasonId              String   @db.VarChar(24)
+  userId                String
+  position              Int?
+  finalRankIndex        Int
+  finalKnowledgePoints  Int      @default(0)
+  finalRankName         String
+  seasonPeakKp          Int?
+  seasonPeakRankIndex   Int?
+  eventsCount           Int      @default(0)
+  rewardsGranted        String[] @default([])
+  resetApplied          Json
+  snapshotAt            DateTime @default(now())
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  season RankSeason @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+
+  @@unique([seasonId, userId])
+  @@index([userId])
+  @@index([snapshotAt])
+  @@map("seasonresultsnapshots")
+}
+
+model RankEventLedger {
+  id               String   @id @db.VarChar(24)
+  userId           String
+  seasonId         String   @db.VarChar(24)
+  action           String
+  baseKP           Int      @default(0)
+  multipliers      Json
+  finalKP          Int      @default(0)
+  deltaKp          Int      @default(0)
+  beforeKp         Int      @default(0)
+  afterKp          Int      @default(0)
+  beforeRankIndex  Int      @default(0)
+  afterRankIndex   Int      @default(0)
+  rankName         String?
+  metadata         Json     @default("{}")
+  reasonBreakdown  Json     @default("{}")
+  contextSessionId String?
+  eventKey         String?  @unique
+  occurredAt       DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([userId])
+  @@index([seasonId])
+  @@index([action])
+  @@index([finalKP])
+  @@index([contextSessionId])
+  @@index([occurredAt])
+  @@index([userId, seasonId, occurredAt])
+  @@index([userId, seasonId, contextSessionId, occurredAt])
+  @@map("rankeventledgers")
+}
+
+model RankBadge {
+  id        String   @id @db.VarChar(24)
+  rankIndex Int      @unique
+  rankName  String
+  tier      String
+  division  String?
+  badgeKey  BadgeKey
+  imagePath String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tier])
+  @@index([isActive])
+  @@map("rankbadges")
+}
+
+// ── Study catalog ─────────────────────────────────────────────────────────────
+
+model Subject {
+  id          String   @id @db.VarChar(24)
+  userId      String
+  name        String
+  description String?
+  image       String?
+  color       String   @default("#ff4655")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@map("subjects")
+}
+
+model Topic {
+  id             String   @id @db.VarChar(24)
+  userId         String
+  name           String
+  description    String?
+  category       String?
+  color          String   @default("#ff4655")
+  totalStudyTime Int      @default(0)
+  mastery        Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId])
+  @@map("topics")
+}
+
+model Course {
+  id                      String            @id @db.VarChar(24)
+  userId                  String
+  scope                   CourseScope       @default(personal)
+  visibility              CourseVisibility?
+  institutionId           String?           @db.VarChar(24)
+  ownerUserId             String?
+  assignedInstructorIds   String[]          @default([])
+  activeRevisionId        String?
+  subjectId               String
+  title                   String
+  description             String?
+  status                  CourseStatus      @default(processing)
+  jobId                   String?
+  correlationId           String?
+  ingestStage             IngestStage?
+  ingestProgress          Float             @default(0)
+  ingestDetail            String            @default("")
+  ingestError             String            @default("")
+  topics                  Json              @default("[]")
+  files                   Json              @default("[]")
+  processedAt             DateTime?
+  aiCourseId              String?
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+
+  revisions   CourseRevision[]
+  enrollments CourseEnrollment[]
+
+  @@index([userId])
+  @@index([subjectId])
+  @@index([jobId])
+  @@index([correlationId])
+  @@index([aiCourseId])
+  @@index([institutionId, scope])
+  @@index([ownerUserId])
+  @@index([visibility, updatedAt])
+  @@index([assignedInstructorIds])
+  @@map("courses")
+}
+
+model CourseRevision {
+  id                     String               @id @db.VarChar(24)
+  courseId               String               @db.VarChar(24)
+  revisionTag            String
+  contentHash            String
+  status                 CourseRevisionStatus @default(draft)
+  publishedByUserId      String?
+  publishedAt            DateTime?
+  summary                String?
+  topics                 Json                 @default("[]")
+  contentDocument        Json?
+  formulaPublication     Json?
+  contentDocumentHash    String?
+  vectorIndexRef         String?
+  isInstructorReviewed   Boolean              @default(false)
+  sourceManifest         Json?
+  sourceManifestDigest   String?
+  indexHash              String?
+  artifactHash           String?
+  activationState        ActivationState?
+  expectedActiveRevisionId String?
+  approvedActivities     Json?
+  revokedAt              DateTime?
+  /// Mongoose's `__v` optimistic-concurrency counter. Draft edits compare it
+  /// and bump it in the same guarded write; Prisma cannot auto-increment it.
+  version                Int                  @default(0) @map("__v")
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, revisionTag])
+  @@index([courseId, status])
+  @@map("course_revisions")
+}
+
+model CourseEnrollment {
+  id                String                 @id @db.VarChar(24)
+  courseId          String                 @db.VarChar(24)
+  institutionId     String?                @db.VarChar(24)
+  userId            String
+  status            CourseEnrollmentStatus @default(active)
+  enrolledAt        DateTime               @default(now())
+  enrolledByUserId  String?
+  revokedAt         DateTime?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, userId])
+  @@index([courseId])
+  @@index([institutionId])
+  @@index([userId])
+  @@index([userId, status])
+  @@index([institutionId, status])
+  @@map("course_enrollments")
+}
+
+model CourseInvitation {
+  id               String                 @id @db.VarChar(24)
+  courseId         String                 @db.VarChar(24)
+  institutionId    String?                @db.VarChar(24)
+  role             CourseInvitationRole   @default(student)
+  tokenHash        String                 @unique
+  recipientEmail   String?
+  status           CourseInvitationStatus @default(pending)
+  issuedByUserId   String
+  acceptedByUserId String?
+  acceptedAt       DateTime?
+  revokedAt        DateTime?
+  expiresAt        DateTime
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  @@index([courseId])
+  @@index([institutionId])
+  @@index([expiresAt])
+  @@index([recipientEmail, status, expiresAt])
+  @@index([courseId, status, expiresAt])
+  @@map("course_invitations")
+}
+
+model PublicCourseJoin {
+  id        String   @id @db.VarChar(24)
+  userId    String
+  courseId  String   @db.VarChar(24)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, courseId])
+  @@index([userId])
+  @@map("public_course_joins")
+}
+
+model Institution {
+  id              String   @id @db.VarChar(24)
+  name            String   @db.VarChar(120)
+  slug            String   @unique @db.VarChar(80)
+  domain          String?  @db.VarChar(253)
+  isVerified      Boolean  @default(false)
+  status          String   @default("active")
+  createdByUserId String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  memberships InstitutionMembership[]
+  invitations InstitutionInvitation[]
+
+  @@map("institutions")
+}
+
+model InstitutionMembership {
+  id              String                     @id @db.VarChar(24)
+  institutionId   String                     @db.VarChar(24)
+  userId          String
+  role            InstitutionMembershipRole
+  status          InstitutionMembershipStatus @default(active)
+  invitedByUserId String?
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+
+  institution Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+
+  @@unique([institutionId, userId])
+  @@index([institutionId])
+  @@index([userId])
+  @@map("institution_memberships")
+}
+
+model InstitutionInvitation {
+  id               String                     @id @db.VarChar(24)
+  institutionId    String                     @db.VarChar(24)
+  role             InstitutionInvitationRole
+  tokenHash        String                     @unique
+  status           InstitutionInvitationStatus @default(pending)
+  issuedByUserId   String
+  acceptedByUserId String?
+  acceptedAt       DateTime?
+  revokedAt        DateTime?
+  expiresAt        DateTime
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+
+  institution Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+
+  @@index([institutionId])
+  @@index([expiresAt])
+  @@index([institutionId, status, expiresAt])
+  @@map("institution_invitations")
+}
+
+// ── Learning evidence pipeline ────────────────────────────────────────────────
+
+model ActivityRecord {
+  id               String   @id @db.VarChar(24)
+  courseId         String
+  revisionId       String
+  contentHash      String
+  activityId       String
+  activityRevision String
+  activityType     String
+  objectiveId      String
+  publicDefinition Json
+  serverEvaluation Json
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([courseId, revisionId, activityId])
+  @@index([courseId])
+  @@index([revisionId])
+  @@index([activityId])
+  @@index([objectiveId])
+  @@map("activity_records")
+}
+
+model StudentAttempt {
+  id               String    @id @db.VarChar(24)
+  userId           String
+  attemptId        String
+  courseId         String
+  revisionId       String
+  contentHash      String
+  activityId       String
+  activityRevision String
+  activityType     String
+  roomId           String?
+  timeSpentSeconds Int
+  answers          Json
+  payloadHash      String
+  status           String    @default("submitted")
+  submittedAt      DateTime  @default(now())
+  assessmentResult Json?
+  evidenceId       String?
+  protocolVersion  Int?
+  processingState  String?
+  submission       Json?
+  preparedEvidence Json?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([userId, attemptId])
+  @@index([userId])
+  @@index([attemptId])
+  @@index([courseId])
+  @@index([activityId])
+  @@index([courseId, revisionId, activityId, userId])
+  @@map("student_attempts")
+}
+
+model LearningEvidence {
+  id              String   @id @db.VarChar(24)
+  evidenceId      String   @unique
+  evidenceVersion String   @default("1.0.0")
+  userId          String
+  attemptId       String
+  activity        Json
+  objectiveId     String
+  status          String   @default("accepted")
+  bloomLevel      String
+  score           Float
+  masteryAchieved Boolean
+  evaluator       Json
+  rewardReference Json?
+  timestamp       DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, attemptId])
+  @@index([evidenceId])
+  @@index([userId])
+  @@index([attemptId])
+  @@index([objectiveId])
+  @@index([userId, objectiveId, masteryAchieved])
+  @@map("learning_evidences")
+}
+
+model LearningSupport {
+  id               String   @id @db.VarChar(24)
+  userId           String
+  courseId         String
+  revisionId       String
+  activityId       String
+  activityRevision String
+  hintLevel        Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([userId, courseId, revisionId, activityId, activityRevision])
+  @@map("learningsupports")
+}
+
+model VisualLab {
+  id               String   @id @db.VarChar(24)
+  labId            String   @unique
+  schemaVersion    Int
+  ownerUserId      String
+  scope            String   @default("private")
+  sourceMode       String
+  courseId         String?
+  revisionId       String?
+  topicId          String?
+  passageIds       String[] @default([])
+  topic            String?
+  engine           String
+  title            String
+  concept          String
+  learningObjective String
+  definition       Json
+  guidance         Json
+  check            Json
+  generationMode   String
+  generationKey    String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([ownerUserId, generationKey])
+  @@index([labId])
+  @@index([ownerUserId])
+  @@index([courseId])
+  @@index([ownerUserId, courseId, revisionId])
+  @@map("visual_labs")
+}
+
+model CourseNardouchProgress {
+  id                String   @id @db.VarChar(24)
+  userId            String
+  courseId          String
+  revisionId        String
+  completedLessonIds String[] @default([])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([userId, courseId, revisionId])
+  @@map("course_nardouch_progress")
+}
+
+model NardouchConversation {
+  id          String    @id @db.VarChar(24)
+  userId      String
+  courseId    String
+  revisionId  String
+  contentHash String
+  mode        String
+  language    Json
+  version     Int       @default(0)
+  messages    Json      @default("[]")
+  feedback    Json      @default("[]")
+  lockToken   String?
+  lockedUntil DateTime?
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("nardouchconversations")
+}
+
+model LearnerAdaptationPreference {
+  id                       String   @id @db.VarChar(24)
+  userId                   String   @unique
+  version                  Int      @default(0)
+  recommendationsEnabled   Boolean  @default(true)
+  allowAssessmentEvidence  Boolean  @default(true)
+  preferredMode            String?
+  preferWorkedExamples     Boolean  @default(false)
+  preferVisualExploration  Boolean  @default(false)
+  preferDetailedProofs     Boolean  @default(false)
+  dismissed                Json     @default("[]")
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@map("learner_adaptation_preferences")
+}
+
+// ── Experience planning and formula review ────────────────────────────────────
+
+model ExperiencePlanRequest {
+  id                 String    @id @db.VarChar(24)
+  requestId          String
+  identity           String    @unique
+  courseId           String
+  revisionId         String
+  lessonId           String
+  mode               String
+  actor              String
+  provider           String
+  providerModel      String
+  contextFingerprint String
+  state              String
+  code               String?
+  stage              String?
+  approvalId         String?
+  reservedTokens     Int       @default(0)
+  reportedTokens     Int?
+  usageReported      Boolean   @default(false)
+  modelVersion       String?
+  planDigest         String?
+  dispatchAt         DateTime?
+  finishedAt         DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([courseId, revisionId, lessonId, state])
+  @@map("experience_plan_requests")
+}
+
+model ExperiencePlanRecord {
+  id                        String    @id @db.VarChar(24)
+  planId                    String
+  courseId                  String
+  revisionId                String
+  lessonId                  String
+  mode                      String
+  contentHash               String
+  contextFingerprint        String
+  planSchemaVersion         String
+  registryVersion           String
+  presentationSchemaVersion String
+  provider                  String
+  providerModel             String
+  plannerImplementation     String
+  plannerVersion            String
+  planDigest                String
+  plan                      Json
+  generatedBy               String
+  generatedAt               DateTime
+  supersededAt              DateTime?
+  supersededByPlanId        String?
+  invalidatedAt             DateTime?
+  invalidationReason        String?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  @@unique([courseId, revisionId, lessonId, mode, contextFingerprint])
+  @@index([courseId, revisionId, lessonId, mode, supersededAt])
+  @@map("experience_plan_records")
+}
+
+model FormulaProposal {
+  id               String   @id @db.VarChar(24)
+  courseId         String   @db.VarChar(24)
+  revisionId       String   @db.VarChar(24)
+  revisionTag      String
+  draftVersion     Int
+  documentId       String
+  documentHash     String
+  regionId         String
+  page             Int
+  bbox             Float[]
+  sourceText       String
+  cropHash         String
+  provider         String
+  model            String
+  modelVersion     String?
+  recognitionJobId String?
+  usage            Json?
+  latex            String
+  warnings         String[] @default([])
+  identity         String   @unique
+  reviewedLatex    String?
+  state            String   @default("pending")
+  reviewVersion    Int      @default(0)
+  history          Json     @default("[]")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([courseId, revisionId, draftVersion])
+  @@map("formulaproposals")
+}
+
+model FormulaRecognitionJob {
+  id           String    @id @db.VarChar(24)
+  identity     String    @unique
+  courseId     String
+  revisionId   String
+  revisionTag  String
+  draftVersion Int
+  actor        String
+  documentId   String
+  documentHash String
+  regionId     String
+  cropHash     String
+  page         Int?
+  bbox         Float[]
+  sourceText   String?
+  model        String
+  state        String    @default("queued")
+  claim        String?
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  error        String?
+  proposalId   String?
+  usage        Json?
+  result       Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@map("formularecognitionjobs")
+}
+
+model StructuredAsset {
+  id               String   @id @db.VarChar(24)
+  assetId          String
+  courseId         String
+  revisionId       String
+  lessonId         String
+  blockId          String?
+  component        String
+  schemaVersion    String
+  registryVersion  String
+  payload          Json
+  provenance       String
+  reviewStatus     String
+  reviewedBy       String?
+  reviewedAt       String?
+  sourceReferences Json?
+  audience         String
+  fallback         String
+  disclosure       String
+  createdByUserId  String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([courseId, revisionId, assetId])
+  @@index([courseId, revisionId, lessonId])
+  @@map("structuredassets")
+}
+
+model StructuredAssetReview {
+  id             String    @id @db.VarChar(24)
+  reviewId       String
+  courseId       String
+  revisionId     String
+  assetId        String
+  contentHash    String
+  lessonId       String
+  decision       String
+  reviewerUserId String
+  reviewerRole   String
+  decidedAt      DateTime
+  rationale      String?
+  revokedAt      DateTime?
+  revokedByUserId String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([courseId, revisionId, assetId, contentHash])
+  @@index([courseId, revisionId, lessonId])
+  @@map("structured_asset_reviews")
+}
+
+// ── Study rooms and collaboration ─────────────────────────────────────────────
+
+model StudyRoom {
+  id                String    @id @db.VarChar(24)
+  createCommandId   String?
+  roomId            String    @unique
+  inviteCode        String    @unique
+  courseId          String?
+  revisionId        String?
+  hostUserId        String
+  presenterUserId   String
+  title             String    @db.VarChar(200)
+  maxParticipants   Int       @default(6)
+  moderatorMode     ModeratorMode @default(guided)
+  facilitatorActive Boolean   @default(false)
+  activeActivityId  String?
+  activePin         Json?
+  activityRound     String?
+  visualizationState Json?
+  currentPhase      RoomPhase @default(idle)
+  status            RoomStatus @default(active)
+  seq               Int       @default(1)
+  commandReceipts   Json      @default("[]")
+  participants      Json      @default("[]")
+  createdAt         DateTime  @default(now())
+  closedAt          DateTime?
+
+  @@index([courseId])
+  @@index([hostUserId])
+  @@index([presenterUserId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([inviteCode, status])
+  @@index([hostUserId, status])
+  @@index([courseId, status])
+  @@map("study_rooms")
+}
+
+model FacilitatorIntervention {
+  id               String    @id @db.VarChar(24)
+  interventionId   String    @unique
+  roomId           String
+  strategy         String
+  trigger          String    @default("explicit_ask")
+  targetUserId     String?
+  targetSpeakerName String?
+  reasoning        String
+  message          String
+  proposedUICommand Json?
+  status           String    @default("delivered")
+  cooldownSeconds  Int       @default(15)
+  createdAt        DateTime  @default(now())
+
+  @@index([roomId])
+  @@index([createdAt])
+  @@index([roomId, createdAt])
+  @@map("facilitatorinterventions")
+}
+
+model RoomWhiteboard {
+  id        String   @id @db.VarChar(24)
+  roomId    String   @unique
+  version   Int      @default(0)
+  locked    Boolean  @default(false)
+  elements  Json     @default("[]")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([updatedAt])
+  @@map("room_whiteboards")
+}
+
+model RoomLearningProposal {
+  id              String    @id @db.VarChar(24)
+  proposalId      String?   @unique
+  roomId          String?
+  presenterUserId String?
+  expectedSeq     Int?
+  activePin       Json?
+  targetPhase     String?
+  message         String?
+  commandId       String?
+  status          String    @default("proposed")
+  expiresAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("roomlearningproposals")
+}
+
+model RoomLearningCheck {
+  id         String   @id @db.VarChar(24)
+  checkId    String?  @unique
+  roomId     String?
+  round      String?
+  userId     String?
+  attemptId  String?
+  activity   Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("roomlearningchecks")
+}
+
+model PrivateRoomHelp {
+  id         String    @id @db.VarChar(24)
+  userId     String
+  roomId     String
+  requestId  String
+  question   String
+  pinHash    String
+  pin        Json?
+  state      String
+  result     Json?
+  claim      String?
+  leaseUntil DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([userId, roomId, requestId])
+  @@map("private_room_help")
+}
+
+// ── Sessions, notifications and signals ──────────────────────────────────────
+
+model StudySession {
+  id                   String    @id @db.VarChar(24)
+  userId               String
+  taskId               String?
+  topicId              String?
+  courseId             String?
+  studyPlanId          String?
+  mode                 String    @default("focus")
+  challengeDifficulty  String    @default("medium")
+  taskProgress         Json
+  xpMultiplier         Float     @default(1)
+  duration             Int?
+  status               String    @default("completed")
+  startTime            DateTime  @default(now())
+  endTime              DateTime?
+  focusScore           Int?
+  completedAt          DateTime  @default(now())
+  notes                String?   @db.VarChar(1000)
+  signalHistory        Json      @default("[]")
+  breakStats           Json
+  type                 String    @default("solo")
+  participants         Json      @default("[]")
+  inviteCode           String?   @unique
+  maxParticipants      Int       @default(5)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([courseId])
+  @@index([studyPlanId])
+  @@index([userId, completedAt])
+  @@index([userId, status, createdAt])
+  @@map("studysessions")
+}
+
+model TaskRecord {
+  id               String    @id @db.VarChar(24)
+  userId           String
+  studyPlanId      String?
+  title            String
+  description      String?
+  topicId          String?
+  objectiveId      String?
+  targetBloomLevel String?
+  priority         String    @default("medium")
+  estimatedTime    Int?
+  actualTime       Int       @default(0)
+  status           String    @default("todo")
+  dueDate          DateTime?
+  completedAt      DateTime?
+  tags             String[]  @default([])
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([studyPlanId])
+  @@index([userId, status, createdAt])
+  @@map("tasks")
+}
+
+model StudyPlan {
+  id                    String    @id @db.VarChar(24)
+  resourceScope         Json?
+  userId                String
+  courseId              String?
+  goal                  String
+  availableTimeMinutes  Int
+  taskGraph             Json
+  totalEstimatedMinutes Int?
+  warning               String?
+  status                String    @default("created")
+  scheduledAt           DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([courseId])
+  @@map("studyplans")
+}
+
+model LearningObjective {
+  id             String    @id @db.VarChar(24)
+  userId         String
+  documentId     String
+  objectiveId    String
+  topicId        String
+  knowledgeType  String
+  bloomLevel     String
+  verb           String
+  text           String
+  textHash       String
+  version        Int       @default(1)
+  isActive       Boolean   @default(true)
+  supersededAt   DateTime?
+  classification Json?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([documentId, topicId, textHash])
+  @@index([topicId, bloomLevel])
+  @@index([documentId])
+  @@index([objectiveId, isActive])
+  @@index([userId])
+  @@map("learning_objectives")
+}
+
+model CompetencyProfile {
+  id            String   @id @db.VarChar(24)
+  userId        String
+  topicId       String
+  knowledgeType String
+  bloomLevel    String
+  score         Float    @default(0)
+  confidence    Float    @default(0)
+  evidence      Json     @default("[]")
+  /// Mongoose's `__v` optimistic-concurrency counter; the evidence update is a
+  /// compare-and-set on it.
+  version       Int      @default(0) @map("__v")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, topicId, knowledgeType, bloomLevel])
+  @@index([userId, topicId])
+  @@map("competency_profiles")
+}
+
+model CompetencyProcessing {
+  id            String   @id @db.VarChar(24)
+  correlationId String   @unique
+  processedAt   DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("competency_processing")
+}
+
+model EvalResult {
+  id                      String    @id @db.VarChar(24)
+  competencyProcessedAt   DateTime?
+  competencyLeaseUntil    DateTime?
+  competencyLeaseToken    String?
+  correlationId           String    @unique
+  // Optional: the orchestrator always sets it; the study view of this table
+  // (competency updates) writes and reads rows without it.
+  messageId               String?
+  userId                  String
+  sessionId               String
+  step                    Int
+  status                  String
+  masteryScore            Float?
+  scores                  Json      @default("{}")
+  nextQuestion            String?
+  demonstratedBloomLevel  String?
+  objectiveId             String?
+  targetBloomLevel        String?
+  createdAt               DateTime  @default(now())
+
+  @@index([userId])
+  @@index([sessionId])
+  @@index([status])
+  @@index([sessionId, step])
+  @@index([demonstratedBloomLevel])
+  @@index([objectiveId])
+  @@index([competencyProcessedAt, competencyLeaseUntil, createdAt])
+  @@map("eval_results")
+}
+
+model AiJob {
+  id            String    @id @db.VarChar(24)
+  jobId         String    @unique
+  type          String
+  userId        String
+  requestId     String?
+  correlationId String
+  messageId     String
+  status        String    @default("PENDING")
+  resourceScope Json?
+  result        Json?
+  error         String?   @db.VarChar(512)
+  attempts      Int       @default(0)
+  fallbackUsed  Boolean   @default(false)
+  expireAt      DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @default(now()) @updatedAt
+
+  @@index([userId])
+  @@index([correlationId])
+  @@index([status])
+  @@index([userId, createdAt])
+  @@index([expireAt])
+  @@map("ai_jobs")
+}
+
+model CourseIngestionOperation {
+  id              String    @id @db.VarChar(64)
+  correlationId   String    @unique
+  courseId        String    @db.VarChar(24)
+  revisionId      String
+  userId          String
+  requestId       String?
+  fileRef         String
+  courseTitle     String?   @db.VarChar(150)
+  files           Json
+  state           String
+  result          Json?
+  resultApplied   Boolean   @default(false)
+  dispatchCount   Int       @default(0)
+  lastDispatchedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([courseId])
+  @@map("course_ingestion_operations")
+}
+
+model Notification {
+  id        String    @id @db.VarChar(24)
+  userId    String
+  type      String
+  title     String    @db.VarChar(200)
+  message   String    @db.VarChar(2000)
+  status    String    @default("unread")
+  priority  String    @default("normal")
+  metadata  Json      @default("{}")
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([userId, status, createdAt])
+  @@map("notifications")
+}
+
+model SessionChat {
+  id            String   @id @db.VarChar(24)
+  sessionId     String
+  userId        String
+  messageType   String
+  content       String
+  peerSeq       Int      @default(0)
+  peerMessages  Json     @default("[]")
+  searchQuery   String   @default("")
+  searchResults Json     @default("[]")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([sessionId])
+  @@index([userId])
+  @@index([sessionId, createdAt])
+  @@map("sessionchats")
+}
+
+model VoiceSession {
+  id           String    @id @db.VarChar(24)
+  sessionId    String    @unique
+  startedAt    DateTime  @default(now())
+  endedAt      DateTime?
+  isActive     Boolean   @default(true)
+  recordingUrl String?
+  participants Json      @default("[]")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([sessionId])
+  @@map("voicesessions")
+}
+
+model FocusSession {
+  id             String    @id @db.VarChar(24)
+  userId         String
+  studySessionId String?
+  startTime      DateTime
+  endTime        DateTime?
+  focusScore     Int?
+  dataPoints     Json      @default("[]")
+  summary        Json?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([userId, startTime])
+  @@map("focussessions")
+}
+
+model AnalyticsEvent {
+  id        String   @id @db.VarChar(24)
+  userId    String
+  eventType String
+  metadata  Json?
+  timestamp DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([timestamp])
+  @@index([userId, timestamp])
+  @@index([eventType, timestamp])
+  @@index([userId, eventType, timestamp])
+  @@map("analytics_events")
+}
+
+// ── Infrastructure ────────────────────────────────────────────────────────────
+
+model ApiInstanceLease {
+  id        String   @id
+  owner     String   @default("")
+  expiresAt DateTime @default(now())
+
+  @@map("api_instance_leases")
+}
+
+model CalendarEntry {
+  id        String   @id @db.VarChar(24)
+  userId    String
+  taskId    String?
+  planId    String?
+  title     String
+  startTime DateTime?
+  endTime   DateTime?
+  status    String?
+  payload   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("calendar")
+}
+
+model LlmApprovalBudget {
+  id        String   @id @db.VarChar(24)
+  key       String   @unique
+  payload   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("llm_approval_budgets")
+}
+
+model ExperiencePlannerEligibility {
+  id         String   @id @db.VarChar(24)
+  provider   String?
+  model      String?
+  payload    Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("experience_planner_eligibility")
+}
+
+model ExperiencePlanningConsent {
+  id        String   @id @db.VarChar(24)
+  userId    String?
+  scope     String?
+  payload   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("experience_planning_consents")
+}
+
+model FormulaSourceConsent {
+  id        String   @id @db.VarChar(24)
+  payload   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("formula_source_consents")
+}
+
+model FormulaProviderEligibility {
+  id              String   @id @db.VarChar(24)
+  provider        String?
+  model           String?
+  freeTier        Boolean?
+  billingAttached Boolean?
+  keySha256       String?
+  verifiedBy      String?
+  projectId       String?
+  expiresAt       DateTime?
+  revoked         Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("formula_provider_eligibility")
+}
+
+// ── Enums ─────────────────────────────────────────────────────────────────────
+
+enum Role {
+  student
+  admin
+}
+
+enum Tier {
+  trial
+  normal
+  vip
+  vip_plus
+}
+
+enum PaymentStatus {
+  pending
+  succeeded
+  failed
+  canceled
+}
+
+enum OnlineStatus {
+  online
+  studying
+  offline
+}
+
+enum FriendshipStatus {
+  pending
+  accepted
+  rejected
+  blocked
+}
+
+enum QuestType {
+  daily
+  weekly
+}
+
+enum QuestAction {
+  task_complete
+  course_upload
+  focus_session
+  study_session
+  review_complete
+}
+
+enum QuestStatus {
+  active
+  completed
+  expired
+}
+
+enum LedgerStatus {
+  pending
+  applied
+}
+
+enum RankSeasonStatus {
+  upcoming
+  active
+  closed
+  archived
+}
+
+enum BadgeKey {
+  first
+  second
+  third
+  use
+}
+
+enum CourseScope {
+  personal
+  institutional
+}
+
+enum CourseVisibility {
+  private
+  institution
+  public
+}
+
+enum CourseStatus {
+  processing
+  completed
+  failed
+}
+
+enum IngestStage {
+  parsing
+  enriching
+  embedding
+  indexing
+}
+
+enum CourseRevisionStatus {
+  draft
+  published
+  deprecated
+}
+
+enum ActivationState {
+  prepared
+  committed
+}
+
+enum CourseEnrollmentStatus {
+  active
+  dropped
+  revoked
+}
+
+enum CourseInvitationRole {
+  student
+  instructor
+}
+
+enum CourseInvitationStatus {
+  pending
+  accepted
+  revoked
+  expired
+}
+
+enum InstitutionMembershipRole {
+  university_admin
+  instructor
+  university_student
+}
+
+enum InstitutionMembershipStatus {
+  active
+  invited
+  suspended
+}
+
+enum InstitutionInvitationRole {
+  instructor
+  university_student
+}
+
+enum InstitutionInvitationStatus {
+  pending
+  accepted
+  revoked
+  expired
+}
+
+enum ModeratorMode {
+  guided
+  on_demand
+  muted
+}
+
+enum RoomPhase {
+  idle
+  peer_discussion
+  individual_attempt
+  debrief
+}
+
+enum RoomStatus {
+  active
+  closed
+}

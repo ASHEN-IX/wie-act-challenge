@@ -12,7 +12,7 @@ The EdNova engineering team rejects the traditional horizontal split ("one front
 
 Instead, **all three team members own an entire product domain end-to-end**:
 - **Frontend UI & Components** (Next.js 16, React 19, Server Actions, Tailwind CSS 4, shadcn/ui)
-- **Backend API & Data Logic** (NestJS domain modules, Mongoose schemas, access guards)
+- **Backend API & Data Logic** (NestJS domain modules, Prisma schema, access guards)
 - **AI Prompts, Workers & Agent Policies** (Python FastAPI, LiteLLM, LiveKit Agents, RabbitMQ workers)
 - **Integration & Unit Testing** (Vitest, Jest, Playwright E2E)
 

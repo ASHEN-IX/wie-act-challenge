@@ -1,61 +1,50 @@
-import mongoose, { Document, Model, Schema } from 'mongoose';
+import type { AvailabilitySlot as SlotRow, Prisma } from '../../../../src/generated/prisma/client';
+import { prisma, toDocument } from '../../../../shared/database';
+import { newId } from '../../../../shared/ids';
 
-export interface IAvailabilitySlot extends Document {
-  userId: string;
-  dayOfWeek: string;
-  startTime: string;
-  endTime: string;
-  label: string;
-  isRecurring: boolean;
-  color: string;
-  createdAt: Date;
-  updatedAt: Date;
+export type IAvailabilitySlot = SlotRow & { _id: string };
+
+function hydrate(row: SlotRow): IAvailabilitySlot {
+  return toDocument(row) as unknown as IAvailabilitySlot;
 }
 
-const availabilitySlotSchema = new Schema<IAvailabilitySlot>(
-  {
-    userId: {
-      type: String,
-      required: true,
-      index: true
-    },
-    dayOfWeek: {
-      type: String,
-      required: true,
-      enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-    },
-    startTime: {
-      type: String,
-      required: true
-    },
-    endTime: {
-      type: String,
-      required: true
-    },
-    label: {
-      type: String,
-      required: true
-    },
-    isRecurring: {
-      type: Boolean,
-      default: true
-    },
-    color: {
-      type: String,
-      default: '#ff6b6b'
-    }
+export const AvailabilitySlot = {
+  async findMany(
+    where: Prisma.AvailabilitySlotWhereInput = {},
+    options: { orderBy?: Prisma.AvailabilitySlotOrderByWithRelationInput } = {}
+  ): Promise<IAvailabilitySlot[]> {
+    const rows = await prisma.availabilitySlot.findMany({ where, ...options });
+    return rows.map(hydrate);
   },
-  {
-    timestamps: true
+
+  async findOne(where: Prisma.AvailabilitySlotWhereInput): Promise<IAvailabilitySlot | null> {
+    const row = await prisma.availabilitySlot.findFirst({ where });
+    return row ? hydrate(row) : null;
+  },
+
+  async create(data: Prisma.AvailabilitySlotUncheckedCreateInput): Promise<IAvailabilitySlot> {
+    return hydrate(
+      await prisma.availabilitySlot.create({ data: { ...data, id: data.id ?? newId() } })
+    );
+  },
+
+  async deleteOne(where: Prisma.AvailabilitySlotWhereInput) {
+    const result = await prisma.availabilitySlot.deleteMany({ where });
+    return { deletedCount: result.count };
+  },
+
+  async deleteMany(where: Prisma.AvailabilitySlotWhereInput = {}) {
+    const result = await prisma.availabilitySlot.deleteMany({ where });
+    return { deletedCount: result.count };
+  },
+
+  async updateOne(
+    where: Prisma.AvailabilitySlotWhereInput,
+    data: Prisma.AvailabilitySlotUpdateInput
+  ) {
+    const result = await prisma.availabilitySlot.updateMany({ where, data });
+    return { matchedCount: result.count };
   }
-);
-
-// Index for efficient queries
-availabilitySlotSchema.index({ userId: 1, dayOfWeek: 1 });
-
-const AvailabilitySlot =
-  (mongoose.models.AvailabilitySlot as Model<IAvailabilitySlot>) ||
-  mongoose.model<IAvailabilitySlot>('AvailabilitySlot', availabilitySlotSchema);
+};
 
 export default AvailabilitySlot;
-module.exports = AvailabilitySlot;

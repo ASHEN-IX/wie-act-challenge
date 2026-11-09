@@ -1,39 +1,79 @@
-import { Schema, model, models } from 'mongoose';
+import type {
+  FormulaProposal as FormulaProposalRow,
+  Prisma
+} from '../../../../src/generated/prisma/client';
+import { prisma } from '../../../../shared/database';
+import { table } from './_table';
 
 /** Separate from immutable canonical source blocks. */
-const decisionSchema = new Schema({
-  reviewer: { type: String, required: true },
-  action: { type: String, enum: ['accepted', 'corrected', 'rejected'], required: true },
-  previous: { type: String, required: true },
-  next: { type: String, required: true },
-  expression: { type: String },
-  draftVersion: { type: Number, required: true },
-  revisionTag: { type: String, required: true },
-  revisionId: { type: String, required: true },
-  reviewVersion: { type: Number, required: true },
-  at: { type: Date, required: true },
-}, { _id: false });
-const schema = new Schema({
-  courseId: { type: Schema.Types.ObjectId, required: true },
-  revisionId: { type: Schema.Types.ObjectId, required: true },
-  revisionTag: { type: String, required: true },
-  draftVersion: { type: Number, required: true },
-  documentId: { type: String, required: true },
-  documentHash: { type: String, required: true },
-  regionId: { type: String, required: true },
-  page: { type: Number, required: true },
-  bbox: { type: [Number], required: true },
-  sourceText: { type: String, required: true },
-  cropHash: { type: String, required: true },
-  provider: { type: String, required: true }, model: { type: String, required: true },
-  modelVersion: String, recognitionJobId: String, usage: Schema.Types.Mixed,
-  latex: { type: String, required: true }, warnings: { type: [String], default: [] },
-  identity: { type: String, required: true },
-  reviewedLatex: { type: String },
-  state: { type: String, enum: ['pending', 'accepted', 'corrected', 'rejected'], default: 'pending' },
-  reviewVersion: { type: Number, default: 0 },
-  history: { type: [decisionSchema], default: [] },
-}, { timestamps: true, strict: 'throw' });
-schema.index({ identity: 1 }, { unique: true });
-schema.index({ courseId: 1, revisionId: 1, draftVersion: 1 });
-export const FormulaProposal = models.FormulaProposal || model('FormulaProposal', schema);
+export interface FormulaProposalDecision {
+  reviewer: string;
+  action: 'accepted' | 'corrected' | 'rejected';
+  previous: string;
+  next: string;
+  expression?: string;
+  draftVersion: number;
+  revisionTag: string;
+  revisionId: string;
+  reviewVersion: number;
+  at: Date;
+}
+
+export type IFormulaProposal = Omit<FormulaProposalRow, 'usage' | 'history' | 'bbox'> & {
+  _id: string;
+  usage?: unknown;
+  history: FormulaProposalDecision[];
+  bbox: number[];
+};
+
+export const FormulaProposal = table<IFormulaProposal>({
+  delegate: () => prisma.formulaProposal,
+  jsonColumns: ['usage', 'history'],
+  // Mongo's `$ne` also matched absent fields; these columns are required.
+  requiredColumns: [
+    'courseId',
+    'revisionId',
+    'revisionTag',
+    'draftVersion',
+    'documentId',
+    'documentHash',
+    'regionId',
+    'page',
+    'cropHash',
+    'provider',
+    'model',
+    'latex',
+    'sourceText',
+    'identity',
+    'state',
+    'reviewVersion'
+  ],
+  defaults: () => ({ warnings: [], state: 'pending', reviewVersion: 0, history: [] }),
+  columns: (row) => ({
+    courseId: row.courseId,
+    revisionId: row.revisionId,
+    revisionTag: row.revisionTag,
+    draftVersion: row.draftVersion,
+    documentId: row.documentId,
+    documentHash: row.documentHash,
+    regionId: row.regionId,
+    page: row.page,
+    bbox: row.bbox,
+    sourceText: row.sourceText,
+    cropHash: row.cropHash,
+    provider: row.provider,
+    model: row.model,
+    modelVersion: row.modelVersion,
+    recognitionJobId: row.recognitionJobId,
+    usage: row.usage as unknown as Prisma.InputJsonValue,
+    latex: row.latex,
+    warnings: row.warnings,
+    identity: row.identity,
+    reviewedLatex: row.reviewedLatex,
+    state: row.state,
+    reviewVersion: row.reviewVersion,
+    history: row.history as unknown as Prisma.InputJsonValue
+  })
+});
+
+export default FormulaProposal;

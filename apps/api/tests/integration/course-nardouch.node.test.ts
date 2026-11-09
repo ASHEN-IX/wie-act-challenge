@@ -2,7 +2,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import mongoose from 'mongoose';
+import { connectDatabase, disconnectDatabase } from '../../shared/database';
+import { newId } from '../../shared/ids';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -25,19 +26,29 @@ test(
   'course mascot persists independently and graduates only on accepted checks',
   { timeout: 30000 },
   async (t) => {
-    const dbName = `test_nardouch_growth_${process.pid}_${Date.now()}`;
-    const uri = new URL(process.env.NARDOUCH_GROWTH_MONGODB_URI || 'mongodb://127.0.0.1:27017');
-    uri.pathname = '/' + dbName;
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'nardouch-growth-'));
+    process.env.DATABASE_URL =
+      process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
     process.env.INGEST_UPLOADS_DIR = path.join(root, 'uploads');
     process.env.FAISS_INDEX_DIR = path.join(root, 'indexes');
-    await mongoose.connect(uri.href);
+    await connectDatabase();
+    const runTag = `${process.pid}_${Date.now()}`;
+    const actor = 'growth-owner_' + runTag;
+    const courseIds: string[] = [];
     t.after(async () => {
-      await mongoose.connection.dropDatabase();
-      await mongoose.disconnect();
-      await fs.rm(root, { recursive: true, force: true });
+      try {
+        if (courseIds.length) {
+          await CourseNardouchProgress.deleteMany({ courseId: { $in: courseIds } });
+          await ActivityRecord.deleteMany({ courseId: { $in: courseIds } });
+          await CourseRevision.deleteMany({ courseId: { $in: courseIds } });
+        }
+        await CourseNardouchProgress.deleteMany({ userId: actor });
+        await Course.deleteMany({ userId: actor });
+      } finally {
+        await disconnectDatabase().catch(() => {});
+        await fs.rm(root, { recursive: true, force: true });
+      }
     });
-    const actor = 'growth-owner';
     const topics = Array.from({ length: 4 }, (_, i) => ({
       id: `lesson_${i}`,
       title: `Lesson ${i + 1}`,
@@ -54,6 +65,7 @@ test(
     }));
     async function seedCourse() {
       const course = await Course.create({
+        _id: newId(),
         userId: actor,
         ownerUserId: actor,
         scope: 'personal',
@@ -63,6 +75,7 @@ test(
         activeRevisionId: 'rev_growth'
       });
       const courseId = course._id.toString();
+      courseIds.push(courseId);
       await CourseRevision.create({
         courseId,
         revisionTag: 'rev_growth',
@@ -167,7 +180,7 @@ test(
         ).status,
         400
       );
-      assert.equal(await CourseNardouchProgress.countDocuments(), 0);
+      assert.equal(await CourseNardouchProgress.countDocuments({ userId: actor }), 0);
     });
     await t.test(
       'concurrent and repeated completion grows once and survives reconnect',
@@ -181,12 +194,12 @@ test(
           )
         );
         assert.equal((await getCourseNardouch(actor, courseId)).stage, 'learner');
-        await mongoose.disconnect();
-        await mongoose.connect(uri.href);
+        await disconnectDatabase();
+        await connectDatabase();
         const saved = await getCourseNardouch(actor, courseId);
         assert.deepEqual(saved.completedLessonIds, ['lesson_0']);
         assert.equal((await getCourseNardouch(actor, otherCourse)).stage, 'baby');
-        assert.equal(await CourseNardouchProgress.countDocuments(), 1);
+        assert.equal(await CourseNardouchProgress.countDocuments({ userId: actor }), 1);
       }
     );
     await t.test('reading grows Explorer and Expert without certifying graduation', async () => {

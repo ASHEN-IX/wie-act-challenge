@@ -1,15 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import mongoose from 'mongoose';
+import { connectDatabase, disconnectDatabase } from '../../shared/database';
 import { StudyRoom } from '../../modules/study/src/models/StudyRoom';
 import request from 'supertest';
 import express from 'express';
 import roomsRouter from '../../modules/study/src/routes/rooms';
 
 test('ED-17 & ED-25: LiveKit token issuance, explicit voice consent and AI moderator dispatch', async (t) => {
-  const dbUri = 'mongodb://127.0.0.1:27018/ednova_livekit_test_' + process.pid + '_' + Date.now();
-  await mongoose.connect(dbUri);
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
+  await connectDatabase();
 
   const prevApiKey = process.env.LIVEKIT_API_KEY;
   const prevApiSecret = process.env.LIVEKIT_API_SECRET;
@@ -28,9 +29,9 @@ test('ED-17 & ED-25: LiveKit token issuance, explicit voice consent and AI moder
     process.env.LIVEKIT_API_KEY = prevApiKey;
     process.env.LIVEKIT_API_SECRET = prevApiSecret;
     try {
-      await mongoose.connection.dropDatabase();
+      await StudyRoom.deleteMany({ roomId: { startsWith: 'room_livekit_fixture_' } });
     } finally {
-      await mongoose.disconnect();
+      await disconnectDatabase().catch(() => {});
     }
   });
 
@@ -65,7 +66,6 @@ test('ED-17 & ED-25: LiveKit token issuance, explicit voice consent and AI moder
   await StudyRoom.create({
     roomId,
     title: 'LiveKit Voice Room',
-    ownerUserId: learnerConsentFalse,
     hostUserId: learnerConsentFalse,
     presenterUserId: learnerConsentFalse,
     inviteCode: 'LK1234',
@@ -142,15 +142,18 @@ test('ED-17 & ED-25: LiveKit token issuance, explicit voice consent and AI moder
     }
   );
 
-  await t.test('AI moderator dispatch reports unavailable without changing room state', async () => {
-    currentActor = { userId: learnerConsentFalse, name: 'Host' };
-    const res = await request(app).post(`/api/v1/study/rooms/${roomId}/ai-moderator/dispatch`);
-    assert.equal(res.status, 503);
-    assert.equal(res.body.error, 'Voice moderator dispatch is unavailable');
+  await t.test(
+    'AI moderator dispatch reports unavailable without changing room state',
+    async () => {
+      currentActor = { userId: learnerConsentFalse, name: 'Host' };
+      const res = await request(app).post(`/api/v1/study/rooms/${roomId}/ai-moderator/dispatch`);
+      assert.equal(res.status, 503);
+      assert.equal(res.body.error, 'Voice moderator dispatch is unavailable');
 
-    const updatedRoom = await StudyRoom.findOne({ roomId }).lean();
-    assert.notEqual(updatedRoom?.facilitatorActive, true);
-  });
+      const updatedRoom = await StudyRoom.findOne({ roomId }).lean();
+      assert.notEqual(updatedRoom?.facilitatorActive, true);
+    }
+  );
 
   await t.test('host requests one dispatch and peers cannot dispatch a moderator', async () => {
     const livekit = express();

@@ -197,3 +197,8 @@ class CourseRepository:
 
 
 COURSES_USER_ID_FIELD = "userId"
+
+# The API now owns `courses`, `subjects` and `studysessions` in PostgreSQL, so
+# these lookups find nothing and every caller already degrades to
+# task-title-only context. Replace this repository with an API call when the
+# coach needs catalog context again.

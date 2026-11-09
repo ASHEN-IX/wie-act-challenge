@@ -84,7 +84,8 @@ function answer(traceId: string) {
     }
   };
 }
-const lean = (value: unknown) => ({ lean: async () => value });
+// The converted models return the row directly; `.lean()` no longer exists.
+const lean = (value: unknown) => Promise.resolve(value);
 beforeEach(() => {
   jest.clearAllMocks();
   (canReadCourse as jest.Mock).mockResolvedValue(true);
@@ -100,7 +101,7 @@ beforeEach(() => {
     artifactHash: hash,
     passages: [passage]
   });
-  (C.create as jest.Mock).mockResolvedValue({ toObject: () => record });
+  (C.create as jest.Mock).mockResolvedValue(record);
   (C.findOne as jest.Mock).mockReturnValue(lean(record));
   (C.findOneAndUpdate as jest.Mock).mockImplementation((_query, update) =>
     lean(

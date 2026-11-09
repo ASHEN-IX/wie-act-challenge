@@ -81,11 +81,33 @@ const calculateChallengeXP = ({ difficulty, baseXP }: CalculateChallengeXPParams
 };
 
 interface CompletionSession {
+  id: string;
   _id: { toString(): string } | string;
-  mode?: string;
-  duration?: number;
-  taskId?: string;
-  challengeDifficulty?: string;
+  mode?: string | null;
+  duration?: number | null;
+  taskId?: string | null;
+  challengeDifficulty?: string | null;
+  userId: string;
+  status?: string;
+  courseId?: string | null;
+  topicId?: string | null;
+  studyPlanId?: string | null;
+  taskProgress?: unknown;
+  xpMultiplier?: number;
+  startTime?: Date;
+  endTime?: Date | null;
+  focusScore?: number | null;
+  completedAt?: Date;
+  notes?: string | null;
+  signalHistory?: unknown;
+  breakStats?: unknown;
+  type?: string;
+  participants?: unknown;
+  inviteCode?: string | null;
+  maxParticipants?: number;
+  createdAt?: Date;
+  updatedAt?: Date;
+  __v?: number;
 }
 
 const getSessionCompletionContext = (session: CompletionSession) => {

@@ -6,9 +6,9 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { config } from 'dotenv';
-import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
-import { MongoClient, ObjectId } from 'mongodb';
+import { connectDatabase, disconnectDatabase, prisma } from '../shared/database';
+import { newId } from '../shared/ids';
 import amqp from 'amqplib';
 
 async function main() {
@@ -18,7 +18,7 @@ async function main() {
   if (!/^test_formula_browser_\d+$/.test(name)) throw new Error('isolated database required');
   const origin = 'http://localhost:5350';
   Object.assign(process.env, {
-    MONGODB_URI: 'mongodb://127.0.0.1:27017/' + name,
+    DATABASE_URL: `postgresql://ednova:ednova@127.0.0.1:5433/${name}`,
     BETTER_AUTH_SECRET: 'isolated-formula-browser-secret-at-least-32-chars',
     BETTER_AUTH_URL: origin,
     AUTH_TRUSTED_ORIGINS: origin,
@@ -150,22 +150,42 @@ async function main() {
   });
   await new Promise<void>((r) => mock.listen(0, '127.0.0.1', r));
   process.env.AI_SERVICE_URL = 'http://127.0.0.1:' + (mock.address() as any).port;
-  const dbClient = new MongoClient(process.env.MONGODB_URI!);
-  await dbClient.connect();
-  const db = dbClient.db();
-  const userId = new ObjectId('aaaaaaaaaaaaaaaaaaaaaaaa');
-  await db.collection('users').insertOne({
-    _id: userId,
-    email: 'formula@example.test',
-    name: 'Formula Instructor',
-    password: await bcrypt.hash('FormulaPass!123', 12),
-    isVerified: true,
-    isActive: true,
-    role: 'student',
-    tier: 'vip'
+  require('./helpers/provision-test-database')
+    .provision(name)
+    .catch(() => process.exit(1));
+  await connectDatabase();
+  const userId = 'aaaaaaaaaaaaaaaaaaaaaaaa';
+  await prisma.user.create({
+    data: {
+      id: userId,
+      email: 'formula@example.test',
+      name: 'Formula Instructor',
+      isVerified: true,
+      isActive: true,
+      role: 'student',
+      tier: 'vip',
+      notificationPreferences: {},
+      onboardingDraft: {}
+    }
   });
-  const { migrateAuth } = require('../scripts/migrate-auth');
-  await migrateAuth(db, { apply: true });
+  await prisma.authUser.create({
+    data: {
+      id: userId,
+      email: 'formula@example.test',
+      name: 'Formula Instructor',
+      emailVerified: true
+    }
+  });
+  const { randomUUID } = require('node:crypto');
+  await prisma.authAccount.create({
+    data: {
+      id: randomUUID(),
+      accountId: userId,
+      providerId: 'credential',
+      userId,
+      password: await bcrypt.hash('FormulaPass!123', 12)
+    }
+  });
   const { start } = require('../dist/main');
   const runtime = await start({ port: 5351, workers: false });
   const { Course, CourseRevision } = require('../modules/study/src/models');
@@ -264,15 +284,18 @@ async function main() {
       }
     ]
   });
-  await db.collection('formula_provider_eligibility').insertOne({
-    provider: 'gemini',
-    model: 'gemini/gemini-2.5-flash',
-    freeTier: true,
-    billingAttached: false,
-    expiresAt: new Date(Date.now() + 900000),
-    keySha256: 'mock-key-no-external-call',
-    verifiedBy: 'isolated fixture',
-    projectId: 'fixture'
+  await prisma.formulaProviderEligibility.create({
+    data: {
+      id: newId(),
+      provider: 'gemini',
+      model: 'gemini/gemini-2.5-flash',
+      freeTier: true,
+      billingAttached: false,
+      expiresAt: new Date(Date.now() + 900000),
+      keySha256: 'mock-key-no-external-call',
+      verifiedBy: 'isolated fixture',
+      projectId: 'fixture'
+    }
   });
   const child = spawn(
     process.execPath,
@@ -289,8 +312,10 @@ async function main() {
     await ch.deleteQueue(process.env.FORMULA_QUEUE!);
     await ch.close();
     await conn.close();
-    await db.dropDatabase();
-    await dbClient.close();
+    await disconnectDatabase();
+    await require('./helpers/provision-test-database')
+      .deprovision(name)
+      .catch(() => undefined);
     await fs.rm(uploads, { recursive: true, force: true });
     process.exit(0);
   }

@@ -1,5 +1,5 @@
 import { errorDetails } from '@ednova/shared/errors';
-import mongoose from 'mongoose';
+import { connectDatabase, disconnectDatabase } from '../../../../shared/database';
 import path from 'path';
 import dotenv from 'dotenv';
 import Gamification, { IGamification } from '../models/Gamification';
@@ -7,8 +7,6 @@ import Gamification, { IGamification } from '../models/Gamification';
 dotenv.config({
   path: path.resolve(__dirname, '../../../../.env')
 });
-
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/ednova';
 
 export const isChallengeCompletionAction = (action = ''): boolean => {
   const normalizedAction = String(action || '')
@@ -58,12 +56,12 @@ export function deriveStatsFromHistory(xpHistory: Array<{ action?: string }> = [
 }
 
 export async function backfill({ dryRun = false }: { dryRun?: boolean } = {}) {
-  const cursor = Gamification.find({}).cursor();
+  const rows = await Gamification.findMany({});
 
   let scanned = 0;
   let changed = 0;
 
-  for await (const profile of cursor) {
+  for (const profile of rows) {
     scanned += 1;
 
     const stats: IGamification['stats'] & {
@@ -104,7 +102,7 @@ export async function backfill({ dryRun = false }: { dryRun?: boolean } = {}) {
     };
 
     if (!dryRun) {
-      await profile.save();
+      await Gamification.save(profile);
     }
   }
 
@@ -116,7 +114,7 @@ async function main() {
   const startedAt = Date.now();
 
   try {
-    await mongoose.connect(MONGODB_URI);
+    await connectDatabase();
 
     const result = await backfill({ dryRun });
     const elapsedSeconds = ((Date.now() - startedAt) / 1000).toFixed(2);
@@ -130,7 +128,7 @@ async function main() {
     console.error('[Backfill] failed:', errorDetails(error).message);
     process.exitCode = 1;
   } finally {
-    await mongoose.disconnect();
+    await disconnectDatabase();
   }
 }
 

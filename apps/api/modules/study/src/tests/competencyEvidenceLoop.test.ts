@@ -9,6 +9,15 @@
  * casing the writer never produced.
  */
 
+/**
+ * The converted models return awaitable row lists that still expose `.lean()`.
+ */
+const leaned = <T>(value: T) => {
+  const result = Promise.resolve(value) as Promise<T> & { lean: () => Promise<T> };
+  result.lean = () => Promise.resolve(value);
+  return result;
+};
+
 jest.mock('../models/index', () => ({
   Subject: { find: jest.fn() },
   Course: { find: jest.fn() },
@@ -54,32 +63,35 @@ beforeEach(() => {
     distinct: jest.fn().mockResolvedValue([COURSE_ID])
   });
   Course.find.mockReturnValue({
-    select: jest.fn().mockReturnThis(),
-    lean: jest.fn().mockResolvedValue([
-      {
-        _id: COURSE_ID,
-        userId: 'instructor-1',
-        subjectId: SUBJECT_ID,
-        title: 'CS301',
-        topics: []
-      }
-    ])
+    select: jest.fn().mockImplementation(() =>
+      leaned([
+        {
+          _id: COURSE_ID,
+          userId: 'instructor-1',
+          subjectId: SUBJECT_ID,
+          title: 'CS301',
+          topics: []
+        }
+      ])
+    )
   });
   CourseRevision.find.mockReturnValue({
-    select: jest.fn().mockReturnThis(),
-    lean: jest
+    select: jest
       .fn()
-      .mockResolvedValue([{ courseId: COURSE_ID, revisionTag: 'rev_1', topics: revisionTopics }])
+      .mockImplementation(() =>
+        leaned([{ courseId: COURSE_ID, revisionTag: 'rev_1', topics: revisionTopics }])
+      )
   });
   Subject.find.mockReturnValue({
-    select: jest.fn().mockReturnThis(),
-    lean: jest.fn().mockResolvedValue([{ _id: SUBJECT_ID, name: 'Computer Science' }])
+    select: jest
+      .fn()
+      .mockImplementation(() => leaned([{ _id: SUBJECT_ID, name: 'Computer Science' }]))
   });
 });
 
 describe('accepted evidence becomes competency evidence', () => {
   test('writes a profile row keyed by lowercase bloom level', async () => {
-    CompetencyProfile.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) });
+    CompetencyProfile.findOne.mockResolvedValue(null);
     CompetencyProfile.findOneAndUpdate.mockResolvedValue({ _id: 'profile-1' });
 
     await recordAcceptedEvidence({
@@ -110,10 +122,8 @@ describe('accepted evidence becomes competency evidence', () => {
   });
 
   test('replaying the same evidence does not duplicate it', async () => {
-    CompetencyProfile.findOne.mockReturnValue({
-      lean: jest.fn().mockResolvedValue({
-        evidence: [{ correlationId: 'evi_abc', masteryScore: 1 }]
-      })
+    CompetencyProfile.findOne.mockResolvedValue({
+      evidence: [{ correlationId: 'evi_abc', masteryScore: 1 }]
     });
 
     await recordAcceptedEvidence({
@@ -133,18 +143,16 @@ describe('accepted evidence becomes competency evidence', () => {
 
 describe('the learner sees competency evidence for an enrolled course', () => {
   test('resolves the subject and level the attempt recorded', async () => {
-    CompetencyProfile.find.mockReturnValue({
-      lean: jest.fn().mockResolvedValue([
-        {
-          topicId: 'sub_1nf_def',
-          knowledgeType: 'procedural',
-          bloomLevel: 'analyze',
-          score: 0.74,
-          confidence: 0.64,
-          evidence: [{ objectiveId: 'obj_1nf_def' }]
-        }
-      ])
-    });
+    CompetencyProfile.find.mockResolvedValue([
+      {
+        topicId: 'sub_1nf_def',
+        knowledgeType: 'procedural',
+        bloomLevel: 'analyze',
+        score: 0.74,
+        confidence: 0.64,
+        evidence: [{ objectiveId: 'obj_1nf_def' }]
+      }
+    ]);
 
     const map = await getUserCompetencyMap('learner-1');
 
@@ -161,26 +169,24 @@ describe('the learner sees competency evidence for an enrolled course', () => {
   });
 
   test('reports British ANALYSE and American ANALYZE as one level', async () => {
-    CompetencyProfile.find.mockReturnValue({
-      lean: jest.fn().mockResolvedValue([
-        {
-          topicId: 'sub_1nf_def',
-          knowledgeType: 'conceptual',
-          bloomLevel: 'ANALYSE',
-          score: 0.5,
-          confidence: 0.4,
-          evidence: []
-        },
-        {
-          topicId: 'sub_1nf_def',
-          knowledgeType: 'procedural',
-          bloomLevel: 'ANALYZE',
-          score: 0.7,
-          confidence: 0.6,
-          evidence: []
-        }
-      ])
-    });
+    CompetencyProfile.find.mockResolvedValue([
+      {
+        topicId: 'sub_1nf_def',
+        knowledgeType: 'conceptual',
+        bloomLevel: 'ANALYSE',
+        score: 0.5,
+        confidence: 0.4,
+        evidence: []
+      },
+      {
+        topicId: 'sub_1nf_def',
+        knowledgeType: 'procedural',
+        bloomLevel: 'ANALYZE',
+        score: 0.7,
+        confidence: 0.6,
+        evidence: []
+      }
+    ]);
 
     const map = await getUserCompetencyMap('learner-1');
 
@@ -189,21 +195,19 @@ describe('the learner sees competency evidence for an enrolled course', () => {
   });
 
   test('flags a level resting on a single observation as needing review', async () => {
-    CompetencyProfile.find.mockReturnValue({
-      lean: jest.fn().mockResolvedValue([
-        {
-          topicId: 'sub_1nf_def',
-          knowledgeType: 'procedural',
-          bloomLevel: 'analyze',
-          score: 0.9,
-          // Exactly what computeConfidence yields for one observation: 1 - 0.6^1.
-          // The threshold sits above this on purpose, so the most misleading case
-          // (a high percentage from one data point) is the one that gets flagged.
-          confidence: 0.4,
-          evidence: [{ objectiveId: 'obj_1nf_def' }]
-        }
-      ])
-    });
+    CompetencyProfile.find.mockResolvedValue([
+      {
+        topicId: 'sub_1nf_def',
+        knowledgeType: 'procedural',
+        bloomLevel: 'analyze',
+        score: 0.9,
+        // Exactly what computeConfidence yields for one observation: 1 - 0.6^1.
+        // The threshold sits above this on purpose, so the most misleading case
+        // (a high percentage from one data point) is the one that gets flagged.
+        confidence: 0.4,
+        evidence: [{ objectiveId: 'obj_1nf_def' }]
+      }
+    ]);
 
     const map = await getUserCompetencyMap('learner-1');
 
@@ -211,18 +215,16 @@ describe('the learner sees competency evidence for an enrolled course', () => {
   });
 
   test('does not flag a level backed by more than one observation', async () => {
-    CompetencyProfile.find.mockReturnValue({
-      lean: jest.fn().mockResolvedValue([
-        {
-          topicId: 'sub_1nf_def',
-          knowledgeType: 'procedural',
-          bloomLevel: 'analyze',
-          score: 0.7,
-          confidence: 0.64,
-          evidence: [{ objectiveId: 'obj_1nf_def' }, { objectiveId: 'obj_1nf_def' }]
-        }
-      ])
-    });
+    CompetencyProfile.find.mockResolvedValue([
+      {
+        topicId: 'sub_1nf_def',
+        knowledgeType: 'procedural',
+        bloomLevel: 'analyze',
+        score: 0.7,
+        confidence: 0.64,
+        evidence: [{ objectiveId: 'obj_1nf_def' }, { objectiveId: 'obj_1nf_def' }]
+      }
+    ]);
 
     const map = await getUserCompetencyMap('learner-1');
 

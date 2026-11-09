@@ -1,19 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MongoClient, ObjectId } from 'mongodb';
 import bcrypt from 'bcryptjs';
-import { migrateAuth } from '../../scripts/migrate-auth';
+import { connectDatabase, disconnectDatabase, prisma } from '../../shared/database';
+import { newId } from '../../shared/ids';
 
-/** Real Nest/session/Mongo checks. All records and users are synthetic. */
+/** Real Nest/session/PostgreSQL checks. All records and users are synthetic. */
 test(
   'ED-19 instructor aggregate authorization, suppression and verified receipts',
   { timeout: 90000 },
   async (t) => {
-    const database = `ednova_ed19_${process.pid}_${Date.now()}`;
+    process.env.DATABASE_URL =
+      process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
     Object.assign(process.env, {
       NODE_ENV: 'test',
-      MONGODB_URI: `mongodb://127.0.0.1:27018/${database}`,
-      DB_NAME: database,
       BETTER_AUTH_SECRET: 'ed19-test-secret-at-least-32-characters',
       BETTER_AUTH_URL: 'http://localhost:5173',
       AUTH_TRUSTED_ORIGINS: 'http://localhost:5173',
@@ -23,38 +22,91 @@ test(
       REDIS_URL: ''
     });
     const originalThreshold = process.env.EDNOVA_ANALYTICS_MIN_COHORT;
-    const client = await new MongoClient(process.env.MONGODB_URI!).connect();
-    const db = client.db();
+    await connectDatabase();
     const runtime: {
       current?: Awaited<ReturnType<(typeof import('../../src/main.js'))['start']>>;
     } = {};
+    // One migrated database is shared by every suite; keep run-unique identity.
+    const run = `${process.pid}_${Date.now()}`;
+    const actors = ['owner', 'other', 'foreign', 'admin', 'student'].map((name) => ({
+      name,
+      id: newId(),
+      email: `ed19-${name}-${run}@synthetic.test`,
+      cookie: ''
+    }));
+    const cohort = [actors[4].id, ...Array.from({ length: 19 }, () => newId())];
+    const actorIds = actors.map((actor) => actor.id);
+    const allUserIds = [...actorIds, ...cohort];
+    let institutionIds: string[] = [];
+    let courseId = '';
     t.after(async () => {
       if (originalThreshold === undefined) delete process.env.EDNOVA_ANALYTICS_MIN_COHORT;
       else process.env.EDNOVA_ANALYTICS_MIN_COHORT = originalThreshold;
-      await runtime.current?.stop();
-      await db.dropDatabase();
-      await client.close();
+      await runtime.current?.stop().catch(() => {});
+      try {
+        await prisma.learningEvidence.deleteMany({ where: { userId: { in: allUserIds } } });
+        await prisma.studentAttempt.deleteMany({ where: { userId: { in: allUserIds } } });
+        if (courseId) {
+          await prisma.courseEnrollment.deleteMany({ where: { courseId } });
+          await prisma.courseRevision.deleteMany({ where: { courseId } });
+          await prisma.course.deleteMany({ where: { id: courseId } });
+        }
+        if (institutionIds.length)
+          await prisma.institution.deleteMany({ where: { id: { in: institutionIds } } });
+        await prisma.authSession.deleteMany({ where: { userId: { in: actorIds } } });
+        await prisma.authAccount.deleteMany({ where: { userId: { in: actorIds } } });
+        await prisma.authUser.deleteMany({ where: { id: { in: actorIds } } });
+        await prisma.user.deleteMany({ where: { id: { in: actorIds } } });
+        await prisma.authRateLimit.deleteMany({});
+      } catch {
+        /* Cleanup is best-effort; the run's rows are namespaced. */
+      } finally {
+        await disconnectDatabase().catch(() => {});
+      }
     });
-    const actors = ['owner', 'other', 'foreign', 'admin', 'student'].map((name) => ({
-      name,
-      id: new ObjectId(),
-      email: `ed19-${name}@synthetic.test`,
-      cookie: ''
-    }));
+    await prisma.authRateLimit.deleteMany({});
     const password = await bcrypt.hash('Synthetic!123', 12);
-    await db.collection('users').insertMany(
-      actors.map((actor) => ({
-        _id: actor.id,
-        name: actor.name,
-        email: actor.email,
-        password,
-        role: 'student',
-        tier: 'vip',
+    for (const actor of actors) {
+      await prisma.user.create({
+        data: {
+          id: actor.id,
+          name: actor.name,
+          email: actor.email,
+          password,
+          role: 'student',
+          tier: 'vip',
+          isActive: true,
+          isVerified: true,
+          notificationPreferences: {},
+          onboardingDraft: {}
+        }
+      });
+      await prisma.authUser.create({
+        data: { id: actor.id, email: actor.email, name: actor.name, emailVerified: true }
+      });
+      await prisma.authAccount.create({
+        data: {
+          id: newId(),
+          accountId: actor.id,
+          providerId: 'credential',
+          userId: actor.id,
+          password
+        }
+      });
+    }
+    // Cohort learners only need a domain row; they never sign in.
+    await prisma.user.createMany({
+      data: cohort.slice(1).map((id, i) => ({
+        id,
+        email: `ed19-cohort-${i}-${run}@synthetic.test`,
+        name: 'Private synthetic learner',
+        role: 'student' as const,
         isActive: true,
-        isVerified: true
+        isVerified: true,
+        notificationPreferences: {},
+        onboardingDraft: {}
       }))
-    );
-    await migrateAuth(db, { apply: true });
+    });
     const auth = await (await import('../../shared/betterAuth.js')).getAuth();
     for (const actor of actors) {
       const signed = await auth.api.signInEmail({
@@ -76,20 +128,21 @@ test(
     const models = await import('../../modules/study/src/models/index.js');
     const alpha = await models.Institution.create({
       name: 'Alpha',
-      slug: 'ed19-alpha',
+      slug: `ed19-alpha-${run}`,
       status: 'active',
-      createdByUserId: admin.id.toString()
+      createdByUserId: admin.id
     });
     const beta = await models.Institution.create({
       name: 'Beta',
-      slug: 'ed19-beta',
+      slug: `ed19-beta-${run}`,
       status: 'active',
-      createdByUserId: foreign.id.toString()
+      createdByUserId: foreign.id
     });
-    await models.InstitutionMembership.create(
+    institutionIds = [String(alpha._id), String(beta._id)];
+    await models.InstitutionMembership.createMany(
       actors.map((actor) => ({
         institutionId: actor === foreign ? beta._id : alpha._id,
-        userId: actor.id.toString(),
+        userId: actor.id,
         status: 'active',
         role:
           actor === admin
@@ -99,43 +152,32 @@ test(
               : 'instructor'
       }))
     );
-    const cohort = [student.id, ...Array.from({ length: 19 }, () => new ObjectId())];
-    await db.collection('users').insertMany(
-      cohort.slice(1).map((id, i) => ({
-        _id: id,
-        email: `ed19-cohort-${i}@synthetic.test`,
-        name: 'Private synthetic learner',
-        role: 'student',
-        isActive: true,
-        isVerified: true
-      }))
-    );
-    await models.InstitutionMembership.create(
+    await models.InstitutionMembership.createMany(
       cohort.slice(1).map((id) => ({
         institutionId: alpha._id,
-        userId: id.toString(),
+        userId: id,
         role: 'university_student',
         status: 'active'
       }))
     );
     const course = await models.Course.create({
-      userId: owner.id.toString(),
-      ownerUserId: owner.id.toString(),
+      userId: owner.id,
+      ownerUserId: owner.id,
       title: 'Owned reviewed course',
       subjectId: 'synthetic',
       scope: 'institutional',
       institutionId: alpha._id,
-      assignedInstructorIds: [owner.id.toString()],
+      assignedInstructorIds: [owner.id],
       status: 'completed',
       activeRevisionId: 'rev_analytics'
     });
-    const courseId = String(course._id),
-      hash = 'sha256:' + 'a'.repeat(64);
-    await models.CourseEnrollment.create(
+    courseId = String(course._id);
+    const hash = 'sha256:' + 'a'.repeat(64);
+    await models.CourseEnrollment.createMany(
       cohort.map((id) => ({
         courseId,
         institutionId: alpha._id,
-        userId: id.toString(),
+        userId: id,
         status: 'active'
       }))
     );
@@ -190,7 +232,7 @@ test(
       await models.LearningEvidence.create({
         evidenceId,
         evidenceVersion: '1.0.0',
-        userId: cohort[index].toString(),
+        userId: cohort[index],
         attemptId,
         activity,
         objectiveId: 'objective',
@@ -207,7 +249,7 @@ test(
       });
       await models.StudentAttempt.create({
         ...activity,
-        userId: cohort[index].toString(),
+        userId: cohort[index],
         attemptId,
         timeSpentSeconds: 1,
         answers: { value: 'PRIVATE_ANSWER_SENTINEL' },
@@ -294,7 +336,7 @@ test(
           'userId',
           'rubric',
           'storageRef',
-          cohort[0].toString()
+          cohort[0]
         ])
           assert.ok(!serialized.includes(secret), secret);
       }
@@ -314,60 +356,63 @@ test(
       }
     );
     await t.test(
-      'delivery-time revoked instructor access is denied after an actual Mongo aggregation',
+      'delivery-time revoked instructor access is denied after an actual evidence read',
       async () => {
-        const original = models.LearningEvidence.aggregate;
-        models.LearningEvidence.aggregate = function (
+        // Revoke while the service is reading evidence, which is the window the
+        // previous aggregation spy opened. The service must re-check access at
+        // delivery and refuse rather than return the rows it already read.
+        const original = models.LearningEvidence.find;
+        models.LearningEvidence.find = function (
           this: typeof models.LearningEvidence,
           ...args: Parameters<typeof original>
         ) {
-          const aggregate = original.apply(this, args);
-          const execute = aggregate.exec.bind(aggregate);
-          aggregate.exec = async function () {
-            const result = await execute();
+          const cursor = original.apply(this, args);
+          const then = cursor.then.bind(cursor);
+          cursor.then = async function (onFulfilled?: never, onRejected?: never) {
+            const rows = await then();
             await models.InstitutionMembership.updateOne(
-              { institutionId: alpha._id, userId: owner.id.toString() },
-              { $set: { status: 'suspended' } }
+              { institutionId: alpha._id, userId: owner.id },
+              { status: 'suspended' }
             );
-            return result;
-          };
-          return aggregate;
+            return then(onFulfilled, onRejected).then(() => rows);
+          } as typeof cursor.then;
+          return cursor;
         } as typeof original;
         try {
           assert.equal((await request(owner)).status, 403);
         } finally {
-          models.LearningEvidence.aggregate = original;
+          models.LearningEvidence.find = original;
           await models.InstitutionMembership.updateOne(
-            { institutionId: alpha._id, userId: owner.id.toString() },
-            { $set: { status: 'active' } }
+            { institutionId: alpha._id, userId: owner.id },
+            { status: 'active' }
           );
         }
       }
     );
     await t.test(
-      'changing the active cohort during aggregation fails closed at delivery',
+      'changing the active cohort during the read fails closed at delivery',
       async () => {
-        const original = models.LearningEvidence.aggregate;
-        models.LearningEvidence.aggregate = function (
+        const original = models.LearningEvidence.find;
+        models.LearningEvidence.find = function (
           this: typeof models.LearningEvidence,
           ...args: Parameters<typeof original>
         ) {
-          const aggregate = original.apply(this, args);
-          const execute = aggregate.exec.bind(aggregate);
-          aggregate.exec = async function () {
-            const result = await execute();
+          const cursor = original.apply(this, args);
+          const then = cursor.then.bind(cursor);
+          cursor.then = async function (onFulfilled?: never, onRejected?: never) {
+            const rows = await then();
             await models.CourseEnrollment.updateOne(
-              { courseId, userId: cohort[19].toString() },
-              { $set: { status: 'revoked' } }
+              { courseId, userId: cohort[19] },
+              { status: 'revoked' }
             );
-            return result;
-          };
-          return aggregate;
+            return then(onFulfilled, onRejected).then(() => rows);
+          } as typeof cursor.then;
+          return cursor;
         } as typeof original;
         try {
           assert.equal((await request(owner)).status, 409);
         } finally {
-          models.LearningEvidence.aggregate = original;
+          models.LearningEvidence.find = original;
         }
       }
     );

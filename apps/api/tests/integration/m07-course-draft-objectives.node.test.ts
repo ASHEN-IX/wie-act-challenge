@@ -1,11 +1,13 @@
 import { cleanupCourseFixtures, prepareCourseFixture } from '../helpers/reviewedActivityFixture';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import mongoose from 'mongoose';
+import { connectDatabase, disconnectDatabase } from '../../shared/database';
+import { newId } from '../../shared/ids';
 import {
   Course,
   CourseEnrollment,
   CourseRevision,
+  Institution,
   InstitutionMembership
 } from '../../modules/study/src/models';
 import {
@@ -17,17 +19,14 @@ import {
 } from '../../modules/study/src/services/courseDraft';
 import { handleIngestResult } from '../../modules/study/src/services/ingestStatus';
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27018/ednova-test';
-
 test('M07 / ED-30: Course Studio Versioned Draft APIs & Learning Objectives', async (t) => {
-  await mongoose.connect(MONGO_URI);
-  const db = mongoose.connection.db!;
+  await connectDatabase();
 
   const testPrefix = `m07_${Date.now()}`;
   const instructorId = `${testPrefix}_instructor`;
   const studentId = `${testPrefix}_student`;
   const foreignUserId = `${testPrefix}_foreign`;
-  const institutionId = new mongoose.Types.ObjectId();
+  const institutionId = newId();
 
   let courseId: string;
   let initialRevisionTag: string;
@@ -35,22 +34,26 @@ test('M07 / ED-30: Course Studio Versioned Draft APIs & Learning Objectives', as
   t.after(async () => {
     await cleanupCourseFixtures();
     try {
-      if (courseId) {
-        await db
-          .collection('course_revisions')
-          .deleteMany({ courseId: new mongoose.Types.ObjectId(courseId) });
-      }
-      await db.collection('courses').deleteMany({ userId: { $regex: testPrefix } });
-      await db.collection('course_enrollments').deleteMany({ userId: { $regex: testPrefix } });
-      await db.collection('institution_memberships').deleteMany({ userId: { $regex: testPrefix } });
+      if (courseId) await CourseRevision.deleteMany({ courseId });
+      await Course.deleteMany({ userId: { contains: testPrefix } });
+      await CourseEnrollment.deleteMany({ userId: { contains: testPrefix } });
+      await InstitutionMembership.deleteMany({ userId: { contains: testPrefix } });
     } catch {
       // ignore
     } finally {
-      await mongoose.disconnect().catch(() => {});
+      await disconnectDatabase().catch(() => {});
     }
   });
 
   await t.test('Setup: Create institutional course with draft revision', async () => {
+    // Memberships carry a foreign key to the institution, so it exists first.
+    await Institution.create({
+      id: institutionId,
+      name: 'M07 Studio Institution',
+      slug: `m07-${institutionId}`,
+      createdByUserId: instructorId,
+      status: 'active'
+    });
     // Add instructor membership
     await InstitutionMembership.create({
       institutionId,
@@ -119,14 +122,14 @@ test('M07 / ED-30: Course Studio Versioned Draft APIs & Learning Objectives', as
     await prepareCourseFixture(courseId, t);
 
     await CourseEnrollment.create({
-      courseId: courseDoc._id,
+      courseId: courseId,
       userId: studentId,
       status: 'active'
     });
 
     initialRevisionTag = `rev_${Date.now()}`;
     await CourseRevision.create({
-      courseId: courseDoc._id,
+      courseId,
       revisionTag: initialRevisionTag,
       contentHash: 'hash_initial',
       status: 'draft',
@@ -223,9 +226,10 @@ test('M07 / ED-30: Course Studio Versioned Draft APIs & Learning Objectives', as
     const reReadDraft = await getCourseDraft(instructorId, courseId);
     assert.equal(reReadDraft.revisionTag, updateRes.revisionTag);
     assert.equal(reReadDraft.isInstructorReviewed, true);
-    assert.equal(reReadDraft.topics!.length, 2);
-    assert.equal(reReadDraft.topics![0].title, 'Corrected Topic 1: Advanced Consensus');
-    assert.equal(reReadDraft.topics![1].title, 'New Topic 2: Byzantine Fault Tolerance');
+    const reReadTopics = reReadDraft.topics as Array<{ title: string }>;
+    assert.equal(reReadTopics.length, 2);
+    assert.equal(reReadTopics[0].title, 'Corrected Topic 1: Advanced Consensus');
+    assert.equal(reReadTopics[1].title, 'New Topic 2: Byzantine Fault Tolerance');
   });
 
   await t.test(
@@ -301,7 +305,7 @@ test('M07 / ED-30: Course Studio Versioned Draft APIs & Learning Objectives', as
     async () => {
       // Create an immutable published revision
       const publishedRev = await CourseRevision.create({
-        courseId: new mongoose.Types.ObjectId(courseId),
+        courseId: courseId,
         revisionTag: 'rev_published_v1',
         contentHash: 'hash_pub',
         status: 'published',
@@ -345,7 +349,7 @@ test('M07 / ED-30: Course Studio Versioned Draft APIs & Learning Objectives', as
 
       // Verify published revision content was not mutated!
       const verifyPub = await CourseRevision.findById(publishedRev._id);
-      assert.equal(verifyPub!.topics![0].title, 'Published Topic v1');
+      assert.equal((verifyPub!.topics as Array<{ title: string }>)[0].title, 'Published Topic v1');
     }
   );
 
@@ -358,9 +362,9 @@ test('M07 / ED-30: Course Studio Versioned Draft APIs & Learning Objectives', as
         courseId,
         ...(activeTag.startsWith('rev_') ? { revisionTag: activeTag } : { _id: activeTag })
       }).lean();
-      assert.ok(active?.topics?.length);
+      assert.ok((active?.topics as unknown[])?.length);
       const stale = await CourseRevision.create({
-        courseId: new mongoose.Types.ObjectId(courseId),
+        courseId: courseId,
         revisionTag: 'rev_stale_empty_shell',
         contentHash: 'empty',
         status: 'draft',
@@ -370,8 +374,8 @@ test('M07 / ED-30: Course Studio Versioned Draft APIs & Learning Objectives', as
 
       const draft = await getCourseDraft(instructorId, courseId);
       assert.notEqual(draft.revisionTag, stale.revisionTag);
-      assert.equal(draft.topics.length, active.topics.length);
-      assert.notEqual(draft.topics[0].title, '');
+      assert.equal((draft.topics as unknown[]).length, (active!.topics as unknown[]).length);
+      assert.notEqual((draft.topics as Array<{ title: string }>)[0].title, '');
       assert.equal((await CourseRevision.findById(stale._id))!.status, 'draft');
       assert.equal((await Course.findById(courseId))!.activeRevisionId, activeTag);
     }
@@ -415,8 +419,9 @@ test('M07 / ED-30: Course Studio Versioned Draft APIs & Learning Objectives', as
 
       // Verify that the instructor reviewed topics were preserved
       const preservedDraft = await getCourseDraft(instructorId, courseId);
-      assert.notEqual(preservedDraft.topics[0].title, 'LATE AI OVERWRITE ATTEMPT');
-      assert.equal(preservedDraft.topics[0].title, 'Draft v2 Topic');
+      const preservedTopics = preservedDraft.topics as Array<{ title: string }>;
+      assert.notEqual(preservedTopics[0].title, 'LATE AI OVERWRITE ATTEMPT');
+      assert.equal(preservedTopics[0].title, 'Draft v2 Topic');
     }
   );
 

@@ -1,21 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { MongoClient, ObjectId } from 'mongodb';
 import bcrypt from 'bcryptjs';
-import { migrateAuth } from '../../scripts/migrate-auth';
+import { connectDatabase, disconnectDatabase, prisma } from '../../shared/database';
+import { newId } from '../../shared/ids';
+import { StudyRoom } from '../../modules/study/src/models';
 import { DEFAULT_BINARY_SEARCH } from '../../shared/visualization';
 
 test(
   'ED-35 real authenticated deterministic room cursor, replay and privacy',
   { timeout: 90000 },
   async (t) => {
-    const database = `ednova_ed35_${process.pid}_${Date.now()}`;
-    const uri = `mongodb://127.0.0.1:27018/${database}`;
+    process.env.DATABASE_URL =
+      process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
     Object.assign(process.env, {
       NODE_ENV: 'test',
-      MONGODB_URI: uri,
-      DB_NAME: database,
       BETTER_AUTH_SECRET: 'ed35-test-secret-at-least-32-characters',
       BETTER_AUTH_URL: 'http://localhost:5173',
       AUTH_TRUSTED_ORIGINS: 'http://localhost:5173',
@@ -24,36 +23,67 @@ test(
       RABBITMQ_URL: 'amqp://127.0.0.1:1',
       REDIS_URL: ''
     });
-    const client = await new MongoClient(uri).connect(),
-      db = client.db();
+    await connectDatabase();
     const runtime: {
       current?: Awaited<ReturnType<(typeof import('../../src/main.js'))['start']>>;
     } = {};
-    t.after(async () => {
-      await runtime.current?.stop();
-      await db.dropDatabase();
-      await client.close();
-    });
     const password = await bcrypt.hash('Synthetic!123', 12);
+    // One migrated database is shared by every suite; keep run-unique identity.
+    const run = `${process.pid}_${Date.now()}`;
     const actors = ['presenter', 'peer', 'late', 'outsider'].map((name) => ({
-      id: new ObjectId(),
+      id: newId(),
       name,
-      email: `ed35-${name}@synthetic.test`,
+      email: `ed35-${name}-${run}@synthetic.test`,
       cookie: ''
     }));
-    await db.collection('users').insertMany(
-      actors.map((actor) => ({
-        _id: actor.id,
-        email: actor.email,
-        name: actor.name,
-        password,
-        role: 'student',
-        tier: 'vip',
-        isActive: true,
-        isVerified: true
-      }))
-    );
-    await migrateAuth(db, { apply: true });
+    const ids = actors.map((actor) => actor.id);
+    t.after(async () => {
+      await runtime.current?.stop().catch(() => {});
+      try {
+        await StudyRoom.deleteMany({ hostUserId: { $in: ids } });
+        await prisma.studentAttempt.deleteMany({ where: { userId: { in: ids } } });
+        await prisma.learningEvidence.deleteMany({ where: { userId: { in: ids } } });
+        await prisma.learningRewardLedger.deleteMany({ where: { userId: { in: ids } } });
+        await prisma.authSession.deleteMany({ where: { userId: { in: ids } } });
+        await prisma.authAccount.deleteMany({ where: { userId: { in: ids } } });
+        await prisma.authUser.deleteMany({ where: { id: { in: ids } } });
+        await prisma.user.deleteMany({ where: { id: { in: ids } } });
+        await prisma.authRateLimit.deleteMany({});
+      } catch {
+        /* Cleanup is best-effort; the run's rows are namespaced. */
+      } finally {
+        await disconnectDatabase().catch(() => {});
+      }
+    });
+    await prisma.authRateLimit.deleteMany({});
+    for (const actor of actors) {
+      await prisma.user.create({
+        data: {
+          id: actor.id,
+          email: actor.email,
+          name: actor.name,
+          password,
+          role: 'student',
+          tier: 'vip',
+          isActive: true,
+          isVerified: true,
+          notificationPreferences: {},
+          onboardingDraft: {}
+        }
+      });
+      await prisma.authUser.create({
+        data: { id: actor.id, email: actor.email, name: actor.name, emailVerified: true }
+      });
+      await prisma.authAccount.create({
+        data: {
+          id: newId(),
+          accountId: actor.id,
+          providerId: 'credential',
+          userId: actor.id,
+          password
+        }
+      });
+    }
     const auth = await (await import('../../shared/betterAuth.js')).getAuth();
     for (const actor of actors) {
       const response = await auth.api.signInEmail({
@@ -143,9 +173,9 @@ test(
         const snapshot = await request(peer, 'GET', endpoint);
         assert.equal(snapshot.body.state.step, 1);
         assert.equal(snapshot.body.seq, initial.body.seq + 1);
-        const row = await db.collection('study_rooms').findOne({ roomId });
+        const row = await StudyRoom.findOne({ roomId });
         assert.equal(
-          row?.commandReceipts.filter(
+          row!.commandReceipts.filter(
             (receipt: { commandId: string }) => receipt.commandId === next.commandId
           ).length,
           1
@@ -221,7 +251,7 @@ test(
         const handoff = await request(presenter, 'PUT', '/' + roomId + '/presenter', {
           commandId: randomUUID(),
           expectedSeq: current.seq,
-          presenterUserId: peer.id.toString()
+          presenterUserId: peer.id
         });
         assert.equal(handoff.status, 200);
         assert.equal((await request(presenter, 'PUT', endpoint, next)).status, 403);
@@ -244,9 +274,13 @@ test(
     await t.test(
       'illustration has no assessment, accepted evidence or reward side effects',
       async () => {
-        assert.equal(await db.collection('student_attempts').countDocuments(), 0);
-        assert.equal(await db.collection('learning_evidences').countDocuments(), 0);
-        assert.equal(await db.collection('learning_reward_awards').countDocuments(), 0);
+        // Scoped to this suite's actors: the migrated database is shared.
+        assert.equal(await prisma.studentAttempt.count({ where: { userId: { in: ids } } }), 0);
+        assert.equal(await prisma.learningEvidence.count({ where: { userId: { in: ids } } }), 0);
+        assert.equal(
+          await prisma.learningRewardLedger.count({ where: { userId: { in: ids } } }),
+          0
+        );
         const projected = JSON.stringify((await request(peer, 'GET', endpoint)).body);
         for (const privateKey of ['answers', 'rubric', 'attemptId', 'userId', 'commandReceipts'])
           assert.ok(!projected.includes(privateKey));

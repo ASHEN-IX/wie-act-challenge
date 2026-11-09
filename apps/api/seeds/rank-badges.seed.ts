@@ -6,16 +6,16 @@
 
 /* eslint-disable no-console */
 
-import mongoose from 'mongoose';
+import type { Prisma } from '../src/generated/prisma/client';
 import path from 'path';
 import dotenv from 'dotenv';
+import { connectDatabase, disconnectDatabase, prisma } from '../shared/database';
+import { newId } from '../shared/ids';
+import { RANK_LADDER } from '../modules/user-profile/src/models/rankingConfig';
 
 dotenv.config({
   path: path.resolve(__dirname, '../.env')
 });
-
-import { RANK_LADDER } from '../modules/user-profile/src/models/rankingConfig';
-import RankBadge from '../modules/user-profile/src/models/RankBadge';
 
 const SINGLE_BADGE_TIERS = new Set(['grandmaster', 'legend']);
 const DIVISION_TO_BADGE_KEY: Record<string, string> = {
@@ -30,78 +30,49 @@ function toBadgeKey(rank: any): string {
   return DIVISION_TO_BADGE_KEY[String(rank?.division || '').toUpperCase()] || 'use';
 }
 
-function buildBadgeDoc(rank: any) {
+function buildBadgeDoc(rank: any): Prisma.RankBadgeUncheckedCreateInput {
   const tier = String(rank.tier || 'novice').toLowerCase();
   const badgeKey = toBadgeKey(rank);
 
   return {
-    rankIndex: rank.index,
-    rankName: rank.name,
+    id: newId(),
+    rankIndex: Number(rank.index),
+    rankName: String(rank.name),
     tier,
     division: rank.division || null,
-    badgeKey,
+    badgeKey: badgeKey as Prisma.RankBadgeUncheckedCreateInput['badgeKey'],
     // The rebrand removed the per-tier badge PNGs; point at a shipped asset.
     imagePath: '/brand/noveris-symbol.svg',
     isActive: true
   };
 }
 
-function buildMongoCandidates(): string[] {
-  const primary =
-    process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/ednova';
-
-  const candidates = [primary];
-  if (primary.includes('host.docker.internal')) {
-    candidates.push(primary.replace(/host\.docker\.internal/g, 'localhost'));
-  }
-
-  const localhostDefault = 'mongodb://localhost:27017/ednova';
-  if (!candidates.includes(localhostDefault)) {
-    candidates.push(localhostDefault);
-  }
-
-  return candidates;
-}
-
-async function connectToMongoWithFallback(): Promise<string> {
-  const candidates = buildMongoCandidates();
-  let lastError: any = null;
-
-  for (const uri of candidates) {
-    try {
-      console.log(`Connecting to MongoDB: ${uri}`);
-      await mongoose.connect(uri);
-      console.log('Connected to MongoDB');
-      return uri;
-    } catch (error: any) {
-      lastError = error;
-      console.warn(`MongoDB connection failed for ${uri}: ${error.message}`);
-
-      if (mongoose.connection.readyState !== 0) {
-        await mongoose.disconnect();
-      }
-    }
-  }
-
-  throw lastError || new Error('Failed to connect to MongoDB');
-}
-
+/** Badge tiers are keyed by `rankIndex`, so a re-run updates the same rows. */
 async function seedRankBadges(): Promise<void> {
   try {
-    await connectToMongoWithFallback();
+    if (process.env.NODE_ENV === 'production') throw new Error('Demo seeding is development only');
+    const url = process.env.DATABASE_URL;
+    if (!url || !['localhost', '127.0.0.1', '[::1]'].includes(new URL(url).hostname))
+      throw new Error('Rank badge seeding requires a loopback PostgreSQL database');
 
+    await connectDatabase();
     const badgeDocs = RANK_LADDER.map(buildBadgeDoc);
-
-    await (RankBadge as any).deleteMany({});
-    await (RankBadge as any).insertMany(badgeDocs, { ordered: true });
+    for (const badge of badgeDocs) {
+      const { id: _id, rankIndex, ...rest } = badge;
+      await prisma.rankBadge.upsert({
+        where: { rankIndex },
+        update: rest,
+        create: badge
+      });
+    }
 
     console.log(`Seeded ${badgeDocs.length} rank badges`);
     console.log('Rank badge seed complete');
-
-    await mongoose.connection.close();
   } catch (error: any) {
     console.error('Rank badge seed failed:', error.message);
-    process.exit(1);
+    process.exitCode = 1;
+  } finally {
+    await disconnectDatabase();
   }
 }
 

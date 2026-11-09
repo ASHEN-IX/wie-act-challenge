@@ -160,7 +160,7 @@ router.post('/team/:sessionId/join', async (req: DomainRequest, res: Response) =
       4: 1.25
     };
     session.xpMultiplier = multipliers[Math.min(activeCount, 4)] || 1.25;
-    await session.save();
+    await StudySession.save(session);
 
     // Notify host
     try {
@@ -235,7 +235,7 @@ router.post('/team/join-by-code', async (req: DomainRequest, res: Response) => {
       4: 1.25
     };
     session.xpMultiplier = multipliers[Math.min(activeCount, 4)] || 1.25;
-    await session.save();
+    await StudySession.save(session);
 
     // Notify host
     try {
@@ -290,7 +290,7 @@ router.post('/team/:sessionId/leave', async (req: DomainRequest, res: Response) 
         error: 'Not in this session'
       });
     participant.leftAt = new Date();
-    await session.save();
+    await StudySession.save(session);
     res.json({
       message: 'Left team session'
     });
@@ -470,13 +470,17 @@ router.put('/team/:sessionId/voice-consent', async (req: DomainRequest, res: Res
     (session.courseId && !(await canReadCourse(actor, session.courseId)))
   )
     return res.status(403).json({ error: 'Session access denied' });
+  // `participants` is a JSON column: rewrite the array from the row already
+  // read rather than addressing one element positionally.
+  const participants = (session.participants || []).map(
+    (participant: { userId: string; leftAt?: Date | null }) =>
+      participant.userId === actor && !participant.leftAt
+        ? { ...participant, hasVoiceConsent: req.body.hasVoiceConsent }
+        : participant
+  );
   const changed = await StudySession.updateOne(
-    {
-      _id: session._id,
-      status: 'active',
-      participants: { $elemMatch: { userId: actor, leftAt: { $exists: false } } }
-    },
-    { $set: { 'participants.$.hasVoiceConsent': req.body.hasVoiceConsent } }
+    { _id: session._id, status: 'active' },
+    { participants }
   );
   if (
     !changed.matchedCount ||
@@ -556,7 +560,7 @@ router.put('/team/:sessionId/end', async (req: DomainRequest, res: Response) => 
     session.participants.forEach((p) => {
       if (!p.leftAt) p.leftAt = now;
     });
-    await session.save();
+    await StudySession.save(session);
 
     // Award XP to each participant with participant-specific auth context.
     const participantMap = new Map();

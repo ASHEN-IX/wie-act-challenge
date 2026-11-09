@@ -12,11 +12,7 @@ function requestFixture(input: {
   if (input.user) req.user = { userId: 'fixture-user', role: 'student', ...input.user };
   return req;
 }
-import {
-  requireInternal,
-  buildInternalHeaders,
-  isInternalRequest
-} from '@ednova/shared/auth';
+import { requireInternal, buildInternalHeaders, isInternalRequest } from '@ednova/shared/auth';
 
 const ORIG_SECRET = process.env.INTERNAL_API_SECRET;
 

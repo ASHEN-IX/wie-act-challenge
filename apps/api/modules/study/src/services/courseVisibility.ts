@@ -16,8 +16,8 @@ export class VisibilityError extends Error {
 
 /** Courses created before this field existed keep their old meaning. */
 export function effectiveVisibility(course: {
-  scope?: string;
-  visibility?: string;
+  scope?: string | null;
+  visibility?: string | null;
 }): CourseVisibility {
   if (course.visibility === 'public') return 'public';
   return course.scope === 'institutional' ? 'institution' : 'private';
@@ -40,6 +40,8 @@ export async function setCourseVisibility(userId: string, courseId: string, valu
   const course = await Course.findById(courseId).select(
     'scope visibility activeRevisionId userId ownerUserId'
   );
+  // `.select()` narrows the projection at the database, so the row still carries
+  // the columns `Course.save()` needs once `visibility` is added.
   if (!course) throw new VisibilityError(404, 'Course not found');
   const institutional = course.scope === 'institutional';
 
@@ -64,7 +66,7 @@ export async function setCourseVisibility(userId: string, courseId: string, valu
     }
   }
   course.visibility = visibility;
-  await course.save();
+  await Course.save(course);
   return { visibility };
 }
 
@@ -100,33 +102,28 @@ export async function listPublicCourses(
     .sort({ updatedAt: -1 })
     .skip(skip)
     .limit(limit)
-    .select('title description subjectId scope institutionId topics userId ownerUserId')
-    .lean();
+    .select('title description subjectId scope institutionId topics userId ownerUserId');
 
   const institutionIds = [
     ...new Set(courses.filter((c) => c.institutionId).map((c) => String(c.institutionId)))
   ];
   const institutions = institutionIds.length
-    ? await Institution.find({ _id: { $in: institutionIds }, status: 'active' })
-        .select('name')
-        .lean()
+    ? await Institution.find({ _id: { $in: institutionIds }, status: 'active' }).select('name')
     : [];
   const names = new Map(institutions.map((i) => [String(i._id), i.name as string]));
   const joins = await PublicCourseJoin.find({
     userId,
     courseId: { $in: courses.map((c) => c._id) }
-  })
-    .select('courseId')
-    .lean();
+  }).select('courseId');
   const joined = new Set(joins.map((j) => String(j.courseId)));
 
   return courses
     .filter((c) => c.scope !== 'institutional' || names.has(String(c.institutionId)))
-    .map((c) => ({
+    .map((c): PublicCourseSummary => ({
       id: String(c._id),
       title: c.title,
-      description: c.description,
-      subjectId: c.subjectId,
+      description: c.description ?? undefined,
+      subjectId: c.subjectId ?? undefined,
       institutionName: c.institutionId ? names.get(String(c.institutionId)) : undefined,
       topicsCount: c.topics?.length || 0,
       joined: joined.has(String(c._id)),
@@ -140,9 +137,7 @@ async function requirePublicCourse(courseId: string) {
     _id: courseId,
     visibility: 'public',
     activeRevisionId: { $exists: true, $nin: [null, ''] }
-  })
-    .select('_id scope institutionId')
-    .lean();
+  }).select('_id scope institutionId');
   if (!course) throw new VisibilityError(404, 'Course not found');
   if (
     course.scope === 'institutional' &&
@@ -159,9 +154,9 @@ async function requirePublicCourse(courseId: string) {
 /** Add a public course to "My learning". Idempotent. */
 export async function joinPublicCourse(userId: string, courseId: string) {
   const course = await requirePublicCourse(courseId);
-  await PublicCourseJoin.updateOne(
-    { userId, courseId: course._id },
-    { $setOnInsert: { userId, courseId: course._id } },
+  await PublicCourseJoin.findOneAndUpdate(
+    { userId, courseId: course.id },
+    { $setOnInsert: { userId, courseId: course.id } },
     { upsert: true }
   );
   return { joined: true };
@@ -174,6 +169,6 @@ export async function leavePublicCourse(userId: string, courseId: string) {
 }
 
 export async function joinedPublicCourseIds(userId: string): Promise<string[]> {
-  const joins = await PublicCourseJoin.find({ userId }).select('courseId').lean();
+  const joins = await PublicCourseJoin.find({ userId }).select('courseId');
   return joins.map((j) => String(j.courseId));
 }

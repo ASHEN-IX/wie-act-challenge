@@ -1,6 +1,12 @@
 import crypto from 'node:crypto';
-import mongoose, { Schema } from 'mongoose';
+import { Prisma } from '../../../../src/generated/prisma/client';
+import { prisma } from '../../../../shared/database';
 import { StudyRoom, StudentAttempt } from '../models';
+import type {
+  RoomLearningCheck,
+  RoomLearningProposal
+} from '../../../../src/generated/prisma/client';
+import { table } from '../models/_table';
 import { canReadCourse } from './resourceAccess';
 import { validateRoomRevision, resolveRoomActivity, sameActivityPin } from './roomActivity';
 import { ActivityBoundaryError } from './activityResolution';
@@ -8,35 +14,38 @@ import { submitAttempt, getAttemptResult } from './activityAttempt';
 import { runRoomCommand } from './roomCommands';
 import SessionChat from '../../../notification/src/models/SessionChat';
 
-const proposalSchema = new Schema(
-  {
-    proposalId: { type: String, unique: true },
-    roomId: String,
-    presenterUserId: String,
-    expectedSeq: Number,
-    activePin: Schema.Types.Mixed,
-    targetPhase: String,
-    message: String,
-    commandId: String,
-    status: { type: String, default: 'proposed' },
-    expiresAt: Date
-  },
-  { timestamps: true, writeConcern: { w: 'majority', j: true } }
-);
-const Proposal =
-  mongoose.models.RoomLearningProposal || mongoose.model('RoomLearningProposal', proposalSchema);
-const checkSchema = new Schema(
-  {
-    checkId: { type: String, unique: true },
-    roomId: String,
-    round: String,
-    userId: String,
-    attemptId: String,
-    activity: Schema.Types.Mixed
-  },
-  { timestamps: true, writeConcern: { w: 'majority', j: true } }
-);
-const Check = mongoose.models.RoomLearningCheck || mongoose.model('RoomLearningCheck', checkSchema);
+/** Room learning proposals and per-round private check rows. */
+export const Proposal = table<RoomLearningProposal>({
+  delegate: () => prisma.roomLearningProposal,
+  jsonColumns: ['activePin'],
+  defaults: () => ({ status: 'proposed' }),
+  columns: (row) => ({
+    proposalId: row.proposalId,
+    roomId: row.roomId,
+    presenterUserId: row.presenterUserId,
+    expectedSeq: row.expectedSeq,
+    activePin: row.activePin as unknown as Prisma.InputJsonValue,
+    targetPhase: row.targetPhase,
+    message: row.message,
+    commandId: row.commandId,
+    status: row.status,
+    expiresAt: row.expiresAt
+  })
+});
+
+export const Check = table<RoomLearningCheck>({
+  delegate: () => prisma.roomLearningCheck,
+  jsonColumns: ['activity'],
+  columns: (row) => ({
+    checkId: row.checkId,
+    roomId: row.roomId,
+    round: row.round,
+    userId: row.userId,
+    attemptId: row.attemptId,
+    activity: row.activity as unknown as Prisma.InputJsonValue
+  })
+});
+
 const fail = (status: number, message: string) => {
   throw new ActivityBoundaryError(status, 'ROOM_LEARNING', message);
 };
@@ -62,8 +71,8 @@ export async function ownRoomCheck(actor: string, roomId: string, checkId?: stri
   if (checkId && checkId !== ownId) return fail(404, 'Private check not found');
   const resolved = await resolveRoomActivity(actor, room, room.activeActivityId);
   if (!sameActivityPin(room.activePin, resolved.pin)) return fail(409, 'Room activity changed');
-  await Check.collection.createIndex({ checkId: 1 }, { unique: true });
-  await Check.updateOne(
+  // Unique checkId keeps the per-round private check single-writer.
+  await Check.findOneAndUpdate(
     { checkId: ownId },
     {
       $setOnInsert: {
@@ -77,16 +86,15 @@ export async function ownRoomCheck(actor: string, roomId: string, checkId?: stri
     },
     { upsert: true }
   );
-  const check = await Check.findOne({ checkId: ownId, userId: actor }).lean<{
-    attemptId: string;
-  }>();
+  const check = await Check.findOne({ checkId: ownId, userId: actor });
   if (!check) return fail(503, 'Check unavailable');
+  const typedCheck = check as unknown as { attemptId: string };
   const receipt = await StudentAttempt.findOne({
     userId: actor,
-    attemptId: check.attemptId
-  }).lean();
+    attemptId: typedCheck.attemptId
+  });
   const result = receipt
-    ? await getAttemptResult(actor, check.attemptId, room.activeActivityId)
+    ? await getAttemptResult(actor, typedCheck.attemptId, room.activeActivityId)
     : null;
   const current = await activeLearningRoom(actor, roomId);
   if (
@@ -98,7 +106,7 @@ export async function ownRoomCheck(actor: string, roomId: string, checkId?: stri
     status: result ? (result.status === 'graded' ? 'completed' : result.status) : 'pending',
     checkId: ownId,
     recipientUserId: actor,
-    attemptId: check.attemptId,
+    attemptId: typedCheck.attemptId,
     activity: resolved.definition,
     result
   };
@@ -154,9 +162,7 @@ export async function proposeRoomSupport(actor: string, roomId: string) {
     const a = await resolveRoomActivity(actor, room, room.activeActivityId);
     if (!sameActivityPin(room.activePin, a.pin)) return fail(409, 'Activity pin mismatch');
   }
-  const journal = await SessionChat.findOne({ sessionId: roomId, messageType: 'peer_stream' })
-    .select('peerMessages')
-    .lean();
+  const journal = await SessionChat.readPeerJournal(roomId);
   const participating = new Set(
     (journal?.peerMessages || [])
       .filter((m) => room.participants.some((p) => !p.leftAt && p.userId === m.senderUserId))
@@ -218,7 +224,7 @@ export async function decideRoomSupport(
     return { status: 200, body: { status: 'declined' } };
   }
   if (
-    (proposal.status !== 'accepted' && proposal.expiresAt.getTime() < Date.now()) ||
+    (proposal.status !== 'accepted' && (proposal.expiresAt?.getTime() ?? 0) < Date.now()) ||
     !sameActivityPin(room.activePin || null, proposal.activePin || null)
   )
     return fail(409, 'Stale proposal');

@@ -30,7 +30,7 @@ This document outlines the security architecture, controls, threat mitigations, 
          │
          ▼
 [Protected Data & Infrastructure]
-         ├──► MongoDB ─────────────── Model-Layer Casts, NoSQL Injection Immunity
+         ├──► PostgreSQL ─────────────── Model-Layer Casts, NoSQL Injection Immunity
          ├──► Redis ───────────────── Rate Limiting State, Token Buckets
          ├──► RabbitMQ ────────────── Authenticated VHosts, TLS Broker Connections
          └──► Independent AI ──────── Strict URL Origin Whitelist, Egress Guard
@@ -44,7 +44,7 @@ This document outlines the security architecture, controls, threat mitigations, 
 - **Protocol**: HTTP-only, `SameSite=Lax`, `Secure` (in production) cookies managed by Better Auth.
 - **Token Leakage Prevention**: Bearer tokens are completely eliminated from `localStorage` and `sessionStorage`. Client JavaScript cannot read session credentials.
 - **Session Lifecycle**:
-  - Logins issue unique session identifiers stored in MongoDB `auth_sessions`.
+  - Logins issue unique session identifiers stored in PostgreSQL `auth_sessions`.
   - Logouts invalidate the database session immediately and clear the cookie.
   - Password resets invalidate all active sessions for the target user.
 
@@ -115,7 +115,7 @@ This document outlines the security architecture, controls, threat mitigations, 
 ## 5. Input Validation & Injection Mitigations
 
 ### 5.1. NoSQL Injection
-- All database operations utilize Mongoose schemas with strict types. User inputs cannot alter MongoDB query operators (`$ne`, `$where`, `$gt`).
+- All database operations utilize Prisma queries with strict types. User inputs cannot alter PostgreSQL query operators (`$ne`, `$where`, `$gt`).
 
 ### 5.2. Request Payload Validation
 - NestJS uses `ContractParameterPipe` backed by Joi validation schemas.
@@ -143,7 +143,7 @@ File uploads (`/api/v1/study/courses`, `/api/v1/study/courses/:id/files`, `/uplo
 - **Client vs. Server Isolation**:
   - `apps/web` environment variables expose NO sensitive credentials.
   - Variables prefixed with `NEXT_PUBLIC_*` contain only safe public settings (such as app title or public URLs).
-  - Secrets (`BETTER_AUTH_SECRET`, `INTERNAL_API_SECRET`, `MONGODB_URI`, `STRIPE_SECRET_KEY`, `RABBITMQ_PASS`) are strictly isolated to server-side environments.
+  - Secrets (`BETTER_AUTH_SECRET`, `INTERNAL_API_SECRET`, `DATABASE_URL`, `STRIPE_SECRET_KEY`, `RABBITMQ_PASS`) are strictly isolated to server-side environments.
 - **Internal API Calls**:
   - Monolith internal service routes (`/api/v1/notifications/internal`, `/api/v1/monitoring/metrics`) require `x-internal-secret` matching `INTERNAL_API_SECRET`.
 

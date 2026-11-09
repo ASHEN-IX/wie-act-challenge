@@ -10,7 +10,9 @@
  */
 
 import crypto from 'node:crypto';
-import mongoose from 'mongoose';
+import { Prisma } from '../../../../src/generated/prisma/client';
+import { prisma } from '../../../../shared/database';
+import { newId } from '../../../../shared/ids';
 import { Course } from '../models';
 import { canManageCourse } from './resourceAccess';
 
@@ -43,12 +45,62 @@ export class PlanningGovernanceError extends Error {
   }
 }
 
-function collections() {
-  const db = mongoose.connection.db!;
-  return {
-    consent: db.collection('experience_planning_consents'),
-    eligibility: db.collection('experience_planner_eligibility'),
-  };
+/**
+ * Both tables are generic `payload` rows (the fields vary by provider and
+ * purpose), so the documented consent/eligibility keys live in `payload` and
+ * are matched after hydration. Reads are bounded by the typed identity columns.
+ */
+type ConsentRow = { id: string; payload: Record<string, unknown> };
+
+async function findConsent(where: Partial<PlanningConsentRecord>): Promise<ConsentRow | null> {
+  // Consent is matched on identity/documentPurpose fields. `purpose` is
+  // re-checked by the caller: a row for a different purpose must never be
+  // treated as this purpose's authorization.
+  const rows = await prisma.experiencePlanningConsent.findMany({
+    where: {
+      ...(where.courseId ? { payload: { path: ['courseId'], equals: where.courseId } } : {})
+    }
+  });
+  for (const row of rows) {
+    const payload = (row.payload ?? {}) as Record<string, unknown>;
+    // `purpose` is excluded here: the caller re-checks it so a row recorded for
+    // another purpose is refused with CONSENT_PURPOSE_MISMATCH, not silently
+    // treated as absent.
+    if (
+      Object.entries(where).every(([key, value]) => key === 'purpose' || payload[key] === value)
+    ) {
+      return { id: row.id, payload };
+    }
+  }
+  return null;
+}
+
+async function findEligibility(where: Record<string, unknown>) {
+  const rows = await prisma.experiencePlannerEligibility.findMany({
+    where: {
+      ...(typeof where.provider === 'string' ? { provider: where.provider } : {}),
+      ...(typeof where.model === 'string' ? { model: where.model } : {})
+    }
+  });
+  for (const row of rows) {
+    const payload = { ...(row.payload as Record<string, unknown>) };
+    if (
+      Object.entries(where).every(([key, value]) => {
+        if (key === 'provider' || key === 'model')
+          return (row as unknown as Record<string, unknown>)[key] === value;
+        if (key === 'revoked') {
+          const expected = value as { $ne?: unknown } | boolean;
+          return typeof expected === 'object' && expected !== null && '$ne' in expected
+            ? payload.revoked !== expected.$ne
+            : payload.revoked === expected;
+        }
+        return payload[key] === value;
+      })
+    ) {
+      return { ...row, ...payload } as Record<string, unknown>;
+    }
+  }
+  return null;
 }
 
 export type PlanningConsentRecord = {
@@ -82,9 +134,9 @@ export async function grantPlanningConsent(
     model: string;
     termsVersion: string;
     ttlMs?: number;
-  },
+  }
 ): Promise<PlanningConsentRecord> {
-  const course = await Course.findById(input.courseId).lean();
+  const course = await Course.findById(input.courseId);
   if (!course) throw new PlanningGovernanceError('PLANNING_FORBIDDEN', 404);
   if (![course.ownerUserId, course.userId].includes(actor))
     throw new PlanningGovernanceError('OWNER_CONSENT_REQUIRED');
@@ -98,8 +150,8 @@ export async function grantPlanningConsent(
         PLANNING_CONSENT_PURPOSE,
         input.provider,
         input.model,
-        input.termsVersion,
-      ]),
+        input.termsVersion
+      ])
     )
     .digest('hex');
 
@@ -118,15 +170,29 @@ export async function grantPlanningConsent(
     grantedAt,
     expiresAt,
     revoked: false,
-    termsVersion: input.termsVersion,
+    termsVersion: input.termsVersion
   };
 
-  await collections().consent.createIndex({ identity: 1 }, { unique: true });
-  await collections().consent.updateOne(
-    { identity },
-    { $set: record },
-    { upsert: true },
-  );
+  const existing = await findConsent({ identity });
+  if (existing) {
+    await prisma.experiencePlanningConsent.update({
+      where: { id: existing.id },
+      data: {
+        userId: actor,
+        scope: PLANNING_CONSENT_PURPOSE,
+        payload: record as unknown as Prisma.InputJsonValue
+      }
+    });
+  } else {
+    await prisma.experiencePlanningConsent.create({
+      data: {
+        id: newId(),
+        userId: actor,
+        scope: PLANNING_CONSENT_PURPOSE,
+        payload: record as unknown as Prisma.InputJsonValue
+      }
+    });
+  }
   return record;
 }
 
@@ -134,15 +200,33 @@ export async function grantPlanningConsent(
  * happened may proceed after this returns. */
 export async function revokePlanningConsent(
   actor: string,
-  input: { courseId: string; revisionId: string },
+  input: { courseId: string; revisionId: string }
 ): Promise<{ revoked: number }> {
   if (!(await canManageCourse(actor, input.courseId)))
     throw new PlanningGovernanceError('PLANNING_FORBIDDEN');
-  const result = await collections().consent.updateMany(
-    { courseId: input.courseId, revisionId: input.revisionId, revoked: false },
-    { $set: { revoked: true, revokedAt: new Date(), revokedBy: actor } },
-  );
-  return { revoked: result.modifiedCount };
+  // Match the documented (courseId, revisionId, revoked) keys inside payload,
+  // then revoke each matching row.
+  const rows = await prisma.experiencePlanningConsent.findMany({
+    where: { payload: { path: ['courseId'], equals: input.courseId } }
+  });
+  let revoked = 0;
+  for (const row of rows) {
+    const payload = (row.payload ?? {}) as Record<string, unknown>;
+    if (payload.revisionId !== input.revisionId || payload.revoked !== false) continue;
+    await prisma.experiencePlanningConsent.update({
+      where: { id: row.id },
+      data: {
+        payload: {
+          ...payload,
+          revoked: true,
+          revokedAt: new Date(),
+          revokedBy: actor
+        } as unknown as Prisma.InputJsonValue
+      }
+    });
+    revoked++;
+  }
+  return { revoked };
 }
 
 /**
@@ -164,12 +248,13 @@ export async function assertPlanningAuthorized(input: {
   if (!(await canManageCourse(input.actor, input.courseId)))
     throw new PlanningGovernanceError('PLANNING_FORBIDDEN');
 
-  const consent = await collections().consent.findOne({
+  const consentRow = await findConsent({
     courseId: input.courseId,
     revisionId: input.revisionId,
     purpose: PLANNING_CONSENT_PURPOSE,
-    provider: input.provider,
+    provider: input.provider
   });
+  const consent = consentRow?.payload as unknown as PlanningConsentRecord | undefined;
   if (!consent) throw new PlanningGovernanceError('OWNER_CONSENT_REQUIRED');
   if (consent.revoked) throw new PlanningGovernanceError('CONSENT_REVOKED');
   if (consent.purpose !== PLANNING_CONSENT_PURPOSE)
@@ -179,16 +264,15 @@ export async function assertPlanningAuthorized(input: {
 
   // Eligibility is a separate, operator-verified record. The existence of an
   // API key never implies eligibility.
-  const eligible = await collections().eligibility.findOne({
+  const eligible = await findEligibility({
     provider: input.provider,
     model: input.model,
-    revoked: { $ne: true },
+    revoked: { $ne: true }
   });
   if (!eligible) throw new PlanningGovernanceError('FREE_TIER_UNVERIFIED', 503);
-  if (eligible.billingAttached === true)
-    throw new PlanningGovernanceError('BILLING_ATTACHED', 503);
+  if (eligible.billingAttached === true) throw new PlanningGovernanceError('BILLING_ATTACHED', 503);
   if (eligible.freeTier !== true) throw new PlanningGovernanceError('FREE_TIER_UNVERIFIED', 503);
-  if (new Date(eligible.expiresAt).getTime() <= Date.now())
+  if (new Date(eligible.expiresAt as string).getTime() <= Date.now())
     throw new PlanningGovernanceError('ELIGIBILITY_EXPIRED', 503);
   if (!eligible.verifiedBy || !eligible.projectId)
     throw new PlanningGovernanceError('OPERATOR_APPROVAL_MISSING', 503);

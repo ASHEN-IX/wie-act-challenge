@@ -4,8 +4,11 @@
  * its existence alone never suppresses an unapplied balance update.
  */
 import crypto from 'node:crypto';
-import Gamification, { type IGamification } from '../models/Gamification';
+import Gamification, { type GamificationEvidenceAward } from '../models/Gamification';
 import { LearningRewardLedger } from '../models/LearningRewardLedger';
+import { Prisma } from '../../../../src/generated/prisma/client';
+import { prisma } from '../../../../shared/database';
+import { newId } from '../../../../shared/ids';
 import { LearningEvidence, StudentAttempt } from '../../../study/src/models';
 import { resolveStoredActivity } from '../../../study/src/services/activityResolution';
 import { canReadCourse } from '../../../study/src/services/resourceAccess';
@@ -22,10 +25,13 @@ export class LearningRewardError extends Error {
     super(code === 'FORBIDDEN' ? 'Learning evidence unavailable' : 'Learning reward unavailable');
   }
 }
-type Marker = NonNullable<IGamification['evidenceAwards']>[number];
+type Marker = GamificationEvidenceAward;
 const hash = (value: unknown) =>
   crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
-const duplicate = (e: unknown) => (e as { code?: number }).code === 11000;
+// Prisma reports a unique violation as `P2002`; the driver used `11000`. The
+// migration preserves the driver code, so accept either.
+const duplicate = (e: unknown) =>
+  (e as { code?: number | string }).code === 11000 || (e as { code?: string }).code === 'P2002';
 const badgeDefinitions = [
   {
     id: 'learning_first_check',
@@ -47,14 +53,14 @@ const badgeDefinitions = [
   }
 ];
 async function ready() {
-  await Promise.all([Gamification.init(), LearningRewardLedger.init()]);
+  // Indexes are created by Prisma migrations; nothing to warm up at runtime.
 }
 async function eligible(actor: string, evidenceId: string) {
   const evidence = await LearningEvidence.findOne({
     userId: actor,
     evidenceId,
     status: 'accepted'
-  }).lean();
+  });
   if (!evidence) throw new LearningRewardError(404, 'FORBIDDEN');
   if (
     !evidence.masteryAchieved ||
@@ -136,47 +142,60 @@ export async function awardAcceptedLearningEvidence(
   ]);
   const awardId = 'award_' + hash([actor, completionKey]).slice(0, 40);
   try {
-    await LearningRewardLedger.updateOne(
-      { userId: actor, completionKey },
-      {
-        $setOnInsert: {
-          userId: actor,
-          completionKey,
-          awardId,
-          evidenceId,
-          policyVersion: POLICY,
-          status: 'pending'
-        }
-      },
-      { upsert: true }
-    );
+    await prisma.learningRewardLedger.upsert({
+      where: { userId_completionKey: { userId: actor, completionKey } },
+      update: {},
+      create: {
+        id: newId(),
+        userId: actor,
+        completionKey,
+        awardId,
+        evidenceId,
+        policyVersion: POLICY,
+        status: 'pending'
+      }
+    });
   } catch (e) {
     if (!duplicate(e)) throw e;
   }
   await fault?.('afterClaim');
   try {
-    await Gamification.updateOne(
-      { userId: actor },
-      { $setOnInsert: { userId: actor } },
-      { upsert: true }
-    );
+    await prisma.gamification.upsert({
+      where: { userId: actor },
+      update: {},
+      create: {
+        id: newId(),
+        userId: actor,
+        stats: {
+          coursesUploaded: 0,
+          tasksCompleted: 0,
+          perfectSessions: 0,
+          currentStreak: 0,
+          longestStreak: 0,
+          friendsAdded: 0,
+          teamSessions: 0,
+          groupSessions: 0,
+          challengesCompleted: 0
+        }
+      }
+    });
   } catch (e) {
     if (!duplicate(e)) throw e;
   }
   let applied: Marker | undefined;
   for (let retry = 0; retry < 100; retry++) {
-    const profile = await Gamification.findOne({ userId: actor }).lean();
+    const profile = await Gamification.findOne({ userId: actor });
     if (!profile) throw new LearningRewardError(503, 'PERSISTENCE_UNAVAILABLE');
     const markers = profile.evidenceAwards || [];
-    applied = markers.find((m) => m.completionKey === completionKey);
+    applied = markers.find((m: Marker) => m.completionKey === completionKey);
     if (applied) break;
     if (markers.length >= MAX_MARKERS)
       throw new LearningRewardError(503, 'REWARD_STORAGE_CAPACITY');
     const day = new Date(evidence.timestamp).toISOString().slice(0, 10);
     const topicKey = hash([evidence.activity.courseId, topicId]);
     const daily = markers
-      .filter((m) => m.day === day && m.topicKey === topicKey)
-      .reduce((s, m) => s + m.xp, 0);
+      .filter((m: Marker) => m.day === day && m.topicKey === topicKey)
+      .reduce((sum: number, m: Marker) => sum + m.xp, 0);
     const xp = Math.max(0, Math.min(XP, DAILY_TOPIC_CAP - daily));
     const marker: Marker = {
       awardId,
@@ -197,33 +216,27 @@ export async function awardAcceptedLearningEvidence(
     };
     const all = [...markers, marker];
     const eligibleBadges = badgeDefinitions.filter((b, i) =>
-      i === 0 ? all.length >= 1 : i === 1 ? all.length >= 5 : all.some((m) => m.group)
+      i === 0 ? all.length >= 1 : i === 1 ? all.length >= 5 : all.some((m: Marker) => m.group)
     );
     const achievements = [...profile.achievements];
     for (const badge of eligibleBadges)
-      if (!achievements.some((b) => b.id === badge.id))
+      if (!achievements.some((b: { id: string }) => b.id === badge.id))
         achievements.push({ ...badge, unlockedAt: new Date() });
     if (!(await canReadCourse(actor, evidence.activity.courseId)))
       throw new LearningRewardError(403, 'FORBIDDEN');
     const totalXp = profile.totalXp + xp;
-    const version = (profile as unknown as { __v?: number }).__v;
-    const updated = await Gamification.collection.updateOne(
-      {
-        _id: profile._id,
-        ...(version === undefined ? { __v: { $exists: false } } : { __v: version })
-      },
-      {
-        $set: {
-          totalXp,
-          level: Math.floor(totalXp / 100) + 1,
-          evidenceAwards: all,
-          achievements,
-          updatedAt: new Date()
-        },
-        $inc: { __v: 1 }
+    // The `__v` guard is now a conditional update on the row version, so a
+    // concurrent writer that already applied a marker makes this write a no-op.
+    const updated = await prisma.gamification.updateMany({
+      where: { id: profile.id, updatedAt: profile.updatedAt },
+      data: {
+        totalXp,
+        level: Math.floor(totalXp / 100) + 1,
+        evidenceAwards: all as unknown as Prisma.InputJsonValue,
+        achievements: achievements as unknown as Prisma.InputJsonValue
       }
-    );
-    if (updated.modifiedCount) {
+    });
+    if (updated.count) {
       applied = marker;
       break;
     }
@@ -232,19 +245,21 @@ export async function awardAcceptedLearningEvidence(
   await fault?.('afterApply');
   await LearningRewardLedger.updateOne(
     { userId: actor, completionKey },
-    {
-      $set: { status: 'applied', xp: applied.xp, reason: applied.reason, appliedAt: new Date() }
-    }
+    { status: 'applied', xp: applied.xp, reason: applied.reason, appliedAt: new Date() }
   );
-  await LearningEvidence.updateOne(
-    { userId: actor, evidenceId },
-    {
-      $set: {
-        'rewardReference.finalAwardId': applied.awardId,
-        'rewardReference.policyVersion': POLICY
+  const evidenceRow = await LearningEvidence.findOne({ userId: actor, evidenceId });
+  if (evidenceRow) {
+    await LearningEvidence.updateOne(
+      { id: evidenceRow.id },
+      {
+        rewardReference: {
+          ...(evidenceRow.rewardReference ?? {}),
+          finalAwardId: applied.awardId,
+          policyVersion: POLICY
+        } as unknown as Prisma.InputJsonValue
       }
-    }
-  );
+    );
+  }
   if (!(await canReadCourse(actor, evidence.activity.courseId)))
     throw new LearningRewardError(403, 'FORBIDDEN');
   return {
@@ -258,22 +273,23 @@ export async function awardAcceptedLearningEvidence(
 
 /** Pure read: refreshing never creates an award or repeats a notification. */
 export async function learningRewardSummary(actor: string) {
-  const profile = await Gamification.findOne({ userId: actor }).lean();
+  const profile = await Gamification.findOne({ userId: actor });
   const awards = profile?.evidenceAwards || [];
   const totalXp = profile?.totalXp || 0;
-  const pending = await LearningRewardLedger.countDocuments({ userId: actor, status: 'pending' });
-  const pendingAwards = await LearningRewardLedger.find({ userId: actor, status: 'pending' })
-    .limit(20)
-    .lean();
+  const pending = (await LearningRewardLedger.findMany({ userId: actor, status: 'pending' }))
+    .length;
+  const pendingAwards = (
+    await LearningRewardLedger.findMany({ userId: actor, status: 'pending' })
+  ).slice(0, 20);
   return {
     totalXp,
     level: Math.floor(totalXp / 100) + 1,
     levelProgress: totalXp % 100,
     nextLevelXp: 100,
-    learningXp: awards.reduce((s, a) => s + a.xp, 0),
-    legacyXp: totalXp - awards.reduce((s, a) => s + a.xp, 0),
+    learningXp: awards.reduce((sum: number, a: Marker) => sum + a.xp, 0),
+    legacyXp: totalXp - awards.reduce((sum: number, a: Marker) => sum + a.xp, 0),
     pending,
-    pendingAwards: pendingAwards.map((a) => ({
+    pendingAwards: pendingAwards.map((a: { awardId: string; evidenceId: string }) => ({
       awardId: String(a.awardId),
       evidenceId: String(a.evidenceId)
     })),

@@ -30,13 +30,19 @@ const mockProfile = {
 };
 
 jest.mock('../models/UserProfile', () => ({
-  findOne: jest.fn(),
-  create: jest.fn(),
-  findOneAndUpdate: jest.fn()
+  __esModule: true,
+  default: {
+    findOne: jest.fn(),
+    create: jest.fn(),
+    findOneAndUpdate: jest.fn(),
+    findMany: jest.fn(),
+    updateOne: jest.fn(),
+    save: jest.fn()
+  }
 }));
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const UserProfile = require('../models/UserProfile');
+const UserProfile = require('../models/UserProfile').default;
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const profileRoutes = require('../routes/profile');
 

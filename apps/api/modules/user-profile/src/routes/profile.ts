@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import { logger } from '@ednova/shared';
 import UserProfile from '../models/UserProfile';
 import Gamification from '../models/Gamification';
+import { jsonOrNull } from '../models/_helpers';
 import {
   defaultLearningProfile,
   normalizeLearningProfile,
@@ -118,7 +119,7 @@ const addGoalSchema = Joi.object({
 const requireUserLevel = async (userId: string, minLevel: number) => {
   let gamification = await Gamification.findOne({ userId });
   if (!gamification) {
-    gamification = await Gamification.create({ userId });
+    gamification = await Gamification.create(userId);
   }
   return {
     level: gamification.level || 1,
@@ -149,7 +150,7 @@ router.get('/', async (req: DomainRequest, res: Response) => {
         req.headers['x-forwarded-proto'] || req.headers['x-forwarded-protocol'];
       const host = forwardedHost || req.get('host') || 'localhost:3000';
       const protocol = forwardedProto || req.protocol || 'http';
-      const profileObj = profile.toObject();
+      const profileObj = { ...profile };
       profileObj.avatar = `${protocol}://${host}${profileObj.avatar}`;
       return res.json({ profile: profileObj });
     }
@@ -164,9 +165,11 @@ router.get('/', async (req: DomainRequest, res: Response) => {
 // route exposes this document, and it is never copied into friend profiles.
 router.get('/learning', async (req: DomainRequest, res: Response) => {
   res.setHeader('Cache-Control', 'private, no-store');
-  const profile = await UserProfile.findOne({ userId: req.user!.userId }).lean();
+  const profile = await UserProfile.findOne({ userId: req.user!.userId });
   const stored = profile?.learningProfile as LearningProfile | null | undefined;
-  res.json({ learningProfile: stored ? normalizeLearningProfile(stored) : defaultLearningProfile() });
+  res.json({
+    learningProfile: stored ? normalizeLearningProfile(stored) : defaultLearningProfile()
+  });
 });
 
 router.put('/learning', async (req: DomainRequest, res: Response) => {
@@ -175,7 +178,7 @@ router.put('/learning', async (req: DomainRequest, res: Response) => {
     return res.status(400).json({ error: 'Invalid learning preferences' });
   }
   const userId = req.user!.userId;
-  const existing = await UserProfile.findOne({ userId }).lean();
+  const existing = await UserProfile.findOne({ userId });
   const base = existing?.learningProfile
     ? normalizeLearningProfile(existing.learningProfile)
     : defaultLearningProfile();
@@ -186,8 +189,8 @@ router.put('/learning', async (req: DomainRequest, res: Response) => {
   }
   await UserProfile.findOneAndUpdate(
     { userId },
-    { $set: { learningProfile: next }, $setOnInsert: { userId } },
-    { upsert: true, new: true }
+    { learningProfile: jsonOrNull(next) },
+    { upsert: true }
   );
   res.json({ learningProfile: next });
 });
@@ -200,8 +203,8 @@ router.delete('/learning', async (req: DomainRequest, res: Response) => {
   const cleared: LearningProfile = { ...defaultLearningProfile(), onboardingStatus: 'skipped' };
   await UserProfile.findOneAndUpdate(
     { userId },
-    { $set: { learningProfile: cleared }, $setOnInsert: { userId } },
-    { upsert: true, new: true }
+    { learningProfile: jsonOrNull(cleared) },
+    { upsert: true }
   );
   res.json({ learningProfile: cleared });
 });
@@ -241,7 +244,7 @@ router.put('/', upload.single('avatarFile'), async (req: DomainRequest, res: Res
       profile.preferences = { ...profile.preferences, ...value.preferences };
     }
 
-    await profile.save();
+    await UserProfile.save(profile);
   }
 
   // Log avatar hash + length instead of the full base64 payload (SEC-08)
@@ -296,7 +299,7 @@ router.patch('/stats', async (req: DomainRequest, res: Response) => {
     profile.stats.completedTasks += tasksCompleted;
   }
 
-  await profile.save();
+  await UserProfile.save(profile);
 
   res.json({
     message: 'Stats updated',
@@ -337,7 +340,7 @@ router.post('/goals', async (req: DomainRequest, res: Response) => {
     current: 0
   });
 
-  await profile.save();
+  await UserProfile.save(profile);
 
   res.status(201).json({
     message: 'Goal added',
@@ -358,7 +361,8 @@ router.patch('/goals/:goalId', async (req: DomainRequest, res: Response) => {
   }
 
   if (typeof goalId !== 'string') return res.status(404).json({ error: 'Goal not found' });
-  const goal = profile.goals.id(goalId);
+  const goalIndex = Number(goalId);
+  const goal = Number.isInteger(goalIndex) ? profile.goals[goalIndex] : undefined;
 
   if (!goal) {
     return res.status(404).json({ error: 'Goal not found' });
@@ -372,7 +376,7 @@ router.patch('/goals/:goalId', async (req: DomainRequest, res: Response) => {
     goal.completed = completed;
   }
 
-  await profile.save();
+  await UserProfile.save(profile);
 
   res.json({
     message: 'Goal updated',
@@ -391,8 +395,11 @@ router.delete('/goals/:goalId', async (req: DomainRequest, res: Response) => {
     return res.status(404).json({ error: 'Profile not found' });
   }
 
-  profile.goals.pull(goalId);
-  await profile.save();
+  const goalIndex = Number(goalId);
+  if (Number.isInteger(goalIndex) && profile.goals[goalIndex]) {
+    profile.goals = profile.goals.filter((_goal, index) => index !== goalIndex);
+    await UserProfile.save(profile);
+  }
 
   res.json({ message: 'Goal deleted' });
 });
@@ -439,9 +446,7 @@ router.get('/online-status/batch', async (req: DomainRequest, res: Response) => 
       return res.json({ statuses: [] });
     }
 
-    const profiles = await UserProfile.find({ userId: { $in: rawUserIds } })
-      .select('userId onlineStatus lastSeenAt updatedAt privacy')
-      .lean();
+    const profiles = await UserProfile.findMany({ userId: { in: rawUserIds } });
 
     const now = Date.now();
     const ACTIVE_WINDOW_MS = 2 * 60 * 1000;
@@ -502,7 +507,7 @@ router.put('/privacy', async (req: DomainRequest, res: Response) => {
     if (showStats !== undefined) profile.privacy.showStats = showStats;
     if (allowRequests !== undefined) profile.privacy.allowRequests = allowRequests;
 
-    await profile.save();
+    await UserProfile.save(profile);
     res.json({ message: 'Privacy settings updated', privacy: profile.privacy });
   } catch (error) {
     console.error('Error updating privacy:', error);
@@ -574,7 +579,7 @@ router.post('/background/apply', async (req: DomainRequest, res: Response) => {
       };
     }
 
-    await profile.save();
+    await UserProfile.save(profile);
     res.json({
       message: 'Background applied',
       backgroundSettings: profile.backgroundSettings,
@@ -644,7 +649,7 @@ router.post(
         speed: profile.animatedBackgroundSettings?.speed ?? 1
       };
 
-      await profile.save();
+      await UserProfile.save(profile);
       res.json({
         message: 'Background uploaded',
         backgroundSettings: profile.backgroundSettings,
@@ -686,11 +691,8 @@ router.get('/media/:filename', async (req: DomainRequest, res: Response, next: N
     if (typeof filename !== 'string' || !/^[a-f0-9-]{36}\.(mp4|webm|mov|avi)$/.test(filename))
       return res.sendStatus(404);
     const url = `/api/v1/users/profile/media/${filename}`;
-    const owner = await UserProfile.exists({
-      userId: req.user!.userId,
-      'animatedBackgroundSettings.videoUrl': url
-    });
-    if (!owner) return res.sendStatus(404);
+    const ownerProfile = await UserProfile.findOne({ userId: req.user!.userId });
+    if (ownerProfile?.animatedBackgroundSettings?.videoUrl !== url) return res.sendStatus(404);
     res.setHeader('Cache-Control', 'private, no-store');
     return res.sendFile(path.join(mediaDirectory, filename), (error) => {
       if (error && !res.headersSent) next(error);
@@ -770,7 +772,7 @@ router.post(
         position: profile.backgroundSettings?.position ?? 'cover'
       };
 
-      await profile.save();
+      await UserProfile.save(profile);
       res.json({
         message: 'Animated background video uploaded',
         animatedBackgroundSettings: profile.animatedBackgroundSettings,
@@ -836,7 +838,7 @@ router.post('/animated-background/apply', async (req: DomainRequest, res: Respon
       };
     }
 
-    await profile.save();
+    await UserProfile.save(profile);
     res.json({
       message: 'Animated background applied',
       animatedBackgroundSettings: profile.animatedBackgroundSettings,
@@ -992,7 +994,7 @@ router.get('/level', async (req: DomainRequest, res: Response) => {
     const userId = req.user!.userId;
     let gamification = await Gamification.findOne({ userId });
     if (!gamification) {
-      gamification = await Gamification.create({ userId });
+      gamification = await Gamification.create(userId);
     }
 
     const level = gamification.level;

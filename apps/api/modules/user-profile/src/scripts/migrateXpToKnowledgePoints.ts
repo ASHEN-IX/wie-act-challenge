@@ -1,10 +1,12 @@
 /* eslint-disable no-console */
 import dotenv from 'dotenv';
 dotenv.config();
-import mongoose from 'mongoose';
+import { Prisma } from '../../../../src/generated/prisma/client';
+import { connectDatabase, disconnectDatabase } from '../../../../shared/database';
 import UserRankProfile from '../models/UserRankProfile';
 import Gamification from '../models/Gamification';
 import RankSeason from '../models/RankSeason';
+import { newId } from '../../../../shared/ids';
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -24,24 +26,28 @@ async function ensureActiveSeason() {
   const now = new Date();
   const seasonCode = toSeasonCode(now);
 
-  let activeSeason = await RankSeason.findOne({
-    status: 'active',
-    startAt: { $lte: now },
-    $or: [{ endAt: null }, { endAt: { $gt: now } }]
-  }).sort({ startAt: -1 });
+  let activeSeason = await RankSeason.getActiveSeason(now);
 
   if (activeSeason) return activeSeason;
 
-  activeSeason = await RankSeason.findOne({ seasonCode, status: { $in: ['upcoming', 'active'] } });
+  activeSeason = await RankSeason.findOne({
+    seasonCode,
+    status: { in: ['upcoming', 'active'] }
+  });
   if (activeSeason) {
-    activeSeason.status = 'active';
-    if (!activeSeason.startAt) activeSeason.startAt = now;
-    if (activeSeason.endAt && activeSeason.endAt <= now) activeSeason.endAt = null;
-    await activeSeason.save();
-    return activeSeason;
+    await RankSeason.updateOne(
+      { id: activeSeason.id },
+      {
+        status: 'active',
+        startAt: activeSeason.startAt || now,
+        endAt: activeSeason.endAt && activeSeason.endAt <= now ? null : activeSeason.endAt
+      }
+    );
+    return (await RankSeason.findOne({ id: activeSeason.id })) as typeof activeSeason;
   }
 
   return RankSeason.create({
+    id: newId(),
     seasonCode,
     name: `Season ${seasonCode}`,
     status: 'active',
@@ -50,14 +56,14 @@ async function ensureActiveSeason() {
       lowBracketDrop: 3,
       highBracketDrop: 5,
       seasonFloorIndex: 3
-    }
+    } as unknown as Prisma.InputJsonValue
   });
 }
 
 async function upsertProfile(
   userId: string,
   totalXp: number,
-  activeSeasonId: mongoose.Types.ObjectId,
+  activeSeasonId: string,
   dryRun: boolean
 ) {
   const initialKP = toInitialKp(totalXp);
@@ -65,7 +71,7 @@ async function upsertProfile(
   const isNew = !profile;
 
   if (!profile) {
-    profile = new UserRankProfile({ userId });
+    profile = await UserRankProfile.create(userId);
   }
 
   profile.currentSeasonId = profile.currentSeasonId || activeSeasonId;
@@ -80,10 +86,10 @@ async function upsertProfile(
     ? profile.comebackBonusRemaining
     : 0;
 
-  profile.syncRankFromPoints();
+  UserRankProfile.syncRankFromPoints(profile);
 
   if (!dryRun) {
-    await profile.save();
+    await UserRankProfile.save(profile);
   }
 
   return { isNew, initialKP };
@@ -91,15 +97,14 @@ async function upsertProfile(
 
 async function run() {
   const dryRun = process.argv.includes('--dry-run');
-  const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/ednova';
 
-  await mongoose.connect(mongoUri);
-  console.log(`[KP Migration] Connected to MongoDB (${dryRun ? 'dry-run' : 'write'})`);
+  await connectDatabase();
+  console.log(`[KP Migration] Connected to PostgreSQL (${dryRun ? 'dry-run' : 'write'})`);
 
   const activeSeason = await ensureActiveSeason();
-  const activeSeasonId = activeSeason._id;
+  const activeSeasonId = activeSeason.id;
 
-  const gamificationRows = await Gamification.find({}).select('userId totalXp').lean();
+  const gamificationRows = await Gamification.findMany({});
   const processedUserIds = new Set();
 
   let created = 0;
@@ -113,9 +118,9 @@ async function run() {
   }
 
   // Profiles without gamification rows still get minimum KP baseline.
-  const orphanProfiles = await UserRankProfile.find({
-    userId: { $nin: [...processedUserIds] }
-  }).select('userId');
+  const orphanProfiles = await UserRankProfile.findMany({
+    userId: { notIn: Array.from(processedUserIds) as string[] }
+  });
 
   for (const profile of orphanProfiles) {
     const result = await upsertProfile(profile.userId, 0, activeSeasonId, dryRun);
@@ -128,14 +133,14 @@ async function run() {
   console.log(`[KP Migration] Updated profiles: ${updated}`);
   console.log(`[KP Migration] Season used: ${activeSeason.seasonCode}`);
 
-  await mongoose.disconnect();
+  await disconnectDatabase();
 }
 
 if (require.main === module) {
   run().catch(async (error) => {
     console.error('[KP Migration] Failed:', error);
     try {
-      await mongoose.disconnect();
+      await disconnectDatabase();
     } catch (disconnectError) {
       console.error(
         '[KP Migration] Disconnect failed:',

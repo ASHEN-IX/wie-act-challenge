@@ -1,4 +1,6 @@
-import { Model, Schema, Types, model, models } from 'mongoose';
+import type { PublicCourseJoin as PublicCourseJoinRow } from '../../../../src/generated/prisma/client';
+import { prisma } from '../../../../shared/database';
+import { table } from './_table';
 
 /**
  * A learner who added a public course to "My learning".
@@ -7,21 +9,11 @@ import { Model, Schema, Types, model, models } from 'mongoose';
  * instructor analytics, and a public learner is not an institution member. This
  * record grants nothing by itself; access comes from the course being public.
  */
-export interface IPublicCourseJoin {
-  userId: string;
-  courseId: Types.ObjectId;
-  createdAt: Date;
-}
+export type IPublicCourseJoin = PublicCourseJoinRow & { _id: string };
 
-const schema = new Schema<IPublicCourseJoin>(
-  {
-    userId: { type: String, required: true, index: true },
-    courseId: { type: Schema.Types.ObjectId, ref: 'Course', required: true }
-  },
-  { collection: 'public_course_joins', timestamps: { createdAt: true, updatedAt: false } }
-);
-schema.index({ userId: 1, courseId: 1 }, { unique: true });
+export const PublicCourseJoin = table<IPublicCourseJoin>({
+  delegate: () => prisma.publicCourseJoin,
+  columns: (row) => ({ userId: row.userId, courseId: row.courseId })
+});
 
-export const PublicCourseJoin: Model<IPublicCourseJoin> =
-  (models.PublicCourseJoin as Model<IPublicCourseJoin>) ||
-  model<IPublicCourseJoin>('PublicCourseJoin', schema);
+export default PublicCourseJoin;

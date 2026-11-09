@@ -17,8 +17,6 @@ const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => 
 });
 afterAll(() => exitSpy.mockRestore());
 
-import mongoose from 'mongoose';
-
 const mockStudySession = {
   _id: 'session-1',
   userId: 'user-123',
@@ -36,6 +34,14 @@ jest.mock('../models/index', () => ({
     findOne: jest.fn().mockReturnValue(mockSessionQuery(mockStudySession)),
     find: jest.fn()
   }
+}));
+
+// The coach job lookup now reads the orchestrator's AiJob model instead of a
+// raw `ai_jobs` collection.
+const mockAiJobFindOne = jest.fn();
+jest.mock('../../../ai-orchestrator/src/models/AiJob', () => ({
+  __esModule: true,
+  default: { findOne: mockAiJobFindOne }
 }));
 
 jest.mock('@ednova/shared/moduleClient', () => ({
@@ -300,9 +306,7 @@ describe('GET /api/v1/coach/jobs/:jobId', () => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
-    jest
-      .spyOn(mongoose.connection.collection('ai_jobs'), 'findOne')
-      .mockImplementation(collectionFindOne);
+    mockAiJobFindOne.mockImplementation(collectionFindOne);
 
     const res = await request(app).get('/api/v1/coach/jobs/job-1').set('Cookie', token);
 
@@ -318,9 +322,7 @@ describe('GET /api/v1/coach/jobs/:jobId', () => {
 
   it('adds userId scoping so another user cannot read the job', async () => {
     const collectionFindOne = jest.fn().mockResolvedValue(null);
-    jest
-      .spyOn(mongoose.connection.collection('ai_jobs'), 'findOne')
-      .mockImplementation(collectionFindOne);
+    mockAiJobFindOne.mockImplementation(collectionFindOne);
 
     const res = await request(app).get('/api/v1/coach/jobs/job-1').set('Cookie', token);
 

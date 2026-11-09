@@ -6,7 +6,8 @@ import {
   CourseEnrollment,
   CourseRevision,
   InstitutionMembership,
-  LearningEvidence
+  LearningEvidence,
+  StudentAttempt
 } from '../models';
 import { canAuthorCourse } from './resourceAccess';
 
@@ -26,9 +27,9 @@ export function analyticsThreshold(): number | null {
 
 async function authorizedCourse(actor: string, courseId: string) {
   if (!(await canAuthorCourse(actor, courseId))) throw new AnalyticsAccessError();
-  const course = await Course.findById(courseId)
-    .select('title scope institutionId activeRevisionId')
-    .lean();
+  const course = await Course.findById(courseId).select(
+    'title scope institutionId activeRevisionId'
+  );
   if (course?.scope !== 'institutional' || !course.institutionId) throw new AnalyticsAccessError();
   return course;
 }
@@ -38,8 +39,7 @@ export async function instructorAnalyticsCourses(actor: string) {
   const candidates = await Course.find({ scope: 'institutional', assignedInstructorIds: actor })
     .select('_id title')
     .sort({ title: 1, _id: 1 })
-    .limit(200)
-    .lean();
+    .limit(200);
   const courses = [];
   for (const course of candidates) {
     if (await canAuthorCourse(actor, String(course._id)))
@@ -57,18 +57,24 @@ async function currentCohort(courseId: string, institutionId: unknown) {
     institutionId,
     status: 'active',
     role: 'university_student'
-  })
-    .select('userId')
-    .lean();
+  }).select('userId');
   const enrolled = await CourseEnrollment.find({
     courseId,
     institutionId,
     status: 'active',
     userId: { $in: members.map((member) => member.userId) }
-  })
-    .select('userId')
-    .lean();
+  }).select('userId');
   return [...new Set(enrolled.map((row) => row.userId))].sort();
+}
+
+/** ISO week token (`%G-W%V`) in UTC, matching the old `$dateToString`. */
+function isoWeek(date: Date): string {
+  const target = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const day = target.getUTCDay() || 7;
+  target.setUTCDate(target.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(target.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(((target.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return `${target.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
 }
 
 interface AggregateRow {
@@ -149,106 +155,105 @@ export async function instructorCourseAnalytics(actor: string, courseId: string)
         activationState: 'committed',
         isInstructorReviewed: true,
         revokedAt: { $exists: false }
-      })
-        .select('contentHash approvedActivities')
-        .lean()
+      }).select('contentHash approvedActivities')
     : null;
   if (!revision) {
     base.suppressionReason = 'published_evidence_unavailable';
     return deliver();
   }
-  const approved = revision.approvedActivities || [];
+  const approved = (revision.approvedActivities || []) as Array<{
+    activityId: string;
+    activityRevision: string;
+    definitionHash: string;
+    evaluationHash: string;
+  }>;
   const hash = 'sha256:' + revision.contentHash.replace(/^sha256:/, '');
-  // Join receipts inside Mongo using only identity/status fields. No private
-  // answer, rubric, transcript, source filename or response text is projected.
-  const rows = approved.length
-    ? await LearningEvidence.aggregate<AggregateRow>([
+  /**
+   * The Mongo pipeline joined accepted evidence to its graded attempt receipt
+   * and grouped one cell per (learner, activity type, ISO week).
+   *
+   * Both sides are keyed by a unique natural identity — evidence by
+   * (userId, attemptId) and attempts by (userId, attemptId) — so the join is
+   * done here over a bounded cohort. Only identity/status fields are read: no
+   * private answer, rubric, transcript, source filename or response text.
+   */
+  const rows: AggregateRow[] = [];
+  if (approved.length) {
+    const approvedKey = (activityId: string, activityRevision: string) =>
+      activityId + '\u0000' + activityRevision;
+    const approvedSet = new Set(
+      approved.map((activity) => approvedKey(activity.activityId, activity.activityRevision))
+    );
+    const evidenceRows = await LearningEvidence.find({
+      userId: { $in: users },
+      status: 'accepted',
+      evidenceVersion: '1.0.0'
+    });
+    const candidates = evidenceRows.filter((evidence) => {
+      const activity = evidence.activity;
+      const evaluator = evidence.evaluator;
+      if (!activity || !evaluator) return false;
+      if (activity.courseId !== courseId) return false;
+      if (activity.revisionId !== course.activeRevisionId) return false;
+      if (activity.contentHash !== hash) return false;
+      if (!['REAL_APPROVED', 'DETERMINISTIC_FALLBACK'].includes(evaluator.executionMode))
+        return false;
+      return approvedSet.has(approvedKey(activity.activityId, activity.activityRevision));
+    });
+    if (candidates.length) {
+      const attemptIds = [...new Set(candidates.map((evidence) => evidence.attemptId))];
+      const receipts = await StudentAttempt.find({
+        userId: { $in: users },
+        attemptId: { $in: attemptIds },
+        courseId,
+        revisionId: course.activeRevisionId,
+        contentHash: hash,
+        status: 'graded',
+        processingState: 'completed'
+      });
+      const receiptByReceiptKey = new Map(
+        receipts.map((receipt) => [
+          [receipt.userId, receipt.attemptId, receipt.evidenceId ?? ''].join('\u0000'),
+          receipt
+        ])
+      );
+      const cells = new Map<
+        string,
         {
-          $match: {
-            userId: { $in: users },
-            status: 'accepted',
-            evidenceVersion: '1.0.0',
-            'activity.courseId': courseId,
-            'activity.revisionId': course.activeRevisionId,
-            'activity.contentHash': hash,
-            'evaluator.executionMode': { $in: ['REAL_APPROVED', 'DETERMINISTIC_FALLBACK'] },
-            $or: approved.map((activity) => ({
-              'activity.activityId': activity.activityId,
-              'activity.activityRevision': activity.activityRevision
-            }))
-          }
-        },
-        {
-          $lookup: {
-            from: 'student_attempts',
-            let: {
-              actor: '$userId',
-              attempt: '$attemptId',
-              evidence: '$evidenceId',
-              activityId: '$activity.activityId',
-              activityRevision: '$activity.activityRevision',
-              activityType: '$activity.activityType'
-            },
-            pipeline: [
-              {
-                $match: {
-                  $expr: {
-                    $and: [
-                      { $eq: ['$userId', '$$actor'] },
-                      { $eq: ['$attemptId', '$$attempt'] },
-                      { $eq: ['$evidenceId', '$$evidence'] },
-                      { $eq: ['$activityId', '$$activityId'] },
-                      { $eq: ['$activityRevision', '$$activityRevision'] },
-                      { $eq: ['$activityType', '$$activityType'] },
-                      { $eq: ['$status', 'graded'] },
-                      { $eq: ['$processingState', 'completed'] },
-                      { $eq: ['$courseId', courseId] },
-                      { $eq: ['$revisionId', course.activeRevisionId] },
-                      { $eq: ['$contentHash', hash] }
-                    ]
-                  }
-                }
-              },
-              { $project: { _id: 0, status: 1 } }
-            ],
-            as: 'receipt'
-          }
-        },
-        { $match: { 'receipt.0': { $exists: true } } },
-        {
-          $project: {
-            _id: 0,
-            userId: 1,
-            activityType: '$activity.activityType',
-            mastered: '$masteryAchieved',
-            week: {
-              $dateToString: {
-                date: '$timestamp',
-                format: '%G-W%V',
-                timezone: 'UTC'
-              }
-            }
-          }
-        },
-        {
-          $group: {
-            _id: { userId: '$userId', activityType: '$activityType', week: '$week' },
-            mastered: { $max: '$mastered' }
-          }
-        },
-        {
-          $project: {
-            _id: 0,
-            userId: '$_id.userId',
-            activityType: '$_id.activityType',
-            week: '$_id.week',
-            mastered: 1
-          }
+          userId: string;
+          activityType: 'InteractiveQuiz' | 'GuidedProblem';
+          week: string;
+          mastered: boolean;
         }
-      ])
-        .option({ maxTimeMS: 5000 })
-        .exec()
-    : [];
+      >();
+      for (const evidence of candidates) {
+        const activity = evidence.activity;
+        const receipt = receiptByReceiptKey.get(
+          [evidence.userId, evidence.attemptId, evidence.evidenceId].join('\u0000')
+        );
+        if (!receipt) continue;
+        if (
+          receipt.activityId !== activity.activityId ||
+          receipt.activityRevision !== activity.activityRevision ||
+          receipt.activityType !== activity.activityType
+        )
+          continue;
+        const week = isoWeek(evidence.timestamp);
+        const key = [evidence.userId, activity.activityType, week].join('\u0000');
+        const mastered = Boolean(evidence.masteryAchieved);
+        const existing = cells.get(key);
+        if (existing) existing.mastered = existing.mastered || mastered;
+        else
+          cells.set(key, {
+            userId: evidence.userId,
+            activityType: activity.activityType as 'InteractiveQuiz' | 'GuidedProblem',
+            week,
+            mastered
+          });
+      }
+      rows.push(...cells.values());
+    }
+  }
   const practiced = new Set(rows.map((row) => row.userId));
   const mastered = new Set(rows.filter((row) => row.mastered).map((row) => row.userId));
   base.suppressed = false;

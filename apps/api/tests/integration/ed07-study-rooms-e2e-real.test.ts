@@ -31,15 +31,16 @@ interface RoomEvent extends RoomProjection {
 import { listeningPort } from '../listening-port';
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
-import { MongoClient, ObjectId } from 'mongodb';
 import bcrypt from 'bcryptjs';
 import WebSocket from 'ws';
-import { migrateAuth } from '../../scripts/migrate-auth';
+import { connectDatabase, disconnectDatabase, prisma } from '../../shared/database';
+import { newId } from '../../shared/ids';
+import { StudyRoom } from '../../modules/study/src/models';
 
 // Real Integration & Concurrency Test Suite for ED-07
 async function runTests() {
-  const dbName = 'ed07_verify_test_' + process.pid + '_' + Date.now();
-  process.env.MONGODB_URI = `mongodb://127.0.0.1:27018/${dbName}`;
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
   process.env.BETTER_AUTH_SECRET = 'isolated-auth-test-secret-at-least-32-characters';
   process.env.AUTH_TRUSTED_ORIGINS = 'http://localhost:5173';
   process.env.BETTER_AUTH_URL = 'http://localhost:5173';
@@ -48,38 +49,54 @@ async function runTests() {
   process.env.REDIS_URL = '';
   process.env.NODE_ENV = 'test';
 
-  const client = new MongoClient(process.env.MONGODB_URI);
-  await client.connect();
-  const db = client.db();
+  await connectDatabase();
 
-  // Create 3 real test users in MongoDB
+  // Create 3 real test users in PostgreSQL. This suite shares one database, so
+  // the addresses are run-unique.
+  const run = `${process.pid}_${Date.now()}`;
   const users = [
-    { id: new ObjectId(), email: 'habib@test.ednova', name: 'Habib S.', role: 'student' },
-    { id: new ObjectId(), email: 'tasnim@test.ednova', name: 'Tasnim K.', role: 'student' },
-    { id: new ObjectId(), email: 'stranger@test.ednova', name: 'Stranger X.', role: 'student' }
+    { id: newId(), email: `habib_${run}@test.ednova`, name: 'Habib S.', role: 'student' },
+    { id: newId(), email: `tasnim_${run}@test.ednova`, name: 'Tasnim K.', role: 'student' },
+    { id: newId(), email: `stranger_${run}@test.ednova`, name: 'Stranger X.', role: 'student' }
   ];
 
   const hashedPw = await bcrypt.hash('Password!123', 12);
+  await prisma.authRateLimit.deleteMany({});
   for (const u of users) {
-    await db.collection('users').insertOne({
-      _id: u.id,
-      email: u.email,
-      name: u.name,
-      password: hashedPw,
-      isVerified: true,
-      isActive: true,
-      role: u.role,
-      tier: 'standard'
+    await prisma.user.create({
+      data: {
+        id: u.id,
+        email: u.email,
+        name: u.name,
+        password: hashedPw,
+        isVerified: true,
+        isActive: true,
+        role: 'student',
+        tier: 'normal',
+        notificationPreferences: {},
+        onboardingDraft: {}
+      }
+    });
+    await prisma.authUser.create({
+      data: { id: u.id, email: u.email, name: u.name, emailVerified: true }
+    });
+    await prisma.authAccount.create({
+      data: {
+        id: newId(),
+        accountId: u.id,
+        providerId: 'credential',
+        userId: u.id,
+        password: hashedPw
+      }
     });
   }
-
-  await migrateAuth(db, { apply: true });
 
   const { getAuth } = await import('../../shared/betterAuth.js');
   const auth = await getAuth();
 
   // Log in each user and obtain valid session cookies
   const cookies: Record<string, string> = {};
+  const candidateUsers: Array<{ id: string; email: string; cookie?: string }> = [];
   for (const u of users) {
     const res = await auth.api.signInEmail({
       body: { email: u.email, password: 'Password!123' },
@@ -103,9 +120,15 @@ async function runTests() {
     } catch {
       /* Best-effort test cleanup / ignore non-JSON transport frames. */
     }
+    const ids = [...users, ...candidateUsers].map((u) => u.id);
     try {
-      await db.dropDatabase();
-      await client.close();
+      await StudyRoom.deleteMany({ hostUserId: { $in: ids } });
+      await prisma.authSession.deleteMany({ where: { userId: { in: ids } } });
+      await prisma.authAccount.deleteMany({ where: { userId: { in: ids } } });
+      await prisma.authUser.deleteMany({ where: { id: { in: ids } } });
+      await prisma.user.deleteMany({ where: { id: { in: ids } } });
+      await prisma.authRateLimit.deleteMany({});
+      await disconnectDatabase();
     } catch {
       /* Best-effort test cleanup / ignore non-JSON transport frames. */
     }
@@ -185,7 +208,7 @@ async function runTests() {
   // PHASE B: Real HTTP Integration Tests
   // ─────────────────────────────────────────────────────────────────────────────
 
-  test('Phase B.1: Contract 10 Room Creation writes to real MongoDB', async () => {
+  test('Phase B.1: Contract 10 Room Creation writes to the real database', async () => {
     const hostUser = users[0];
     const res = await apiCall(
       '/api/v1/study/rooms',
@@ -211,18 +234,17 @@ async function runTests() {
       'Invite code must be 6 alphanumeric uppercase chars'
     );
     assert.equal(res.data.title, 'Algorithms Group Prep');
-    assert.equal(res.data.presenterUserId, hostUser.id.toString());
+    assert.equal(res.data.presenterUserId, hostUser.id);
     assert.equal(res.data.participantsCount, 1);
     assert.equal(res.data.currentPhase, 'idle');
 
     testRoomId = res.data.roomId;
     testInviteCode = res.data.inviteCode;
 
-    // Verify document in real MongoDB database
-    const doc = await db.collection('study_rooms').findOne({ roomId: testRoomId });
-    assert.ok(doc, 'Expected persisted study room');
-    assert.ok(doc, 'StudyRoom document must exist in MongoDB');
-    assert.equal(doc.hostUserId, hostUser.id.toString());
+    // Verify the persisted row
+    const doc = await StudyRoom.findOne({ roomId: testRoomId });
+    assert.ok(doc, 'StudyRoom row must exist');
+    assert.equal(doc.hostUserId, hostUser.id);
     assert.equal(doc.seq, 1);
     assert.equal(doc.status, 'active');
     assert.equal(doc.participants.length, 1);
@@ -250,11 +272,11 @@ async function runTests() {
     assert.equal(res.data.roomId, testRoomId);
     assert.equal(res.data.participantsCount, 2);
 
-    // Verify participant added to MongoDB document and seq incremented
-    const doc = await db.collection('study_rooms').findOne({ roomId: testRoomId });
+    // Verify participant added to the room row and seq incremented
+    const doc = await StudyRoom.findOne({ roomId: testRoomId });
     assert.ok(doc, 'Expected persisted study room');
     assert.equal(doc.participants.length, 2);
-    assert.equal(doc.participants[1].userId, peerUser.id.toString());
+    assert.equal(doc.participants[1].userId, peerUser.id);
     assert.equal(doc.participants[1].role, 'participant');
     assert.equal(doc.seq, 2, 'Monotonic seq must increment on participant join');
   });
@@ -271,7 +293,7 @@ async function runTests() {
     assert.equal(res.status, 200);
     assert.equal(res.data.participantsCount, 2);
 
-    const doc = await db.collection('study_rooms').findOne({ roomId: testRoomId });
+    const doc = await StudyRoom.findOne({ roomId: testRoomId });
     assert.ok(doc, 'Expected persisted study room');
     assert.equal(doc.participants.length, 2, 'Must not duplicate participant on re-join');
   });
@@ -292,7 +314,7 @@ async function runTests() {
     assert.equal(res.data.activeActivityId, null);
     assert.equal(res.data.seq, 3);
 
-    const doc = await db.collection('study_rooms').findOne({ roomId: testRoomId });
+    const doc = await StudyRoom.findOne({ roomId: testRoomId });
     assert.ok(doc, 'Expected persisted study room');
     assert.equal(doc.currentPhase, 'peer_discussion');
     assert.equal(doc.activeActivityId, null);
@@ -339,7 +361,7 @@ async function runTests() {
     assert.equal(roster.status, 200);
     assert.equal(roster.data.participants.length, 2);
     const peer = roster.data.participants.find(
-      (p: ParticipantProjection) => p.userId === peerUser.id.toString()
+      (p: ParticipantProjection) => p.userId === peerUser.id
     );
     assert.ok(peer, 'Expected the joined peer in roster');
     assert.equal(peer.hasSubmitted, false);
@@ -351,7 +373,7 @@ async function runTests() {
     // 1. Stop the current NestJS runtime
     await runtime.stop();
 
-    // 2. Restart a fresh NestJS runtime against the same MongoDB database
+    // 2. Restart a fresh NestJS runtime against the same database
     runtime = await start({ port: 0, workers: false });
     baseUrl = 'http://127.0.0.1:' + listeningPort(runtime.server);
     wsBaseUrl = 'ws://127.0.0.1:' + listeningPort(runtime.server);
@@ -380,8 +402,8 @@ async function runTests() {
     const user1 = users[0];
     const user2 = users[1];
 
-    const client1 = await connectWs(testRoomId, user1.email, user1.id.toString());
-    const client2 = await connectWs(testRoomId, user2.email, user2.id.toString());
+    const client1 = await connectWs(testRoomId, user1.email, user1.id);
+    const client2 = await connectWs(testRoomId, user2.email, user2.id);
 
     // Both should receive initial ROOM_STATE_SYNC snapshot upon connection
     const snapshot1 = client1.initialMessages.find((m) => m.type === 'ROOM_STATE_SYNC');
@@ -406,8 +428,8 @@ async function runTests() {
     const user1 = users[0];
     const user2 = users[1];
 
-    const client1 = await connectWs(testRoomId, user1.email, user1.id.toString());
-    const client2 = await connectWs(testRoomId, user2.email, user2.id.toString());
+    const client1 = await connectWs(testRoomId, user1.email, user1.id);
+    const client2 = await connectWs(testRoomId, user2.email, user2.id);
 
     // Set up message listeners for live broadcast
     const receivedMessagesUser2: RoomEvent[] = [];
@@ -450,7 +472,7 @@ async function runTests() {
   test('Phase C.3: Non-member WebSocket connection is rejected', async () => {
     const stranger = users[2]; // Stranger is NOT a participant in testRoomId
     const ws = new WebSocket(
-      `${wsBaseUrl}/ws/realtime?roomId=${testRoomId}&userId=${stranger.id.toString()}`,
+      `${wsBaseUrl}/ws/realtime?roomId=${testRoomId}&userId=${stranger.id}`,
       {
         headers: {
           origin: 'http://localhost:5173',
@@ -498,23 +520,37 @@ async function runTests() {
     const tightInviteCode = createRes.data.inviteCode;
 
     // 2. Create 5 temporary users
-    const candidateUsers: Array<{ id: ObjectId; email: string; cookie?: string }> = [];
     for (let i = 0; i < 5; i++) {
-      const uId = new ObjectId();
-      const email = `candidate${i}_${Date.now()}@test.ednova`;
-      await db.collection('users').insertOne({
-        _id: uId,
-        email,
-        name: `Candidate ${i}`,
-        password: hashedPw,
-        isVerified: true,
-        isActive: true,
-        role: 'student'
+      const uId = newId();
+      const email = `candidate${i}_${run}@test.ednova`;
+      await prisma.user.create({
+        data: {
+          id: uId,
+          email,
+          name: `Candidate ${i}`,
+          password: hashedPw,
+          isVerified: true,
+          isActive: true,
+          role: 'student',
+          tier: 'normal',
+          notificationPreferences: {},
+          onboardingDraft: {}
+        }
+      });
+      await prisma.authUser.create({
+        data: { id: uId, email, name: `Candidate ${i}`, emailVerified: true }
+      });
+      await prisma.authAccount.create({
+        data: {
+          id: newId(),
+          accountId: uId,
+          providerId: 'credential',
+          userId: uId,
+          password: hashedPw
+        }
       });
       candidateUsers.push({ id: uId, email });
     }
-
-    await migrateAuth(db, { apply: true });
 
     const { getAuth: getFreshAuth } = await import('../../shared/betterAuth.js');
     const freshAuth = await getFreshAuth();
@@ -543,16 +579,14 @@ async function runTests() {
     assert.equal(successes.length, 1, 'Exactly 1 concurrent join must succeed');
     assert.equal(conflicts.length, 4, 'Remaining 4 concurrent joins must receive 409 Conflict');
 
-    // 4. Verify MongoDB state strictly has 2 active participants
-    const tightDoc = await db.collection('study_rooms').findOne({ roomId: tightRoomId });
+    // 4. Verify the persisted room strictly has 2 active participants
+    const tightDoc = await StudyRoom.findOne({ roomId: tightRoomId });
     assert.ok(tightDoc, 'Expected persisted study room');
-    const activeParticipants = tightDoc.participants.filter(
-      (p: ParticipantProjection) => !p.leftAt
-    );
+    const activeParticipants = tightDoc.participants.filter((p) => !p.leftAt);
     assert.equal(
       activeParticipants.length,
       2,
-      'Room participants count in MongoDB must strictly equal maxParticipants'
+      'Room participants count must strictly equal maxParticipants'
     );
   });
 
@@ -569,11 +603,9 @@ async function runTests() {
     assert.equal(res1.status, 503);
     assert.equal(res2.status, 503);
 
-    const doc = await db.collection('study_rooms').findOne({ roomId: testRoomId });
+    const doc = await StudyRoom.findOne({ roomId: testRoomId });
     assert.ok(doc, 'Expected persisted study room');
-    const submittedCount = doc.participants.filter(
-      (p: ParticipantProjection) => !p.leftAt && p.hasSubmitted
-    ).length;
+    const submittedCount = doc.participants.filter((p) => !p.leftAt && p.hasSubmitted).length;
     assert.equal(
       submittedCount,
       0,
@@ -583,7 +615,7 @@ async function runTests() {
 
   test('Phase D.3: Repeated unavailable submission requests do not inflate count or sequence', async () => {
     const user1 = users[0];
-    const docBefore = await db.collection('study_rooms').findOne({ roomId: testRoomId });
+    const docBefore = await StudyRoom.findOne({ roomId: testRoomId });
     assert.ok(docBefore, 'Expected persisted study room');
     const seqBefore = docBefore.seq;
 
@@ -596,7 +628,7 @@ async function runTests() {
     );
 
     assert.equal(res.status, 503);
-    const docAfter = await db.collection('study_rooms').findOne({ roomId: testRoomId });
+    const docAfter = await StudyRoom.findOne({ roomId: testRoomId });
     assert.ok(docAfter, 'Expected persisted study room');
     assert.equal(docAfter.seq, seqBefore, 'Duplicate submission must NOT increment seq');
   });
@@ -614,14 +646,10 @@ async function runTests() {
     );
     assert.equal(res.status, 200);
 
-    const doc = await db.collection('study_rooms').findOne({ roomId: testRoomId });
+    const doc = await StudyRoom.findOne({ roomId: testRoomId });
     assert.ok(doc, 'Expected persisted study room');
     assert.equal(doc.status, 'active');
-    assert.equal(
-      doc.presenterUserId,
-      peerUser.id.toString(),
-      'Presenter must be delegated to peer user'
-    );
+    assert.equal(doc.presenterUserId, peerUser.id, 'Presenter must be delegated to peer user');
 
     // Peer user can now advance phase
     const phaseRes = await apiCall(
@@ -646,7 +674,7 @@ async function runTests() {
     );
     assert.equal(res.status, 200);
 
-    const doc = await db.collection('study_rooms').findOne({ roomId: testRoomId });
+    const doc = await StudyRoom.findOne({ roomId: testRoomId });
     assert.ok(doc, 'Expected persisted study room');
     assert.equal(doc.status, 'closed', 'Room status must be closed when empty');
     assert.ok(doc.closedAt);

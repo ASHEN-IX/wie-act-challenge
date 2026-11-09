@@ -21,11 +21,7 @@ export const moduleDefinitions: Array<[name: string, packageName: string, prefix
     '@ednova/study-service',
     ['/api/v1/study', '/api/v1/competencies', '/api/v1/coach', '/uploads']
   ],
-  [
-    'ai',
-    '@ednova/ai-orchestrator-service',
-    ['/api/v1/ai', '/api/v1/eval', '/api/v1/search']
-  ],
+  ['ai', '@ednova/ai-orchestrator-service', ['/api/v1/ai', '/api/v1/eval', '/api/v1/search']],
   ['signals', '@ednova/signal-processing-service', ['/api/v1/signals']],
   ['analytics', '@ednova/analytics-service', ['/api/v1/analytics']],
   [
@@ -61,7 +57,7 @@ export function createApp(): Application {
     })
   );
   app.get('/api/v1/monitoring/health', async (_req: Request, res: Response) => {
-    const connected = require('mongoose').connection.readyState === 1;
+    const connected = await require('@ednova/shared/database').isConnectedToDatabase();
     const services = Object.fromEntries(
       moduleDefinitions.map(([name]) => [
         name,
@@ -89,9 +85,7 @@ export function createApp(): Application {
   app.get('/api/v1/docs', (_req: Request, res: Response) =>
     res
       .type('html')
-      .send(
-        '<h1>EdNova API</h1><a href="/api/v1/docs/openapi.json">OpenAPI specification</a>'
-      )
+      .send('<h1>EdNova API</h1><a href="/api/v1/docs/openapi.json">OpenAPI specification</a>')
   );
   app.post('/api/v1/study/courses', requireMultipart);
   app.post('/api/v1/study/courses/:courseId/files', requireMultipart);

@@ -27,10 +27,9 @@ const fakeAuth = (req: DomainRequest, _res: Response, next: NextFunction) => {
 };
 app.use('/api/v1/study/learning', fakeAuth, learningRoutes);
 
-const profileResult = (preferences?: Record<string, unknown>) => ({
-  select: jest.fn().mockReturnThis(),
-  lean: jest.fn().mockResolvedValue(preferences === undefined ? null : { preferences })
-});
+// The converted model returns the row (already plain) from `findOne`.
+const profileResult = (preferences?: Record<string, unknown>) =>
+  Promise.resolve(preferences === undefined ? null : { preferences });
 
 describe('GET /language', () => {
   beforeEach(() => jest.clearAllMocks());
@@ -67,7 +66,8 @@ describe('PUT /language', () => {
     expect(res.body).toEqual({ language: 'ary' });
     const [filter, update] = UserProfile.findOneAndUpdate.mock.calls[0];
     expect(filter).toEqual({ userId: 'learner-1' });
-    expect(update.$set).toEqual({ 'preferences.language': 'ary' });
+    // Preferences are a single JSON column now; the language is merged in.
+    expect(update.preferences).toMatchObject({ language: 'ary' });
   });
 
   it('rejects an unsupported language instead of storing it', async () => {

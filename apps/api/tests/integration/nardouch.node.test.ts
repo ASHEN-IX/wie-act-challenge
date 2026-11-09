@@ -1,4 +1,4 @@
-/** Real Nest + Better Auth + MongoDB + revision artifacts. Inference alone is a test HTTP fixture. */
+/** Real Nest + Better Auth + PostgreSQL + revision artifacts. Inference alone is a test HTTP fixture. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -6,9 +6,9 @@ import type { AddressInfo } from 'node:net';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { MongoClient, ObjectId } from 'mongodb';
 import bcrypt from 'bcryptjs';
-import { migrateAuth } from '../../scripts/migrate-auth';
+import { connectDatabase, disconnectDatabase, prisma } from '../../shared/database';
+import { newId } from '../../shared/ids';
 import { materializeRevisionFixture } from '../helpers/revisionArtifactFixture';
 import { Course, CourseRevision } from '../../modules/study/src/models';
 import { NardouchConversationModel } from '../../modules/study/src/models/NardouchConversation';
@@ -17,12 +17,9 @@ test(
   'Nardouch: real authorization, continuity, persistence and stale-write protection',
   { timeout: 60000 },
   async (t) => {
-    const database = `ednova_nardouch_test_${process.pid}_${Date.now()}`;
-    const mongoUri = new URL(process.env.NARDOUCH_TEST_MONGODB_URI || 'mongodb://127.0.0.1:27018');
-    mongoUri.pathname = '/' + database;
-    const client = await new MongoClient(mongoUri.href, {
-      serverSelectionTimeoutMS: 2000
-    }).connect();
+    process.env.DATABASE_URL =
+      process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
+    await connectDatabase();
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'nardouch-integration-'));
     const seen: Array<{ history: unknown[] }> = [];
     const source = 'Recursion requires a base case. factorial(0) = 1.';
@@ -68,8 +65,6 @@ test(
     await new Promise<void>((resolve) => ai.listen(0, '127.0.0.1', resolve));
     Object.assign(process.env, {
       NODE_ENV: 'test',
-      MONGODB_URI: mongoUri.href,
-      DB_NAME: database,
       BETTER_AUTH_SECRET: 'nardouch-integration-secret-at-least-32-characters',
       BETTER_AUTH_URL: 'http://localhost:5173',
       AUTH_TRUSTED_ORIGINS: 'http://localhost:5173',
@@ -84,36 +79,58 @@ test(
     const runtime: {
       current?: Awaited<ReturnType<(typeof import('../../src/main.js'))['start']>>;
     } = {};
+    const actorIds = ['owner', 'stranger'].map(() => newId());
+    let courseId: string | undefined; // eslint-disable-line prefer-const -- assigned after teardown registration
     t.after(async () => {
       await runtime.current?.stop();
-      await client.db().dropDatabase();
-      await client.close();
-      await new Promise<void>((r) => ai.close(() => r()));
-      await fs.rm(directory, { recursive: true, force: true });
+      try {
+        if (courseId) {
+          await NardouchConversationModel.deleteMany({ courseId });
+          await CourseRevision.deleteMany({ courseId });
+          await Course.deleteMany({ _id: courseId });
+        }
+        await prisma.authSession.deleteMany({ where: { userId: { in: actorIds } } });
+        await prisma.authAccount.deleteMany({ where: { userId: { in: actorIds } } });
+        await prisma.authUser.deleteMany({ where: { id: { in: actorIds } } });
+        await prisma.user.deleteMany({ where: { id: { in: actorIds } } });
+        await prisma.authRateLimit.deleteMany({});
+      } finally {
+        await disconnectDatabase().catch(() => {});
+        await new Promise<void>((r) => ai.close(() => r()));
+        await fs.rm(directory, { recursive: true, force: true });
+      }
     });
-    const actors = ['owner', 'stranger'].map((name) => ({
-      id: new ObjectId(),
+    const runTag = `${process.pid}_${Date.now()}`;
+    const actors = ['owner', 'stranger'].map((name, index) => ({
+      id: actorIds[index],
       name,
-      email: `nardouch-${name}@synthetic.test`,
+      email: `nardouch-${name}-${runTag}@synthetic.test`,
       cookie: ''
     }));
     const password = await bcrypt.hash('Synthetic!123', 12);
-    await client
-      .db()
-      .collection('users')
-      .insertMany(
-        actors.map((a) => ({
-          _id: a.id,
+    await prisma.authRateLimit.deleteMany({});
+    for (const a of actors) {
+      await prisma.user.create({
+        data: {
+          id: a.id,
           name: a.name,
           email: a.email,
           password,
           role: 'student',
           tier: 'vip',
           isActive: true,
-          isVerified: true
-        }))
-      );
-    await migrateAuth(client.db(), { apply: true });
+          isVerified: true,
+          notificationPreferences: {},
+          onboardingDraft: {}
+        }
+      });
+      await prisma.authUser.create({
+        data: { id: a.id, email: a.email, name: a.name, emailVerified: true }
+      });
+      await prisma.authAccount.create({
+        data: { id: newId(), accountId: a.id, providerId: 'credential', userId: a.id, password }
+      });
+    }
     const auth = await (await import('../../shared/betterAuth.js')).getAuth();
     for (const actor of actors) {
       const response = await auth.api.signInEmail({
@@ -137,7 +154,7 @@ test(
       status: 'completed',
       activeRevisionId: 'rev_nardouch'
     });
-    const courseId = course._id.toString();
+    courseId = course._id.toString();
     await CourseRevision.create({
       courseId: course._id,
       revisionTag: 'rev_nardouch',
@@ -147,8 +164,8 @@ test(
       topics: [],
       isInstructorReviewed: true
     });
-    const document = await materializeRevisionFixture(courseId, 'rev_nardouch', source);
-    await NardouchConversationModel.init();
+    const document = await materializeRevisionFixture(courseId!, 'rev_nardouch', source);
+
     async function call(actor: number | null, method: string, endpoint: string, body?: unknown) {
       const response = await fetch(base + endpoint, {
         method,

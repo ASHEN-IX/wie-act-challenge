@@ -139,6 +139,15 @@ const {
   CompetencyProfile
 } = require('../models/index');
 
+/**
+ * The converted models return awaitable row lists that still expose `.lean()`.
+ */
+const leaned = <T>(value: T) => {
+  const result = Promise.resolve(value) as Promise<T> & { lean: () => Promise<T> };
+  result.lean = () => Promise.resolve(value);
+  return result;
+};
+
 jest.mock('../models/index', () => ({
   Subject: { find: jest.fn() },
   Course: { find: jest.fn() },
@@ -170,53 +179,50 @@ describe('getUserCompetencyMap (real implementation, mocked models)', () => {
       distinct: jest.fn().mockResolvedValue(['course-1'])
     });
     CourseRevision.find.mockReturnValue({
-      select: jest.fn().mockReturnThis(),
-      lean: jest.fn().mockResolvedValue([])
+      select: jest.fn().mockImplementation(() => leaned([]))
     });
   });
 
   test('groups profiles by subject → topic → bloom level', async () => {
     Course.find.mockReturnValue({
-      select: jest.fn().mockReturnThis(),
-      lean: jest.fn().mockResolvedValue([
-        {
-          _id: 'course-1',
-          subjectId: SUBJECT_ID,
-          title: 'CS',
-          topics: [
-            {
-              title: 'Core',
-              subtopics: [{ id: 't1', title: 'Sorting' }]
-            }
-          ]
-        }
-      ])
+      select: jest.fn().mockImplementation(() =>
+        leaned([
+          {
+            _id: 'course-1',
+            subjectId: SUBJECT_ID,
+            title: 'CS',
+            topics: [
+              {
+                title: 'Core',
+                subtopics: [{ id: 't1', title: 'Sorting' }]
+              }
+            ]
+          }
+        ])
+      )
     });
 
-    CompetencyProfile.find.mockReturnValue({
-      lean: jest.fn().mockResolvedValue([
-        {
-          topicId: 't1',
-          knowledgeType: 'conceptual',
-          bloomLevel: 'REMEMBER',
-          score: 0.6,
-          confidence: 0.5,
-          evidence: []
-        },
-        {
-          topicId: 't1',
-          knowledgeType: 'procedural',
-          bloomLevel: 'APPLY',
-          score: 0.8,
-          confidence: 0.7,
-          evidence: []
-        }
-      ])
-    });
+    CompetencyProfile.find.mockResolvedValue([
+      {
+        topicId: 't1',
+        knowledgeType: 'conceptual',
+        bloomLevel: 'REMEMBER',
+        score: 0.6,
+        confidence: 0.5,
+        evidence: []
+      },
+      {
+        topicId: 't1',
+        knowledgeType: 'procedural',
+        bloomLevel: 'APPLY',
+        score: 0.8,
+        confidence: 0.7,
+        evidence: []
+      }
+    ]);
 
     Subject.find.mockReturnValue({
-      select: jest.fn().mockReturnThis(),
-      lean: jest.fn().mockResolvedValue([{ _id: SUBJECT_ID, name: 'Algorithms' }])
+      select: jest.fn().mockImplementation(() => leaned([{ _id: SUBJECT_ID, name: 'Algorithms' }]))
     });
 
     const map = await realGetUserCompetencyMap('u1');
@@ -230,45 +236,43 @@ describe('getUserCompetencyMap (real implementation, mocked models)', () => {
 
   test('filters by subjectId', async () => {
     Course.find.mockReturnValue({
-      select: jest.fn().mockReturnThis(),
-      lean: jest.fn().mockResolvedValue([
-        {
-          _id: 'c1',
-          subjectId: SUBJECT_ID,
-          title: 'A',
-          topics: [{ title: 'T', subtopics: [{ id: 't1', title: 'S' }] }]
-        },
-        {
-          _id: 'c2',
-          subjectId: 'subj-2',
-          title: 'B',
-          topics: [{ title: 'T', subtopics: [{ id: 't2', title: 'S2' }] }]
-        }
-      ])
+      select: jest.fn().mockImplementation(() =>
+        leaned([
+          {
+            _id: 'c1',
+            subjectId: SUBJECT_ID,
+            title: 'A',
+            topics: [{ title: 'T', subtopics: [{ id: 't1', title: 'S' }] }]
+          },
+          {
+            _id: 'c2',
+            subjectId: 'subj-2',
+            title: 'B',
+            topics: [{ title: 'T', subtopics: [{ id: 't2', title: 'S2' }] }]
+          }
+        ])
+      )
     });
-    CompetencyProfile.find.mockReturnValue({
-      lean: jest.fn().mockResolvedValue([
-        {
-          topicId: 't1',
-          knowledgeType: 'k',
-          bloomLevel: 'REMEMBER',
-          score: 0.5,
-          confidence: 0.5,
-          evidence: []
-        },
-        {
-          topicId: 't2',
-          knowledgeType: 'k',
-          bloomLevel: 'APPLY',
-          score: 0.9,
-          confidence: 0.8,
-          evidence: []
-        }
-      ])
-    });
+    CompetencyProfile.find.mockResolvedValue([
+      {
+        topicId: 't1',
+        knowledgeType: 'k',
+        bloomLevel: 'REMEMBER',
+        score: 0.5,
+        confidence: 0.5,
+        evidence: []
+      },
+      {
+        topicId: 't2',
+        knowledgeType: 'k',
+        bloomLevel: 'APPLY',
+        score: 0.9,
+        confidence: 0.8,
+        evidence: []
+      }
+    ]);
     Subject.find.mockReturnValue({
-      select: jest.fn().mockReturnThis(),
-      lean: jest.fn().mockResolvedValue([{ _id: SUBJECT_ID, name: 'A' }])
+      select: jest.fn().mockImplementation(() => leaned([{ _id: SUBJECT_ID, name: 'A' }]))
     });
 
     const map = await realGetUserCompetencyMap('u1', { subjectId: SUBJECT_ID });
@@ -279,39 +283,37 @@ describe('getUserCompetencyMap (real implementation, mocked models)', () => {
 
   test('drops profiles whose topic is not in any course topic tree', async () => {
     Course.find.mockReturnValue({
-      select: jest.fn().mockReturnThis(),
-      lean: jest.fn().mockResolvedValue([
-        {
-          _id: 'c1',
-          subjectId: SUBJECT_ID,
-          title: 'A',
-          topics: [{ title: 'T', subtopics: [{ id: 't1', title: 'S' }] }]
-        }
-      ])
+      select: jest.fn().mockImplementation(() =>
+        leaned([
+          {
+            _id: 'c1',
+            subjectId: SUBJECT_ID,
+            title: 'A',
+            topics: [{ title: 'T', subtopics: [{ id: 't1', title: 'S' }] }]
+          }
+        ])
+      )
     });
-    CompetencyProfile.find.mockReturnValue({
-      lean: jest.fn().mockResolvedValue([
-        {
-          topicId: 't1',
-          knowledgeType: 'k',
-          bloomLevel: 'REMEMBER',
-          score: 0.5,
-          confidence: 0.5,
-          evidence: []
-        },
-        {
-          topicId: 'orphan',
-          knowledgeType: 'k',
-          bloomLevel: 'APPLY',
-          score: 0.9,
-          confidence: 0.8,
-          evidence: []
-        }
-      ])
-    });
+    CompetencyProfile.find.mockResolvedValue([
+      {
+        topicId: 't1',
+        knowledgeType: 'k',
+        bloomLevel: 'REMEMBER',
+        score: 0.5,
+        confidence: 0.5,
+        evidence: []
+      },
+      {
+        topicId: 'orphan',
+        knowledgeType: 'k',
+        bloomLevel: 'APPLY',
+        score: 0.9,
+        confidence: 0.8,
+        evidence: []
+      }
+    ]);
     Subject.find.mockReturnValue({
-      select: jest.fn().mockReturnThis(),
-      lean: jest.fn().mockResolvedValue([{ _id: SUBJECT_ID, name: 'A' }])
+      select: jest.fn().mockImplementation(() => leaned([{ _id: SUBJECT_ID, name: 'A' }]))
     });
 
     const map = await realGetUserCompetencyMap('u1');
@@ -321,39 +323,37 @@ describe('getUserCompetencyMap (real implementation, mocked models)', () => {
 
   test('includes knowledgeType breakdown when requested', async () => {
     Course.find.mockReturnValue({
-      select: jest.fn().mockReturnThis(),
-      lean: jest.fn().mockResolvedValue([
-        {
-          _id: 'c1',
-          subjectId: SUBJECT_ID,
-          title: 'A',
-          topics: [{ title: 'T', subtopics: [{ id: 't1', title: 'S' }] }]
-        }
-      ])
+      select: jest.fn().mockImplementation(() =>
+        leaned([
+          {
+            _id: 'c1',
+            subjectId: SUBJECT_ID,
+            title: 'A',
+            topics: [{ title: 'T', subtopics: [{ id: 't1', title: 'S' }] }]
+          }
+        ])
+      )
     });
-    CompetencyProfile.find.mockReturnValue({
-      lean: jest.fn().mockResolvedValue([
-        {
-          topicId: 't1',
-          knowledgeType: 'conceptual',
-          bloomLevel: 'APPLY',
-          score: 0.6,
-          confidence: 0.5,
-          evidence: []
-        },
-        {
-          topicId: 't1',
-          knowledgeType: 'procedural',
-          bloomLevel: 'APPLY',
-          score: 0.8,
-          confidence: 0.7,
-          evidence: []
-        }
-      ])
-    });
+    CompetencyProfile.find.mockResolvedValue([
+      {
+        topicId: 't1',
+        knowledgeType: 'conceptual',
+        bloomLevel: 'APPLY',
+        score: 0.6,
+        confidence: 0.5,
+        evidence: []
+      },
+      {
+        topicId: 't1',
+        knowledgeType: 'procedural',
+        bloomLevel: 'APPLY',
+        score: 0.8,
+        confidence: 0.7,
+        evidence: []
+      }
+    ]);
     Subject.find.mockReturnValue({
-      select: jest.fn().mockReturnThis(),
-      lean: jest.fn().mockResolvedValue([{ _id: SUBJECT_ID, name: 'A' }])
+      select: jest.fn().mockImplementation(() => leaned([{ _id: SUBJECT_ID, name: 'A' }]))
     });
 
     const map = await realGetUserCompetencyMap('u1', { knowledgeTypeBreakdown: true });
@@ -372,50 +372,48 @@ describe('getTopicDetail (real implementation, mocked models)', () => {
       distinct: jest.fn().mockResolvedValue(['course-1'])
     });
     CourseRevision.find.mockReturnValue({
-      select: jest.fn().mockReturnThis(),
-      lean: jest.fn().mockResolvedValue([])
+      select: jest.fn().mockImplementation(() => leaned([]))
     });
   });
 
   test('returns per-level competencies with evidence excerpts and needsReview', async () => {
     Course.find.mockReturnValue({
-      select: jest.fn().mockReturnThis(),
-      lean: jest.fn().mockResolvedValue([
-        {
-          _id: 'c1',
-          subjectId: SUBJECT_ID,
-          title: 'A',
-          topics: [{ title: 'T', subtopics: [{ id: 't1', title: 'Sorting' }] }]
-        }
-      ])
+      select: jest.fn().mockImplementation(() =>
+        leaned([
+          {
+            _id: 'c1',
+            subjectId: SUBJECT_ID,
+            title: 'A',
+            topics: [{ title: 'T', subtopics: [{ id: 't1', title: 'Sorting' }] }]
+          }
+        ])
+      )
     });
-    CompetencyProfile.find.mockReturnValue({
-      lean: jest.fn().mockResolvedValue([
-        {
-          topicId: 't1',
-          knowledgeType: 'conceptual',
-          bloomLevel: 'APPLY',
-          score: 0.72,
-          confidence: 0.2, // below threshold => needsReview
-          evidence: [
-            {
-              objectiveId: 'o1',
-              demonstratedBloomLevel: 'APPLY',
-              masteryScore: 0.7,
-              evaluatedAt: new Date('2026-01-01'),
-              correlationId: 'corr-1'
-            },
-            {
-              objectiveId: 'o1',
-              demonstratedBloomLevel: 'APPLY',
-              masteryScore: 0.9,
-              evaluatedAt: new Date('2026-01-02'),
-              correlationId: 'corr-2'
-            }
-          ]
-        }
-      ])
-    });
+    CompetencyProfile.find.mockResolvedValue([
+      {
+        topicId: 't1',
+        knowledgeType: 'conceptual',
+        bloomLevel: 'APPLY',
+        score: 0.72,
+        confidence: 0.2, // below threshold => needsReview
+        evidence: [
+          {
+            objectiveId: 'o1',
+            demonstratedBloomLevel: 'APPLY',
+            masteryScore: 0.7,
+            evaluatedAt: new Date('2026-01-01'),
+            correlationId: 'corr-1'
+          },
+          {
+            objectiveId: 'o1',
+            demonstratedBloomLevel: 'APPLY',
+            masteryScore: 0.9,
+            evaluatedAt: new Date('2026-01-02'),
+            correlationId: 'corr-2'
+          }
+        ]
+      }
+    ]);
 
     const detail = await realGetTopicDetail('u1', 't1');
     expect(detail.topicName).toBe('Sorting');
@@ -428,10 +426,9 @@ describe('getTopicDetail (real implementation, mocked models)', () => {
 
   test('returns null when the user has no competencies for the topic', async () => {
     Course.find.mockReturnValue({
-      select: jest.fn().mockReturnThis(),
-      lean: jest.fn().mockResolvedValue([])
+      select: jest.fn().mockImplementation(() => leaned([]))
     });
-    CompetencyProfile.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([]) });
+    CompetencyProfile.find.mockResolvedValue([]);
     const detail = await realGetTopicDetail('u1', 't1');
     expect(detail).toBeNull();
   });

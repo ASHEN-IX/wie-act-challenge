@@ -4,12 +4,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import express, { type Response, type NextFunction } from 'express';
 import request from 'supertest';
-import mongoose from 'mongoose';
+import { connectDatabase, disconnectDatabase } from '../../shared/database';
+import { newId } from '../../shared/ids';
 
 import {
   ActivityRecord,
   Course,
   CourseRevision,
+  Institution,
   InstitutionMembership
 } from '../../modules/study/src/models';
 import coursesRouter from '../../modules/study/src/routes/courses';
@@ -17,16 +19,14 @@ import activitiesRouter from '../../modules/study/src/routes/activities';
 import { updateCourseDraft } from '../../modules/study/src/services/courseDraft';
 import type { DomainRequest } from '../../src/framework/contracts';
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27018/ednova-test';
-
 test('M14 / ED-32: Course Studio Source-Backed Activity Proposal Generation Integration', async (t) => {
-  await mongoose.connect(MONGO_URI);
+  await connectDatabase();
 
   const testPrefix = `m14_${Date.now()}`;
   const ownerUserId = `${testPrefix}_owner`;
   const instructorId = `${testPrefix}_instructor`;
   const unauthorizedUserId = `${testPrefix}_unauthorized`;
-  const institutionId = new mongoose.Types.ObjectId();
+  const institutionId = newId();
 
   let courseId: string;
   let draftRevisionTag: string;
@@ -52,19 +52,28 @@ test('M14 / ED-32: Course Studio Source-Backed Activity Proposal Generation Inte
     await cleanupCourseFixtures();
     try {
       if (courseId) {
-        await Course.deleteMany({ courseId });
         await CourseRevision.deleteMany({ courseId });
         await ActivityRecord.deleteMany({ courseId });
       }
+      await Course.deleteMany({ userId: { contains: testPrefix } });
       await InstitutionMembership.deleteMany({ institutionId });
+      await Institution.deleteMany({ _id: institutionId });
     } finally {
-      await mongoose.disconnect();
+      await disconnectDatabase().catch(() => {});
     }
   });
 
   await t.test(
     'Setup: Create institutional course with draft hierarchy and objectives',
     async () => {
+      // The membership's institution must exist first (real foreign key).
+      await Institution.create({
+        id: institutionId,
+        name: 'M14 Studio Institution',
+        slug: `m14-${institutionId}`,
+        createdByUserId: ownerUserId,
+        status: 'active'
+      });
       await InstitutionMembership.create({
         institutionId,
         userId: instructorId,
@@ -89,38 +98,43 @@ test('M14 / ED-32: Course Studio Source-Backed Activity Proposal Generation Inte
 
       await prepareCourseFixture(courseId, t);
 
+      // `findEditableDraft` deliberately ignores empty draft shells (an empty
+      // stale shell must not mask reviewed material), so the fixture draft
+      // starts out carrying the hierarchy the instructor then edits.
+      const initialTopics = [
+        {
+          id: 'topic_backprop',
+          title: 'Backpropagation and Automatic Differentiation',
+          subtopics: [
+            {
+              id: 'subtopic_chain_rule',
+              title: 'Vector Calculus Chain Rule',
+              learning_objectives: [
+                {
+                  id: 'obj_gradient_derivation',
+                  text: 'Apply multivariate chain rule to derive analytical matrix gradients',
+                  bloomLevel: 'apply'
+                }
+              ]
+            }
+          ]
+        }
+      ];
+
       const initialRevision = await CourseRevision.create({
         courseId,
         revisionTag: `rev_init_${Date.now()}`,
         contentHash: 'sha256:7777777777777777777777777777777777777777777777777777777777777777',
         status: 'draft',
         isInstructorReviewed: false,
-        topics: []
+        topics: initialTopics
       });
 
       const draftUpdate = await updateCourseDraft(instructorId, courseId, {
         expectedRevisionTag: initialRevision.revisionTag,
         summary: 'Curated deep learning optimization curriculum',
         isInstructorReviewed: true,
-        topics: [
-          {
-            id: 'topic_backprop',
-            title: 'Backpropagation and Automatic Differentiation',
-            subtopics: [
-              {
-                id: 'subtopic_chain_rule',
-                title: 'Vector Calculus Chain Rule',
-                learning_objectives: [
-                  {
-                    id: 'obj_gradient_derivation',
-                    text: 'Apply multivariate chain rule to derive analytical matrix gradients',
-                    bloomLevel: 'apply'
-                  }
-                ]
-              }
-            ]
-          }
-        ]
+        topics: initialTopics
       });
 
       draftRevisionTag = draftUpdate.revisionTag;

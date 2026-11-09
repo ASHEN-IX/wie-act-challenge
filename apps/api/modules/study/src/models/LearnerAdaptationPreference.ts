@@ -1,4 +1,9 @@
-import { Document, Model, Schema, model, models } from 'mongoose';
+import type {
+  LearnerAdaptationPreference as LearnerAdaptationPreferenceRow,
+  Prisma
+} from '../../../../src/generated/prisma/client';
+import { prisma } from '../../../../shared/database';
+import { table } from './_table';
 
 /**
  * One learner's adaptation preferences (Batch 4, Milestone 4.4).
@@ -12,52 +17,40 @@ import { Document, Model, Schema, model, models } from 'mongoose';
  * `version` makes concurrent writes deterministic: a stale tab writing an old
  * version is rejected rather than silently winning.
  */
-export interface ILearnerAdaptationPreference extends Document {
-  userId: string;
-  /** Optimistic-concurrency counter, incremented on every accepted write. */
-  version: number;
-  recommendationsEnabled: boolean;
-  allowAssessmentEvidence: boolean;
-  preferredMode: string | null;
-  preferWorkedExamples: boolean;
-  preferVisualExploration: boolean;
-  preferDetailedProofs: boolean;
-  /** When set, the learner dismissed a suggestion for this lesson+mode and it
-   * is not re-surfaced until the inputs change. */
-  dismissed: Array<{ courseId: string; revisionId: string; lessonId: string; mode: string; at: Date }>;
-  createdAt: Date;
-  updatedAt: Date;
-}
+export type ILearnerAdaptationPreference = Omit<LearnerAdaptationPreferenceRow, 'dismissed'> & {
+  _id: string;
+  dismissed: Array<{
+    courseId: string;
+    revisionId: string;
+    lessonId: string;
+    mode: string;
+    at: Date;
+  }>;
+};
 
-const schema = new Schema<ILearnerAdaptationPreference>(
-  {
-    userId: { type: String, required: true, unique: true },
-    version: { type: Number, required: true, default: 0 },
-    recommendationsEnabled: { type: Boolean, required: true, default: true },
-    allowAssessmentEvidence: { type: Boolean, required: true, default: true },
-    preferredMode: { type: String, default: null },
-    preferWorkedExamples: { type: Boolean, required: true, default: false },
-    preferVisualExploration: { type: Boolean, required: true, default: false },
-    preferDetailedProofs: { type: Boolean, required: true, default: false },
-    dismissed: {
-      type: [
-        new Schema(
-          {
-            courseId: { type: String, required: true },
-            revisionId: { type: String, required: true },
-            lessonId: { type: String, required: true },
-            mode: { type: String, required: true },
-            at: { type: Date, required: true },
-          },
-          { _id: false },
-        ),
-      ],
-      default: [],
-    },
-  },
-  { collection: 'learner_adaptation_preferences', timestamps: true },
-);
+export const LearnerAdaptationPreference = table<ILearnerAdaptationPreference>({
+  delegate: () => prisma.learnerAdaptationPreference,
+  jsonColumns: ['dismissed'],
+  defaults: () => ({
+    version: 0,
+    recommendationsEnabled: true,
+    allowAssessmentEvidence: true,
+    preferWorkedExamples: false,
+    preferVisualExploration: false,
+    preferDetailedProofs: false,
+    dismissed: []
+  }),
+  columns: (row) => ({
+    userId: row.userId,
+    version: row.version,
+    recommendationsEnabled: row.recommendationsEnabled,
+    allowAssessmentEvidence: row.allowAssessmentEvidence,
+    preferredMode: row.preferredMode,
+    preferWorkedExamples: row.preferWorkedExamples,
+    preferVisualExploration: row.preferVisualExploration,
+    preferDetailedProofs: row.preferDetailedProofs,
+    dismissed: row.dismissed as unknown as Prisma.InputJsonValue
+  })
+});
 
-export const LearnerAdaptationPreference: Model<ILearnerAdaptationPreference> =
-  models.LearnerAdaptationPreference ||
-  model<ILearnerAdaptationPreference>('LearnerAdaptationPreference', schema);
+export default LearnerAdaptationPreference;

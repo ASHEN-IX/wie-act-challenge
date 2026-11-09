@@ -8,8 +8,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import express, { type Response, type NextFunction } from 'express';
 import request from 'supertest';
-import mongoose from 'mongoose';
 import crypto from 'node:crypto';
+import { connectDatabase, disconnectDatabase } from '../../shared/database';
+import { newId } from '../../shared/ids';
 
 import {
   ActivityRecord,
@@ -32,14 +33,14 @@ import { publishCourseRevision } from '../../modules/study/src/services/coursePu
 import { registerActivity, submitAttempt } from '../../modules/study/src/services/activityAttempt';
 import type { DomainRequest } from '../../src/framework/contracts';
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27018/ednova-test';
-
 test('M21 / ED-13: Comprehensive Privacy, Resource Isolation & Synthetic Compliance Audit', async (t) => {
-  await mongoose.connect(MONGO_URI);
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
+  await connectDatabase();
 
   const testPrefix = `m21_priv_${Date.now()}`;
-  const instAId = new mongoose.Types.ObjectId();
-  const instBId = new mongoose.Types.ObjectId();
+  const instAId = newId();
+  const instBId = newId();
 
   // Synthetic user identities
   const instAAdmin = `${testPrefix}_admin_a`;
@@ -94,21 +95,23 @@ test('M21 / ED-13: Comprehensive Privacy, Resource Isolation & Synthetic Complia
   t.after(async () => {
     await cleanupCourseFixtures();
     try {
-      if (courseAId) {
-        await Course.deleteMany({ _id: { $in: [courseAId, courseBId] } });
-        await CourseRevision.deleteMany({ courseId: { $in: [courseAId, courseBId] } });
-        await CourseEnrollment.deleteMany({ courseId: { $in: [courseAId, courseBId] } });
-        await ActivityRecord.deleteMany({ courseId: { $in: [courseAId, courseBId] } });
-        await StudentAttempt.deleteMany({ courseId: { $in: [courseAId, courseBId] } });
-        await LearningEvidence.deleteMany({ 'activity.courseId': { $in: [courseAId, courseBId] } });
+      const courseIds = [courseAId, courseBId].filter((id): id is string => Boolean(id));
+      if (courseIds.length) {
+        await Course.deleteMany({ _id: { $in: courseIds } });
+        await CourseRevision.deleteMany({ courseId: { $in: courseIds } });
+        await CourseEnrollment.deleteMany({ courseId: { $in: courseIds } });
+        await ActivityRecord.deleteMany({ courseId: { $in: courseIds } });
+        await StudentAttempt.deleteMany({ courseId: { $in: courseIds } });
+        await LearningEvidence.deleteMany({ userId: { startsWith: testPrefix } });
       }
-      await Institution.deleteMany({ _id: { $in: [instAId, instBId] } });
       await InstitutionMembership.deleteMany({ institutionId: { $in: [instAId, instBId] } });
+      await Institution.deleteMany({ _id: { $in: [instAId, instBId] } });
+      await Course.deleteMany({ userId: { startsWith: testPrefix } });
       if (roomId) {
         await StudyRoom.deleteMany({ roomId });
       }
     } finally {
-      await mongoose.disconnect();
+      await disconnectDatabase().catch(() => {});
     }
   });
 
@@ -122,7 +125,7 @@ test('M21 / ED-13: Comprehensive Privacy, Resource Isolation & Synthetic Complia
       domain: 'sit.synthetic.edu',
       status: 'active'
     });
-    await InstitutionMembership.create([
+    await InstitutionMembership.createMany([
       { institutionId: instAId, userId: instAAdmin, role: 'university_admin', status: 'active' },
       { institutionId: instAId, userId: instAInstructor, role: 'instructor', status: 'active' },
       {
@@ -148,7 +151,7 @@ test('M21 / ED-13: Comprehensive Privacy, Resource Isolation & Synthetic Complia
       domain: 'sas.synthetic.edu',
       status: 'active'
     });
-    await InstitutionMembership.create([
+    await InstitutionMembership.createMany([
       { institutionId: instBId, userId: instBInstructor, role: 'instructor', status: 'active' },
       { institutionId: instBId, userId: instBStudent, role: 'university_student', status: 'active' }
     ]);
@@ -161,7 +164,7 @@ test('M21 / ED-13: Comprehensive Privacy, Resource Isolation & Synthetic Complia
       userId: instAAdmin,
       ownerUserId: instAAdmin,
       scope: 'institutional',
-      institutionId: instAId.toString(),
+      institutionId: instAId,
       assignedInstructorIds: [instAInstructor],
       status: 'completed',
       topics: []
@@ -177,7 +180,7 @@ test('M21 / ED-13: Comprehensive Privacy, Resource Isolation & Synthetic Complia
       userId: instBInstructor,
       ownerUserId: instBInstructor,
       scope: 'institutional',
-      institutionId: instBId.toString(),
+      institutionId: instBId,
       assignedInstructorIds: [instBInstructor],
       status: 'completed',
       topics: []
@@ -187,38 +190,41 @@ test('M21 / ED-13: Comprehensive Privacy, Resource Isolation & Synthetic Complia
 
     // Draft & Publish Course A
     const initialHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const draftTopics = [
+      {
+        id: 'topic_hash_tables',
+        title: 'Hash Tables and Collision Resolution',
+        subtopics: [
+          {
+            id: 'sub_chaining',
+            title: 'Separate Chaining Analysis',
+            learning_objectives: [
+              {
+                id: objectiveId,
+                text: 'Analyze worst-case lookup complexity in hash tables with chaining',
+                bloomLevel: 'analyze'
+              }
+            ]
+          }
+        ]
+      }
+    ];
+    // A draft revision is only editable once it carries ingested topics, so the
+    // synthetic ingestion result seeds the hierarchy the review then confirms.
     const revA = await CourseRevision.create({
       courseId: courseAId,
       revisionTag: `rev_init_${Date.now()}`,
       contentHash: initialHash,
       status: 'draft',
       isInstructorReviewed: false,
-      topics: []
+      topics: draftTopics
     });
 
     const draftRes = await updateCourseDraft(instAInstructor, courseAId, {
       expectedRevisionTag: revA.revisionTag,
       summary: 'Reviewed data structures curriculum',
       isInstructorReviewed: true,
-      topics: [
-        {
-          id: 'topic_hash_tables',
-          title: 'Hash Tables and Collision Resolution',
-          subtopics: [
-            {
-              id: 'sub_chaining',
-              title: 'Separate Chaining Analysis',
-              learning_objectives: [
-                {
-                  id: objectiveId,
-                  text: 'Analyze worst-case lookup complexity in hash tables with chaining',
-                  bloomLevel: 'analyze'
-                }
-              ]
-            }
-          ]
-        }
-      ]
+      topics: draftTopics
     });
 
     const rawContentHash = draftRes.contentHash.replace(/^sha256:/, '');
@@ -285,19 +291,17 @@ test('M21 / ED-13: Comprehensive Privacy, Resource Isolation & Synthetic Complia
     );
 
     // Enroll students in Course A
-    await CourseEnrollment.create([
+    await CourseEnrollment.createMany([
       {
         courseId: courseAId,
         institutionId: instAId,
         userId: instAStudent1,
-        enrolledRole: 'student',
         status: 'active'
       },
       {
         courseId: courseAId,
         institutionId: instAId,
         userId: instAStudent2,
-        enrolledRole: 'student',
         status: 'active'
       }
     ]);

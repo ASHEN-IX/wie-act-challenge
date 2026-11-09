@@ -9,7 +9,8 @@ Browser ──► web (Next.js, :3000) ──/api/v1, /ws, /uploads──► API
               │  hosts /api/auth/* (Better Auth)                │   │   │
               │                                                 │   │   └─ HTTP + RabbitMQ ─► AI service (FastAPI, :8000) + workers
               ▼                                                 ▼   ▼
-           MongoDB  ◄───────────── same database ───────────── Mongo  Redis (cache, rate limits)
+           PostgreSQL ◄── Prisma ── API                   MongoDB (Python's own collections)
+                                                                 ├─ Redis (cache, rate limits)
                                                                  └─ RabbitMQ (jobs and results)
 SMTP (Mailpit :1025 locally) is used by web (sign-in emails) and API (invitations, notifications).
 The AI workers and the API share two folders: uploads and the FAISS index.
@@ -17,8 +18,8 @@ The AI workers and the API share two folders: uploads and the FAISS index.
 
 Two things surprise people:
 
-- **The web app talks to MongoDB.** It hosts the sign-in endpoints (`apps/web/src/app/api/auth/[...all]`, Better Auth through `apps/api/shared/betterAuth.ts`). Sessions are stored in the same database the API reads, and the API verifies them with the same secret. That is why `apps/web/.env.local` has `MONGODB_URI`, `BETTER_AUTH_SECRET`, `AUTH_TRUSTED_ORIGINS` and SMTP settings. Everything else the web app does goes through the API (`BACKEND_URL`).
-- **There is one database (`ednova`).** API, web (auth) and AI workers all use it. The AI service may be pointed at a different one with `AI_DB_NAME` / `.env.ai`, but locally they are the same.
+- **The web app talks to PostgreSQL.** It hosts the sign-in endpoints (`apps/web/src/app/api/auth/[...all]`, Better Auth through `apps/api/shared/betterAuth.ts`). Sessions are stored in the same database the API reads, and the API verifies them with the same secret. That is why `apps/web/.env.local` has `DATABASE_URL`, `BETTER_AUTH_SECRET`, `AUTH_TRUSTED_ORIGINS` and SMTP settings. Everything else the web app does goes through the API (`BACKEND_URL`).
+- **There are two databases with different owners.** API and web share one PostgreSQL database (`ednova`) through Prisma. The Python AI service keeps its own MongoDB database for the collections only it owns; it never reads the application tables. Locally both run side by side (`docker compose -f deploy/compose.development.yml up -d`).
 
 ## Which file for which app
 
@@ -27,7 +28,7 @@ Two things surprise people:
 | `apps/api/.env` | API, and Compose through `pnpm docker:up` (`--env-file`) | The only env file for the backend. Copy from `apps/api/.env.example`. |
 | `.env` at the repo root | nothing of its own | Optional symlink to `apps/api/.env` so plain `docker compose` sees the same values. Do not keep a separate copy: it drifts. |
 | `apps/web/.env.local` | web | Copy from `apps/web/.env.example`. |
-| `apps/ai/.env` | AI service and workers | Copy from `apps/ai/.env.example`. Compose overrides the Mongo, RabbitMQ and Redis hosts with container names. |
+| `apps/ai/.env` | AI service and workers | Copy from `apps/ai/.env.example`. Compose overrides the MongoDB, RabbitMQ and Redis hosts with container names. |
 | `.env.ai` (from `.env.ai.example`) | only the separate `docker-compose.ai.yml` | For running the AI stack on its own server. |
 
 Real env files are git-ignored; only `*.example` files are committed.
@@ -36,7 +37,8 @@ Real env files are git-ignored; only `*.example` files are committed.
 
 | Value | Where | Why |
 |---|---|---|
-| `MONGODB_URI` (database `ednova`) | api, web, ai | One database. |
+| `DATABASE_URL` (database `ednova`) | api, web | One PostgreSQL database, through Prisma. |
+| `MONGODB_URI` (database `ednova`) | ai | The Python service's own collections. The API no longer reads it. |
 | `BETTER_AUTH_SECRET` | api, web | Web signs sessions, API verifies them. Different secrets mean every request is "not signed in". |
 | `BETTER_AUTH_URL`, `AUTH_TRUSTED_ORIGINS` | api, web | The public web origin (`http://localhost:3000`). |
 | `AI_SERVICE_API_KEY` | api, ai | The API sends it; the AI service checks it. |
@@ -61,7 +63,7 @@ They are kept for compatibility; collapsing them into one variable is a code cha
 
 ## Local ports
 
-web 3000, API 3001, AI 8000, MongoDB 27017, Redis 6379, RabbitMQ 5672 (UI 15672), Mailpit 1025 (UI 8025).
+web 3000, API 3001, AI 8000, PostgreSQL 5433 (host) → 5432 (container), MongoDB 27017 (Python only), Redis 6379, RabbitMQ 5672 (UI 15672), Mailpit 1025 (UI 8025).
 
 ## Tests
 

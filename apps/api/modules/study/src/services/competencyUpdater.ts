@@ -43,7 +43,7 @@ async function resolveCompetencyKey(
   userId: string
 ): Promise<{ topicId: string; knowledgeType: string } | null> {
   if (!objectiveId) return null;
-  const objective = await LearningObjective.findOne({ objectiveId, userId, isActive: true }).lean();
+  const objective = await LearningObjective.findOne({ objectiveId, userId, isActive: true });
   if (!objective || !objective.topicId) return null;
   return { topicId: objective.topicId, knowledgeType: objective.knowledgeType || 'declarative' };
 }
@@ -99,8 +99,11 @@ async function processEvalResult(
     }
   });
   await EvalResultRecord.updateOne(filter, {
-    $set: { competencyProcessedAt: new Date() },
-    $unset: { competencyLeaseUntil: '', competencyLeaseToken: '' }
+    $set: {
+      competencyProcessedAt: new Date(),
+      competencyLeaseUntil: null,
+      competencyLeaseToken: null
+    }
   });
   return {
     processed: true,
@@ -128,8 +131,7 @@ async function runOnce(): Promise<RunOnceResults> {
     $or: [{ competencyLeaseUntil: null }, { competencyLeaseUntil: { $lte: new Date() } }]
   })
     .sort({ createdAt: 1 })
-    .limit(POLL_LIMIT)
-    .lean();
+    .limit(POLL_LIMIT);
 
   const results: RunOnceResults = { total: candidates.length, processed: 0, skipped: 0, errors: 0 };
 

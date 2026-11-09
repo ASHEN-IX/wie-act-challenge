@@ -1,5 +1,4 @@
 import crypto from 'node:crypto';
-import { Types } from 'mongoose';
 import { Course, CourseRevision } from '../models';
 import { captureActivitySources } from './activityResolution';
 import { canManageCourse } from './resourceAccess';
@@ -56,19 +55,20 @@ export interface UpdateCourseDraftInput {
 }
 
 function extractionReviewRequired(contentDocument: unknown): boolean {
-  if (!contentDocument || typeof contentDocument !== 'object' || Array.isArray(contentDocument)) return false;
+  if (!contentDocument || typeof contentDocument !== 'object' || Array.isArray(contentDocument))
+    return false;
   const quality = (contentDocument as { quality?: { publicationState?: unknown } }).quality;
   return quality?.publicationState === 'review_required';
 }
 
 async function authoritativeCanonicalDocument(
-  courseId: Types.ObjectId,
+  courseId: string,
   revisionTag: string,
   fallback: unknown
 ): Promise<unknown> {
-  const durable = await CourseRevision.findOne({ courseId, revisionTag })
-    .select({ contentDocument: 1 })
-    .lean();
+  const durable = await CourseRevision.findOne({ courseId, revisionTag }).select({
+    contentDocument: 1
+  });
   return durable?.contentDocument ?? fallback;
 }
 
@@ -76,10 +76,7 @@ export function canonicalHasReviewableRegions(value: unknown): boolean {
   return extractionReviewRequired(value);
 }
 
-export function withExtractionReview(
-  value: unknown,
-  acknowledgedAt: Date = new Date()
-): unknown {
+export function withExtractionReview(value: unknown, acknowledgedAt: Date = new Date()): unknown {
   if (!extractionReviewRequired(value) || !value || typeof value !== 'object') return value;
   return {
     ...(value as Record<string, unknown>),
@@ -134,7 +131,13 @@ export async function findEditableDraft(courseId: string) {
   const drafts = await CourseRevision.find({ courseId, status: 'draft' });
   return (
     drafts
-      .filter((draft) => Boolean(draft.topics?.length) && draft.activationState !== 'prepared' && !draft.revokedAt && !draft.formulaPublication?.sourceDraftId)
+      .filter(
+        (draft) =>
+          Boolean(draft.topics?.length) &&
+          draft.activationState !== 'prepared' &&
+          !draft.revokedAt &&
+          !draft.formulaPublication?.sourceDraftId
+      )
       .sort(
         (a, b) =>
           Number(Boolean(b.contentDocument)) - Number(Boolean(a.contentDocument)) ||
@@ -179,8 +182,12 @@ export async function getCourseDraft(actorUserId: string, courseId: string) {
         }).lean()
       : null;
     if (active?.topics?.length) {
-      const originalCanonical = active.contentDocument ? JSON.parse(JSON.stringify(active.contentDocument)) : undefined;
-      if (originalCanonical) for (const c of originalCanonical.chapters || []) for (const l of c.lessons || []) for (const b of l.blocks || []) delete b.reviewedFormula;
+      const originalCanonical = active.contentDocument
+        ? JSON.parse(JSON.stringify(active.contentDocument))
+        : undefined;
+      if (originalCanonical)
+        for (const c of originalCanonical.chapters || [])
+          for (const l of c.lessons || []) for (const b of l.blocks || []) delete b.reviewedFormula;
       draft = await CourseRevision.create({
         courseId: course._id,
         revisionTag: `rev_${crypto.randomUUID().replace(/-/g, '')}`,
@@ -397,14 +404,24 @@ export async function updateCourseDraft(
       )
     : undefined;
 
+  // `draft` was just read, so these two predicates are evaluated on that read;
+  // the `__v` guard below is what makes the write atomic. A nested JSON path
+  // cannot be a Prisma `where`, and a formula publication is immutable, so
+  // refusing here rather than in the filter is equivalent.
+  if (draft.activationState === 'prepared')
+    throw new StaleRevisionError('Draft changed during update');
+  if (draft.formulaPublication?.sourceDraftId)
+    throw Object.assign(new Error('Draft already published as a formula'), {
+      status: 409,
+      code: 'FORMULA_SNAPSHOT_CHANGED'
+    });
+
   const changed = await CourseRevision.findOneAndUpdate(
     {
       _id: draft._id,
       revisionTag: input.expectedRevisionTag,
       status: 'draft',
-      __v: draft.__v,
-      activationState: { $ne: 'prepared' },
-      'formulaPublication.sourceDraftId': { $exists: false }
+      __v: draft.__v
     },
     {
       $set: {
@@ -432,7 +449,9 @@ export async function updateCourseDraft(
   );
   if (!changed) throw new StaleRevisionError('Draft changed during update');
   // Course.topics is a legacy editable projection; revision content is authoritative.
-  draft.set(changed.toObject());
+  // The write is authoritative; continue with the fresh row rather than a
+  // mutated local copy.
+  Object.assign(draft, changed);
   return {
     success: true,
     courseId: course._id.toString(),

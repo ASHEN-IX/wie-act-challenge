@@ -349,7 +349,9 @@ describe('GET /api/v1/ai/status', () => {
     });
     const response = await request(app).get('/api/v1/ai/status').expect(200);
     expect(response.body.agents.coach).toEqual({
-      status: 'unavailable', tier: 'compact', model: 'fixture/coach'
+      status: 'unavailable',
+      tier: 'compact',
+      model: 'fixture/coach'
     });
     expect(response.body.executionMode).toBe('UNAVAILABLE');
   });
@@ -362,7 +364,9 @@ describe('GET /api/v1/ai/status', () => {
     });
     const response = await request(app).get('/api/v1/ai/status').expect(200);
     expect(response.body.agents.planner).toEqual({
-      status: 'available', tier: 'capable', model: 'fixture/planner'
+      status: 'available',
+      tier: 'capable',
+      model: 'fixture/planner'
     });
     expect(response.body.agents.coach).toEqual({ status: 'unavailable', tier: null, model: null });
     expect(response.body.executionMode).toBe('REAL_APPROVED');
@@ -376,7 +380,9 @@ describe('GET /api/v1/ai/status', () => {
     });
     const response = await request(app).get('/api/v1/ai/status').expect(200);
     expect(response.body.agents.coach).toEqual({
-      status: 'available', tier: 'compact', model: 'fixture/coach'
+      status: 'available',
+      tier: 'compact',
+      model: 'fixture/coach'
     });
     expect(response.body.executionMode).toBe(mode);
   });

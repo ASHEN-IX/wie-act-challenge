@@ -6,14 +6,15 @@
  */
 
 const request = require('supertest');
-const mongoose = require('mongoose');
+const { connectDatabase, disconnectDatabase } = require('../../shared/database');
 
 jest.setTimeout(30000);
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'integration-test-secret';
 process.env.JWT_REFRESH_SECRET =
   process.env.JWT_REFRESH_SECRET || 'integration-test-refresh-secret';
-process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/ednova_test';
+process.env.DATABASE_URL =
+  process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
 process.env.NODE_ENV = 'test';
 
 jest.mock('@ednova/shared/ai-messaging', () => {
@@ -47,9 +48,7 @@ let tokenA: string;
 let tokenB: string;
 
 beforeAll(async () => {
-  await mongoose.connect(process.env.MONGODB_URI, {
-    serverSelectionTimeoutMS: 5000
-  });
+  await connectDatabase();
   await AiJob.deleteMany({});
   tokenA = `ednova.test_session=${generateToken(userA)}`;
   tokenB = `ednova.test_session=${generateToken(userB)}`;
@@ -61,7 +60,7 @@ afterEach(async () => {
 
 afterAll(async () => {
   await AiJob.deleteMany({});
-  await mongoose.disconnect();
+  await disconnectDatabase();
 });
 
 describe('POST /api/v1/ai/jobs', () => {
@@ -158,7 +157,8 @@ describe('state machine', () => {
     const first = await AiJob.completeByCorrelation(correlationId, { answer: 'x' });
     const second = await AiJob.completeByCorrelation(correlationId, { answer: 'y' });
     expect(first.result.answer).toBe('x'); // first write wins
-    expect(second._id.equals(first._id)).toBe(true);
+    // Ids are plain hex strings now, not BSON ObjectIds.
+    expect(second._id).toBe(first._id);
   });
 
   test('failByCorrelation sanitizes long errors to 512 chars', async () => {

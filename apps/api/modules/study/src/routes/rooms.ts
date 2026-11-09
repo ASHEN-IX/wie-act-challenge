@@ -13,7 +13,8 @@ import {
   validateRoomRevision
 } from '../services/roomActivity';
 import type { Response, NextFunction } from 'express';
-import type { FilterQuery } from 'mongoose';
+/** Prisma-shaped filter: a plain object of column predicates. */
+type FilterQuery = Record<string, unknown>;
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { IStudyRoom, IStudyRoomParticipant, RoomPhase } from '../models/StudyRoom';
 import type { IFacilitatorIntervention } from '../models/FacilitatorIntervention';
@@ -45,7 +46,14 @@ import crypto from 'crypto';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const moduleClient = require('@ednova/shared/moduleClient');
 import Joi from 'joi';
-import { StudyRoom, FacilitatorIntervention, Course, StudentAttempt, InstitutionMembership } from '../models';
+import {
+  StudyRoom,
+  FacilitatorIntervention,
+  Course,
+  StudentAttempt,
+  InstitutionMembership,
+  mutateRoom
+} from '../models';
 import { buildInternalHeaders } from '../utils/sessionHelpers';
 import { logger } from '@ednova/shared';
 import { runRoomCommand } from '../services/roomCommands';
@@ -304,9 +312,10 @@ function evaluateLocalPeerFirstPolicy(obs: {
     const title = obs.learningContext?.activityTitle;
     const focus = title ? `“${title}”` : 'the question your group is discussing';
     const evidence = obs.learningContext?.courseId ? 'the course material' : 'your study notes';
-    const prompt = level === 1
-      ? `Which concept from ${evidence} helps explain ${focus}?`
-      : `Find a worked example or definition in ${evidence}. How could your group use it to take the next step on ${focus}?`;
+    const prompt =
+      level === 1
+        ? `Which concept from ${evidence} helps explain ${focus}?`
+        : `Find a worked example or definition in ${evidence}. How could your group use it to take the next step on ${focus}?`;
     return {
       shouldIntervene: true,
       strategy: 'SOCRATIC_NUDGE',
@@ -383,9 +392,9 @@ async function verifyCourseAccess(
       try {
         const canRead = await canReadCourse(req.user.userId, courseId);
         if (canRead) {
-          const course = await Course.findOne({
-            $or: [{ courseId }, { _id: courseId.match(/^[0-9a-fA-F]{24}$/) ? courseId : null }]
-          }).lean();
+          // `courseId` in the path is the course's own id. The old `$or` also
+          // matched a non-existent `courseId` column; only `_id` was ever real.
+          const course = await Course.findOne({ _id: courseId }).lean();
           return { authorized: true, title: course?.title };
         }
       } catch {
@@ -438,23 +447,36 @@ router.put('/:roomId/voice-consent', requireActiveRoom, async (req: RoomRequest,
     return res.status(400).json({ error: 'Explicit boolean consent required' });
   const actor = req.user!.userId;
   const member = { userId: actor, leftAt: { $exists: false } };
-  let room = await StudyRoom.findOneAndUpdate(
-    {
-      roomId: req.params.roomId,
-      status: 'active',
-      participants: {
-        $elemMatch: { ...member, hasVoiceConsent: { $ne: req.body.hasVoiceConsent } }
-      }
-    },
-    {
-      $set: {
-        'participants.$.hasVoiceConsent': req.body.hasVoiceConsent,
-        ...(!req.body.hasVoiceConsent ? { 'participants.$.isSpeaking': false } : {})
-      },
-      $inc: { seq: 1 }
-    },
-    { new: true }
-  );
+  // `participants` is a JSON column: the array is rewritten from the row the
+  // predicate matched, which keeps the same "only this member changes" effect
+  // as the old positional `$set`.
+  const current = await StudyRoom.findOne({
+    roomId: req.params.roomId,
+    status: 'active',
+    participants: {
+      $elemMatch: { ...member, hasVoiceConsent: { $ne: req.body.hasVoiceConsent } }
+    }
+  });
+  let room = current
+    ? await StudyRoom.findOneAndUpdate(
+        { roomId: current.roomId, status: 'active', seq: current.seq },
+        {
+          $set: {
+            participants: (current.participants || []).map((participant) =>
+              participant.userId === member.userId && !participant.leftAt
+                ? {
+                    ...participant,
+                    hasVoiceConsent: req.body.hasVoiceConsent,
+                    isSpeaking: req.body.hasVoiceConsent ? participant.isSpeaking : false
+                  }
+                : participant
+            )
+          },
+          $inc: { seq: 1 }
+        },
+        { new: true }
+      )
+    : null;
   if (!room)
     room = await StudyRoom.findOne({
       roomId: req.params.roomId,
@@ -549,7 +571,9 @@ router.post(
     }
 
     if (actor !== room.hostUserId && actor !== room.presenterUserId) {
-      return res.status(403).json({ error: 'Only the host or presenter can request a voice moderator' });
+      return res
+        .status(403)
+        .json({ error: 'Only the host or presenter can request a voice moderator' });
     }
     const agentName = process.env.LIVEKIT_MODERATOR_AGENT_NAME?.trim();
     if (!isLiveKitConfigured() || !agentName) {
@@ -577,10 +601,20 @@ function durableRoomCommand(kind: Parameters<typeof runRoomCommand>[0]): DomainM
     const actor = req.user;
     if (!actor?.userId) return res.status(401).json({ error: 'Unauthorized' });
     if (kind === 'create' || kind === 'join') {
-      const teaching = actor.role === 'instructor' || actor.role === 'admin' || await InstitutionMembership.exists({
-        userId: actor.userId, status: 'active', role: { $in: ['instructor', 'university_admin'] }
-      });
-      if (teaching) return res.status(403).json({ error: 'Peer study rooms are for students. Use your teaching workspace to manage courses.' });
+      const teaching =
+        actor.role === 'instructor' ||
+        actor.role === 'admin' ||
+        // Membership rows also exist for students, so only a *teaching* role
+        // counts here.
+        (await InstitutionMembership.exists({
+          userId: actor.userId,
+          status: 'active',
+          role: { $in: ['instructor', 'university_admin'] }
+        }));
+      if (teaching)
+        return res.status(403).json({
+          error: 'Peer study rooms are for students. Use your teaching workspace to manage courses.'
+        });
     }
     if (!Object.prototype.hasOwnProperty.call(req.body || {}, 'commandId')) return next();
     const result = await runRoomCommand(
@@ -804,7 +838,7 @@ router.post('/join', durableRoomCommand('join'), async (req: RoomRequest, res: R
     const { error, value } = joinRoomSchema.validate(req.body || {});
     if (error) return res.status(400).json({ error: error.details[0].message });
 
-    const filter: FilterQuery<IStudyRoom> = { status: 'active' };
+    const filter: FilterQuery = { status: 'active' };
     if (value.inviteCode) {
       filter.inviteCode = value.inviteCode.trim().toUpperCase();
     } else {
@@ -846,79 +880,76 @@ router.post('/join', durableRoomCommand('join'), async (req: RoomRequest, res: R
       });
     }
 
-    // 2. Atomic Join with Capacity Check
-    let updatedRoom: IStudyRoom | null;
-    if (existingParticipant) {
-      // Returning participant reactivation
-      updatedRoom = await StudyRoom.findOneAndUpdate(
-        {
-          _id: room._id,
-          status: 'active',
-          participants: { $elemMatch: { userId, leftAt: { $exists: true } } },
-          $expr: {
-            $lt: [
-              {
-                $size: {
-                  $filter: {
-                    input: '$participants',
-                    cond: { $not: '$$this.leftAt' }
-                  }
-                }
-              },
-              '$maxParticipants'
-            ]
-          }
-        },
-        {
-          $unset: { 'participants.$.leftAt': 1 },
-          $set: {
-            'participants.$.isOnline': true,
-            ...(value.hasVoiceConsent !== undefined
-              ? { 'participants.$.hasVoiceConsent': !!value.hasVoiceConsent }
-              : {})
-          },
-          $inc: { seq: 1 }
-        },
-        { new: true }
-      );
-    } else {
-      // New participant addition
-      updatedRoom = await StudyRoom.findOneAndUpdate(
-        {
-          _id: room._id,
-          status: 'active',
-          'participants.userId': { $ne: userId },
-          $expr: {
-            $lt: [
-              {
-                $size: {
-                  $filter: {
-                    input: '$participants',
-                    cond: { $not: '$$this.leftAt' }
-                  }
-                }
-              },
-              '$maxParticipants'
-            ]
-          }
-        },
-        {
-          $push: {
-            participants: {
-              userId,
-              name: req.user!.name || 'Participant',
-              role: 'participant',
-              hasVoiceConsent: !!value.hasVoiceConsent,
-              isOnline: true,
-              hasSubmitted: false,
-              joinedAt: new Date()
-            }
-          },
-          $inc: { seq: 1 }
-        },
-        { new: true }
-      );
+    // 2. Join with an atomic capacity check.
+    //
+    // Mongo did this with a guarded `$push` plus `$expr` on the filtered
+    // participant count. The equivalent here: re-read the room inside a CAS
+    // mutation, re-check capacity against that fresh row, and only then write.
+    // The update is conditional on `seq` and the exact `participants` array, so
+    // a concurrent join that filled the room makes this write lose; the loop
+    // re-reads and re-checks instead of oversubscribing.
+    let capacityFull = false;
+    let notJoinable = false;
+    const updatedRoom: IStudyRoom | null = await mutateRoom(
+      { _id: room._id, status: 'active' },
+      (candidate) => {
+        const active = candidate.participants.filter((p) => !p.leftAt);
+        if (active.length >= candidate.maxParticipants) {
+          capacityFull = true;
+          return false;
+        }
+        if (
+          existingParticipant &&
+          candidate.participants.some((p) => p.userId === userId && !p.leftAt)
+        ) {
+          // A concurrent join already restored this membership.
+          return false;
+        }
+        if (!existingParticipant && candidate.participants.some((p) => p.userId === userId)) {
+          notJoinable = true;
+          return false;
+        }
+        const participant = candidate.participants.find((p) => p.userId === userId);
+        if (participant) {
+          delete participant.leftAt;
+          participant.isOnline = true;
+          if (value.hasVoiceConsent !== undefined)
+            participant.hasVoiceConsent = !!value.hasVoiceConsent;
+        } else {
+          candidate.participants.push({
+            userId,
+            name: req.user!.name || 'Participant',
+            role: 'participant',
+            hasVoiceConsent: !!value.hasVoiceConsent,
+            isOnline: true,
+            hasSubmitted: false,
+            joinedAt: new Date()
+          });
+        }
+        candidate.seq += 1;
+      }
+    );
+    if (!updatedRoom && capacityFull) {
+      const fresh = await StudyRoom.findById(room._id);
+      if (
+        fresh?.status === 'active' &&
+        fresh.participants.some((p) => p.userId === userId && !p.leftAt)
+      ) {
+        return res.status(200).json({
+          roomId: fresh.roomId,
+          inviteCode: fresh.inviteCode,
+          courseId: fresh.courseId,
+          title: fresh.title,
+          presenterUserId: fresh.presenterUserId,
+          moderatorMode: fresh.moderatorMode,
+          participantsCount: fresh.participants.filter((p) => !p.leftAt).length,
+          currentPhase: fresh.currentPhase,
+          createdAt: fresh.createdAt.toISOString()
+        });
+      }
+      return res.status(409).json({ error: 'Room has reached maximum capacity' });
     }
+    if (!updatedRoom && notJoinable) return res.status(400).json({ error: 'Unable to join room' });
 
     if (!updatedRoom) {
       const fresh = await StudyRoom.findById(room._id).lean();
@@ -1203,7 +1234,7 @@ router.put(
           activePin?: IStudyRoom['activePin'];
           revisionId?: string;
           activityRound?: string;
-          'participants.$[].hasSubmitted'?: boolean;
+          participants?: IStudyRoom['participants'];
         };
         $inc: { seq: number };
       } = {
@@ -1215,8 +1246,13 @@ router.put(
         updateOps.$set.activePin = selected?.pin || null;
         if (selected) updateOps.$set.revisionId = selected.pin.revisionId;
         updateOps.$set.activityRound = crypto.randomUUID();
-        // Reset submission flags for the new round
-        updateOps.$set['participants.$[].hasSubmitted'] = false;
+        // Reset submission flags for the new round. Participants are a JSON
+        // column, so the array is rewritten from the row read above rather than
+        // addressed positionally.
+        updateOps.$set.participants = (room.participants || []).map((participant) => ({
+          ...participant,
+          hasSubmitted: false
+        }));
       }
 
       const updatedRoom = await StudyRoom.findOneAndUpdate(
@@ -1412,16 +1448,19 @@ router.post(
         actionType,
         currentPhase: room.currentPhase,
         activeActivityId: room.activeActivityId || null,
-        learningContext: { courseId: room.courseId, title: room.title, confusion },
+        learningContext: {
+          courseId: room.courseId ?? undefined,
+          activityTitle: room.title,
+          confusion
+        },
         confusion,
-        participants: activeParticipants.map((p) => ({
-          userId: p.userId,
-          name: p.name || 'Student',
-          role: p.role,
-          hasSubmitted: !!p.hasSubmitted,
-          isSpeaking: !!p.isSpeaking,
-          isOnline: !!p.isOnline
-        })),
+        participants: activeParticipants.map(
+          (p): Pick<IStudyRoomParticipant, 'userId' | 'name' | 'leftAt'> => ({
+            userId: p.userId,
+            name: p.name || 'Student',
+            leftAt: p.leftAt
+          })
+        ),
         recentDialogue,
         hintLevel
       };
@@ -1594,15 +1633,14 @@ router.post(
         hintLevel,
         currentPhase: room.currentPhase,
         activeActivityId: room.activeActivityId || null,
-        learningContext: { courseId: room.courseId, title: room.title, activityTitle },
-        participants: activeParticipants.map((p) => ({
-          userId: p.userId,
-          name: p.name || 'Student',
-          role: p.role,
-          hasSubmitted: !!p.hasSubmitted,
-          isSpeaking: !!p.isSpeaking,
-          isOnline: !!p.isOnline
-        }))
+        learningContext: { courseId: room.courseId ?? undefined, activityTitle },
+        participants: activeParticipants.map(
+          (p): Pick<IStudyRoomParticipant, 'userId' | 'name' | 'leftAt'> => ({
+            userId: p.userId,
+            name: p.name || 'Student',
+            leftAt: p.leftAt
+          })
+        )
       };
 
       let proposal: FacilitatorProposal | null = null;

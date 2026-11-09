@@ -20,7 +20,8 @@ const jwt = { sign: require('../../../../tests/sessionFixtures').createSession }
 
 jest.mock('../models/AiJob', () => ({
   createPending: jest.fn(),
-  findOne: jest.fn()
+  findOne: jest.fn(),
+  deleteOne: jest.fn()
 }));
 jest.mock('@ednova/shared/ai-messaging', () => ({
   publishAiJob: jest.fn(),
@@ -61,10 +62,10 @@ const VALID_STEP = {
 beforeEach(() => {
   jest.clearAllMocks();
   AiJob.createPending.mockResolvedValue({
+    id: 'job-row-1',
     jobId: 'job-1',
     status: 'PENDING',
-    correlationId: 'corr-1',
-    deleteOne: jest.fn().mockResolvedValue(null)
+    correlationId: 'corr-1'
   });
 });
 
@@ -207,37 +208,34 @@ describe('POST /api/v1/eval/step', () => {
 
   test('rolls back the PENDING job + 503 when the bus publish fails', async () => {
     (publishAiJob as jest.Mock).mockRejectedValue(new Error('broker down'));
-    const deleteOne = jest.fn().mockResolvedValue(null);
     AiJob.createPending.mockResolvedValue({
+      id: 'job-row-1',
       jobId: 'job-1',
       status: 'PENDING',
-      correlationId: 'corr-1',
-      deleteOne
+      correlationId: 'corr-1'
     });
 
     const res = await request(app).post('/api/v1/eval/step').set(authHeader()).send(VALID_STEP);
 
     expect(res.status).toBe(503);
-    expect(deleteOne).toHaveBeenCalledTimes(1);
+    expect(AiJob.deleteOne).toHaveBeenCalledWith({ id: 'job-row-1' });
   });
 });
 
 describe('GET /api/v1/eval/jobs/:jobId', () => {
   test('returns status + step result for the owning user', async () => {
-    AiJob.findOne.mockReturnValue({
-      lean: jest.fn().mockResolvedValue({
-        jobId: 'job-1',
-        type: 'study.eval.step',
-        userId: 'user-1',
-        resourceScope: {},
-        status: 'COMPLETED',
-        attempts: 1,
-        result: { state: 'CONTINUE', mastery_score: 0.8, next_question: 'Why?' },
-        error: null,
-        fallbackUsed: false,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      })
+    AiJob.findOne.mockResolvedValue({
+      jobId: 'job-1',
+      type: 'study.eval.step',
+      userId: 'user-1',
+      resourceScope: {},
+      status: 'COMPLETED',
+      attempts: 1,
+      result: { state: 'CONTINUE', mastery_score: 0.8, next_question: 'Why?' },
+      error: null,
+      fallbackUsed: false,
+      createdAt: new Date(),
+      updatedAt: new Date()
     });
 
     const res = await request(app).get('/api/v1/eval/jobs/job-1').set(authHeader());
@@ -248,7 +246,7 @@ describe('GET /api/v1/eval/jobs/:jobId', () => {
   });
 
   test('scopes the query to the owning user (non-admin)', async () => {
-    AiJob.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) });
+    AiJob.findOne.mockResolvedValue(null);
 
     await request(app).get('/api/v1/eval/jobs/job-1').set(authHeader('user-2'));
 
@@ -260,9 +258,7 @@ describe('GET /api/v1/eval/jobs/:jobId', () => {
   });
 
   test('admin job lookup remains actor-scoped', async () => {
-    AiJob.findOne.mockReturnValue({
-      lean: jest.fn().mockResolvedValue({ jobId: 'job-1', status: 'PENDING' })
-    });
+    AiJob.findOne.mockResolvedValue({ jobId: 'job-1', status: 'PENDING' });
 
     await request(app).get('/api/v1/eval/jobs/job-1').set(authHeader('admin-1', 'admin'));
 
@@ -274,7 +270,7 @@ describe('GET /api/v1/eval/jobs/:jobId', () => {
   });
 
   test('404 for unknown or non-eval jobs', async () => {
-    AiJob.findOne.mockReturnValue({ lean: jest.fn().mockResolvedValue(null) });
+    AiJob.findOne.mockResolvedValue(null);
 
     const res = await request(app).get('/api/v1/eval/jobs/nope').set(authHeader());
 

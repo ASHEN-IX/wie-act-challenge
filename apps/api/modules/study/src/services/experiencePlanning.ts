@@ -24,11 +24,11 @@ import {
   type ExperiencePlanValidationContext,
   type ExperiencePlanRejectionCode,
   type ValidatedAssetBinding,
-  type ValidatedLearningExperiencePlan,
+  type ValidatedLearningExperiencePlan
 } from '../../../../shared/ednova/experiencePlan';
 import {
   tryValidateExperiencePlan,
-  type ValidationOutcome,
+  type ValidationOutcome
 } from '../../../../shared/ednova/experiencePlanValidator';
 import {
   MOCK_PLANNER_IMPLEMENTATION,
@@ -37,27 +37,23 @@ import {
   planMockExperience,
   type MockPlannerScenario,
   type PlannerAssetView,
-  type PlannerBlockView,
+  type PlannerBlockView
 } from '../../../../shared/ednova/mockExperiencePlanner';
 import {
   parseStructuredAsset,
-  type StructuredAssetV1,
+  type StructuredAssetV1
 } from '../../../../shared/ednova/structuredAsset';
 import { StructuredAsset } from '../models/StructuredAsset';
+import { prisma } from '../../../../shared/database';
 import { getPublishedPresentation } from './presentationReader';
 import { generateExperiencePlan } from './experiencePlanGeneration';
 import { loadAcceptedPlan } from './experiencePlanStore';
 import { isLearningMode } from '../../../../shared/ednova/learningModes';
 import { configuredPlannerModel } from './experiencePlannerProviders';
 import type { ExperiencePlannerProvider } from '../../../../shared/ednova/experiencePlannerProvider';
-import {
-  capabilityDigest,
-} from '../../../../shared/ednova/experiencePlanValidator';
+import { capabilityDigest } from '../../../../shared/ednova/experiencePlanValidator';
 import type { PlanningContextInput } from '../../../../shared/ednova/planningContext';
-import {
-  verifyReviewProvenance,
-  type ReviewProvenance,
-} from './assetReviewProvenance';
+import { verifyReviewProvenance, type ReviewProvenance } from './assetReviewProvenance';
 
 /**
  * Mock planning is a development/QA pathway, never a production feature.
@@ -80,7 +76,9 @@ export class ExperiencePlanningDisabledError extends Error {
 
 export class ExperiencePlanningUnavailableError extends Error {
   readonly status = 503;
-  constructor(message = 'The experience planner is unavailable. The deterministic reader remains available.') {
+  constructor(
+    message = 'The experience planner is unavailable. The deterministic reader remains available.'
+  ) {
     super(message);
     this.name = 'ExperiencePlanningUnavailableError';
   }
@@ -90,7 +88,7 @@ export class ExperiencePlanningUnavailableError extends Error {
  * Milestone 4.2 adds a provider implementation here — and must add it here,
  * because the validator checks every proposal against this list. */
 const ALLOWED_PLANNERS = Object.freeze([
-  Object.freeze({ implementation: MOCK_PLANNER_IMPLEMENTATION, version: MOCK_PLANNER_VERSION }),
+  Object.freeze({ implementation: MOCK_PLANNER_IMPLEMENTATION, version: MOCK_PLANNER_VERSION })
 ]);
 
 /**
@@ -117,7 +115,12 @@ const ALLOWED_PLANNERS = Object.freeze([
  */
 export function verifyAssetBindings(
   assets: StructuredAssetV1[],
-  binding: { courseId: string; revisionId: string; lessonId: string; authorizedDocumentIds: Set<string> },
+  binding: {
+    courseId: string;
+    revisionId: string;
+    lessonId: string;
+    authorizedDocumentIds: Set<string>;
+  }
 ): ValidatedAssetBinding[] {
   return assets.map((asset) => {
     const bound =
@@ -131,7 +134,7 @@ export function verifyAssetBindings(
         : Array.isArray(asset.sourceReferences) &&
           asset.sourceReferences.length > 0 &&
           asset.sourceReferences.every((reference) =>
-            binding.authorizedDocumentIds.has(reference.documentId),
+            binding.authorizedDocumentIds.has(reference.documentId)
           );
 
     return {
@@ -144,7 +147,7 @@ export function verifyAssetBindings(
       // proved nothing about whether a person approved this version; M4.2
       // resolves it from persisted decisions in `verifyReviewProvenance`.
       reviewVerified: false,
-      sourceVerified: bound && sourceVerified,
+      sourceVerified: bound && sourceVerified
     };
   });
 }
@@ -158,19 +161,26 @@ export function verifyAssetBindings(
  */
 export async function verifyAssetBindingsWithProvenance(
   assets: StructuredAssetV1[],
-  binding: { courseId: string; revisionId: string; lessonId: string; authorizedDocumentIds: Set<string> },
+  binding: {
+    courseId: string;
+    revisionId: string;
+    lessonId: string;
+    authorizedDocumentIds: Set<string>;
+  }
 ): Promise<{ bindings: ValidatedAssetBinding[]; provenance: Map<string, ReviewProvenance> }> {
   const bindings = verifyAssetBindings(assets, binding);
   const provenance = await verifyReviewProvenance(assets, binding);
-  const bound = new Set(bindings.filter((entry) => entry.lessonId === binding.lessonId).map((e) => e.assetId));
+  const bound = new Set(
+    bindings.filter((entry) => entry.lessonId === binding.lessonId).map((e) => e.assetId)
+  );
   return {
     bindings: bindings.map((entry) => ({
       ...entry,
       // Only a persisted, unrevoked, version-matching decision from a current
       // course author counts. A proposal cannot influence this value.
-      reviewVerified: bound.has(entry.assetId) && provenance.get(entry.assetId)?.verified === true,
+      reviewVerified: bound.has(entry.assetId) && provenance.get(entry.assetId)?.verified === true
     })),
-    provenance,
+    provenance
   };
 }
 
@@ -197,13 +207,13 @@ async function loadAssets(courseId: string, revisionId: string): Promise<Structu
           review: {
             status: row.reviewStatus,
             ...(row.reviewedBy !== undefined ? { reviewedBy: row.reviewedBy } : {}),
-            ...(row.reviewedAt !== undefined ? { reviewedAt: row.reviewedAt } : {}),
+            ...(row.reviewedAt !== undefined ? { reviewedAt: row.reviewedAt } : {})
           },
           ...(row.sourceReferences !== undefined ? { sourceReferences: row.sourceReferences } : {}),
           audience: row.audience,
           fallback: row.fallback,
-          disclosure: row.disclosure,
-        }),
+          disclosure: row.disclosure
+        })
       );
     } catch {
       // A malformed optional asset is skipped, never fatal: the deterministic
@@ -260,7 +270,7 @@ export const EXPERIENCE_PLAN_DISCLOSURE =
 /** Project a validated plan into the browser shape. Only a branded validated
  * plan can be projected, so this function cannot be reached with raw JSON. */
 export function projectExperiencePlan(
-  plan: ValidatedLearningExperiencePlan,
+  plan: ValidatedLearningExperiencePlan
 ): PublishedExperiencePlanV1 {
   if (!isValidatedExperiencePlan(plan))
     throw new ExperiencePlanRejection('PLAN_FINALIZATION_INCOMPLETE', 'finalization');
@@ -285,7 +295,7 @@ export function projectExperiencePlan(
       group: entry.group,
       disclosure: entry.disclosure,
       ...(entry.interaction !== undefined ? { interaction: entry.interaction } : {}),
-      fallback: entry.fallback,
+      fallback: entry.fallback
     })),
     supplemental: plan.supplemental.map((entry) => ({
       placementId: entry.placementId,
@@ -296,9 +306,9 @@ export function projectExperiencePlan(
       assetId: entry.assetId!,
       group: entry.group,
       disclosure: entry.disclosure,
-      fallback: entry.fallback,
+      fallback: entry.fallback
     })),
-    disclosure: EXPERIENCE_PLAN_DISCLOSURE,
+    disclosure: EXPERIENCE_PLAN_DISCLOSURE
   };
 }
 
@@ -320,7 +330,7 @@ export async function planLessonExperience(
   courseId: string,
   lessonId: string,
   scenario: MockPlannerScenario,
-  mode = 'read',
+  mode = 'read'
 ): Promise<PlanningOutcome> {
   if (!mockPlanningEnabled()) throw new ExperiencePlanningDisabledError();
   if (!isMockPlannerScenario(scenario))
@@ -348,7 +358,7 @@ export async function planLessonExperience(
         (block.provenance?.length ?? 0) > 0,
       hasSourceRegion: block.type !== 'chart' && Boolean(block.sourceMeta?.regionId),
       isReviewedFormula: block.type === 'math' && Boolean(block.review),
-      hasStructuredFixture: false,
+      hasStructuredFixture: false
     };
   });
 
@@ -360,7 +370,7 @@ export async function planLessonExperience(
     courseId: presentation.courseId,
     revisionId: presentation.revisionId,
     lessonId,
-    authorizedDocumentIds,
+    authorizedDocumentIds
   });
 
   const context: ExperiencePlanValidationContext = {
@@ -375,7 +385,7 @@ export async function planLessonExperience(
       contentHash: presentation.contentHash,
       lessonId,
       mode,
-      blockIds: blocks.map((block) => block.blockId),
+      blockIds: blocks.map((block) => block.blockId)
     }),
     allowedPlanners: ALLOWED_PLANNERS,
     blocks: blocks.map((block) => ({
@@ -386,9 +396,9 @@ export async function planLessonExperience(
       hasEvidence: block.hasEvidence,
       hasSourceRegion: block.hasSourceRegion,
       isReviewedFormula: block.isReviewedFormula,
-      hasStructuredFixture: block.hasStructuredFixture,
+      hasStructuredFixture: block.hasStructuredFixture
     })),
-    assets: assetBindings,
+    assets: assetBindings
   };
 
   // The planner receives the minimal context and nothing else: no actor id, no
@@ -397,7 +407,7 @@ export async function planLessonExperience(
     assetId: asset.assetId,
     blockId: asset.blockId,
     component: asset.component,
-    provenance: asset.provenance,
+    provenance: asset.provenance
   }));
   const result = planMockExperience(scenario, {
     courseId: context.courseId,
@@ -406,7 +416,7 @@ export async function planLessonExperience(
     lessonId,
     mode,
     blocks,
-    assets: plannerAssets,
+    assets: plannerAssets
   });
   if (!result.ok) return { status: 'planner_unavailable', failure: result.failure };
 
@@ -415,7 +425,7 @@ export async function planLessonExperience(
     // The code and stage only: never the proposal, source text or actor.
     console.warn(
       `[experience-plan] rejected ${outcome.code} at ${outcome.stage} ` +
-        `(lesson=${lessonId} blocks=${context.blocks.length})`,
+        `(lesson=${lessonId} blocks=${context.blocks.length})`
     );
     return { status: 'rejected', code: outcome.code, stage: outcome.stage };
   }
@@ -433,7 +443,7 @@ export async function loadTrustedPlanningContext(
   actor: string,
   courseId: string,
   lessonId: string,
-  mode: string,
+  mode: string
 ): Promise<{
   presentation: Awaited<ReturnType<typeof getPublishedPresentation>>;
   lessonId: string;
@@ -455,7 +465,7 @@ export async function loadTrustedPlanningContext(
     courseId: presentation.courseId,
     revisionId: presentation.revisionId,
     lessonId,
-    authorizedDocumentIds,
+    authorizedDocumentIds
   });
   const lessonAssets = storedAssets.filter((asset) => asset.lessonId === lessonId);
   const bindingByAsset = new Map(bindings.map((entry) => [entry.assetId, entry] as const));
@@ -469,7 +479,7 @@ export async function loadTrustedPlanningContext(
       ...(block.type === 'callout' ? { role: block.kind } : {}),
       hasSourceRegion: block.type !== 'chart' && Boolean(block.sourceMeta?.regionId),
       isReviewedFormula: block.type === 'math' && Boolean(block.review),
-      hasStructuredFixture: false,
+      hasStructuredFixture: false
     };
   });
 
@@ -485,7 +495,7 @@ export async function loadTrustedPlanningContext(
       contentHash: presentation.contentHash,
       lessonId,
       mode,
-      blockIds: blocks.map((block) => block.blockId),
+      blockIds: blocks.map((block) => block.blockId)
     }),
     // Both implementations are permitted; the provider is chosen by config and
     // the proposal's own `planner` field must match one of these.
@@ -502,9 +512,9 @@ export async function loadTrustedPlanningContext(
         (entry.block.provenance?.length ?? 0) > 0,
       hasSourceRegion: entry.hasSourceRegion,
       isReviewedFormula: entry.isReviewedFormula,
-      hasStructuredFixture: entry.hasStructuredFixture,
+      hasStructuredFixture: entry.hasStructuredFixture
     })),
-    assets: bindings,
+    assets: bindings
   };
 
   const contextInput: PlanningContextInput = {
@@ -525,9 +535,9 @@ export async function loadTrustedPlanningContext(
         blockId: asset.blockId ?? '',
         component: asset.component,
         provenance: asset.provenance,
-        reviewVerified: true,
+        reviewVerified: true
       })),
-    capabilities: capabilityDigest(),
+    capabilities: capabilityDigest()
   };
 
   // Eligibility carries the key fingerprint the operator verified; governance
@@ -543,21 +553,26 @@ export async function loadTrustedPlanningContext(
 async function loadEligibilityKeySha(courseId: string, mode: string): Promise<string | null> {
   void courseId;
   void mode;
-  const mongoose = await import('mongoose');
-  const db = mongoose.default.connection.db;
-  if (!db) return null;
   const model = configuredPlannerModel();
-  const row = await db.collection('experience_planner_eligibility').findOne({
-    provider: 'gemini',
-    model,
-    revoked: { $ne: true },
+  const rows = await prisma.experiencePlannerEligibility.findMany({
+    where: { provider: 'gemini', model }
   });
-  const keySha = row?.keySha256;
-  return typeof keySha === 'string' && /^[a-f0-9]{64}$/.test(keySha) ? keySha : null;
+  for (const row of rows) {
+    const payload = (row.payload ?? {}) as Record<string, unknown>;
+    if (payload.revoked === true) continue;
+    const keySha = payload.keySha256;
+    if (typeof keySha === 'string' && /^[a-f0-9]{64}$/.test(keySha)) return keySha;
+  }
+  return null;
 }
 
 export type RealPlanningOutcome =
-  | { status: 'planned'; plan: PublishedExperiencePlanV1; requestId: string; usageReported: boolean }
+  | {
+      status: 'planned';
+      plan: PublishedExperiencePlanV1;
+      requestId: string;
+      usageReported: boolean;
+    }
   | { status: 'rejected'; code: string; stage: string; requestId: string }
   | { status: 'refused'; code: string }
   | { status: 'failed'; code: string; uncertain: boolean; requestId: string }
@@ -574,7 +589,7 @@ export async function planLessonWithProvider(
   courseId: string,
   lessonId: string,
   provider: ExperiencePlannerProvider,
-  mode = 'read',
+  mode = 'read'
 ): Promise<RealPlanningOutcome> {
   const trusted = await loadTrustedPlanningContext(actor, courseId, lessonId, mode);
   const outcome = await generateExperiencePlan({
@@ -586,7 +601,7 @@ export async function planLessonWithProvider(
     mode,
     keySha256: trusted.keySha256 ?? '',
     contextInput: trusted.contextInput,
-    validationContext: trusted.validationContext,
+    validationContext: trusted.validationContext
   });
 
   // An accepted plan already exists for this exact scope: reuse it rather than
@@ -600,22 +615,25 @@ export async function planLessonWithProvider(
       mode: isLearningMode(mode) ? mode : 'guided',
       contentHash: trusted.validationContext.contentHash,
       contextFingerprint: trusted.validationContext.contextFingerprint,
-      validationContext: trusted.validationContext,
+      validationContext: trusted.validationContext
     });
     if (reused.status === 'available')
       return {
         status: 'planned',
         plan: reused.plan,
         requestId: outcome.requestId,
-        usageReported: false,
+        usageReported: false
       };
     // The stored record no longer passes validation; report it plainly rather
     // than pretending a plan is available.
     return {
       status: 'failed',
-      code: reused.status === 'rejected' ? reused.code : String((reused as { reason?: string }).reason ?? 'PLAN_UNAVAILABLE'),
+      code:
+        reused.status === 'rejected'
+          ? reused.code
+          : String((reused as { reason?: string }).reason ?? 'PLAN_UNAVAILABLE'),
       uncertain: false,
-      requestId: outcome.requestId,
+      requestId: outcome.requestId
     };
   }
 
@@ -627,7 +645,7 @@ export async function planLessonWithProvider(
     status: 'planned',
     plan: projectExperiencePlan(outcome.plan),
     requestId: outcome.requestId,
-    usageReported: outcome.usageReported,
+    usageReported: outcome.usageReported
   };
 }
 
@@ -663,7 +681,7 @@ export async function readStoredPlan(input: {
     input.actor,
     input.courseId,
     input.lessonId,
-    input.mode,
+    input.mode
   );
 
   const outcome = await loadAcceptedPlan({
@@ -673,12 +691,11 @@ export async function readStoredPlan(input: {
     mode: input.mode,
     contentHash: trusted.validationContext.contentHash,
     contextFingerprint: trusted.validationContext.contextFingerprint,
-    validationContext: trusted.validationContext,
+    validationContext: trusted.validationContext
   });
 
   if (outcome.status === 'available') return { status: 'available', plan: outcome.plan };
-  if (outcome.status === 'rejected')
-    return { status: 'rejected', code: outcome.code };
+  if (outcome.status === 'rejected') return { status: 'rejected', code: outcome.code };
   if (outcome.status === 'stale') return { status: 'stale', reason: outcome.reason };
   return { status: 'absent' };
 }

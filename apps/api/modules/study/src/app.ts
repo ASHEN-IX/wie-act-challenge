@@ -43,7 +43,7 @@ const {
 const { authenticate } = require('@ednova/shared/auth');
 
 // --- Environment validation (fail-fast on missing secrets) ---
-requireEnv(['MONGODB_URI', 'INTERNAL_API_SECRET', 'RABBITMQ_URL'], {
+requireEnv(['DATABASE_URL', 'INTERNAL_API_SECRET', 'RABBITMQ_URL'], {
   serviceName: 'study'
 });
 

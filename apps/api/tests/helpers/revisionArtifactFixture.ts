@@ -74,17 +74,15 @@ export async function materializeRevisionFixture(
   await fs.writeFile(base + '.faiss', index);
   await fs.writeFile(base + '.meta.json', JSON.stringify(meta));
   cleanup.add(path.dirname(base));
-  await CourseRevision.collection.updateOne(
+  await CourseRevision.updateOne(
     { _id: revision._id },
     {
-      $set: {
-        sourceManifest: [document],
-        sourceManifestDigest: meta.manifestDigest,
-        vectorIndexRef: 'faiss/' + courseId + '/' + revisionId + '.faiss',
-        ...(revision.status === 'published' || revision.status === 'deprecated'
-          ? { activationState: 'committed' }
-          : {})
-      }
+      sourceManifest: [document],
+      sourceManifestDigest: meta.manifestDigest,
+      vectorIndexRef: 'faiss/' + courseId + '/' + revisionId + '.faiss',
+      ...(revision.status === 'published' || revision.status === 'deprecated'
+        ? { activationState: 'committed' }
+        : {})
     }
   );
   return document;

@@ -16,9 +16,7 @@ export class InfrastructureController {
   docs(@Res() res: Response): void {
     res
       .type('html')
-      .send(
-        '<h1>EdNova API</h1><a href="/api/v1/docs/openapi.json">OpenAPI specification</a>'
-      );
+      .send('<h1>EdNova API</h1><a href="/api/v1/docs/openapi.json">OpenAPI specification</a>');
   }
   @Get('monitoring/metrics')
   @UseGuards(SessionGuard)
@@ -29,7 +27,7 @@ export class InfrastructureController {
   }
   @Get('monitoring/health')
   async monitoring(@Res() res: Response): Promise<void> {
-    const connected = require('mongoose').connection.readyState === 1;
+    const connected = await require('../../shared/database').isConnectedToDatabase();
     const names = ['auth', 'users', 'study', 'ai', 'signals', 'analytics', 'notifications'];
     const services: Record<string, unknown> = Object.fromEntries(
       names.map((name) => [name, { status: connected ? 'healthy' : 'degraded', latency: 0 }])

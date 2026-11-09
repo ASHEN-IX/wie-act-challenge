@@ -1,4 +1,5 @@
 import { RoomWhiteboard } from '../models/RoomWhiteboard';
+import { isDuplicateKey } from '../models/_table';
 import {
   WhiteboardError,
   mergeElements,
@@ -21,7 +22,7 @@ const EMPTY = (roomId: string): WhiteboardView => ({
 });
 
 export async function readWhiteboard(roomId: string): Promise<WhiteboardView> {
-  const doc = await RoomWhiteboard.findOne({ roomId }).lean();
+  const doc = await RoomWhiteboard.findOne({ roomId });
   if (!doc) return EMPTY(roomId);
   return { roomId, version: doc.version, locked: doc.locked, elements: doc.elements };
 }
@@ -48,18 +49,20 @@ export async function writeWhiteboardElements(
     const { elements, changed } = mergeElements(current.elements, incoming);
     if (!changed) return { board: current, changed: false };
     try {
+      // Compare-and-set on `version`: the guarded update only matches the board
+      // this writer read, so a concurrent save cannot silently drop elements.
       const updated =
         current.version === 0
           ? await RoomWhiteboard.findOneAndUpdate(
               { roomId, version: 0 },
-              { $set: { elements }, $inc: { version: 1 }, $setOnInsert: { roomId, locked: false } },
+              { $set: { elements }, $inc: { version: 1 } },
               { upsert: true, new: true }
-            ).lean()
+            )
           : await RoomWhiteboard.findOneAndUpdate(
               { roomId, version: current.version },
               { $set: { elements }, $inc: { version: 1 } },
               { new: true }
-            ).lean();
+            );
       if (updated) {
         return {
           board: {
@@ -72,8 +75,8 @@ export async function writeWhiteboardElements(
         };
       }
     } catch (error) {
-      // A concurrent first write hits the unique index: retry against the new document.
-      if ((error as { code?: number }).code !== 11000) throw error;
+      // A concurrent first write hits the unique index: retry against the new row.
+      if (!isDuplicateKey(error)) throw error;
     }
   }
   throw new WhiteboardError(409, 'The board changed while saving; try again');
@@ -87,7 +90,7 @@ export async function setWhiteboardLocked(
     { roomId },
     { $set: { locked }, $setOnInsert: { roomId } },
     { upsert: true, new: true }
-  ).lean();
+  );
   return {
     roomId,
     version: updated!.version,

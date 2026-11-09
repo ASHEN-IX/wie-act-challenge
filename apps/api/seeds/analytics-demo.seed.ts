@@ -2,20 +2,23 @@
  * Seed demo analytics events for a user email.
  *
  * Usage:
- *   MONGODB_URI=mongodb://localhost:27017/ednova npx tsx seeds/analytics-demo.seed.ts kammounaziz12@gmail.com
+ *   DATABASE_URL=postgresql://ednova:ednova@127.0.0.1:5433/ednova_test \
+ *     npx tsx seeds/analytics-demo.seed.ts kammounaziz12@gmail.com
  */
-import mongoose from 'mongoose';
-import User from '../modules/auth/src/models/User';
-import AnalyticsEvent from '../modules/analytics/src/models/AnalyticsEvent';
+import { config } from 'dotenv';
+import path from 'node:path';
+import { Prisma } from '../src/generated/prisma/client';
+import { connectDatabase, disconnectDatabase, prisma } from '../shared/database';
+import { newId } from '../shared/ids';
+
+config({ path: path.resolve(__dirname, '../.env') });
 
 const DEFAULT_EMAIL = 'kammounaziz12@gmail.com';
-const DEFAULT_MONGODB_URI = 'mongodb://localhost:27017/ednova';
 const SEED_BATCH = 'analytics-demo-v1';
 
 const email = String(process.argv[2] || DEFAULT_EMAIL)
   .toLowerCase()
   .trim();
-const mongoUri = process.env.MONGODB_URI || DEFAULT_MONGODB_URI;
 
 interface SessionPlanItem {
   daysAgo: number;
@@ -60,7 +63,15 @@ const sessionPlan: SessionPlanItem[] = [
 ];
 
 const buildEvents = (userId: string) => {
-  const events: any[] = [];
+  const events: Array<{
+    id: string;
+    userId: string;
+    eventType: string;
+    metadata: Prisma.InputJsonValue;
+    timestamp: Date;
+    createdAt: Date;
+    updatedAt: Date;
+  }> = [];
 
   sessionPlan.forEach((session, sessionIndex) => {
     const sessionId = `seed-session-${SEED_BATCH}-${session.daysAgo}`;
@@ -68,6 +79,7 @@ const buildEvents = (userId: string) => {
     const completedAt = daysAgo(session.daysAgo, session.hour, Math.min(55, session.duration));
 
     events.push({
+      id: newId(),
       userId,
       eventType: 'study_session_started',
       metadata: {
@@ -84,6 +96,7 @@ const buildEvents = (userId: string) => {
       const taskTimestamp = daysAgo(session.daysAgo, session.hour, Math.min(55, 8 + taskIndex * 7));
 
       events.push({
+        id: newId(),
         userId,
         eventType: 'task_completed',
         metadata: {
@@ -103,6 +116,7 @@ const buildEvents = (userId: string) => {
     if (sessionIndex % 3 === 0) {
       const focusTimestamp = daysAgo(session.daysAgo, session.hour, 15);
       events.push({
+        id: newId(),
         userId,
         eventType: 'focus_tracked',
         metadata: {
@@ -117,6 +131,7 @@ const buildEvents = (userId: string) => {
     }
 
     events.push({
+      id: newId(),
       userId,
       eventType: 'study_session_completed',
       metadata: {
@@ -139,6 +154,7 @@ const buildEvents = (userId: string) => {
 
   events.push(
     {
+      id: newId(),
       userId,
       eventType: 'course_ingested',
       metadata: {
@@ -150,6 +166,7 @@ const buildEvents = (userId: string) => {
       updatedAt: courseIngestedAt
     },
     {
+      id: newId(),
       userId,
       eventType: 'plan_generated',
       metadata: {
@@ -166,37 +183,54 @@ const buildEvents = (userId: string) => {
 };
 
 async function run(): Promise<void> {
-  await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 5000 });
+  if (process.env.NODE_ENV === 'production') throw new Error('Demo seeding is development only');
+  const url = process.env.DATABASE_URL;
+  if (!url || !['localhost', '127.0.0.1', '[::1]'].includes(new URL(url).hostname))
+    throw new Error('Analytics demo seeding requires a loopback PostgreSQL database');
 
-  const user = await (User as any).findOne({ email }).lean();
-  if (!user) {
-    throw new Error(`No user found with email ${email}`);
+  await connectDatabase();
+  try {
+    const user = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+    if (!user) {
+      throw new Error(`No user found with email ${email}`);
+    }
+
+    const userId = user.id;
+    const events = buildEvents(userId);
+
+    // The seed batch marker is stored inside `metadata`; delete the previous batch
+    // so a re-run replaces its own events instead of duplicating them.
+    const existing = await prisma.analyticsEvent.findMany({
+      where: { userId },
+      select: { id: true, metadata: true }
+    });
+    const stale = existing
+      .filter(
+        (row) =>
+          row.metadata &&
+          typeof row.metadata === 'object' &&
+          (row.metadata as Record<string, unknown>).seedBatch === SEED_BATCH
+      )
+      .map((row) => row.id);
+    if (stale.length) await prisma.analyticsEvent.deleteMany({ where: { id: { in: stale } } });
+    await prisma.analyticsEvent.createMany({ data: events, skipDuplicates: true });
+
+    console.log(`Seeded ${events.length} analytics events for ${email} (${userId}).`);
+    console.log('Seed batch:', SEED_BATCH);
+    console.log('Summary shape:', {
+      studySessions: sessionPlan.length,
+      completedTasks: sessionPlan.reduce((sum, session) => sum + session.tasks, 0),
+      totalStudyMinutes: sessionPlan.reduce((sum, session) => sum + session.duration, 0)
+    });
+  } finally {
+    await disconnectDatabase();
   }
-
-  const userId = user._id.toString();
-  const events = buildEvents(userId);
-
-  await (AnalyticsEvent as any).deleteMany({
-    userId,
-    'metadata.seedBatch': SEED_BATCH
-  });
-  await (AnalyticsEvent as any).insertMany(events, { ordered: false });
-
-  console.log(`Seeded ${events.length} analytics events for ${email} (${userId}).`);
-  console.log('Seed batch:', SEED_BATCH);
-  console.log('Summary shape:', {
-    studySessions: sessionPlan.length,
-    completedTasks: sessionPlan.reduce((sum, session) => sum + session.tasks, 0),
-    totalStudyMinutes: sessionPlan.reduce((sum, session) => sum + session.duration, 0)
-  });
-
-  await mongoose.disconnect();
 }
 
 run().catch(async (error: Error) => {
   console.error('Analytics seed failed:', error.message);
   try {
-    await mongoose.disconnect();
+    await disconnectDatabase();
   } catch {
     // Ignore disconnect failures.
   }

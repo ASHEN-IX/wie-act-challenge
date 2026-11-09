@@ -4,12 +4,12 @@ import {
 } from '../helpers/revisionArtifactFixture';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MongoClient, ObjectId } from 'mongodb';
 import bcrypt from 'bcryptjs';
+import { connectDatabase, disconnectDatabase, prisma } from '../../shared/database';
+import { newId } from '../../shared/ids';
 import http from 'node:http';
 import WebSocket from 'ws';
 import { randomUUID, createHash } from 'node:crypto';
-import { migrateAuth } from '../../scripts/migrate-auth';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { writeFile, unlink } from 'node:fs/promises';
@@ -19,10 +19,10 @@ test(
   'P0-R1 real sessions, current grants and secure activity foundation',
   { timeout: 120000 },
   async (t) => {
-    const database = 'ednova_p0r1_' + process.pid + '_' + Date.now();
+    process.env.DATABASE_URL =
+      process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
     Object.assign(process.env, {
       NODE_ENV: 'test',
-      MONGODB_URI: 'mongodb://127.0.0.1:27018/' + database,
       BETTER_AUTH_SECRET: 'p0r1-synthetic-secret-at-least-32-characters',
       INTERNAL_API_SECRET: 'p0r1-synthetic-internal-secret',
       BETTER_AUTH_URL: 'http://localhost:5173',
@@ -31,13 +31,17 @@ test(
       REDIS_URL: '',
       AI_SERVICE_URL: 'http://127.0.0.1:1'
     });
-    const client = await new MongoClient(process.env.MONGODB_URI!).connect();
-    const db = client.db();
+    await connectDatabase();
     // Teardown must also handle bootstrap failure before assignment.
     // eslint-disable-next-line prefer-const
     let runtime: Awaited<ReturnType<(typeof import('../../src/main.js'))['start']>> | undefined;
     const sockets: WebSocket[] = [];
     const servers: http.Server[] = [];
+    const actorIds = ['instructor', 'learner', 'peer', 'admin', 'foreign', 'personal'].map(() =>
+      newId()
+    );
+    const courses: string[] = [];
+    const institutions: string[] = [];
     t.after(async () => {
       for (const socket of sockets) socket.terminate();
       for (const server of servers) {
@@ -46,31 +50,65 @@ test(
       }
       await cleanupRevisionFixtures();
       await runtime?.stop();
-      await db.dropDatabase();
-      await client.close();
+      try {
+        await prisma.authSession.deleteMany({ where: { userId: { in: actorIds } } });
+        await prisma.authAccount.deleteMany({ where: { userId: { in: actorIds } } });
+        await prisma.authUser.deleteMany({ where: { id: { in: actorIds } } });
+        await prisma.user.deleteMany({ where: { id: { in: actorIds } } });
+        await prisma.authRateLimit.deleteMany({});
+        const models: typeof import('../../modules/study/src/models/index.js') | undefined =
+          await import('../../modules/study/src/models/index.js').catch(() => undefined);
+        if (models && courses.length) {
+          await models.CourseRevision.deleteMany({ courseId: { $in: courses } });
+          await models.CourseEnrollment.deleteMany({ courseId: { $in: courses } });
+          await models.ActivityRecord.deleteMany({ courseId: { $in: courses } });
+          await models.StudentAttempt.deleteMany({ courseId: { $in: courses } });
+          await models.Course.deleteMany({ _id: { $in: courses } });
+        }
+        if (models && institutions.length) {
+          await models.InstitutionMembership.deleteMany({
+            institutionId: { $in: institutions }
+          });
+          await models.Institution.deleteMany({ _id: { $in: institutions } });
+        }
+      } finally {
+        await disconnectDatabase().catch(() => {});
+      }
     });
+    const runTag = `${process.pid}_${Date.now()}`;
     const actors = ['instructor', 'learner', 'peer', 'admin', 'foreign', 'personal'].map(
-      (name) => ({
-        id: new ObjectId().toString(),
+      (name, index) => ({
+        id: actorIds[index],
         name,
-        email: name + '@p0r1.test',
+        email: name + '-' + runTag + '@p0r1.test',
         cookie: ''
       })
     );
     const [instructor, learner, peer, admin, foreign, personal] = actors;
     const password = await bcrypt.hash('Synthetic!123', 12);
-    for (const a of actors)
-      await db.collection('users').insertOne({
-        _id: new ObjectId(a.id),
-        name: a.name,
-        email: a.email,
-        password,
-        role: 'student',
-        tier: 'vip',
-        isActive: true,
-        isVerified: true
+    await prisma.authRateLimit.deleteMany({});
+    for (const a of actors) {
+      await prisma.user.create({
+        data: {
+          id: a.id,
+          name: a.name,
+          email: a.email,
+          password,
+          role: 'student',
+          tier: 'vip',
+          isActive: true,
+          isVerified: true,
+          notificationPreferences: {},
+          onboardingDraft: {}
+        }
       });
-    await migrateAuth(db, { apply: true });
+      await prisma.authUser.create({
+        data: { id: a.id, email: a.email, name: a.name, emailVerified: true }
+      });
+      await prisma.authAccount.create({
+        data: { id: newId(), accountId: a.id, providerId: 'credential', userId: a.id, password }
+      });
+    }
     const auth = await (await import('../../shared/betterAuth.js')).getAuth();
     for (const a of actors) {
       const r = await auth.api.signInEmail({
@@ -103,12 +141,14 @@ test(
       slug: 'p0r1-a-' + Date.now(),
       createdByUserId: admin.id
     });
+    institutions.push(institution._id.toString());
     const otherInstitution = await m.Institution.create({
       name: 'P0R1 B',
       slug: 'p0r1-b-' + Date.now(),
       createdByUserId: foreign.id
     });
-    await m.InstitutionMembership.create([
+    institutions.push(otherInstitution._id.toString());
+    await m.InstitutionMembership.createMany([
       {
         institutionId: institution._id,
         userId: instructor.id,
@@ -187,6 +227,7 @@ test(
       ]
     });
     const courseId = course._id.toString();
+    courses.push(courseId);
     await m.CourseRevision.create({
       courseId,
       revisionTag: 'rev_source',
@@ -232,6 +273,7 @@ test(
           userId: personal.id,
           scope: 'personal'
         });
+        courses.push(c._id.toString());
         assert.equal((await request(personal, 'GET', '/api/v1/study/courses/' + c.id)).status, 200);
         assert.equal((await request(admin, 'GET', '/api/v1/study/courses/' + c.id)).status, 404);
       }
@@ -312,7 +354,9 @@ test(
     await t.test(
       'REAL WEBSOCKET: current institutional grant checked on subsequent delivery',
       async () => {
-        const created = await request(instructor, 'POST', '/api/v1/study/rooms', {
+        // Peer study rooms are student-only, so the enrolled peer presents and
+        // the suspended learner is the listener whose delivery must stop.
+        const created = await request(peer, 'POST', '/api/v1/study/rooms', {
           courseId,
           title: 'Revocation room'
         });
@@ -349,12 +393,9 @@ test(
           { $set: { status: 'suspended' } }
         );
         events.length = 0;
-        const response = await request(
-          instructor,
-          'PUT',
-          '/api/v1/study/rooms/' + roomId + '/phase',
-          { currentPhase: 'peer_discussion' }
-        );
+        const response = await request(peer, 'PUT', '/api/v1/study/rooms/' + roomId + '/phase', {
+          currentPhase: 'peer_discussion'
+        });
         assert.equal(response.status, 200);
         await new Promise((r) => setTimeout(r, 100));
         assert.ok(!events.some((x) => x.includes('"currentPhase":"peer_discussion"')));
@@ -479,7 +520,7 @@ test(
         const foreignDefinition = {
           ...guided,
           activityId: 'act_foreign',
-          courseId: new ObjectId().toString()
+          courseId: newId()
         };
         await assert.rejects(
           service.registerActivity(instructor.id, courseId, foreignDefinition, {

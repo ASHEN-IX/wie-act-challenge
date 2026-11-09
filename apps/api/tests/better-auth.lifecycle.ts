@@ -1,40 +1,40 @@
 import test, { after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { MongoClient, ObjectId, Db } from 'mongodb';
 import bcrypt from 'bcryptjs';
 import { createAuth, resolveIdentity } from '../shared/betterAuth';
-import { migrateAuth } from '../scripts/migrate-auth';
+import { connectDatabase, disconnectDatabase, prisma } from '../shared/database';
+import { newId } from '../shared/ids';
 
 async function registerTests() {
   process.env.BETTER_AUTH_SECRET = 'isolated-auth-test-secret-at-least-32-characters';
   process.env.AUTH_TRUSTED_ORIGINS = 'http://localhost:5173';
-  const client = new MongoClient('mongodb://127.0.0.1:27018');
-  await client.connect();
-  const db: Db = client.db('auth_migration_test_' + process.pid);
+  await connectDatabase();
   const emails: Array<{ text: string }> = [];
   const latestEmail = () => {
     const email = emails.at(-1);
     assert.ok(email, 'Expected an authentication email');
     return email;
   };
-  const auth = await createAuth(db, {
+  const auth = await createAuth({
     sendMail: async (message) => {
       assert.ok(typeof message.text === 'string', 'Authentication email must contain text');
-      emails.push({ text: message.text });
+      emails.push({ text: String(message.text) });
     }
   });
 
   after(async () => {
-    await db.dropDatabase();
-    await client.close();
+    await prisma.user.deleteMany({ where: { email: { endsWith: '@example.test' } } });
+    await prisma.authUser.deleteMany({ where: { email: { endsWith: '@example.test' } } });
+    await prisma.authRateLimit.deleteMany({});
+    await disconnectDatabase();
   });
 
   beforeEach(async () => {
-    await db.collection('auth_rate_limits').deleteMany({});
+    await prisma.authRateLimit.deleteMany({});
   });
 
   const password = 'LegacyPass!123';
-  let cookie: string, userId: ObjectId;
+  let cookie: string, userId: string;
 
   const call = async (path: string, body?: unknown, headers: Record<string, string> = {}) => {
     const result = await auth.handler(
@@ -66,38 +66,47 @@ async function registerTests() {
     };
   };
 
-  test('legacy migration is idempotent and bcrypt sign-in preserves identity', async () => {
-    userId = new ObjectId();
-    await db.collection('users').insertOne({
-      _id: userId,
-      email: 'legacy@example.test',
-      name: 'Legacy',
-      password: await bcrypt.hash(password, 12),
-      isVerified: true,
-      isActive: true,
-      role: 'student',
-      tier: 'vip'
+  test('a bcrypt password from the migrated user signs in with the same identity', async () => {
+    userId = newId();
+    await prisma.user.create({
+      data: {
+        id: userId,
+        email: 'legacy@example.test',
+        name: 'Legacy',
+        isVerified: true,
+        isActive: true,
+        role: 'student',
+        tier: 'vip',
+        notificationPreferences: {},
+        onboardingDraft: {}
+      }
     });
-    assert.equal((await migrateAuth(db)).inspected, 1);
-    await migrateAuth(db, { apply: true });
-    await migrateAuth(db, { apply: true });
-    assert.equal(await db.collection('auth_accounts').countDocuments(), 1);
+    await prisma.authUser.create({
+      data: { id: userId, email: 'legacy@example.test', name: 'Legacy', emailVerified: true }
+    });
+    await prisma.authAccount.create({
+      data: {
+        id: newId(),
+        accountId: userId,
+        providerId: 'credential',
+        userId,
+        password: await bcrypt.hash(password, 12)
+      }
+    });
     const response = await call('sign-in/email', { email: 'legacy@example.test', password });
     assert.equal(response.status, 200, JSON.stringify(response.data));
     assert.equal(response.data.user.id, String(userId));
     assert.match(response.headers.get('set-cookie') || '', /HttpOnly/i);
     cookie = response.cookie;
-    assert.equal((await resolveIdentity({ cookie }, auth, db))?.identity.tier, 'vip');
+    assert.equal((await resolveIdentity({ cookie }, auth))?.identity.tier, 'vip');
   });
 
   test('old valid sessions renew their database expiration and HTTP-only cookie', async () => {
     const expires = new Date(Date.now() + 2 * 86400000);
-    await db
-      .collection('auth_sessions')
-      .updateMany(
-        { userId },
-        { $set: { updatedAt: new Date(Date.now() - 2 * 86400000), expiresAt: expires } }
-      );
+    await prisma.authSession.updateMany({
+      where: { userId },
+      data: { updatedAt: new Date(Date.now() - 2 * 86400000), expiresAt: expires }
+    });
     const response = await call('get-session', undefined, { cookie });
     assert.equal(response.status, 200);
     assert.ok(new Date(response.data.session.expiresAt) > expires);
@@ -109,21 +118,21 @@ async function registerTests() {
       (await call('sign-in/email', { email: 'legacy@example.test', password: 'wrong' })).status,
       401
     );
-    assert.equal(await resolveIdentity({ cookie: 'accessToken=old.jwt.token' }, auth, db), null);
-    await db.collection('users').updateOne({ _id: userId }, { $set: { isActive: false } });
-    assert.equal(await resolveIdentity({ cookie }, auth, db), null);
+    assert.equal(await resolveIdentity({ cookie: 'accessToken=old.jwt.token' }, auth), null);
+    await prisma.user.update({ where: { id: userId }, data: { isActive: false } });
+    assert.equal(await resolveIdentity({ cookie }, auth), null);
     assert.equal(
       (await call('sign-in/email', { email: 'legacy@example.test', password })).status,
       403
     );
-    await db.collection('users').updateOne({ _id: userId }, { $set: { isActive: true } });
+    await prisma.user.update({ where: { id: userId }, data: { isActive: true } });
   });
 
   test('fresh database roles and session expiration are authoritative', async () => {
-    await db.collection('users').updateOne({ _id: userId }, { $set: { role: 'admin' } });
-    assert.equal((await resolveIdentity({ cookie }, auth, db))?.identity.role, 'admin');
-    await db.collection('auth_sessions').updateMany({}, { $set: { expiresAt: new Date(0) } });
-    assert.equal(await resolveIdentity({ cookie }, auth, db), null);
+    await prisma.user.update({ where: { id: userId }, data: { role: 'admin' } });
+    assert.equal((await resolveIdentity({ cookie }, auth))?.identity.role, 'admin');
+    await prisma.authSession.updateMany({ data: { expiresAt: new Date(0) } });
+    assert.equal(await resolveIdentity({ cookie }, auth), null);
   });
 
   test('registration preserves password policy, ignores elevated role, verifies by OTP', async () => {
@@ -146,12 +155,14 @@ async function registerTests() {
     });
     assert.equal(response.status, 200, JSON.stringify(response.data));
     assert.equal(
-      (await db.collection('users').findOne({ email: 'new@example.test' }))?.onboardingDraft
-        ?.weeklyHours,
+      (
+        (await prisma.user.findUnique({ where: { email: 'new@example.test' } }))
+          ?.onboardingDraft as { weeklyHours?: number } | undefined
+      )?.weeklyHours,
       12
     );
     assert.equal(
-      (await db.collection('users').findOne({ email: 'new@example.test' }))?.role,
+      (await prisma.user.findUnique({ where: { email: 'new@example.test' } }))?.role,
       'student'
     );
     assert.equal(
@@ -178,7 +189,7 @@ async function registerTests() {
       200
     );
     assert.equal(
-      (await db.collection('users').findOne({ email: 'new@example.test' }))?.isVerified,
+      (await prisma.user.findUnique({ where: { email: 'new@example.test' } }))?.isVerified,
       true
     );
   });
@@ -187,9 +198,9 @@ async function registerTests() {
     const login = await call('sign-in/email', { email: 'new@example.test', password });
     assert.equal(login.status, 200);
     cookie = login.cookie;
-    assert.ok(await resolveIdentity({ cookie }, auth, db));
+    assert.ok(await resolveIdentity({ cookie }, auth));
     assert.equal((await call('sign-out', {}, { cookie })).status, 200);
-    assert.equal(await resolveIdentity({ cookie }, auth, db), null);
+    assert.equal(await resolveIdentity({ cookie }, auth), null);
   });
 
   test('reset is non-enumerating, revokes sessions, rejects replay and uses native scrypt', async () => {
@@ -214,7 +225,7 @@ async function registerTests() {
       (await call('reset-password', { token, newPassword: 'ChangedPass!456' })).status,
       200
     );
-    assert.equal(await resolveIdentity({ cookie }, auth, db), null);
+    assert.equal(await resolveIdentity({ cookie }, auth), null);
     assert.equal(
       (await call('reset-password', { token, newPassword: 'ChangedPass!456' })).status,
       400
@@ -228,10 +239,8 @@ async function registerTests() {
         .status,
       200
     );
-    const account = await db
-      .collection('auth_accounts')
-      .findOne({ userId: new ObjectId(login.data.user.id) });
-    assert.ok(!account?.password.startsWith('$2'));
+    const account = await prisma.authAccount.findFirst({ where: { userId: login.data.user.id } });
+    assert.equal(account?.password?.startsWith('$2'), false);
   });
 
   test('untrusted origin cannot mutate authentication and passwordless signup stays disabled', async () => {
@@ -266,13 +275,13 @@ async function registerTests() {
     assert.ok(
       (await call('email-otp/verify-email', { email: 'otp-lock@example.test', otp })).status >= 400
     );
-    await db.collection('auth_verifications').deleteMany({});
+    await prisma.authVerification.deleteMany({});
     await call('email-otp/send-verification-otp', {
       email: 'otp-lock@example.test',
       type: 'email-verification'
     });
     const expiredOtp = latestEmail().text.match(/\b\d{6}\b/)?.[0];
-    await db.collection('auth_verifications').updateMany({}, { $set: { expiresAt: new Date(0) } });
+    await prisma.authVerification.updateMany({ data: { expiresAt: new Date(0) } });
     assert.ok(
       (await call('email-otp/verify-email', { email: 'otp-lock@example.test', otp: expiredOtp }))
         .status >= 400
@@ -287,7 +296,7 @@ async function registerTests() {
     const token = new URL(latestEmail().text.split('Reset your password: ')[1]).pathname
       .split('/')
       .at(-1);
-    await db.collection('auth_verifications').updateMany({}, { $set: { expiresAt: new Date(0) } });
+    await prisma.authVerification.updateMany({ data: { expiresAt: new Date(0) } });
     assert.equal(
       (await call('reset-password', { token, newPassword: 'ExpiredPass!123' })).status,
       400
@@ -310,30 +319,17 @@ async function registerTests() {
     );
   });
 
-  test('migration refuses normalized email conflicts before creating identities and never overwrites reset hashes', async () => {
-    await migrateAuth(db, { apply: true });
-    const authUser = await db.collection('auth_users').findOne({ email: 'new@example.test' });
-    const account = await db.collection('auth_accounts').findOne({
-      providerId: 'credential',
-      userId: new ObjectId(authUser?._id)
+  test('a reset password is stored natively and never as a bcrypt hash', async () => {
+    const authUser = await prisma.authUser.findUnique({ where: { email: 'new@example.test' } });
+    const account = await prisma.authAccount.findFirst({
+      where: { providerId: 'credential', userId: authUser?.id }
     });
-    assert.ok(!account?.password.startsWith('$2'));
-    const count = await db.collection('auth_users').countDocuments();
-    const duplicate = new ObjectId();
-    await db.collection('users').insertOne({
-      _id: duplicate,
-      email: ' LEGACY@example.test ',
-      name: 'Duplicate',
-      password: await bcrypt.hash(password, 12)
-    });
-    await assert.rejects(migrateAuth(db, { apply: true }), /duplicate legacy identity/);
-    assert.equal(await db.collection('auth_users').countDocuments(), count);
-    await db.collection('users').deleteOne({ _id: duplicate });
+    assert.equal(account?.password?.startsWith('$2'), false);
   });
 
   test('HTTPS sessions use secure HTTP-only SameSite cookies and fresh random sessions', async () => {
     process.env.AUTH_TRUSTED_ORIGINS = 'http://localhost:5173,https://ednova.example';
-    const secure = await createAuth(db, {
+    const secure = await createAuth({
       baseURL: 'https://ednova.example',
       sendMail: async () => {}
     });

@@ -40,7 +40,7 @@ sequenceDiagram
     actor Inst as Instructor
     participant Web as Next.js Web App
     participant Nest as NestJS Control Plane
-    participant DB as MongoDB
+    participant DB as PostgreSQL
     participant S3 as Private Storage
     participant RMQ as RabbitMQ
     participant Worker as Python Ingest Worker
@@ -113,7 +113,7 @@ sequenceDiagram
     actor Learner
     participant Web as Next.js Web App
     participant Nest as NestJS Control Plane
-    participant DB as MongoDB
+    participant DB as PostgreSQL
     participant AI as Python AI Service (LiteLLM)
 
     Learner->>Web: Enter Topic: "Quantum Computing Basics"
@@ -162,7 +162,7 @@ sequenceDiagram
     actor Student
     participant Web as Next.js Web App
     participant Nest as NestJS Control Plane
-    participant DB as MongoDB
+    participant DB as PostgreSQL
     participant FAISS as FAISS Vector Store
     participant AI as Python Socratic Tutor
 
@@ -216,7 +216,7 @@ sequenceDiagram
     participant Web as Next.js Web App
     participant Nest as NestJS Control Plane
     participant LK as LiveKit Cloud (Media Plane)
-    participant DB as MongoDB
+    participant DB as PostgreSQL
 
     Host->>Web: Click "Start Study Room" for Database Systems
     Web->>Nest: POST /api/v1/study/rooms (Contract 10)
@@ -345,7 +345,7 @@ sequenceDiagram
     actor S2 as Student 2
     participant Web as Next.js Web App
     participant Nest as NestJS Control Plane
-    participant DB as MongoDB
+    participant DB as PostgreSQL
     participant WS as Room WebSocket
 
     Note over S1,S2: Both view the same exercise on screen

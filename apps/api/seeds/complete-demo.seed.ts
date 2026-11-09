@@ -1,9 +1,10 @@
 import { config } from 'dotenv';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { MongoClient } from 'mongodb';
-import mongoose, { Types } from 'mongoose';
-import { createAuth } from '../shared/betterAuth';
+import { Prisma } from '../src/generated/prisma/client';
+import { connectDatabase, disconnectDatabase, prisma } from '../shared/database';
+import { newId } from '../shared/ids';
+import { createAuth, defaultNotificationPreferences } from '../shared/betterAuth';
 import aiClient from '../shared/aiClient';
 import {
   contentHash,
@@ -12,24 +13,12 @@ import {
   type SourceDocument
 } from '../modules/study/src/services/revisionSources';
 import { activityDigest } from '../modules/study/src/services/activityIdentity';
-import { Institution, InstitutionMembership } from '../modules/study/src/models/Institution';
 import {
   bootstrapInstitution,
   issueInstitutionInvitation,
   acceptInstitutionInvitation
 } from '../modules/study/src/services/institutions';
 import { RANK_LADDER } from '../modules/user-profile/src/models/rankingConfig';
-import RankBadge from '../modules/user-profile/src/models/RankBadge';
-import {
-  Course,
-  Task,
-  StudySession,
-  Subject,
-  LearningObjective
-} from '../modules/study/src/models';
-import { CourseRevision } from '../modules/study/src/models/CourseRevision';
-import { ActivityRecord } from '../modules/study/src/models/ActivityRecord';
-import { CourseEnrollment } from '../modules/study/src/models/CourseEnrollment';
 
 config({ path: path.resolve(__dirname, '../.env') });
 
@@ -174,19 +163,14 @@ async function materializeSourceArtifact(
       })
     );
   }
-  await CourseRevision.collection.updateOne(
-    {
-      courseId: new Types.ObjectId(courseId),
-      revisionTag
-    },
-    {
-      $set: {
-        sourceManifest: [document],
-        sourceManifestDigest: digest,
-        vectorIndexRef: 'faiss/' + courseId + '/' + revisionTag + '.faiss'
-      }
+  await prisma.courseRevision.updateMany({
+    where: { courseId, revisionTag },
+    data: {
+      sourceManifest: [document] as unknown as Prisma.InputJsonValue,
+      sourceManifestDigest: digest,
+      vectorIndexRef: 'faiss/' + courseId + '/' + revisionTag + '.faiss'
     }
-  );
+  });
   return document;
 }
 
@@ -197,65 +181,82 @@ function toBadgeKey(rank: any): string {
 }
 
 async function main() {
-  if (process.env.ALLOW_DEMO_COURSES !== "1") {
-    console.log("Demo data is disabled. Upload your own course, or explicitly set ALLOW_DEMO_COURSES=1 in a disposable development database.");
+  if (process.env.ALLOW_DEMO_COURSES !== '1') {
+    console.log(
+      'Demo data is disabled. Upload your own course, or explicitly set ALLOW_DEMO_COURSES=1 in a disposable development database.'
+    );
     return;
   }
-  const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/ednova';
+  const url = process.env.DATABASE_URL;
+  if (!url || !['localhost', '127.0.0.1', '[::1]'].includes(new URL(url).hostname))
+    throw new Error('Complete demo seeding requires a loopback PostgreSQL database');
+  if (process.env.NODE_ENV === 'production') throw new Error('Demo seeding is development only');
   const password = process.env.DEMO_USER_PASSWORD || 'EdNovaDemo!2026';
 
   console.log('🌱 Starting Complete EdNova Demo Seeder...');
-  console.log(`Connecting to: ${uri}`);
+  console.log('Connecting to: configured PostgreSQL target (credentials redacted)');
 
-  const client = new MongoClient(uri);
-  await client.connect();
-  await mongoose.connect(uri);
-  const db = client.db();
-
+  await connectDatabase();
   try {
     // 1. Seed Demo Users
     console.log('\n[1/5] Seeding Demo Users...');
-    const auth = await createAuth(db, { sendMail: async () => {} });
+    const auth = await createAuth({ sendMail: async () => {} });
     const userIds = new Map<string, string>();
 
     for (const account of accounts) {
-      let identity = await db.collection('auth_users').findOne({ email: account.email });
+      let identity = await prisma.authUser.findUnique({
+        where: { email: account.email },
+        select: { id: true }
+      });
       if (!identity) {
         await auth.api.signUpEmail({
           body: { email: account.email, name: account.name, password }
         });
-        identity = await db.collection('auth_users').findOne({ email: account.email });
+        identity = await prisma.authUser.findUnique({
+          where: { email: account.email },
+          select: { id: true }
+        });
         if (!identity) throw new Error(`Missing auth identity: ${account.email}`);
         const now = new Date();
-        await db
-          .collection('auth_users')
-          .updateOne({ _id: identity._id }, { $set: { emailVerified: true, updatedAt: now } });
-        await db.collection('users').updateOne(
-          { _id: identity._id },
-          {
-            $set: {
-              role: account.role === 'university_admin' ? 'admin' : 'student',
-              isAdmin: account.role === 'university_admin',
-              isVerified: true,
-              isActive: true,
-              onboardingCompletedAt: now,
-              updatedAt: now
-            }
+        await prisma.authUser.update({
+          where: { id: identity.id },
+          data: { emailVerified: true, updatedAt: now }
+        });
+        await prisma.user.update({
+          where: { id: identity.id },
+          data: {
+            role: account.role === 'university_admin' ? 'admin' : 'student',
+            isAdmin: account.role === 'university_admin',
+            isVerified: true,
+            isActive: true,
+            onboardingCompletedAt: now,
+            notificationPreferences: defaultNotificationPreferences(),
+            onboardingDraft: {
+              studyGoals: [],
+              preferredSubjects: [],
+              weeklyHours: 0,
+              studyLevel: 'beginner',
+              studyTime: 'evening',
+              timezone: 'UTC',
+              language: 'en',
+              notificationPreferences: { email: true, push: true }
+            },
+            updatedAt: now
           }
-        );
+        });
         console.log(`  ✓ Created user: ${account.email}`);
       } else {
         console.log(`  ✓ User exists: ${account.email}`);
       }
-      userIds.set(account.email, identity._id.toString());
+      userIds.set(account.email, identity.id);
     }
 
     // 2. Seed Institution
     console.log('\n[2/5] Seeding Institution & Memberships...');
-    await Institution.init();
-    await InstitutionMembership.init();
     const adminId = userIds.get('admin@ednova.test')!;
-    let institution = await Institution.findOne({ slug: 'ednova-learning-demo' });
+    let institution = await prisma.institution.findUnique({
+      where: { slug: 'ednova-learning-demo' }
+    });
 
     if (!institution) {
       const created = await bootstrapInstitution({
@@ -263,7 +264,9 @@ async function main() {
         name: 'EdNova Learning Demo University',
         slug: 'ednova-learning-demo'
       });
-      institution = await Institution.findById(created.institution.id);
+      institution = await prisma.institution.findUnique({
+        where: { id: created.institution.id }
+      });
       console.log('  ✓ Created Institution: EdNova Learning Demo University');
     } else {
       console.log('  ✓ Institution already exists');
@@ -272,14 +275,13 @@ async function main() {
     if (institution) {
       for (const account of accounts) {
         const userId = userIds.get(account.email)!;
-        const membership = await InstitutionMembership.findOne({
-          institutionId: institution._id,
-          userId
+        const membership = await prisma.institutionMembership.findFirst({
+          where: { institutionId: institution.id, userId }
         });
         if (!membership && account.role !== 'university_admin') {
           const inv = await issueInstitutionInvitation({
             actorUserId: adminId,
-            institutionId: institution._id.toString(),
+            institutionId: institution.id,
             role: account.role
           });
           await acceptInstitutionInvitation({ actorUserId: userId, token: inv.token });
@@ -294,17 +296,23 @@ async function main() {
     for (const rank of RANK_LADDER) {
       const tier = String(rank.tier || 'novice').toLowerCase();
       const badgeKey = toBadgeKey(rank);
-      const existing = await RankBadge.findOne({ rankIndex: rank.index });
+      const existing = await prisma.rankBadge.findUnique({
+        where: { rankIndex: rank.index },
+        select: { id: true }
+      });
       if (!existing) {
-        await RankBadge.create({
-          rankIndex: rank.index,
-          rankName: rank.name,
-          tier,
-          division: rank.division || null,
-          badgeKey,
-          // The rebrand removed the per-tier badge PNGs; point at a shipped asset.
-    imagePath: '/brand/noveris-symbol.svg',
-          isActive: true
+        await prisma.rankBadge.create({
+          data: {
+            id: newId(),
+            rankIndex: rank.index,
+            rankName: rank.name,
+            tier,
+            division: rank.division || null,
+            badgeKey: badgeKey as Prisma.RankBadgeCreateInput['badgeKey'],
+            // The rebrand removed the per-tier badge PNGs; point at a shipped asset.
+            imagePath: '/brand/noveris-symbol.svg',
+            isActive: true
+          }
         });
         badgeCount++;
       }
@@ -316,105 +324,119 @@ async function main() {
     const instructorId = userIds.get('instructor@ednova.test')!;
     const learnerId = userIds.get('learner@ednova.test')!;
 
-    let course = await Course.findOne({ title: 'Relational Database Design & Normalization' });
+    let course = await prisma.course.findFirst({
+      where: { title: 'Relational Database Design & Normalization' }
+    });
     if (!course) {
-      course = await Course.create({
-        userId: instructorId,
-        ownerUserId: instructorId,
-        assignedInstructorIds: [instructorId],
-        subjectId: 'computer-science',
-        title: 'Relational Database Design & Normalization',
-        description:
-          'Comprehensive course covering First Normal Form (1NF), Second Normal Form (2NF), Third Normal Form (3NF), Boyce-Codd Normal Form, and relational dependency decomposition.',
-        status: 'completed',
-        ingestProgress: 1,
-        ingestDetail: 'Published and reviewed by instructor',
-        scope: 'institutional',
-        institutionId: institution?._id
+      course = await prisma.course.create({
+        data: {
+          id: newId(),
+          userId: instructorId,
+          ownerUserId: instructorId,
+          assignedInstructorIds: [instructorId],
+          subjectId: 'computer-science',
+          title: 'Relational Database Design & Normalization',
+          description:
+            'Comprehensive course covering First Normal Form (1NF), Second Normal Form (2NF), Third Normal Form (3NF), Boyce-Codd Normal Form, and relational dependency decomposition.',
+          status: 'completed',
+          ingestProgress: 1,
+          ingestDetail: 'Published and reviewed by instructor',
+          scope: 'institutional',
+          institutionId: institution?.id
+        }
       });
       console.log('  ✓ Created Course: Relational Database Design & Normalization');
     }
 
-    const courseId = course._id;
-    let revision = await CourseRevision.findOne({ courseId, status: 'published' });
+    const courseId = course.id;
+    let revision = await prisma.courseRevision.findFirst({
+      where: { courseId, status: 'published' }
+    });
     if (!revision) {
       // Content hash is derived from the same source bytes that get indexed, so the
       // seeded revision satisfies the same integrity checks production does.
       const revisionTag = 'rev_20261018_v1';
       const sourceText = DEMO_SOURCE_TEXT;
       const revisionHash = contentHash(sourceText);
-      revision = await CourseRevision.create({
-        courseId,
-        revisionTag,
-        contentHash: revisionHash.replace(/^sha256:/, ''),
-        status: 'published',
-        // Publication gates require committed activation plus no revocation;
-        // see getPublishedCourseContext in coursePublication.ts.
-        activationState: 'committed',
-        publishedByUserId: instructorId,
-        publishedAt: new Date(),
-        summary: 'Official published revision for CS301 Normalization.',
-        isInstructorReviewed: true,
-        // Objectives live under subtopics[].learning_objectives: that is the shape
-        // ingestion produces and the one the published context projects.
-        topics: [
-          {
-            id: 'top_1nf',
-            title: 'First Normal Form (1NF) & Atomicity',
-            description: 'Elimination of repeating groups and ensuring attribute atomicity.',
-            subtopics: [
-              {
-                id: 'sub_1nf_def',
-                title: 'Atomic domains',
-                learning_objectives: [
-                  {
-                    id: 'obj_1nf_def',
-                    statement:
-                      'Identify table definitions that violate 1NF atomic domain constraints',
-                    bloomLevel: 'analyze'
-                  },
-                  {
-                    id: 'obj_1nf_decompose',
-                    statement: 'Decompose non-atomic attributes into 1NF compliant relations',
-                    bloomLevel: 'apply'
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            id: 'top_2nf',
-            title: 'Second Normal Form (2NF) & Full Functional Dependency',
-            description: 'Removal of partial dependencies on candidate keys.',
-            subtopics: [
-              {
-                id: 'sub_2nf_identify',
-                title: 'Partial dependencies',
-                learning_objectives: [
-                  {
-                    id: 'obj_2nf_identify',
-                    statement: 'Detect partial functional dependencies on composite primary keys',
-                    bloomLevel: 'analyze'
-                  }
-                ]
-              }
-            ]
-          }
-        ]
+      revision = await prisma.courseRevision.create({
+        data: {
+          id: newId(),
+          courseId,
+          revisionTag,
+          contentHash: revisionHash.replace(/^sha256:/, ''),
+          status: 'published',
+          // Publication gates require committed activation plus no revocation;
+          // see getPublishedCourseContext in coursePublication.ts.
+          activationState: 'committed',
+          publishedByUserId: instructorId,
+          publishedAt: new Date(),
+          summary: 'Official published revision for CS301 Normalization.',
+          isInstructorReviewed: true,
+          // Objectives live under subtopics[].learning_objectives: that is the shape
+          // ingestion produces and the one the published context projects.
+          topics: [
+            {
+              id: 'top_1nf',
+              title: 'First Normal Form (1NF) & Atomicity',
+              description: 'Elimination of repeating groups and ensuring attribute atomicity.',
+              subtopics: [
+                {
+                  id: 'sub_1nf_def',
+                  title: 'Atomic domains',
+                  learning_objectives: [
+                    {
+                      id: 'obj_1nf_def',
+                      statement:
+                        'Identify table definitions that violate 1NF atomic domain constraints',
+                      bloomLevel: 'analyze'
+                    },
+                    {
+                      id: 'obj_1nf_decompose',
+                      statement: 'Decompose non-atomic attributes into 1NF compliant relations',
+                      bloomLevel: 'apply'
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              id: 'top_2nf',
+              title: 'Second Normal Form (2NF) & Full Functional Dependency',
+              description: 'Removal of partial dependencies on candidate keys.',
+              subtopics: [
+                {
+                  id: 'sub_2nf_identify',
+                  title: 'Partial dependencies',
+                  learning_objectives: [
+                    {
+                      id: 'obj_2nf_identify',
+                      statement: 'Detect partial functional dependencies on composite primary keys',
+                      bloomLevel: 'analyze'
+                    }
+                  ]
+                }
+              ]
+            }
+          ] as Prisma.InputJsonValue
+        }
       });
-      course.activeRevisionId = revision.revisionTag;
-      await course.save();
+      await prisma.course.update({
+        where: { id: courseId },
+        data: { activeRevisionId: revision.revisionTag }
+      });
       console.log('  ✓ Created Published Course Revision (v1)');
     }
 
     // Materialize genuine source provenance (blob + FAISS artifact + manifest) so
     // the seeded revision passes verifyRevisionArtifact exactly like a published one.
     const sourceDocument = await materializeSourceArtifact(
-      courseId.toString(),
+      courseId,
       revision.revisionTag,
       revision.contentHash
     );
-    const resolvedRevision = await CourseRevision.findOne({ _id: revision._id });
+    const resolvedRevision = await prisma.courseRevision.findUnique({
+      where: { id: revision.id }
+    });
     if (!resolvedRevision) throw new Error('Seeded revision disappeared');
 
     // The published revision is the curriculum source of truth, but several read
@@ -422,30 +444,42 @@ async function main() {
     // objective topics through these records. Seed them from the same hierarchy.
     // Course.subjectId historically held a free-form slug, which no Subject could
     // ever match, so subject names resolved to null. Point it at a real Subject.
-    let subject = mongoose.isValidObjectId(course.subjectId)
-      ? await Subject.findOne({ _id: course.subjectId })
+    let subject = /^[a-f\d]{24}$/i.test(course.subjectId)
+      ? await prisma.subject.findUnique({ where: { id: course.subjectId } })
       : null;
     if (!subject) {
-      subject = await Subject.create({
-        userId: instructorId,
-        name: 'Computer Science',
-        description: 'Relational data modelling and database design'
+      subject = await prisma.subject.create({
+        data: {
+          id: newId(),
+          userId: instructorId,
+          name: 'Computer Science',
+          description: 'Relational data modelling and database design'
+        }
       });
       console.log('  ✓ Created Subject: Computer Science');
     }
-    for (const topic of resolvedRevision.topics || []) {
+    const revisionTopics = (resolvedRevision.topics ?? []) as Array<{
+      id: string;
+      subtopics?: Array<{
+        learning_objectives?: Array<{
+          id: string;
+          statement?: string;
+          text?: string;
+          bloomLevel: string;
+        }>;
+      }>;
+    }>;
+    for (const topic of revisionTopics) {
       for (const sub of topic.subtopics || []) {
         for (const objective of sub.learning_objectives || []) {
           const statement = objective.statement || objective.text;
           if (!statement) continue;
-          await LearningObjective.updateOne(
-            {
-              documentId: sourceDocument.documentId,
-              topicId: topic.id,
-              textHash: contentHash(statement)
-            },
-            {
-              $setOnInsert: {
+          // Each objective has a natural key (document + topic + text hash), so a
+          // re-run inserts nothing new.
+          await prisma.learningObjective.createMany({
+            data: [
+              {
+                id: newId(),
                 userId: instructorId,
                 documentId: sourceDocument.documentId,
                 objectiveId: objective.id,
@@ -458,17 +492,21 @@ async function main() {
                 version: 1,
                 isActive: true
               }
-            },
-            { upsert: true, runValidators: true }
-          );
+            ],
+            skipDuplicates: true
+          });
         }
       }
     }
     // Keep the legacy editable projection aligned with the revision so studio and
     // planner surfaces that still read Course.topics resolve the same hierarchy.
-    course.topics = resolvedRevision.topics as never;
-    course.subjectId = String(subject._id);
-    await course.save();
+    await prisma.course.update({
+      where: { id: courseId },
+      data: {
+        topics: (resolvedRevision.topics ?? []) as Prisma.InputJsonValue,
+        subjectId: subject.id
+      }
+    });
     console.log('  ✓ Seeded Subject & LearningObjectives');
 
     // Seed Interactive Learning Activities (Contract 04). The definition must carry
@@ -486,7 +524,7 @@ async function main() {
       }
     ];
     const pinFor = (activityId: string, activityType: 'InteractiveQuiz' | 'GuidedProblem') => ({
-      courseId: courseId.toString(),
+      courseId,
       revisionId: revisionTag,
       contentHash: pinnedHash,
       activityId,
@@ -497,7 +535,7 @@ async function main() {
       schemaVersion: '1.0.0',
       activityRevision: 'ar_1',
       componentVersion: '1.0.0',
-      courseId: courseId.toString(),
+      courseId,
       revisionId: revisionTag,
       contentHash: pinnedHash,
       visibility: 'public',
@@ -613,66 +651,78 @@ async function main() {
       }
     ];
     for (const { publicDefinition, serverEvaluation } of seededActivities) {
-      const exists = await ActivityRecord.findOne({
-        activityId: publicDefinition.activityId,
-        courseId: courseId.toString()
+      const exists = await prisma.activityRecord.findFirst({
+        where: { activityId: publicDefinition.activityId, courseId },
+        select: { id: true }
       });
       if (exists) continue;
-      await ActivityRecord.create({
-        courseId: courseId.toString(),
-        revisionId: revisionTag,
-        contentHash: pinnedHash,
-        activityId: publicDefinition.activityId,
-        activityRevision: 'ar_1',
-        activityType: publicDefinition.activityType,
-        objectiveId: publicDefinition.objectiveId,
-        publicDefinition,
-        serverEvaluation
+      await prisma.activityRecord.create({
+        data: {
+          id: newId(),
+          courseId,
+          revisionId: revisionTag,
+          contentHash: pinnedHash,
+          activityId: publicDefinition.activityId,
+          activityRevision: 'ar_1',
+          activityType: publicDefinition.activityType,
+          objectiveId: publicDefinition.objectiveId,
+          publicDefinition: publicDefinition as Prisma.InputJsonValue,
+          serverEvaluation: serverEvaluation as Prisma.InputJsonValue
+        }
       });
       console.log('  ✓ Created Interactive Activity: ' + publicDefinition.title);
     }
-    await CourseRevision.collection.updateOne(
-      { _id: resolvedRevision._id },
-      {
-        $set: {
-          approvedActivities: seededActivities.map(({ publicDefinition, serverEvaluation }) => ({
-            activityId: publicDefinition.activityId,
-            activityRevision: 'ar_1',
-            definitionHash: activityDigest(publicDefinition),
-            evaluationHash: activityDigest(serverEvaluation)
-          }))
-        }
+    await prisma.courseRevision.update({
+      where: { id: resolvedRevision.id },
+      data: {
+        approvedActivities: seededActivities.map(({ publicDefinition, serverEvaluation }) => ({
+          activityId: publicDefinition.activityId,
+          activityRevision: 'ar_1',
+          definitionHash: activityDigest(publicDefinition),
+          evaluationHash: activityDigest(serverEvaluation)
+        })) as Prisma.InputJsonValue
       }
-    );
+    });
 
     // 5. Enroll Learner and Seed Tasks & Progress
     console.log('\n[5/5] Enrolling Learner & Creating Study Tasks...');
-    let enrollment = await CourseEnrollment.findOne({ courseId, userId: learnerId });
+    const enrollment = await prisma.courseEnrollment.findFirst({
+      where: { courseId, userId: learnerId },
+      select: { id: true }
+    });
     if (!enrollment) {
-      enrollment = await CourseEnrollment.create({
-        courseId,
-        // Institutional course access requires the enrollment to carry the same
-        // institution as the course; see courseGrant in resourceAccess.ts.
-        institutionId: course.institutionId,
-        userId: learnerId,
-        enrolledAt: new Date(),
-        status: 'active'
+      await prisma.courseEnrollment.create({
+        data: {
+          id: newId(),
+          courseId,
+          // Institutional course access requires the enrollment to carry the same
+          // institution as the course; see courseGrant in resourceAccess.ts.
+          institutionId: course.institutionId,
+          userId: learnerId,
+          enrolledAt: new Date(),
+          status: 'active'
+        }
       });
       console.log('  ✓ Enrolled Tasnim in Database Normalization course');
     }
 
-    let task = await Task.findOne({ userId: learnerId, title: 'Master 1NF Normalization' });
+    const task = await prisma.taskRecord.findFirst({
+      where: { userId: learnerId, title: 'Master 1NF Normalization' },
+      select: { id: true }
+    });
     if (!task) {
-      task = await Task.create({
-        userId: learnerId,
-        title: 'Master 1NF Normalization',
-        description: 'Demo task (synthetic): complete the 1NF challenge and practice Socratic reasoning.',
-        courseId: courseId.toString(),
-        topicId: 'top_1nf',
-        priority: 'high',
-        status: 'in-progress',
-        dueDate: new Date(Date.now() + 86400000 * 3),
-        estimatedMinutes: 45
+      await prisma.taskRecord.create({
+        data: {
+          id: newId(),
+          userId: learnerId,
+          title: 'Master 1NF Normalization',
+          description:
+            'Demo task (synthetic): complete the 1NF challenge and practice Socratic reasoning.',
+          priority: 'high',
+          status: 'in-progress',
+          dueDate: new Date(Date.now() + 86400000 * 3),
+          estimatedTime: 45
+        }
       });
       console.log('  ✓ Created Study Task for Learner');
     }
@@ -683,160 +733,183 @@ async function main() {
     // 6. Second demo course whose material the Visual Lab can actually render.
     console.log('\n[6/6] Seeding the visual-ready demo course (shortest paths)...');
     const GRAPH_TITLE = 'Demo: Shortest paths in weighted graphs';
-    let graphCourse = await Course.findOne({ title: GRAPH_TITLE });
+    let graphCourse = await prisma.course.findFirst({ where: { title: GRAPH_TITLE } });
     const graphCourseExists = !!graphCourse;
-    if (graphCourse && (String(graphCourse.ownerUserId) !== String(instructorId) || !graphCourse.description?.startsWith('Synthetic demo course (not real course material):'))) {
-      throw new Error('A course with the demo title already exists and is not the seed-owned demo; refusing to modify it.');
+    if (
+      graphCourse &&
+      (String(graphCourse.ownerUserId) !== String(instructorId) ||
+        !graphCourse.description?.startsWith('Synthetic demo course (not real course material):'))
+    ) {
+      throw new Error(
+        'A course with the demo title already exists and is not the seed-owned demo; refusing to modify it.'
+      );
     }
     if (!graphCourse) {
-      graphCourse = await Course.create({
-        userId: instructorId,
-        ownerUserId: instructorId,
-        assignedInstructorIds: [instructorId],
-        subjectId: 'computer-science',
-        title: GRAPH_TITLE,
-        description:
-          'Synthetic demo course (not real course material): weighted graphs and Dijkstra, written so the Visual Lab can build a matching experiment.',
-        status: 'completed',
-        ingestProgress: 1,
-        ingestDetail: 'Published and reviewed by instructor',
-        scope: 'institutional',
-        institutionId: institution?._id
+      graphCourse = await prisma.course.create({
+        data: {
+          id: newId(),
+          userId: instructorId,
+          ownerUserId: instructorId,
+          assignedInstructorIds: [instructorId],
+          subjectId: 'computer-science',
+          title: GRAPH_TITLE,
+          description:
+            'Synthetic demo course (not real course material): weighted graphs and Dijkstra, written so the Visual Lab can build a matching experiment.',
+          status: 'completed',
+          ingestProgress: 1,
+          ingestDetail: 'Published and reviewed by instructor',
+          scope: 'institutional',
+          institutionId: institution?.id
+        }
       });
     }
-    const graphCourseId = graphCourse._id;
-    let graphRevision = await CourseRevision.findOne({
-      courseId: graphCourseId,
-      revisionTag: 'rev_demo_graph_v1'
+    const graphCourseId = graphCourse.id;
+    let graphRevision = await prisma.courseRevision.findFirst({
+      where: { courseId: graphCourseId, revisionTag: 'rev_demo_graph_v1' }
     });
     const graphRevisionExists = !!graphRevision;
     if (graphCourseExists && !graphRevisionExists) {
-      throw new Error('The existing demo course has no seed revision; refusing to replace its published content.');
+      throw new Error(
+        'The existing demo course has no seed revision; refusing to replace its published content.'
+      );
     }
-    if (graphRevision && (graphRevision.status !== 'published' || graphRevision.contentHash !== contentHash(DEMO_GRAPH_TEXT).replace(/^sha256:/, ''))) {
-      throw new Error('The demo graph revision already exists with different content or status; refusing to overwrite it.');
+    if (
+      graphRevision &&
+      (graphRevision.status !== 'published' ||
+        graphRevision.contentHash !== contentHash(DEMO_GRAPH_TEXT).replace(/^sha256:/, ''))
+    ) {
+      throw new Error(
+        'The demo graph revision already exists with different content or status; refusing to overwrite it.'
+      );
     }
     if (!graphRevision) {
-      graphRevision = await CourseRevision.create({
-        courseId: graphCourseId,
-        revisionTag: 'rev_demo_graph_v1',
-        contentHash: contentHash(DEMO_GRAPH_TEXT).replace(/^sha256:/, ''),
-        status: 'published',
-        activationState: 'committed',
-        publishedByUserId: instructorId,
-        publishedAt: new Date(),
-        summary: 'Synthetic demo revision: shortest paths in weighted graphs.',
-        isInstructorReviewed: true,
-        topics: [
-          {
-            id: 'top_shortest_path',
-            title: 'Weighted graphs and shortest paths',
-            description: 'Edge weights, path cost and how Dijkstra settles nodes.',
-            subtopics: [
-              {
-                id: 'sub_dijkstra',
-                title: "Dijkstra's algorithm",
-                learning_objectives: [
-                  {
-                    id: 'obj_shortest_path',
-                    statement: 'Find the shortest path between two nodes of a weighted graph',
-                    bloomLevel: 'apply'
-                  }
-                ]
-              }
-            ]
-          }
-        ]
+      graphRevision = await prisma.courseRevision.create({
+        data: {
+          id: newId(),
+          courseId: graphCourseId,
+          revisionTag: 'rev_demo_graph_v1',
+          contentHash: contentHash(DEMO_GRAPH_TEXT).replace(/^sha256:/, ''),
+          status: 'published',
+          activationState: 'committed',
+          publishedByUserId: instructorId,
+          publishedAt: new Date(),
+          summary: 'Synthetic demo revision: shortest paths in weighted graphs.',
+          isInstructorReviewed: true,
+          topics: [
+            {
+              id: 'top_shortest_path',
+              title: 'Weighted graphs and shortest paths',
+              description: 'Edge weights, path cost and how Dijkstra settles nodes.',
+              subtopics: [
+                {
+                  id: 'sub_dijkstra',
+                  title: "Dijkstra's algorithm",
+                  learning_objectives: [
+                    {
+                      id: 'obj_shortest_path',
+                      statement: 'Find the shortest path between two nodes of a weighted graph',
+                      bloomLevel: 'apply'
+                    }
+                  ]
+                }
+              ]
+            }
+          ] as Prisma.InputJsonValue
+        }
       });
-      graphCourse.activeRevisionId = graphRevision.revisionTag;
-      await graphCourse.save();
+      await prisma.course.update({
+        where: { id: graphCourseId },
+        data: { activeRevisionId: graphRevision.revisionTag }
+      });
     }
     if (!graphRevisionExists) {
-    const graphSource = await materializeSourceArtifact(
-      graphCourseId.toString(),
-      graphRevision.revisionTag,
-      graphRevision.contentHash,
-      DEMO_GRAPH_TEXT,
-      'shortest-paths.txt'
-    );
-    const graphPin = 'sha256:' + graphRevision.contentHash.replace(/^sha256:/, '');
-    const graphActivityBase = {
-      schemaVersion: '1.0.0',
-      activityRevision: 'ar_1',
-      componentVersion: '1.0.0',
-      courseId: graphCourseId.toString(),
-      revisionId: graphRevision.revisionTag,
-      contentHash: graphPin,
-      visibility: 'public',
-      language: 'en',
-      sourceRefs: [
-        {
-          documentId: graphSource.documentId,
-          contentHash: graphSource.contentHash,
-          pageNumber: null,
-          locationKnown: false,
-          provenance: 'extracted' as const
-        }
-      ]
-    };
-    const graphPublic = {
-      ...graphActivityBase,
-      activityId: 'act_graph_quiz_01',
-      activityType: 'InteractiveQuiz',
-      objectiveId: 'obj_shortest_path',
-      title: 'Pick the shortest route',
-      instructions: 'Add up the edge weights along each route and choose the smallest total.',
-      timeLimitSeconds: 180,
-      constraints: { maxAttempts: 3, allowCalculator: false },
-      presentationData: {
-        question:
-          'Edges: A-B weight 4, A-C weight 1, C-B weight 2. Which route from A to B has the smallest total weight?',
-        options: [
-          { id: 'opt_a', label: 'A to B directly (total 4)' },
-          { id: 'opt_b', label: 'A to C to B (total 3)' }
-        ],
-        isMultiSelect: false
-      }
-    };
-    const graphServer = {
-      schemaVersion: '1.0.0',
-      visibility: 'server_only',
-      activity: {
-        courseId: graphCourseId.toString(),
+      const graphSource = await materializeSourceArtifact(
+        graphCourseId,
+        graphRevision.revisionTag,
+        graphRevision.contentHash,
+        DEMO_GRAPH_TEXT,
+        'shortest-paths.txt'
+      );
+      const graphPin = 'sha256:' + graphRevision.contentHash.replace(/^sha256:/, '');
+      const graphActivityBase = {
+        schemaVersion: '1.0.0',
+        activityRevision: 'ar_1',
+        componentVersion: '1.0.0',
+        courseId: graphCourseId,
         revisionId: graphRevision.revisionTag,
         contentHash: graphPin,
+        visibility: 'public',
+        language: 'en',
+        sourceRefs: [
+          {
+            documentId: graphSource.documentId,
+            contentHash: graphSource.contentHash,
+            pageNumber: null,
+            locationKnown: false,
+            provenance: 'extracted' as const
+          }
+        ]
+      };
+      const graphPublic = {
+        ...graphActivityBase,
         activityId: 'act_graph_quiz_01',
-        activityRevision: 'ar_1',
-        activityType: 'InteractiveQuiz'
-      },
-      evaluationRef: 'ref_graph_eval',
-      evaluatorType: 'deterministic_rubric',
-      rubricVersion: 'exact-options-v1',
-      rubric: 'The route through C costs 1 + 2 = 3, which is less than the direct edge of 4.',
-      answerKey: ['opt_b']
-    };
-    if (
-      !(await ActivityRecord.findOne({
-        activityId: graphPublic.activityId,
-        courseId: graphCourseId.toString()
-      }))
-    ) {
-      await ActivityRecord.create({
-        courseId: graphCourseId.toString(),
-        revisionId: graphRevision.revisionTag,
-        contentHash: graphPin,
-        activityId: graphPublic.activityId,
-        activityRevision: 'ar_1',
-        activityType: graphPublic.activityType,
-        objectiveId: graphPublic.objectiveId,
-        publicDefinition: graphPublic,
-        serverEvaluation: graphServer
-      });
-    }
-    await CourseRevision.collection.updateOne(
-      { _id: graphRevision._id },
-      {
-        $set: {
+        activityType: 'InteractiveQuiz',
+        objectiveId: 'obj_shortest_path',
+        title: 'Pick the shortest route',
+        instructions: 'Add up the edge weights along each route and choose the smallest total.',
+        timeLimitSeconds: 180,
+        constraints: { maxAttempts: 3, allowCalculator: false },
+        presentationData: {
+          question:
+            'Edges: A-B weight 4, A-C weight 1, C-B weight 2. Which route from A to B has the smallest total weight?',
+          options: [
+            { id: 'opt_a', label: 'A to B directly (total 4)' },
+            { id: 'opt_b', label: 'A to C to B (total 3)' }
+          ],
+          isMultiSelect: false
+        }
+      };
+      const graphServer = {
+        schemaVersion: '1.0.0',
+        visibility: 'server_only',
+        activity: {
+          courseId: graphCourseId,
+          revisionId: graphRevision.revisionTag,
+          contentHash: graphPin,
+          activityId: 'act_graph_quiz_01',
+          activityRevision: 'ar_1',
+          activityType: 'InteractiveQuiz'
+        },
+        evaluationRef: 'ref_graph_eval',
+        evaluatorType: 'deterministic_rubric',
+        rubricVersion: 'exact-options-v1',
+        rubric: 'The route through C costs 1 + 2 = 3, which is less than the direct edge of 4.',
+        answerKey: ['opt_b']
+      };
+      if (
+        !(await prisma.activityRecord.findFirst({
+          where: { activityId: graphPublic.activityId, courseId: graphCourseId },
+          select: { id: true }
+        }))
+      ) {
+        await prisma.activityRecord.create({
+          data: {
+            id: newId(),
+            courseId: graphCourseId,
+            revisionId: graphRevision.revisionTag,
+            contentHash: graphPin,
+            activityId: graphPublic.activityId,
+            activityRevision: 'ar_1',
+            activityType: graphPublic.activityType,
+            objectiveId: graphPublic.objectiveId,
+            publicDefinition: graphPublic as Prisma.InputJsonValue,
+            serverEvaluation: graphServer as Prisma.InputJsonValue
+          }
+        });
+      }
+      await prisma.courseRevision.update({
+        where: { id: graphRevision.id },
+        data: {
           approvedActivities: [
             {
               activityId: graphPublic.activityId,
@@ -844,45 +917,53 @@ async function main() {
               definitionHash: activityDigest(graphPublic),
               evaluationHash: activityDigest(graphServer)
             }
-          ]
+          ] as Prisma.InputJsonValue
         }
-      }
-    );
-    await LearningObjective.updateOne(
-      {
-        documentId: graphSource.documentId,
-        topicId: 'top_shortest_path',
-        textHash: contentHash('Find the shortest path between two nodes of a weighted graph')
-      },
-      {
-        $setOnInsert: {
-          userId: instructorId,
-          documentId: graphSource.documentId,
-          objectiveId: 'obj_shortest_path',
-          topicId: 'top_shortest_path',
-          knowledgeType: 'procedural',
-          bloomLevel: 'apply',
-          verb: 'apply',
-          text: 'Find the shortest path between two nodes of a weighted graph',
-          textHash: contentHash('Find the shortest path between two nodes of a weighted graph'),
-          version: 1,
-          isActive: true
-        }
-      },
-      { upsert: true, runValidators: true }
-    );
-    graphCourse.topics = (await CourseRevision.findById(graphRevision._id))!.topics as never;
-    await graphCourse.save();
+      });
+      const graphObjective = 'Find the shortest path between two nodes of a weighted graph';
+      await prisma.learningObjective.createMany({
+        data: [
+          {
+            id: newId(),
+            userId: instructorId,
+            documentId: graphSource.documentId,
+            objectiveId: 'obj_shortest_path',
+            topicId: 'top_shortest_path',
+            knowledgeType: 'procedural',
+            bloomLevel: 'apply',
+            verb: 'apply',
+            text: graphObjective,
+            textHash: contentHash(graphObjective),
+            version: 1,
+            isActive: true
+          }
+        ],
+        skipDuplicates: true
+      });
+      const storedGraphRevision = await prisma.courseRevision.findUnique({
+        where: { id: graphRevision.id }
+      });
+      await prisma.course.update({
+        where: { id: graphCourseId },
+        data: { topics: (storedGraphRevision?.topics ?? []) as Prisma.InputJsonValue }
+      });
     }
     for (const learner of ['learner@ednova.test', 'peer@ednova.test']) {
       const uid = userIds.get(learner)!;
-      if (!(await CourseEnrollment.findOne({ courseId: graphCourseId, userId: uid }))) {
-        await CourseEnrollment.create({
-          courseId: graphCourseId,
-          institutionId: graphCourse.institutionId,
-          userId: uid,
-          enrolledAt: new Date(),
-          status: 'active'
+      const exists = await prisma.courseEnrollment.findFirst({
+        where: { courseId: graphCourseId, userId: uid },
+        select: { id: true }
+      });
+      if (!exists) {
+        await prisma.courseEnrollment.create({
+          data: {
+            id: newId(),
+            courseId: graphCourseId,
+            institutionId: graphCourse.institutionId,
+            userId: uid,
+            enrolledAt: new Date(),
+            status: 'active'
+          }
         });
       }
     }
@@ -897,8 +978,7 @@ async function main() {
     console.log('  • Admin             : admin@ednova.test      | EdNovaDemo!2026');
     console.log('========================================================');
   } finally {
-    await mongoose.disconnect();
-    await client.close();
+    await disconnectDatabase();
   }
 }
 

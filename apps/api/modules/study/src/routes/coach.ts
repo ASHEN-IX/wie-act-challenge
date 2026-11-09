@@ -1,5 +1,5 @@
 import { canDeliverJob } from '../../../ai-orchestrator/src/services/jobAccess';
-import type { IAiJob } from '../../../ai-orchestrator/src/models/AiJob';
+import AiJob from '../../../ai-orchestrator/src/models/AiJob';
 import { errorDetails } from '@ednova/shared/errors';
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response } from 'express';
@@ -13,7 +13,6 @@ import type { Response } from 'express';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { createContracts } = require('@ednova/shared/domainContracts');
 import Joi from 'joi';
-import mongoose from 'mongoose';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const moduleClient = require('@ednova/shared/moduleClient');
 
@@ -150,9 +149,11 @@ router.post('/nudge', tierGate('vip_plus', 'trial'), async (req: DomainRequest, 
 router.get('/jobs/:jobId', async (req: DomainRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
-    const job = await mongoose.connection
-      .collection<IAiJob>('ai_jobs')
-      .findOne({ jobId: req.params.jobId, userId, type: 'study.coach.nudge' });
+    const job = await AiJob.findOne({
+      jobId: String(req.params.jobId),
+      userId,
+      type: 'study.coach.nudge'
+    });
 
     if (!job || !(await canDeliverJob(job))) {
       return res.status(404).json({ error: 'Job not found' });

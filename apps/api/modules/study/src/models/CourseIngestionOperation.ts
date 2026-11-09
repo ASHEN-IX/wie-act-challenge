@@ -1,65 +1,55 @@
-import { Schema, model, models, type Model, type Types } from 'mongoose';
+import type { Prisma } from '../../../../src/generated/prisma/client';
+import { prisma } from '../../../../shared/database';
+import { table } from './_table';
 import type { PublishIngestionParams } from '../services/ingestionJob';
 import type { AiResultEnvelope } from '@ednova/shared/ai-messaging/envelope';
 
-export interface IngestionOperation {
+export type IngestionOperationState =
+  'prepared' | 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'superseded';
+
+export interface IngestionOperation extends Record<string, unknown> {
+  id: string;
   _id: string;
   correlationId: string;
-  courseId: Types.ObjectId;
+  courseId: string;
   revisionId: string;
   userId: string;
-  requestId?: string;
+  requestId?: string | null;
   fileRef: string;
   /** Display-only title captured with this operation for an exact retry/reconcile. */
-  courseTitle?: string;
+  courseTitle?: string | null;
   files: NonNullable<PublishIngestionParams['files']>;
-  state: 'prepared' | 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'superseded';
-  result?: Pick<AiResultEnvelope, 'type' | 'correlationId' | 'status' | 'payload' | 'error'>;
+  state: IngestionOperationState;
+  result?: Pick<AiResultEnvelope, 'type' | 'correlationId' | 'status' | 'payload' | 'error'> | null;
   resultApplied?: boolean;
   dispatchCount: number;
-  lastDispatchedAt?: Date;
+  lastDispatchedAt?: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  __v?: number;
 }
 
-/** Server-owned dispatch/recovery record. Never a learner/browser source grant. */
-const schema = new Schema<IngestionOperation>(
-  {
-    _id: { type: String, required: true },
-    correlationId: { type: String, required: true, unique: true },
-    courseId: { type: Schema.Types.ObjectId, required: true, index: true },
-    revisionId: { type: String, required: true },
-    userId: { type: String, required: true },
-    requestId: String,
-    fileRef: { type: String, required: true },
-    courseTitle: { type: String, trim: true, maxlength: 150 },
-    files: {
-      type: [
-        new Schema<NonNullable<PublishIngestionParams['files']>[number]>(
-          {
-            filename: String,
-            originalName: String,
-            mimetype: String,
-            size: Number,
-            path: String,
-            fileHash: String
-          },
-          { _id: false }
-        )
-      ],
-      required: true
-    },
-    state: {
-      type: String,
-      enum: ['prepared', 'queued', 'processing', 'completed', 'failed', 'cancelled', 'superseded'],
-      required: true
-    },
-    result: { type: Schema.Types.Mixed },
-    resultApplied: { type: Boolean, default: false },
-    dispatchCount: { type: Number, default: 0 },
-    lastDispatchedAt: Date
-  },
-  { collection: 'course_ingestion_operations', timestamps: true }
-);
+export const CourseIngestionOperation = table<IngestionOperation>({
+  delegate: () => prisma.courseIngestionOperation,
+  jsonColumns: ['files', 'result'],
+  // Non-null columns: a `$ne`/`$nin` filter needs no NULL branch for these.
+  requiredColumns: ['correlationId', 'courseId', 'revisionId', 'userId', 'fileRef', 'state'],
+  defaults: () => ({ files: [], resultApplied: false, dispatchCount: 0 }),
+  columns: (row) => ({
+    correlationId: row.correlationId,
+    courseId: row.courseId,
+    revisionId: row.revisionId,
+    userId: row.userId,
+    requestId: row.requestId,
+    fileRef: row.fileRef,
+    courseTitle: row.courseTitle,
+    files: row.files as unknown as Prisma.InputJsonValue,
+    state: row.state,
+    result: row.result as unknown as Prisma.InputJsonValue,
+    resultApplied: row.resultApplied,
+    dispatchCount: row.dispatchCount,
+    lastDispatchedAt: row.lastDispatchedAt
+  })
+});
 
-export const CourseIngestionOperation =
-  (models.CourseIngestionOperation as Model<IngestionOperation>) ||
-  model<IngestionOperation>('CourseIngestionOperation', schema);
+export default CourseIngestionOperation;

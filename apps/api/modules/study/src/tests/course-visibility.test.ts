@@ -3,7 +3,12 @@ const findById = jest.fn();
 const roleMock = jest.fn();
 
 jest.mock('../models', () => ({
-  Course: { findById: (...a: unknown[]) => findById(...a), findOne: jest.fn() },
+  Course: {
+    findById: (...a: unknown[]) => findById(...a),
+    findOne: jest.fn(),
+    // The route saves through the model static now.
+    save: jest.fn(async (row: Record<string, unknown>) => row)
+  },
   Institution: { exists: jest.fn(), find: jest.fn() },
   PublicCourseJoin: { updateOne: jest.fn(), deleteOne: jest.fn(), find: jest.fn() }
 }));
@@ -16,6 +21,8 @@ import {
   setCourseVisibility,
   VisibilityError
 } from '../services/courseVisibility';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { Course } = jest.requireMock('../models');
 
 const id = '0123456789abcdef01234567';
 
@@ -46,7 +53,7 @@ describe('setCourseVisibility', () => {
     const doc = course({ scope: 'personal', activeRevisionId: 'r1' });
     await expect(setCourseVisibility('u', id, 'public')).resolves.toEqual({ visibility: 'public' });
     expect(doc.visibility).toBe('public');
-    expect(doc.save).toHaveBeenCalled();
+    expect(Course.save).toHaveBeenCalledWith(doc);
   });
 
   it('refuses public before the course is published', async () => {

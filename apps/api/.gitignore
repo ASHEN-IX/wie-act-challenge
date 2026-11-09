@@ -37,3 +37,7 @@ docker-compose.override.yml
 
 # Runtime uploads (test + user files)
 uploads/
+
+# Database dumps and migration artifacts
+backups/
+migration-report.json

@@ -8,7 +8,7 @@ One documentation folder, one task register. Start with the team plan and backlo
 | [Backlog](sprint-backlog.md) | All 36 task owners, current gaps, technical steps, dependencies and acceptance |
 | [Development](development.md) | Local setup, Python/workers, testing and troubleshooting |
 | [Environment](environment.md) | Which `.env` belongs to which app, how web, API, AI and the database connect, values that must match |
-| [Architecture Decisions (ADRs)](architecture-decisions.md) | 16 authoritative decisions: 3 execution planes, LiveKit, STT/TTS, Next.js 16, NestJS, Mongo, Redis, RabbitMQ |
+| [Architecture Decisions (ADRs)](architecture-decisions.md) | 16 authoritative decisions: 3 execution planes, LiveKit, STT/TTS, Next.js 16, NestJS, PostgreSQL, Redis, RabbitMQ |
 | [Technical Contracts](contracts/technical-contracts.md) | 18 implementation-ready contracts across Control, Media, and Intelligence planes |
 | [Current architecture](architecture.md) | Existing services, frameworks and data flow |
 | [Target architecture](target-architecture.md) | Approved 3-plane target design, LiveKit audio, dual-path inference, and recovery rules |
@@ -22,6 +22,7 @@ One documentation folder, one task register. Start with the team plan and backlo
 | [Hackathon delivery](hackathon-delivery.md) | Organizer requirements and submission artifacts |
 | [Deployment](deployment.md) / [Security](security.md) | Deployment and security guidance |
 | [AI message contract](contracts/ai-message-contract.md) / [RabbitMQ runbook](runbooks/rabbitmq-topology-v2-migration.md) | Existing interoperability constraints; JSON fixtures are consumed by tests |
+| [PostgreSQL migration](mongodb-to-postgres-migration.md) / [runbook](runbooks/postgres-migration.md) | What moved, how it was verified, and how to roll back |
 | [Bloom taxonomy](education/bloom-taxonomy.md) | Existing educational mechanics |
 | [Reference inputs](reference/README.md) | Latest team brief and official organizer PDF |
 | [Current preparation results](audit/cleanup.md) | Cleanup changes, checks and remaining blockers |

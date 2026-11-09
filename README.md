@@ -14,7 +14,7 @@ pnpm dev:doctor
 pnpm dev
 ```
 
-Open [localhost:3000](http://localhost:3000). Setup creates missing local environment files with shared random service/auth secrets and preserves existing files. Resolve any `doctor` failures before continuing. Infrastructure ports: Mongo **27018**, RabbitMQ **5673** (management **15673**), Redis **6381**, SMTP **1026**, Mailpit UI **8026**. Stop an existing test stack before starting the dev stack; their Mongo/Mailpit ports overlap.
+Open [localhost:3000](http://localhost:3000). Setup creates missing local environment files with shared random service/auth secrets and preserves existing files. Resolve any `doctor` failures before continuing. Infrastructure ports: PostgreSQL **5433**, RabbitMQ **5673** (management **15673**), Redis **6381**, SMTP **1026**, Mailpit UI **8026**. Stop an existing test stack before starting the dev stack; their PostgreSQL/Mailpit ports overlap.
 
 `pnpm dev` starts the API and web only. See [development](docs/development.md) for Python HTTP/workers, provider configuration, uploads and testing. Local setup explicitly uses mock inference; real approved model access remains required for feature acceptance.
 

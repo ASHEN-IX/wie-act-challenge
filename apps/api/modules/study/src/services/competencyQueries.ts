@@ -12,7 +12,6 @@ import {
   CompetencyProfile
 } from '../models/index';
 import type { ICompetencyProfile } from '../models/index';
-import mongoose from 'mongoose';
 
 type CompetencyRow = Pick<
   ICompetencyProfile,
@@ -126,9 +125,7 @@ async function buildTopicIndex(userId: string): Promise<Map<string, TopicMeta>> 
       { assignedInstructorIds: userId },
       { _id: { $in: enrolledIds } }
     ]
-  })
-    .select('subjectId title topics activeRevisionId')
-    .lean();
+  }).select('subjectId title topics activeRevisionId');
 
   const index = new Map<string, TopicMeta>();
   for (const course of courses) {
@@ -142,9 +139,7 @@ async function buildTopicIndex(userId: string): Promise<Map<string, TopicMeta>> 
       courseId: { $in: courses.map((c) => c._id) },
       status: { $in: ['published', 'deprecated'] },
       activationState: 'committed'
-    })
-      .select('courseId revisionTag topics')
-      .lean();
+    }).select('courseId revisionTag topics');
     const byId = new Map(courses.map((c) => [String(c._id), c]));
     for (const revision of revisions) {
       const course = byId.get(String(revision.courseId));
@@ -206,7 +201,7 @@ async function getUserCompetencyMap(
   { subjectId, knowledgeTypeBreakdown = false }: CompetencyMapOpts = {}
 ) {
   const [profiles, topicIndex] = await Promise.all([
-    CompetencyProfile.find({ userId }).lean(),
+    CompetencyProfile.find({ userId }),
     buildTopicIndex(userId)
   ]);
 
@@ -241,13 +236,11 @@ async function getUserCompetencyMap(
   // Resolve subject names. Courses may carry either a Subject ObjectId or a slug,
   // so only well-formed ids are sent to an ObjectId query.
   const subjectIds = [...subjects.keys()];
-  const objectIds = subjectIds.filter((id) => mongoose.isValidObjectId(id));
+  const objectIds = subjectIds.filter((id) => /^[a-f\d]{24}$/i.test(id));
   // Subjects are authored by whoever created the course, not by the learner
   // reading their progress, so scope the lookup to the ids the learner can reach.
   const subjectDocs = objectIds.length
-    ? await Subject.find({ _id: { $in: objectIds } })
-        .select('name')
-        .lean()
+    ? await Subject.find({ _id: { $in: objectIds } }).select('name')
     : [];
   const nameById = new Map(subjectDocs.map((s) => [String(s._id), s.name]));
 
@@ -325,7 +318,7 @@ async function getUserCompetencyMap(
  */
 async function getTopicDetail(userId: string, topicId: string) {
   const [profiles, topicIndex] = await Promise.all([
-    CompetencyProfile.find({ userId, topicId }).lean(),
+    CompetencyProfile.find({ userId, topicId }),
     buildTopicIndex(userId)
   ]);
 
@@ -379,7 +372,7 @@ async function getWeakCompetenciesForCourse(userId: string, courseId: string, li
   const rows = await CompetencyProfile.find({
     userId,
     topicId: { $in: validTopicIds }
-  }).lean();
+  });
 
   // Aggregate per topicId: level -> average score across knowledge types
   const buckets = new Map<string, Map<string, { total: number; count: number }>>();

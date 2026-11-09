@@ -3,7 +3,7 @@
 ## Phase 0: repository audit and plan
 
 The actual application uses Next.js 16 / React 19, a NestJS modular monolith
-hosting Study domain contracts, Better Auth sessions, MongoDB/Mongoose, a private
+hosting Study domain contracts, Better Auth sessions, PostgreSQL/Prisma, a private
 FastAPI service, and RabbitMQ workers. Redis supports rate limiting and optional
 LLM response caching. Older descriptions of independently deployed Node APIs and
 browser-side Python authentication are obsolete; the gateway authorizes students
@@ -21,7 +21,7 @@ and writing preferences, bounded model selection, browser recording/review, and
 replaceable cloud speech adapters.
 
 Implementation sequence: (1) course workspace text slice, shared RAG and typed
-contracts, session-derived identity, MongoDB continuity, compact/capable routing,
+contracts, session-derived identity, PostgreSQL continuity, compact/capable routing,
 validation and failure tests; (2) explicit push-to-talk and speech providers;
 (3) deeper targeted assessment integration through the existing attempt workflow;
 (4) shared Study Circle facilitation through its existing membership/projection
@@ -108,14 +108,14 @@ Set these variables in the appropriate server environment, never `NEXT_PUBLIC_*`
 | --- | --- |
 | `AI_SERVICE_URL` | Node gateway; normally `http://localhost:8000` |
 | `AI_SERVICE_API_KEY` | Same secret of at least 32 characters in Node and Python |
-| `MONGODB_URI`, `DB_NAME` | Existing application persistence settings |
+| `DATABASE_URL` | Existing application persistence settings (PostgreSQL) |
 | `INGEST_UPLOADS_DIR`, `FAISS_INDEX_DIR` | Existing shared source/artifact paths |
 | `REDIS_URL` | Existing shared rate limiting; existing middleware falls back locally during Redis outages |
 | `NARDOUCH_COMPACT_MODEL` | Python; default existing compact deployment `groq/openai/gpt-oss-20b` |
 | `NARDOUCH_CAPABLE_MODEL` | Python; default existing capable deployment `groq/openai/gpt-oss-120b` |
 | Provider key, e.g. `GROQ_API_KEY` | Python; must match the selected model's provider |
 | `LLM_APPROVALS_JSON` | Existing operator-configured approval for **each new alias**, bound to exact model and task, with valid expiry and request budget |
-| `LLM_BUDGET_MONGODB_URI`, `LLM_BUDGET_DB_NAME` | Existing durable LLM accounting, required by `ask` |
+| `DATABASE_URL` (budget tables) | Existing durable LLM accounting, required by `ask` |
 | `NARDOUCH_CONCURRENCY` | Python; default 4, clamped 1–16 per process |
 | `NARDOUCH_PROMPTS_PATH` | Optional trusted JSON override; examples must be reviewed before approval |
 | `NARDOUCH_ASR_PROVIDER` | `disabled` (default), `azure`, or `google` |
@@ -144,8 +144,8 @@ handling depends on the chosen account's settings.
 
 The API is limited to 12 generation/voice/feedback requests per minute per learner.
 Conversation reads recheck current course and publication access. Provision the
-Mongoose TTL index on `nardouchconversations.expiresAt` if automatic index creation
-is disabled; reads reject expired rows even before MongoDB's TTL sweep runs.
+expiry sweep (`ednova_sweep_expired_rows`, created by the Prisma migrations) on
+`nardouchconversations.expiresAt`; reads reject expired rows even before the sweep runs.
 
 ## Provider evidence and evaluation
 
@@ -187,13 +187,13 @@ pronunciation especially need review before enabling spoken responses widely.
 
 The following checks were executed on this change. Inference and cloud speech are
 injected **only in tests**; the Nest integration uses real Better Auth cookies,
-MongoDB, and real revision bytes/FAISS artifacts.
+PostgreSQL, and real revision bytes/FAISS artifacts.
 
 | Check | Actual result |
 | --- | --- |
 | Python Nardouch, voice, grounding and shared LiteLLM regression tests | 82 passed; one existing PyMuPDF `fitz` deprecation warning |
 | Gateway Nardouch unit/HTTP tests | 23 passed |
-| Real Nest/Better Auth/MongoDB integration | 6 passed |
+| Real Nest/Better Auth/PostgreSQL integration | 6 passed |
 | Frontend component and WAV encoding tests | 8 passed |
 | Chromium interactive checks at a mobile viewport | 8 passed |
 | API typecheck and production build | Passed |
@@ -222,8 +222,8 @@ pnpm --filter web exec vite --config e2e/nardouch/vite.config.ts
 node apps/web/e2e/nardouch/browser.mjs
 ```
 
-The integration test uses the isolated test MongoDB at port 27018 by default;
-`NARDOUCH_TEST_MONGODB_URI` can select a different test server. It always generates
+The integration test uses the isolated test PostgreSQL at port 5433 by default;
+`DATABASE_URL` can select a different test server. It always generates
 and removes its own uniquely named database and source directory. The browser
 harness uses test-only action adapters in `e2e/nardouch`, never production routes;
 it exercises recording using Chromium's fake microphone, transcript editing,
@@ -358,7 +358,7 @@ complete real-model voice conversation was produced. Native WER, semantic qualit
 TTS latency, GPU memory peaks and native-speaker ratings remain unmeasured.
 
 Executed regressions: 86 Python tests passed (including 18 voice tests), 23 gateway
-unit tests passed, six real Nest/Better Auth/Mongo integration checks passed,
+unit tests passed, six real Nest/Better Auth/PostgreSQL integration checks passed,
 eight frontend tests and eight Chromium checks passed. Cloud-specific tests were
 replaced by assertions that cloud selection fails closed; original input validation,
 transcript, privacy and educational tests remain. Both builds and TypeScript checks
@@ -630,7 +630,7 @@ Primary sources:
 [selected Miro model card](https://huggingface.co/OpenVoiceOS/phoonnx_ar-SA_miro_espeak/blob/d5cf31ab113941464d4a9e5e0b81b64b7454b234/README.md).
 
 Piper sprint executed checks: **102 Python**, **23 gateway unit**, **6 real
-Nest/Better Auth/Mongo integration**, **8 frontend** and **9 Chromium** checks
+Nest/Better Auth/PostgreSQL integration**, **8 frontend** and **9 Chromium** checks
 passed; both production builds, TypeScript checks, targeted ESLint and
 `git diff --check` passed. These are the selected Nardouch/LLM/grounding regression
 suites, not a claim that every unrelated repository test was run. The ninth
@@ -778,7 +778,7 @@ No automatic synthesis or playback occurs on a new educational response. Listen
 is explicit; duplicate clicks/components share one promise. Up to ten generated
 blobs remain in tab-runtime memory, with object URLs revoked when players unmount.
 Pause/resume/native controls, Replay and Stop reuse existing bytes. Toggling voice
-off/on reuses cached bytes. Neither audio nor text is saved in MongoDB by TTS;
+off/on reuses cached bytes. Neither audio nor text is saved in PostgreSQL by TTS;
 the ledger stores only an opaque key, counters, state, model and timings. On tab
 reload/cache eviction, already-attempted generations are refused rather than
 silently billed again. There is no same-message regeneration operation in this
@@ -834,7 +834,7 @@ Official references:
    failure leaves the written response readable. Text/ASR continue independently.
 
 Executed selected regression checks in this sprint: **122 Python**, **23 gateway
-unit**, **6 real Nest/Better Auth/Mongo integration**, **9 frontend**, and **11
+unit**, **6 real Nest/Better Auth/PostgreSQL integration**, **9 frontend**, and **11
 Chromium** checks passed. Both production builds, API/web TypeScript checks,
 targeted ESLint and `git diff --check` passed. Browser checks include synthetic
 MP3 decoding, duplicate clicks, Replay/Stop and voice-toggle cache reuse. The MP3
@@ -1122,7 +1122,7 @@ rules and saved progress are unchanged by this artwork update.
 
 - API growth/persistence rule tests and existing Nardouch unit regressions: 35 passed.
 - Frontend companion, reader, practice and assistant tests: 28 passed.
-- Real MongoDB integration: 7 passed, including concurrent idempotent writes,
+- Real PostgreSQL integration: 7 passed, including concurrent idempotent writes,
   reconnect persistence, separate courses/revisions, permission denial, incorrect
   checks staying at Expert, and the real reviewed grader unlocking Graduate.
 - Existing real Nest/Better Auth conversation regressions: 6 passed.

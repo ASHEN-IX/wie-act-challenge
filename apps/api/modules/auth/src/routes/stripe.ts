@@ -8,6 +8,8 @@ import { authenticate } from '@ednova/shared/auth';
 import type { Response } from 'express';
 import User from '../models/User';
 import Payment from '../models/Payment';
+import { prisma } from '../../../../shared/database';
+import { newId } from '../../../../shared/ids';
 import { MONTH_OPTIONS, calculatePlanPrice } from '../config/pricing';
 
 const router = createContracts();
@@ -75,11 +77,19 @@ export async function applyCheckoutSession(
   { stripeEventId = null }: { stripeEventId?: string | null } = {}
 ) {
   const userId = session.metadata?.userId;
-  const targetTier = session.metadata?.tier;
+  const rawTier = session.metadata?.tier;
+  const targetTier = (['vip', 'vip_plus'].includes(String(rawTier)) ? rawTier : null) as
+    'vip' | 'vip_plus' | null;
+  const subscriptionId =
+    typeof session.subscription === 'string'
+      ? session.subscription
+      : (session.subscription?.id ?? null);
+  const customerId =
+    typeof session.customer === 'string' ? session.customer : (session.customer?.id ?? null);
   const durationMonths = Number(session.metadata?.durationMonths || 1);
   if (
     !userId ||
-    !['vip', 'vip_plus'].some((tier) => tier === targetTier) ||
+    !targetTier ||
     !MONTH_OPTIONS.some((months) => months === durationMonths) ||
     session.payment_status !== 'paid' ||
     !session.id ||
@@ -90,57 +100,71 @@ export async function applyCheckoutSession(
   // Stable purchase time, never the time of a webhook retry or confirmation.
   const startAt = new Date(session.created * 1000);
   const endAt = addMonths(startAt, durationMonths);
-  const user = await User.findById(userId).select('_id');
+  const user = await User.findById(userId);
   if (!user) return { applied: false, reason: 'user_not_found' };
   // The entitlement and once-only marker live in the same atomic document write.
   // A later purchase wins, including when old webhook events arrive out of order.
-  await User.updateOne(
-    {
-      _id: userId,
-      appliedCheckoutSessionIds: { $ne: session.id },
-      $or: [
-        { entitlementPurchasedAt: { $exists: false } },
-        { entitlementPurchasedAt: { $lte: startAt } }
-      ]
-    },
-    {
-      $set: {
+  // The entitlement and once-only marker commit together; a later purchase wins,
+  // including when old webhook events arrive out of order.
+  await prisma.$transaction(async (tx) => {
+    const current = await tx.user.findUnique({
+      where: { id: userId },
+      select: { appliedCheckoutSessionIds: true, entitlementPurchasedAt: true }
+    });
+    if (!current) return;
+    if (current.appliedCheckoutSessionIds.includes(session.id)) return;
+    if (current.entitlementPurchasedAt && current.entitlementPurchasedAt > startAt) return;
+    await tx.user.update({
+      where: { id: userId },
+      data: {
         tier: targetTier,
         tierChangedAt: startAt,
         entitlementPurchasedAt: startAt,
-        subscriptionId: session.subscription || null,
-        stripeCustomerId: session.customer || null,
+        subscriptionId,
+        stripeCustomerId: customerId,
         subscriptionStartAt: startAt,
         subscriptionEndAt: endAt,
         subscriptionDurationMonths: durationMonths,
         renewalDate: endAt,
         canChangeAfter: new Date(endAt.getTime() - 5 * 86400000),
-        autoRenew: false
-      },
-      $addToSet: { appliedCheckoutSessionIds: session.id }
-    }
-  );
+        autoRenew: false,
+        appliedCheckoutSessionIds: [...current.appliedCheckoutSessionIds, session.id]
+      }
+    });
+  });
   // This is deliberately after the account write. A retry repairs the ledger if
   // it failed; it cannot reapply or extend the atomic entitlement above.
-  await Payment.findOneAndUpdate(
-    { stripeCheckoutSessionId: session.id },
-    {
-      $set: {
-        userId,
-        tier: targetTier,
-        ...(stripeEventId ? { stripeEventId } : {}),
-        stripeSubscriptionId: session.subscription || null,
-        stripeCustomerId: session.customer || null,
-        durationMonths,
-        monthlyPriceCents: Number(session.metadata?.monthlyPriceCents || 0),
-        discountPercentage: Number(session.metadata?.discountPercentage || 0),
-        amount: session.amount_total ?? null,
-        currency: session.currency || 'usd',
-        status: 'succeeded'
-      }
+  await prisma.payment.upsert({
+    where: { stripeCheckoutSessionId: session.id },
+    update: {
+      userId,
+      tier: targetTier,
+      ...(stripeEventId ? { stripeEventId } : {}),
+      stripeSubscriptionId: subscriptionId,
+      stripeCustomerId: customerId,
+      durationMonths,
+      monthlyPriceCents: Number(session.metadata?.monthlyPriceCents || 0),
+      discountPercentage: Number(session.metadata?.discountPercentage || 0),
+      amount: session.amount_total ?? null,
+      currency: session.currency || 'usd',
+      status: 'succeeded'
     },
-    { upsert: true, runValidators: true }
-  );
+    create: {
+      id: newId(),
+      userId,
+      tier: targetTier,
+      ...(stripeEventId ? { stripeEventId } : {}),
+      stripeCheckoutSessionId: session.id,
+      stripeSubscriptionId: subscriptionId,
+      stripeCustomerId: customerId,
+      durationMonths,
+      monthlyPriceCents: Number(session.metadata?.monthlyPriceCents || 0),
+      discountPercentage: Number(session.metadata?.discountPercentage || 0),
+      amount: session.amount_total ?? null,
+      currency: session.currency || 'usd',
+      status: 'succeeded'
+    }
+  });
   return { applied: true, userId, tier: targetTier, durationMonths };
 }
 
@@ -156,7 +180,7 @@ async function upsertCustomer(user: IUser): Promise<string> {
   });
 
   user.stripeCustomerId = customer.id;
-  await user.save();
+  await User.save(user);
   return customer.id;
 }
 
@@ -218,10 +242,11 @@ router.post('/subscribe', authenticate, async (req: DomainRequest, res: Response
     });
 
     await Payment.create({
-      userId: user._id,
+      id: newId(),
+      userId: String(user._id),
       stripeCheckoutSessionId: checkoutSession.id,
       stripeCustomerId: customerId,
-      tier: value.tier,
+      tier: value.tier as 'vip' | 'vip_plus',
       durationMonths: pricing.durationMonths,
       monthlyPriceCents: pricing.monthlyPriceCents,
       discountPercentage: pricing.discountPercentage,
@@ -315,31 +340,23 @@ async function processWebhookEvent(event: Stripe.Event): Promise<void> {
   if (event.type === 'customer.subscription.deleted') {
     const subscription = event.data.object;
 
-    await Payment.findOneAndUpdate(
+    await Payment.updateOne(
       { stripeSubscriptionId: subscription.id },
-      {
-        $set: {
-          stripeEventId: event.id,
-          status: 'canceled',
-          metadata: subscription
-        }
-      }
+      { stripeEventId: event.id, status: 'canceled', metadata: subscription as never }
     );
 
-    await User.findOneAndUpdate(
+    await User.updateOne(
       { subscriptionId: subscription.id },
       {
-        $set: {
-          tier: 'normal',
-          tierChangedAt: new Date(),
-          subscriptionId: null,
-          subscriptionStartAt: null,
-          subscriptionEndAt: null,
-          subscriptionDurationMonths: 0,
-          renewalDate: null,
-          canChangeAfter: null,
-          autoRenew: false
-        }
+        tier: 'normal',
+        tierChangedAt: new Date(),
+        subscriptionId: null,
+        subscriptionStartAt: null,
+        subscriptionEndAt: null,
+        subscriptionDurationMonths: 0,
+        renewalDate: null,
+        canChangeAfter: null,
+        autoRenew: false
       }
     );
   }
@@ -360,7 +377,7 @@ export async function webhookHandler(req: DomainRequest, res: Response) {
 
     const event = stripe.webhooks.constructEvent(req.body, signature, webhookSecret);
 
-    const alreadyHandled = await Payment.findOne({ stripeEventId: event.id }).lean();
+    const alreadyHandled = await Payment.findOne({ stripeEventId: event.id });
     if (alreadyHandled) {
       return res.json({ received: true, duplicate: true });
     }

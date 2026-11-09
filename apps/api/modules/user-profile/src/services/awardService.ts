@@ -1,4 +1,3 @@
-import type { Types } from 'mongoose';
 import type { IUserRankProfile } from '../models/UserRankProfile';
 import type { IRankSeason } from '../models/RankSeason';
 
@@ -40,7 +39,11 @@ interface AwardResult {
   rankUp?: boolean;
   rankDown?: boolean;
 }
+import { Prisma } from '../../../../src/generated/prisma/client';
+import { newId } from '../../../../shared/ids';
 import RankEventLedger from '../models/RankEventLedger';
+import UserRankProfile from '../models/UserRankProfile';
+import { prisma } from '../../../../shared/database';
 import * as seasonService from './seasonService';
 import * as leaderboardService from './leaderboardService';
 
@@ -218,40 +221,37 @@ function computeLearningSkillDelta({
   return Math.round(score);
 }
 
-async function getTodayAwardedKp(userId: string, seasonId: Types.ObjectId) {
+async function getTodayAwardedKp(userId: string, seasonId: string) {
   const { start, end } = getUtcDayBounds();
-  const result = await RankEventLedger.aggregate([
-    {
-      $match: {
-        userId,
-        seasonId,
-        occurredAt: { $gte: start, $lt: end },
-        finalKP: { $gt: 0 }
-      }
-    },
-    {
-      $group: {
-        _id: null,
-        total: { $sum: '$finalKP' }
-      }
-    }
-  ]);
-
-  return result[0]?.total || 0;
+  // `$group: { $sum: '$finalKP' }` has no Prisma aggregate equivalent for a
+  // single integer sum, so the sum runs in the database with parameterized SQL.
+  const rows = await prisma.$queryRaw<Array<{ total: bigint | number | null }>>`
+    SELECT COALESCE(SUM("finalKP"), 0) AS total
+    FROM "rankeventledgers"
+    WHERE "userId" = ${userId}
+      AND "seasonId" = ${seasonId}
+      AND "occurredAt" >= ${start}
+      AND "occurredAt" < ${end}
+      AND "finalKP" > 0
+  `;
+  const total = rows[0]?.total ?? 0;
+  return typeof total === 'bigint' ? Number(total) : total;
 }
 
-async function countRecentLowDifficultyActions(
-  userId: string,
-  seasonId: Types.ObjectId,
-  now: Date
-) {
+async function countRecentLowDifficultyActions(userId: string, seasonId: string, now: Date) {
   const since = new Date(now.getTime() - LOW_DIFFICULTY_WINDOW_MINUTES * 60 * 1000);
-  return RankEventLedger.countDocuments({
-    userId,
-    seasonId,
-    occurredAt: { $gte: since },
-    'reasonBreakdown.lowDifficultyAction': true
-  });
+  // The flag lives inside the `reasonBreakdown` JSON document, so the filter is
+  // applied in the database with a JSON predicate rather than a column.
+  const rows = await prisma.$queryRaw<Array<{ count: bigint | number }>>`
+    SELECT COUNT(*) AS count
+    FROM "rankeventledgers"
+    WHERE "userId" = ${userId}
+      AND "seasonId" = ${seasonId}
+      AND "occurredAt" >= ${since}
+      AND ("reasonBreakdown" ->> 'lowDifficultyAction') = 'true'
+  `;
+  const count = rows[0]?.count ?? 0;
+  return typeof count === 'bigint' ? Number(count) : count;
 }
 
 export async function awardKnowledgePoints({
@@ -273,12 +273,12 @@ export async function awardKnowledgePoints({
   }
 
   const season = await seasonService.getOrCreateActiveSeason();
-  const profile = await seasonService.ensureUserRankProfile(userId, season._id);
+  const profile = await seasonService.ensureUserRankProfile(userId, String(season.id));
   const now = new Date();
 
   const eventKey = buildEventKey({ userId, action, metadata });
   if (eventKey) {
-    const existingEvent = await RankEventLedger.findOne({ eventKey }).lean();
+    const existingEvent = await RankEventLedger.findOne({ eventKey });
     if (existingEvent) {
       return {
         awarded: false,
@@ -302,7 +302,7 @@ export async function awardKnowledgePoints({
   const lowDifficultyAction = difficultyLabel === 'easy';
   let antiGrindMultiplier = 1;
   if (lowDifficultyAction) {
-    const recentLowCount = await countRecentLowDifficultyActions(userId, season._id, now);
+    const recentLowCount = await countRecentLowDifficultyActions(userId, season.id, now);
     if (recentLowCount >= LOW_DIFFICULTY_REPEAT_THRESHOLD) {
       antiGrindMultiplier = 0.6;
     }
@@ -325,12 +325,12 @@ export async function awardKnowledgePoints({
   const rawFinalKp = baseKP * totalMultiplier;
   let finalKP = Math.max(0, Math.floor(rawFinalKp));
 
-  const todayAwarded = await getTodayAwardedKp(userId, season._id);
+  const todayAwarded = await getTodayAwardedKp(userId, season.id);
   const remaining = Math.max(0, DAILY_KP_CAP - todayAwarded);
   let cappedByDailyLimit = false;
 
   if (remaining <= 0) {
-    await profile.save();
+    await UserRankProfile.save(profile);
     return {
       awarded: false,
       reason: 'daily_cap_reached',
@@ -347,7 +347,7 @@ export async function awardKnowledgePoints({
   }
 
   if (finalKP <= 0) {
-    await profile.save();
+    await UserRankProfile.save(profile);
     return {
       awarded: false,
       reason: 'zero_kp_after_balancing',
@@ -358,7 +358,7 @@ export async function awardKnowledgePoints({
     };
   }
 
-  const applyResult = profile.applyKnowledgeDelta(finalKP);
+  const applyResult = UserRankProfile.applyKnowledgeDelta(profile, finalKP);
 
   const skillDelta = computeLearningSkillDelta({
     difficultyMultiplier,
@@ -371,7 +371,7 @@ export async function awardKnowledgePoints({
     Math.round((profile.learningSkillRating || 1000) + skillDelta)
   );
 
-  await profile.save();
+  await UserRankProfile.save(profile);
 
   const reasonBreakdown = {
     formula:
@@ -408,8 +408,9 @@ export async function awardKnowledgePoints({
   };
 
   await RankEventLedger.create({
+    id: newId(),
     userId,
-    seasonId: season._id,
+    seasonId: season.id,
     action,
     baseKP,
     multipliers: {
@@ -427,9 +428,13 @@ export async function awardKnowledgePoints({
     beforeRankIndex: applyResult.beforeRankIndex,
     afterRankIndex: applyResult.afterRankIndex,
     rankName: profile.rankName,
-    metadata,
+    metadata: metadata as unknown as Prisma.InputJsonValue,
     reasonBreakdown,
-    contextSessionId: metadata.sessionId || metadata.focusSessionId || metadata.eventId || null,
+    contextSessionId:
+      (metadata.sessionId as string) ||
+      (metadata.focusSessionId as string) ||
+      (metadata.eventId as string) ||
+      null,
     eventKey
   });
 

@@ -7,20 +7,19 @@ process.env.JWT_SECRET = 'test-secret-key';
 process.env.MONGODB_URI = 'mongodb://localhost:27017/test_ednova';
 process.env.NODE_ENV = 'test';
 
-jest.mock('../models', () => {
-  const Subject = jest.fn();
-  return {
-  Subject: Object.assign(Subject, {
+jest.mock('../models', () => ({
+  Subject: {
     find: jest.fn(),
     findOne: jest.fn(),
-    findOneAndDelete: jest.fn()
-  }),
+    findOneAndDelete: jest.fn(),
+    create: jest.fn(),
+    save: jest.fn()
+  },
   Course: {
     countDocuments: jest.fn(),
     deleteMany: jest.fn()
   }
-};
-});
+}));
 
 jest.mock('@ednova/shared/moduleClient', () => ({
   post: jest.fn().mockRejectedValue(new Error('reward service unavailable'))
@@ -47,13 +46,12 @@ describe('subject creation', () => {
 
   test('creates and returns a subject for the current account', async () => {
     Subject.findOne.mockResolvedValue(null);
-    Subject.mockImplementation(function (this: Record<string, unknown>, data: object) {
-      Object.assign(this, data, {
-        _id: { toString: () => 'subject-new' },
-        color: '#ff4655',
-        save: jest.fn().mockResolvedValue(undefined)
-      });
-    });
+    Subject.create.mockImplementation(async (data: Record<string, unknown>) => ({
+      ...data,
+      id: 'subject-new',
+      _id: 'subject-new',
+      color: '#ff4655'
+    }));
 
     const res = await request(app)
       .post('/api/v1/study/subjects')

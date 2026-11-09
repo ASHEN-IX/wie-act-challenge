@@ -9,12 +9,14 @@ import http from 'node:http';
 import { AddressInfo } from 'node:net';
 import express, { type Response, type NextFunction } from 'express';
 import request from 'supertest';
-import mongoose from 'mongoose';
+import { connectDatabase, disconnectDatabase } from '../../shared/database';
+import { newId } from '../../shared/ids';
 
 import {
   Course,
   CourseEnrollment,
   CourseRevision,
+  Institution,
   InstitutionMembership
 } from '../../modules/study/src/models';
 import coursesRouter from '../../modules/study/src/routes/courses';
@@ -22,18 +24,15 @@ import { updateCourseDraft } from '../../modules/study/src/services/courseDraft'
 import { publishCourseRevision } from '../../modules/study/src/services/coursePublication';
 import type { DomainRequest } from '../../src/framework/contracts';
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27018/ednova-test';
-
 test('M09 / ED-10: Source-Grounded Tutor with Verifiable Citations Integration', async (t) => {
-  await mongoose.connect(MONGO_URI);
-  const db = mongoose.connection.db!;
+  await connectDatabase();
 
   const testPrefix = `m09_${Date.now()}`;
   const ownerUserId = `${testPrefix}_owner`;
   const instructorId = `${testPrefix}_instructor`;
   const studentId = `${testPrefix}_enrolled_student`;
   const foreignUserId = `${testPrefix}_foreign_user`;
-  const institutionId = new mongoose.Types.ObjectId();
+  const institutionId = newId();
 
   let courseId: string;
   let unpublishedCourseId: string;
@@ -182,32 +181,37 @@ test('M09 / ED-10: Source-Grounded Tutor with Verifiable Citations Integration',
     await cleanupCourseFixtures();
     try {
       if (courseId) {
-        await db
-          .collection('course_revisions')
-          .deleteMany({ courseId: new mongoose.Types.ObjectId(courseId) });
+        await CourseRevision.deleteMany({ courseId });
       }
       if (unpublishedCourseId) {
-        await db
-          .collection('course_revisions')
-          .deleteMany({ courseId: new mongoose.Types.ObjectId(unpublishedCourseId) });
+        await CourseRevision.deleteMany({ courseId: unpublishedCourseId });
       }
-      await db.collection('courses').deleteMany({ userId: { $regex: testPrefix } });
-      await db.collection('course_enrollments').deleteMany({ userId: { $regex: testPrefix } });
-      await db.collection('institution_memberships').deleteMany({ userId: { $regex: testPrefix } });
+      await Course.deleteMany({ userId: { contains: testPrefix } });
+      await CourseEnrollment.deleteMany({ userId: { contains: testPrefix } });
+      await InstitutionMembership.deleteMany({ userId: { contains: testPrefix } });
+      await Institution.deleteMany({ _id: institutionId });
     } catch {
       // ignore
     } finally {
       process.env.AI_SERVICE_URL = originalAiUrl;
       process.env.AI_SERVICE_API_KEY = originalAiKey;
       mockServer.close();
-      await mongoose.disconnect().catch(() => {});
+      await disconnectDatabase().catch(() => {});
     }
   });
 
   await t.test(
     '1. Setup: Create published course with reviewed objectives and enroll student',
     async () => {
-      // 1. Add instructor membership
+      // 1. The institution exists before any membership (real foreign key).
+      await Institution.create({
+        id: institutionId,
+        name: 'M09 Calculus Institution',
+        slug: `m09-${institutionId}`,
+        createdByUserId: ownerUserId,
+        status: 'active'
+      });
+      // Add instructor membership
       await InstitutionMembership.create({
         institutionId,
         userId: instructorId,

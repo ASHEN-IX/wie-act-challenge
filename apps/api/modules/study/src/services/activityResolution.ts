@@ -119,9 +119,7 @@ export async function resolveStoredActivity(
     activityId,
     ...(courseId ? { courseId } : {}),
     ...(revisionId ? { revisionId } : {})
-  })
-    .limit(2)
-    .lean();
+  }).limit(2);
   if (!records.length)
     throw new ActivityBoundaryError(404, 'ACTIVITY_NOT_FOUND', 'Activity not found');
   if (records.length !== 1)
@@ -134,8 +132,14 @@ export async function resolveStoredActivity(
   const revision = await resolveActivityRevision(actor, record.courseId, record.revisionId);
   const definition = parseContract('ActivityDefinition', record.publicDefinition);
   validateActivityRevision(definition, revision);
+  const approved = (revision.approvedActivities ?? []) as Array<{
+    activityId: string;
+    activityRevision: string;
+    definitionHash: string;
+    evaluationHash: string;
+  }>;
   if (
-    !revision.approvedActivities?.some(
+    !approved.some(
       (a) =>
         a.activityId === definition.activityId &&
         a.activityRevision === definition.activityRevision &&
@@ -162,10 +166,9 @@ export async function validateActivityRoom(
   const room = await StudyRoom.findOne({
     roomId,
     status: 'active',
-    participants: {
-      $elemMatch: { userId: actor, leftAt: { $exists: false } }
-    }
-  }).lean();
+    // `participants` is a JSONB array: membership is an `$elemMatch` predicate.
+    participants: { $elemMatch: { userId: actor, leftAt: { $exists: false } } }
+  });
   if (
     !room ||
     room.courseId !== definition.courseId ||

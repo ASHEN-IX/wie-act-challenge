@@ -1,19 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MongoClient, ObjectId } from 'mongodb';
-import mongoose from 'mongoose';
 import express, { type Response, type NextFunction } from 'express';
 import request from 'supertest';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { connectDatabase, disconnectDatabase, prisma } from '../../shared/database';
+import { newId } from '../../shared/ids';
 import type { DomainRequest } from '../../src/framework/contracts';
 import coursesRouter from '../../modules/study/src/routes/courses';
 import { handleIngestResult } from '../../modules/study/src/services/ingestStatus';
 import { setCustomPublisher } from '../../modules/study/src/services/ingestionJob';
 import { validateIngestPayload } from '../../shared/ai-messaging/payloadSchemas';
-
-const MONGO_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27018/ednova_m05_test';
+import { Course, CourseRevision, Subject } from '../../modules/study/src/models';
 
 setCustomPublisher(async () => {
   return {
@@ -23,37 +22,33 @@ setCustomPublisher(async () => {
 });
 
 test('M05 / ED-06: Scoped source ingestion, revision pinning, and provenance', async (t) => {
-  const client = await new MongoClient(MONGO_URI).connect();
-  const db = client.db();
-  await mongoose.connect(MONGO_URI);
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
+  await connectDatabase();
 
-  const userId = new ObjectId().toString();
-  const subjectId = new ObjectId().toString();
+  const userId = newId();
+  const subjectId = newId();
   let createdCourseId: string | undefined;
 
   t.after(async () => {
     try {
-      if (createdCourseId) {
-        await db.collection('courses').deleteOne({ _id: new ObjectId(createdCourseId) });
-        await db
-          .collection('course_revisions')
-          .deleteMany({ courseId: new ObjectId(createdCourseId) });
-      }
-      await db.collection('subjects').deleteOne({ _id: new ObjectId(subjectId) });
+      // Foreign keys cascade from the course to its revisions, so deleting the
+      // course row removes the whole fixture.
+      if (createdCourseId) await Course.deleteMany({ _id: createdCourseId });
+      await Subject.deleteMany({ _id: subjectId });
     } catch {
       // ignore teardown error
     } finally {
-      await client.close().catch(() => {});
+      await disconnectDatabase().catch(() => {});
     }
   });
 
-  await db.collection('subjects').insertOne({
-    _id: new ObjectId(subjectId),
+  await Subject.create({
+    _id: subjectId,
     userId,
     name: 'Distributed Systems',
     description: 'Core concepts',
-    color: '#3b82f6',
-    totalStudyTime: 0
+    color: '#3b82f6'
   });
 
   function buildApp() {
@@ -93,18 +88,15 @@ test('M05 / ED-06: Scoped source ingestion, revision pinning, and provenance', a
       courseId = res.body.courseId;
       createdCourseId = courseId;
 
-      // Verify course document in MongoDB
-      const courseDoc = await db.collection('courses').findOne({ _id: new ObjectId(courseId) });
+      // Verify the course row
+      const courseDoc = await Course.findById(courseId);
       assert.ok(courseDoc);
       assert.equal(courseDoc.status, 'processing');
       assert.equal(courseDoc.files.length, 1);
       assert.equal(courseDoc.files[0].fileHash, expectedFileHash, 'Original file hash preserved');
 
-      // Verify draft CourseRevision in MongoDB
-      const revisions = await db
-        .collection('course_revisions')
-        .find({ courseId: new ObjectId(courseId) })
-        .toArray();
+      // Verify the draft CourseRevision
+      const revisions = await CourseRevision.find({ courseId });
       assert.equal(revisions.length, 1);
       const rev = revisions[0];
       assert.ok(rev.revisionTag.startsWith('rev_'));
@@ -119,12 +111,14 @@ test('M05 / ED-06: Scoped source ingestion, revision pinning, and provenance', a
   await t.test(
     '2. Ingestion worker result completion links sanitized draft topics without activating an unreviewed revision',
     async () => {
-      const courseDoc = await db.collection('courses').findOne({ _id: new ObjectId(courseId) });
+      const courseDoc = await Course.findById(courseId);
       assert.ok(courseDoc);
+      // Uploading stages a durable operation, so the course carries its correlation.
+      assert.ok(courseDoc.correlationId);
 
       const syntheticResult = {
         type: 'study.ingest.course' as const,
-        correlationId: courseDoc.correlationId,
+        correlationId: courseDoc.correlationId!,
         status: 'completed' as const,
         payload: {
           courseId,
@@ -157,22 +151,22 @@ test('M05 / ED-06: Scoped source ingestion, revision pinning, and provenance', a
 
       await handleIngestResult(syntheticResult);
 
-      const updatedCourse = await db.collection('courses').findOne({ _id: new ObjectId(courseId) });
+      const updatedCourse = await Course.findById(courseId);
       assert.equal(updatedCourse!.status, 'completed');
       assert.equal(updatedCourse!.topics.length, 1);
-      assert.equal(updatedCourse!.topics[0].title, 'Consensus Protocols');
+      assert.equal((updatedCourse!.topics[0] as { title?: string }).title, 'Consensus Protocols');
       assert.ok(
         !updatedCourse!.activeRevisionId,
         'Ingestion cannot activate an unreviewed revision'
       );
 
-      const updatedRev = await db.collection('course_revisions').findOne({
-        courseId: new ObjectId(courseId),
+      const updatedRev = await CourseRevision.findOne({
+        courseId,
         revisionTag: initialRevisionTag
       });
       assert.ok(updatedRev);
       assert.equal(updatedRev.topics.length, 1);
-      assert.equal(updatedRev.topics[0].title, 'Consensus Protocols');
+      assert.equal((updatedRev.topics[0] as { title?: string }).title, 'Consensus Protocols');
       assert.equal(updatedRev.status, 'draft', 'Stays draft until explicit publication');
     }
   );
@@ -191,10 +185,7 @@ test('M05 / ED-06: Scoped source ingestion, revision pinning, and provenance', a
 
       assert.equal(res.status, 202);
 
-      const revisions = await db
-        .collection('course_revisions')
-        .find({ courseId: new ObjectId(courseId) })
-        .toArray();
+      const revisions = await CourseRevision.find({ courseId });
       assert.equal(revisions.length, 2, 'Two distinct revisions coexist');
 
       const revTags = revisions.map((r) => r.revisionTag);
@@ -208,9 +199,9 @@ test('M05 / ED-06: Scoped source ingestion, revision pinning, and provenance', a
       );
 
       // Verify course files list has both files with their distinct hashes
-      const updatedCourse = await db.collection('courses').findOne({ _id: new ObjectId(courseId) });
+      const updatedCourse = await Course.findById(courseId);
       assert.equal(updatedCourse!.files.length, 2);
-      const hashes = updatedCourse!.files.map((f: { fileHash: string }) => f.fileHash);
+      const hashes = updatedCourse!.files.map((f) => f.fileHash);
       assert.ok(hashes.includes(expectedFileHash));
       assert.ok(hashes.includes(file2Hash));
     }
@@ -253,7 +244,8 @@ test('M05 / ED-06: Scoped source ingestion, revision pinning, and provenance', a
 
   // Cleanup
   fs.rmSync(tmpDir, { recursive: true, force: true });
-  await db.dropDatabase();
-  await mongoose.disconnect();
-  await client.close();
+  if (createdCourseId) await Course.deleteMany({ _id: createdCourseId });
+  await Subject.deleteMany({ _id: subjectId });
+  await prisma.$queryRaw`SELECT 1`;
+  await disconnectDatabase();
 });

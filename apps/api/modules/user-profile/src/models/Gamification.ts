@@ -1,343 +1,340 @@
-import mongoose, { Document, Model, Schema } from 'mongoose';
+import type {
+  Gamification as GamificationRow,
+  Prisma
+} from '../../../../src/generated/prisma/client';
+import { prisma, toDocument } from '../../../../shared/database';
+import { newId } from '../../../../shared/ids';
+import { json } from './_helpers';
 
-// Achievement catalog
+export interface IGamificationStats {
+  coursesUploaded: number;
+  tasksCompleted: number;
+  perfectSessions: number;
+  currentStreak: number;
+  longestStreak: number;
+  friendsAdded: number;
+  teamSessions: number;
+  groupSessions: number;
+  challengesCompleted: number;
+  subjectsCreated?: number;
+}
+
+export interface IGamificationAchievement {
+  id: string;
+  name: string;
+  description: string;
+  unlockedAt: Date;
+  icon: string;
+}
+
+export type IGamification = Omit<
+  GamificationRow,
+  'stats' | 'xpHistory' | 'achievements' | 'evidenceAwards'
+> & {
+  _id: string;
+  stats: IGamificationStats;
+  xpHistory: Array<{ action: string; xp: number; timestamp: Date; metadata?: unknown }>;
+  achievements: IGamificationAchievement[];
+  evidenceAwards: GamificationEvidenceAward[];
+};
+
+export interface GamificationEvidenceAward {
+  awardId: string;
+  completionKey: string;
+  evidenceId: string;
+  policyVersion: string;
+  xp: number;
+  reason: string;
+  day: string;
+  topicKey: string;
+  group: boolean;
+  timestamp: Date;
+}
+
 export const ACHIEVEMENT_CATALOG = [
   {
     id: 'first_course',
     name: 'Knowledge Seeker',
     description: 'Upload your first course',
     icon: '📚',
-    condition: (stats: IGamification['stats']) => stats.coursesUploaded >= 1
+    condition: (s: IGamificationStats) => s.coursesUploaded >= 1
   },
   {
     id: 'five_courses',
     name: 'Librarian',
     description: 'Upload 5 courses',
     icon: '🏛️',
-    condition: (stats: IGamification['stats']) => stats.coursesUploaded >= 5
+    condition: (s: IGamificationStats) => s.coursesUploaded >= 5
   },
   {
     id: 'first_task',
     name: 'Task Tackler',
     description: 'Complete your first task',
     icon: '✅',
-    condition: (stats: IGamification['stats']) => stats.tasksCompleted >= 1
+    condition: (s: IGamificationStats) => s.tasksCompleted >= 1
   },
   {
     id: 'ten_tasks',
     name: 'Productivity Machine',
     description: 'Complete 10 tasks',
     icon: '⚡',
-    condition: (stats: IGamification['stats']) => stats.tasksCompleted >= 10
+    condition: (s: IGamificationStats) => s.tasksCompleted >= 10
   },
   {
     id: 'fifty_tasks',
     name: 'Task Master',
     description: 'Complete 50 tasks',
     icon: '🏆',
-    condition: (stats: IGamification['stats']) => stats.tasksCompleted >= 50
+    condition: (s: IGamificationStats) => s.tasksCompleted >= 50
   },
   {
     id: 'first_focus',
     name: 'Laser Focus',
     description: 'Achieve your first perfect focus session',
     icon: '🎯',
-    condition: (stats: IGamification['stats']) => stats.perfectSessions >= 1
+    condition: (s: IGamificationStats) => s.perfectSessions >= 1
   },
   {
     id: 'ten_focus',
     name: 'Focus Guru',
     description: 'Achieve 10 perfect focus sessions',
     icon: '🧘',
-    condition: (stats: IGamification['stats']) => stats.perfectSessions >= 10
+    condition: (s: IGamificationStats) => s.perfectSessions >= 10
   },
   {
     id: 'level_5',
     name: 'Rising Star',
     description: 'Reach level 5',
     icon: '⭐',
-    condition: (_: IGamification['stats'], profile: Pick<IGamification, 'level'>) =>
-      profile.level >= 5
+    condition: (_s: IGamificationStats, level: number) => level >= 5
   },
   {
     id: 'level_10',
     name: 'Veteran Scholar',
     description: 'Reach level 10',
     icon: '🌟',
-    condition: (_: IGamification['stats'], profile: Pick<IGamification, 'level'>) =>
-      profile.level >= 10
+    condition: (_s: IGamificationStats, level: number) => level >= 10
   },
   {
     id: 'level_25',
     name: 'Grand Master',
     description: 'Reach level 25',
     icon: '👑',
-    condition: (_: IGamification['stats'], profile: Pick<IGamification, 'level'>) =>
-      profile.level >= 25
+    condition: (_s: IGamificationStats, level: number) => level >= 25
   },
   {
     id: 'streak_7',
     name: 'Week Warrior',
     description: 'Maintain a 7-day streak',
     icon: '🔥',
-    condition: (stats: IGamification['stats']) => stats.currentStreak >= 7
+    condition: (s: IGamificationStats) => s.currentStreak >= 7
   },
   {
     id: 'streak_30',
     name: 'Unstoppable',
     description: 'Maintain a 30-day streak',
     icon: '💎',
-    condition: (stats: IGamification['stats']) => stats.currentStreak >= 30
+    condition: (s: IGamificationStats) => s.currentStreak >= 30
   },
-  // Social achievements
   {
     id: 'first_friend',
     name: 'Social Butterfly',
     description: 'Add your first friend',
     icon: '🤝',
-    condition: (stats: IGamification['stats']) => (stats.friendsAdded || 0) >= 1
+    condition: (s: IGamificationStats) => (s.friendsAdded || 0) >= 1
   },
   {
     id: 'five_friends',
     name: 'Study Circle',
     description: 'Have 5 friends',
     icon: '👥',
-    condition: (stats: IGamification['stats']) => (stats.friendsAdded || 0) >= 5
+    condition: (s: IGamificationStats) => (s.friendsAdded || 0) >= 5
   },
   {
     id: 'first_team_session',
     name: 'Team Player',
     description: 'Complete your first team study session',
     icon: '🎮',
-    condition: (stats: IGamification['stats']) => (stats.teamSessions || 0) >= 1
+    condition: (s: IGamificationStats) => (s.teamSessions || 0) >= 1
   },
   {
     id: 'ten_team_sessions',
     name: 'Squad Leader',
     description: 'Complete 10 team study sessions',
     icon: '🏅',
-    condition: (stats: IGamification['stats']) => (stats.teamSessions || 0) >= 10
+    condition: (s: IGamificationStats) => (s.teamSessions || 0) >= 10
   }
 ];
 
-export interface IGamification extends Document {
-  userId: string;
-  totalXp: number;
-  evidenceAwards?: Array<{
-    awardId: string;
-    completionKey: string;
-    evidenceId: string;
-    policyVersion: string;
-    xp: number;
-    reason: string;
-    day: string;
-    topicKey: string;
-    group: boolean;
-    timestamp: Date;
-  }>;
-
-  level: number;
-  xpHistory: Array<{
-    action: string;
-    xp: number;
-    timestamp: Date;
-    metadata?: unknown;
-  }>;
-  achievements: Array<{
-    id: string;
-    name: string;
-    description: string;
-    unlockedAt: Date;
-    icon: string;
-  }>;
-  stats: {
-    coursesUploaded: number;
-    tasksCompleted: number;
-    perfectSessions: number;
-    currentStreak: number;
-    longestStreak: number;
-    friendsAdded: number;
-    teamSessions: number;
-    groupSessions: number;
-    challengesCompleted: number;
-    subjectsCreated?: number;
-  };
-  createdAt: Date;
-  updatedAt: Date;
-  calculateLevel(): number;
-  awardXp(
-    xp: number,
-    action: string,
-    metadata?: unknown
-  ): {
-    xpAwarded: number;
-    totalXp: number;
-    oldLevel: number;
-    newLevel: number;
-    leveledUp: boolean;
-    newAchievements: IGamification['achievements'];
-  };
-  checkAndUnlockAchievements(): IGamification['achievements'];
+function hydrate(row: GamificationRow): IGamification {
+  return toDocument(row) as unknown as IGamification;
 }
 
-const gamificationSchema = new Schema<IGamification>(
-  {
-    userId: {
-      type: String,
-      required: true,
-      unique: true,
-      index: true
-    },
-    totalXp: {
-      type: Number,
-      default: 0,
-      min: 0
-    },
-    level: {
-      type: Number,
-      default: 1,
-      min: 1
-    },
-    // Compact atomic application markers are retained, never pruned silently.
-    // The evidence service fails closed at its documented document bound.
-    evidenceAwards: { type: [Schema.Types.Mixed], default: [] },
-    xpHistory: [
-      {
-        action: {
-          type: String,
-          required: true
-        },
-        xp: {
-          type: Number,
-          required: true
-        },
-        timestamp: {
-          type: Date,
-          default: Date.now
-        },
-        metadata: {
-          type: Schema.Types.Mixed
-        }
-      }
-    ],
-    achievements: [
-      {
-        id: String,
-        name: String,
-        description: String,
-        unlockedAt: Date,
-        icon: String
-      }
-    ],
-    stats: {
-      coursesUploaded: {
-        type: Number,
-        default: 0
-      },
-      tasksCompleted: {
-        type: Number,
-        default: 0
-      },
-      perfectSessions: {
-        type: Number,
-        default: 0
-      },
-      currentStreak: {
-        type: Number,
-        default: 0
-      },
-      longestStreak: {
-        type: Number,
-        default: 0
-      },
-      friendsAdded: {
-        type: Number,
-        default: 0
-      },
-      teamSessions: {
-        type: Number,
-        default: 0
-      },
-      groupSessions: {
-        type: Number,
-        default: 0
-      },
-      challengesCompleted: {
-        type: Number,
-        default: 0
-      }
-    }
-  },
-  {
-    timestamps: true,
-    optimisticConcurrency: true
-  }
-);
+export function calculateLevel(totalXp: number): number {
+  return Math.floor(totalXp / 100) + 1;
+}
 
-// Calculate level based on XP (100 XP per level)
-gamificationSchema.methods.calculateLevel = function (this: IGamification) {
-  return Math.floor(this.totalXp / 100) + 1;
-};
-
-// Award XP and check for level up
-gamificationSchema.methods.awardXp = function (
-  this: IGamification,
-  xp: number,
-  action: string,
-  metadata: unknown = {}
-) {
-  const oldLevel = this.level;
-  this.totalXp += xp;
-  this.level = this.calculateLevel();
-
-  this.xpHistory.push({
-    action,
-    xp,
-    metadata,
-    timestamp: new Date()
-  });
-
-  // Check for new achievements
-  const newAchievements = this.checkAndUnlockAchievements();
-
-  return {
-    xpAwarded: xp,
-    totalXp: this.totalXp,
-    oldLevel,
-    newLevel: this.level,
-    leveledUp: this.level > oldLevel,
-    newAchievements
-  };
-};
-
-// Check all achievement conditions and unlock any newly earned ones
-gamificationSchema.methods.checkAndUnlockAchievements = function (this: IGamification) {
-  const unlockedIds = new Set(this.achievements.map((a) => a.id));
-  const newlyUnlocked: IGamification['achievements'] = [];
-
+function unlockedAchievements(
+  stats: IGamificationStats,
+  level: number,
+  existing: IGamificationAchievement[]
+): IGamificationAchievement[] {
+  const unlocked = new Set(existing.map((a) => a.id));
+  const newly: IGamificationAchievement[] = [];
   for (const achievement of ACHIEVEMENT_CATALOG) {
-    if (unlockedIds.has(achievement.id)) continue;
-    if (achievement.condition(this.stats, this)) {
-      const unlocked = {
+    if (unlocked.has(achievement.id)) continue;
+    if (achievement.condition(stats, level)) {
+      newly.push({
         id: achievement.id,
         name: achievement.name,
         description: achievement.description,
         icon: achievement.icon,
         unlockedAt: new Date()
-      };
-      this.achievements.push(unlocked);
-      newlyUnlocked.push(unlocked);
+      });
     }
   }
+  return newly;
+}
 
-  return newlyUnlocked;
+/**
+ * Award XP, recompute the level and unlock any achievement the new stats earn.
+ *
+ * The previous version mutated a Mongoose document and relied on a `__v`
+ * optimistic-concurrency guard. The guard is preserved with a conditional
+ * update on `updatedAt`: a concurrent writer that moved the row is detected and
+ * the call throws rather than silently overwriting.
+ */
+export async function awardXp(
+  doc: IGamification,
+  xp: number,
+  action: string,
+  metadata: unknown = {}
+): Promise<{
+  xpAwarded: number;
+  totalXp: number;
+  oldLevel: number;
+  newLevel: number;
+  leveledUp: boolean;
+  newAchievements: IGamificationAchievement[];
+  document: IGamification;
+}> {
+  const oldLevel = doc.level;
+  const totalXp = doc.totalXp + xp;
+  const level = calculateLevel(totalXp);
+  const newAchievements = unlockedAchievements(doc.stats, level, doc.achievements);
+  const xpHistory = [...doc.xpHistory, { action, xp, metadata, timestamp: new Date() }];
+  const achievements = [...doc.achievements, ...newAchievements];
+  const row = await prisma.gamification.update({
+    where: { id: doc.id, updatedAt: doc.updatedAt },
+    data: {
+      totalXp,
+      level,
+      xpHistory: json(xpHistory) as Prisma.InputJsonValue,
+      achievements: json(achievements) as Prisma.InputJsonValue
+    }
+  });
+  return {
+    xpAwarded: xp,
+    totalXp,
+    oldLevel,
+    newLevel: level,
+    leveledUp: level > oldLevel,
+    newAchievements,
+    document: hydrate(row)
+  };
+}
+
+export const Gamification = {
+  async findOne(where: Prisma.GamificationWhereInput): Promise<IGamification | null> {
+    const row = await prisma.gamification.findFirst({ where });
+    return row ? hydrate(row) : null;
+  },
+
+  async findMany(
+    where: Prisma.GamificationWhereInput = {},
+    options: {
+      take?: number;
+      skip?: number;
+      orderBy?: Prisma.GamificationOrderByWithRelationInput;
+    } = {}
+  ): Promise<IGamification[]> {
+    const rows = await prisma.gamification.findMany({
+      where,
+      take: options.take,
+      skip: options.skip,
+      orderBy: options.orderBy
+    });
+    return rows.map(hydrate);
+  },
+
+  async create(userId: string): Promise<IGamification> {
+    const row = await prisma.gamification.create({
+      data: {
+        id: newId(),
+        userId,
+        stats: json({
+          coursesUploaded: 0,
+          tasksCompleted: 0,
+          perfectSessions: 0,
+          currentStreak: 0,
+          longestStreak: 0,
+          friendsAdded: 0,
+          teamSessions: 0,
+          groupSessions: 0,
+          challengesCompleted: 0
+        }) as Prisma.InputJsonValue
+      }
+    });
+    return hydrate(row);
+  },
+
+  async findOneAndUpdate(
+    where: Prisma.GamificationWhereInput,
+    data: Prisma.GamificationUpdateInput,
+    { upsert = false }: { upsert?: boolean } = {}
+  ): Promise<IGamification | null> {
+    const existing = await prisma.gamification.findFirst({ where, select: { id: true } });
+    if (existing) {
+      return hydrate(await prisma.gamification.update({ where: { id: existing.id }, data }));
+    }
+    if (!upsert) return null;
+    const userId = (where as { userId?: string }).userId;
+    return userId ? Gamification.create(userId) : null;
+  },
+
+  async updateOne(where: Prisma.GamificationWhereInput, data: Prisma.GamificationUpdateInput) {
+    const result = await prisma.gamification.updateMany({ where, data });
+    return { matchedCount: result.count };
+  },
+
+  async save(doc: IGamification): Promise<IGamification> {
+    const row = await prisma.gamification.update({
+      where: { id: doc.id },
+      data: {
+        totalXp: doc.totalXp,
+        level: doc.level,
+        evidenceAwards: json(doc.evidenceAwards) as Prisma.InputJsonValue,
+        xpHistory: json(doc.xpHistory) as Prisma.InputJsonValue,
+        achievements: json(doc.achievements) as Prisma.InputJsonValue,
+        stats: json(doc.stats) as Prisma.InputJsonValue
+      }
+    });
+    return hydrate(row);
+  },
+
+  awardXp,
+  calculateLevel,
+
+  /** Unlock any achievement the current stats already satisfy. */
+  async checkAndUnlockAchievements(doc: IGamification): Promise<IGamificationAchievement[]> {
+    const newly = unlockedAchievements(doc.stats, doc.level, doc.achievements);
+    if (newly.length === 0) return [];
+    await prisma.gamification.update({
+      where: { id: doc.id },
+      data: { achievements: json([...doc.achievements, ...newly]) as Prisma.InputJsonValue }
+    });
+    return newly;
+  }
 };
 
-gamificationSchema.index({ totalXp: -1, userId: 1 });
-
-const Gamification =
-  (mongoose.models.Gamification as Model<IGamification>) ||
-  mongoose.model<IGamification>('Gamification', gamificationSchema);
-
 export default Gamification;
-module.exports = Gamification;

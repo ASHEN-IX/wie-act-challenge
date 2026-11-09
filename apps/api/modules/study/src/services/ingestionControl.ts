@@ -46,7 +46,9 @@ export async function enqueueCourseIngestionOperation(
       }
     }
   );
-  if (!reserved.modifiedCount) {
+  // `updateOne` resolves to `{ matchedCount, modifiedCount }`, which is truthy
+  // even when nothing matched; the compare-and-set result is the count.
+  if (!reserved.matchedCount) {
     await CourseIngestionOperation.updateOne({ _id: messageId }, { $set: { state: 'superseded' } });
     throw new IngestionConflictError('Another ingestion operation already changed this course');
   }
@@ -74,13 +76,13 @@ export async function dispatchIngestionOperation(jobId: string) {
   try {
     await publishCourseIngestionJob({
       // Recovery replays display metadata with the exact retained operation.
-      courseTitle: operation.courseTitle,
+      courseTitle: operation.courseTitle ?? undefined,
       courseId: String(operation.courseId),
       revisionId: operation.revisionId,
       userId: operation.userId,
       fileRef: operation.fileRef,
       files: operation.files,
-      requestId: operation.requestId,
+      requestId: operation.requestId ?? undefined,
       messageId: jobId,
       correlationId: operation.correlationId
     });
@@ -140,7 +142,7 @@ export async function cancelIngestionOperation(
       $unset: { correlationId: 1 }
     }
   );
-  if (!stopped.modifiedCount)
+  if (!stopped.matchedCount)
     throw new IngestionConflictError('Operation already completed or cancelled');
   await CourseIngestionOperation.updateOne(
     { _id: expectedJobId },

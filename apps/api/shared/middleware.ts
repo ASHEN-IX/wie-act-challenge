@@ -240,18 +240,19 @@ export function healthCheck(serviceName: string) {
       uptime: process.uptime()
     };
 
-    // Check MongoDB connection if mongoose is loaded
+    // Report the PostgreSQL connection when this process opened one.
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const mongoose = require('mongoose');
-      if (mongoose.connection.readyState !== 1) {
+      const database = require('./database');
+      if (!database.hasDatabaseClient()) {
         health.status = 'degraded';
         health.db = 'disconnected';
       } else {
-        health.db = 'connected';
+        health.db = (await database.isConnectedToDatabase()) ? 'connected' : 'disconnected';
+        if (health.db === 'disconnected') health.status = 'degraded';
       }
     } catch {
-      // No mongoose in this service (e.g., api-gateway)
+      // No database client in this service (e.g., api-gateway)
     }
 
     const statusCode = health.status === 'healthy' ? 200 : 503;

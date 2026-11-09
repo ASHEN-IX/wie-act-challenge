@@ -9,19 +9,32 @@ const mockCreate = jest.fn();
 jest.mock('../../modules/study/src/models', () => ({
   Course: {
     exists: jest.fn().mockResolvedValue({ _id: '64a000000000000000000001' }),
-    findById: jest.fn().mockReturnValue({
-      select: jest.fn().mockReturnValue({
-        lean: jest.fn().mockResolvedValue({
-          _id: '64a00000000000000000001',
-          userId: 'user-1',
-          scope: 'personal'
-        })
-      })
+    // `canReadCourse` awaits the cursors returned by these; the mock must too.
+    countDocuments: jest.fn().mockResolvedValue(0),
+    // `canReadCourse` awaits `.select()` directly; other callers use `.lean()`.
+    findById: jest.fn((id: unknown) => {
+      void id;
+      const course = {
+        _id: '64a000000000000000000001',
+        userId: 'user-1',
+        ownerUserId: 'user-1',
+        scope: 'personal',
+        visibility: null,
+        institutionId: null,
+        assignedInstructorIds: [],
+        activeRevisionId: null
+      };
+      const promise = Promise.resolve(course);
+      return {
+        select: () => Object.assign(promise, { lean: () => promise })
+      };
     })
   },
   StudySession: {
     findOne: (...args: unknown[]) => mockFindOne(...args),
-    create: (...args: unknown[]) => mockCreate(...args)
+    create: (...args: unknown[]) => mockCreate(...args),
+    // Ending a session persists through the model, not the row.
+    save: async (row: unknown) => row
   }
 }));
 const sessionsRouter = require('../../modules/study/src/routes/sessions');

@@ -31,27 +31,23 @@ const mockNotification = {
 };
 
 jest.mock('../models/Notification', () => ({
-  find: jest.fn().mockReturnValue({
-    sort: jest.fn().mockReturnValue({
-      skip: jest.fn().mockReturnValue({
-        limit: jest.fn().mockReturnValue({
-          maxTimeMS: jest
-            .fn()
-            .mockReturnValue({ lean: jest.fn().mockResolvedValue([mockNotification]) })
-        })
-      })
-    })
-  }),
-  countDocuments: jest.fn().mockReturnValue({ maxTimeMS: jest.fn().mockResolvedValue(1) }),
-  create: jest.fn().mockResolvedValue(mockNotification),
-  findByIdAndUpdate: jest.fn(),
-  updateMany: jest.fn().mockResolvedValue({ modifiedCount: 1 })
+  __esModule: true,
+  default: {
+    listPage: jest.fn().mockResolvedValue({
+      notifications: [mockNotification],
+      total: 1,
+      unreadCount: 1
+    }),
+    countDocuments: jest.fn().mockResolvedValue(1),
+    create: jest.fn().mockResolvedValue(mockNotification),
+    findByIdAndUpdate: jest.fn(),
+    updateMany: jest.fn().mockResolvedValue({ modifiedCount: 1 })
+  }
 }));
 
 jest.mock('@ednova/shared', () => ({
   requireInternal:
-    jest.requireActual<typeof import('@ednova/shared')>('@ednova/shared')
-      .requireInternal,
+    jest.requireActual<typeof import('@ednova/shared')>('@ednova/shared').requireInternal,
   corsMiddleware: jest.fn(
     () => (req: DomainRequest & { userTier?: string }, res: Response, next: NextFunction) => next()
   ),
@@ -82,9 +78,8 @@ jest.mock('@ednova/shared', () => ({
 }));
 
 jest.mock('@ednova/shared/auth', () => ({
-  requireInternal: jest.requireActual<typeof import('@ednova/shared/auth')>(
-    '@ednova/shared/auth'
-  ).requireInternal,
+  requireInternal:
+    jest.requireActual<typeof import('@ednova/shared/auth')>('@ednova/shared/auth').requireInternal,
   authenticate: jest.fn(
     (req: DomainRequest & { userTier?: string }, res: Response, next: NextFunction) => {
       req.user = { userId: 'user-123', role: 'student' };
@@ -99,10 +94,7 @@ import request from 'supertest';
 
 const app = express();
 app.use(express.json());
-app.use(
-  (require('@ednova/shared/auth') as typeof import('@ednova/shared/auth'))
-    .authenticate
-);
+app.use((require('@ednova/shared/auth') as typeof import('@ednova/shared/auth')).authenticate);
 app.use('/api/v1/notifications', notifRoutes);
 app.use((require('@ednova/shared') as typeof import('@ednova/shared')).errorHandler);
 
@@ -111,20 +103,11 @@ describe('Notification Service', () => {
 
   describe('GET /api/v1/notifications', () => {
     it('should return notifications for a user', async () => {
-      (Notification.find as jest.Mock).mockReturnValue({
-        sort: jest.fn().mockReturnValue({
-          skip: jest.fn().mockReturnValue({
-            limit: jest.fn().mockReturnValue({
-              maxTimeMS: jest
-                .fn()
-                .mockReturnValue({ lean: jest.fn().mockResolvedValue([mockNotification]) })
-            })
-          })
-        })
+      (Notification.listPage as jest.Mock).mockResolvedValue({
+        notifications: [mockNotification],
+        total: 1,
+        unreadCount: 1
       });
-      (Notification.countDocuments as jest.Mock)
-        .mockReturnValueOnce({ maxTimeMS: jest.fn().mockResolvedValue(1) }) // total
-        .mockReturnValueOnce({ maxTimeMS: jest.fn().mockResolvedValue(1) }); // unread
 
       const res = await request(app).get('/api/v1/notifications').query({ userId: 'user-123' });
 
@@ -138,7 +121,8 @@ describe('Notification Service', () => {
     it('uses authenticated identity without a userId parameter', async () => {
       const res = await request(app).get('/api/v1/notifications');
       expect(res.status).toBe(200);
-      expect(Notification.find).toHaveBeenCalledWith(
+      expect(Notification.listPage).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'user-123' }),
         expect.objectContaining({ userId: 'user-123' })
       );
     });
@@ -146,10 +130,7 @@ describe('Notification Service', () => {
 
   describe('POST /api/v1/notifications', () => {
     it('should create a notification', async () => {
-      (Notification.create as jest.Mock).mockResolvedValue({
-        ...mockNotification,
-        toObject: () => mockNotification
-      });
+      (Notification.create as jest.Mock).mockResolvedValue(mockNotification);
 
       const res = await request(app)
         .post('/api/v1/notifications')

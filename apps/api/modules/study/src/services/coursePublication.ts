@@ -119,18 +119,20 @@ export async function publishCourseRevision(
       publishedAt: draft.publishedAt!.toISOString()
     };
   }
-  if (draft.formulaPublication?.targetTag) return publishCourseRevision(actorUserId, courseId, await reviewedPublication(actorUserId,draft) || undefined);
+  if (draft.formulaPublication?.targetTag)
+    return publishCourseRevision(
+      actorUserId,
+      courseId,
+      (await reviewedPublication(actorUserId, draft)) || undefined
+    );
   if (draft.status !== 'draft') throw new PublicationConflictError();
   if (!draft.isInstructorReviewed) throw new PublicationReviewRequiredError();
   if (!draft.topics?.length) throw new PublicationValidationError('Reviewed objectives required');
   if (draft.contentDocument && !draft.contentDocumentHash)
     throw new PublicationValidationError('Canonical content checksum unavailable');
-  if (
-    draft.contentDocument &&
-    draft.contentDocumentHash !== activityDigest(draft.contentDocument)
-  )
+  if (draft.contentDocument && draft.contentDocumentHash !== activityDigest(draft.contentDocument))
     throw new PublicationValidationError('Canonical content checksum mismatch');
-  const canonical = (draft.contentDocument || draft.get?.('contentDocument')) as
+  const canonical = draft.contentDocument as
     | { quality?: { publicationState?: unknown }; extractionReview?: { acknowledged?: unknown } }
     | undefined;
   if (
@@ -176,7 +178,7 @@ export async function publishCourseRevision(
     );
     if (!prepared)
       throw new PublicationConflictError('Concurrent review/publication; retry exact command');
-    draft.set(prepared.toObject());
+    Object.assign(draft, prepared);
   }
   // Receipt-first activation: immutable prepared revision, one CAS pointer,
   // then completion. A crash at either write is repaired by the same command.
@@ -215,7 +217,7 @@ export async function publishCourseRevision(
     await invalidateStoredPlans({
       courseId: String(courseId),
       revisionId: draft.expectedActiveRevisionId,
-      reason: 'REVISION_SUPERSEDED',
+      reason: 'REVISION_SUPERSEDED'
     }).catch(() => undefined);
   }
   return {

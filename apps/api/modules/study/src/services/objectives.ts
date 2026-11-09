@@ -89,9 +89,7 @@ async function syncObjectivesForDocument({
   const previouslyActive = await LearningObjective.find({
     documentId,
     isActive: true
-  })
-    .select('topicId textHash')
-    .lean();
+  }).select('topicId textHash');
 
   const toSupersede = previouslyActive.filter(
     (p) => !incomingKeys.has(`${p.topicId}\0${p.textHash}`)
@@ -116,42 +114,40 @@ async function syncObjectivesForDocument({
   let inserted = 0;
   let updated = 0;
 
-  const ops: Parameters<typeof LearningObjective.bulkWrite>[0] = incoming.map((obj) => {
+  // Each objective is upserted on its unique (documentId, topicId, textHash)
+  // key. A concurrent writer converges on the same row and the version bump
+  // still applies, so `ordered: false` semantics are preserved by not aborting
+  // the remaining objectives on one duplicate.
+  for (const obj of incoming) {
     const filter = { documentId, topicId: obj.topicId, textHash: obj.textHash };
     const existing = previouslyActive.find(
       (p) => p.topicId === obj.topicId && p.textHash === obj.textHash
     );
-
     if (existing) {
-      // version bump
       updated++;
-      return {
-        updateOne: {
-          filter,
-          update: {
-            $set: {
-              userId,
-              objectiveId: obj.objectiveId,
-              knowledgeType: obj.knowledgeType,
-              bloomLevel: obj.bloomLevel,
-              verb: obj.verb,
-              text: obj.text,
-              classification: obj.classification,
-              isActive: true,
-              supersededAt: null
-            },
-            $inc: { version: 1 }
-          }
-        }
-      };
-    }
-
-    // new objective
-    inserted++;
-    return {
-      updateOne: {
+      await LearningObjective.findOneAndUpdate(
         filter,
-        update: {
+        {
+          $set: {
+            userId,
+            objectiveId: obj.objectiveId,
+            knowledgeType: obj.knowledgeType,
+            bloomLevel: obj.bloomLevel,
+            verb: obj.verb,
+            text: obj.text,
+            classification: obj.classification,
+            isActive: true,
+            supersededAt: null
+          },
+          $inc: { version: 1 }
+        },
+        { new: true }
+      );
+    } else {
+      inserted++;
+      await LearningObjective.findOneAndUpdate(
+        filter,
+        {
           $setOnInsert: {
             userId,
             documentId: obj.documentId,
@@ -167,12 +163,10 @@ async function syncObjectivesForDocument({
             isActive: true
           }
         },
-        upsert: true
-      }
-    };
-  });
-
-  await LearningObjective.bulkWrite(ops, { ordered: false });
+        { upsert: true }
+      );
+    }
+  }
 
   return { inserted, updated, superseded };
 }

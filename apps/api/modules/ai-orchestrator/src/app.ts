@@ -16,7 +16,7 @@ import searchRoutes from './routes/search';
 import fileUpload from 'express-fileupload';
 
 // --- Environment validation (fail-fast on missing secrets) ---
-requireEnv(['MONGODB_URI', 'RABBITMQ_URL'], { serviceName: 'ai-orchestrator' });
+requireEnv(['DATABASE_URL', 'RABBITMQ_URL'], { serviceName: 'ai-orchestrator' });
 
 const app = express();
 app.set('trust proxy', 1);

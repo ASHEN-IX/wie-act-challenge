@@ -1,4 +1,3 @@
-import { errorDetails } from '@ednova/shared/errors';
 import VoiceSession, { IVoiceSession } from '../models/VoiceSession';
 
 function findParticipantIndex(session: IVoiceSession, userId: string): number {
@@ -11,7 +10,8 @@ export async function ensureVoiceSession(sessionId: string): Promise<IVoiceSessi
     try {
       session = await VoiceSession.create({ sessionId, isActive: true, participants: [] });
     } catch (err) {
-      if (errorDetails(err).code === 11000) {
+      // A concurrent start raced us on the unique `sessionId`; read the winner.
+      if (isUniqueViolation(err)) {
         session = await VoiceSession.findOne({ sessionId });
       } else {
         throw err;
@@ -26,7 +26,7 @@ export async function startVoiceSession(sessionId: string): Promise<IVoiceSessio
   session.isActive = true;
   session.startedAt = session.startedAt || new Date();
   session.endedAt = null;
-  await session.save();
+  await VoiceSession.save(session);
   return session;
 }
 
@@ -35,7 +35,7 @@ export async function endVoiceSession(sessionId: string): Promise<IVoiceSession 
   if (!session) return null;
   session.isActive = false;
   session.endedAt = new Date();
-  await session.save();
+  await VoiceSession.save(session);
   return session;
 }
 
@@ -71,7 +71,7 @@ export async function joinParticipant({
     });
   }
 
-  await session.save();
+  await VoiceSession.save(session);
   return session;
 }
 
@@ -93,7 +93,7 @@ export async function leaveParticipant({
     session.participants[idx].connectionState = 'disconnected';
   }
 
-  await session.save();
+  await VoiceSession.save(session);
   return session;
 }
 
@@ -117,7 +117,7 @@ export async function updateMute({
     session.participants[idx].lastHeartbeat = new Date();
   }
 
-  await session.save();
+  await VoiceSession.save(session);
   return session;
 }
 
@@ -141,12 +141,12 @@ export async function updateSpeakingStatus({
     session.participants[idx].lastHeartbeat = new Date();
   }
 
-  await session.save();
+  await VoiceSession.save(session);
   return session;
 }
 
 export async function getVoiceStatus(sessionId: string) {
-  const session = await VoiceSession.findOne({ sessionId }).lean();
+  const session = await VoiceSession.findOne({ sessionId });
   if (!session) return null;
 
   return {
@@ -156,4 +156,14 @@ export async function getVoiceStatus(sessionId: string) {
     endedAt: session.endedAt,
     participants: (session.participants || []).filter((p) => !p.leftAt)
   };
+}
+
+/** Prisma reports a unique constraint violation as `P2002`. */
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: unknown }).code === 'P2002'
+  );
 }

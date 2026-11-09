@@ -29,7 +29,11 @@ export async function resolveRoomActivity(
     await resolveStoredActivity(actor, activityId);
     throw new ActivityBoundaryError(403, 'UNAUTHORIZED', 'A source-backed room is required');
   }
-  const context = await getPublishedCourseContext(actor, room.courseId, room.revisionId);
+  const context = await getPublishedCourseContext(
+    actor,
+    room.courseId,
+    room.revisionId ?? undefined
+  );
   const resolved = await resolveStoredActivity(
     actor,
     activityId,

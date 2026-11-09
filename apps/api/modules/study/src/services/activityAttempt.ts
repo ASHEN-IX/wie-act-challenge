@@ -7,6 +7,7 @@ import {
   type Contract
 } from '../../../../shared/ednova/contracts';
 import { ActivityRecord, LearningEvidence, StudentAttempt, StudyRoom } from '../models';
+import { prisma } from '../../../../shared/database';
 import { broadcastRoomState } from '../routes/rooms';
 import { PublicationForbiddenError } from './coursePublication';
 import { canAuthorCourse, canReadCourse } from './resourceAccess';
@@ -89,38 +90,47 @@ function duplicate(error: unknown) {
   return (error as { code?: number }).code === 11000;
 }
 
-const indexReadiness = new WeakMap<object, Promise<unknown>>();
+/**
+ * The activity uniqueness keys are Postgres constraints created by the schema
+ * migration: `student_attempts(userId, attemptId)`, `learning_evidences(userId,
+ * attemptId)`, `learning_evidences(evidenceId)` and `activity_records(courseId,
+ * revisionId, activityId)`. Verify they exist once per process and fail closed
+ * if a deployment is missing one — the same guarantee the runtime index build
+ * gave, without mutating the database at request time.
+ */
+const REQUIRED_UNIQUE_INDEXES = [
+  'student_attempts_userId_attemptId_key',
+  'learning_evidences_userId_attemptId_key',
+  'learning_evidences_evidenceId_key',
+  'activity_records_courseId_revisionId_activityId_key'
+];
+
+let indexReadiness: Promise<void> | null = null;
 async function ensureActivityIndexes() {
-  const db = StudentAttempt.db.db;
-  if (!db)
-    throw new ActivityBoundaryError(
-      503,
-      'PERSISTENCE_UNAVAILABLE',
-      'Activity persistence unavailable'
-    );
-  let ready = indexReadiness.get(db);
-  if (!ready) {
-    // Additive, idempotent index creation only. Never drop/rewrite an existing
-    // deployment index or tolerate duplicates when the required unique key fails.
-    ready = Promise.all([
-      StudentAttempt.collection.createIndex({ userId: 1, attemptId: 1 }, { unique: true }),
-      LearningEvidence.collection.createIndex({ userId: 1, attemptId: 1 }, { unique: true }),
-      LearningEvidence.collection.createIndex({ evidenceId: 1 }, { unique: true }),
-      ActivityRecord.collection.createIndex(
-        { courseId: 1, revisionId: 1, activityId: 1 },
-        { unique: true }
-      )
-    ]).catch(() => {
-      indexReadiness.delete(db);
+  if (!indexReadiness) {
+    indexReadiness = (async () => {
+      const rows = await prisma.$queryRaw<Array<{ indexname: string }>>`
+        SELECT indexname FROM pg_indexes
+        WHERE schemaname = current_schema()
+          AND indexname = ANY(${REQUIRED_UNIQUE_INDEXES})
+      `;
+      if (rows.length !== REQUIRED_UNIQUE_INDEXES.length)
+        throw new ActivityBoundaryError(
+          503,
+          'PERSISTENCE_UNAVAILABLE',
+          'Required activity uniqueness unavailable'
+        );
+    })().catch((error) => {
+      indexReadiness = null;
+      if (error instanceof ActivityBoundaryError) throw error;
       throw new ActivityBoundaryError(
         503,
         'PERSISTENCE_UNAVAILABLE',
-        'Required activity uniqueness unavailable'
+        'Activity persistence unavailable'
       );
     });
-    indexReadiness.set(db, ready);
   }
-  await ready;
+  await indexReadiness;
 }
 
 function parseActivity(input: unknown) {
@@ -171,7 +181,7 @@ export async function registerActivity(
   )
     throw new ActivityValidationError('Source page not present in verified extraction');
   const key = { courseId, revisionId: definition.revisionId, activityId: definition.activityId };
-  const existing = await ActivityRecord.findOne(key).lean();
+  const existing = await ActivityRecord.findOne(key);
   if (existing) {
     if (
       canonicalHash(existing.publicDefinition) !== canonicalHash(definition) ||
@@ -197,7 +207,7 @@ export async function registerActivity(
     });
   } catch (error) {
     if (!duplicate(error)) throw error;
-    const winner = await ActivityRecord.findOne(key).lean();
+    const winner = await ActivityRecord.findOne(key);
     if (
       !winner ||
       canonicalHash(winner.publicDefinition) !== canonicalHash(definition) ||
@@ -316,7 +326,7 @@ export async function submitAttempt(actor: string, input: unknown, expectedActiv
           submittedAt: new Date()
         }
       },
-      { new: true, upsert: true, runValidators: true }
+      { new: true, upsert: true }
     );
   } catch (error) {
     if (!duplicate(error)) throw error;
@@ -427,11 +437,36 @@ export async function submitAttempt(actor: string, input: unknown, expectedActiv
     if (receipt.preparedEvidence) {
       const evidence = parseContract('AcceptedEvidence', receipt.preparedEvidence);
       try {
-        await LearningEvidence.updateOne(
+        // `evidence` carries the wider contract shape; the table stores the
+        // columns the schema declares, so only those are written.
+        const {
+          evidenceId,
+          evidenceVersion,
+          userId,
+          attemptId,
+          activity,
+          objectiveId,
+          status,
+          bloomLevel,
+          score,
+          masteryAchieved,
+          evaluator
+        } = evidence;
+        await LearningEvidence.findOneAndUpdate(
           key,
           {
             $setOnInsert: {
-              ...evidence,
+              evidenceId,
+              evidenceVersion,
+              userId,
+              attemptId,
+              activity,
+              objectiveId,
+              status,
+              bloomLevel,
+              score,
+              masteryAchieved,
+              evaluator,
               timestamp: new Date(evidence.timestamp),
               rewardReference: {
                 rewardCandidateId: 'rc_' + evidence.evidenceId.slice(4),
@@ -441,12 +476,12 @@ export async function submitAttempt(actor: string, input: unknown, expectedActiv
               }
             }
           },
-          { upsert: true, runValidators: true }
+          { upsert: true }
         );
       } catch (error) {
         if (!duplicate(error)) throw error;
       }
-      const stored = await LearningEvidence.findOne(key).lean();
+      const stored = await LearningEvidence.findOne(key);
       if (!stored || stored.evidenceId !== evidence.evidenceId)
         throw new AttemptConflictError('Existing evidence conflicts with receipt');
       if (evidence.masteryAchieved) {
@@ -486,18 +521,32 @@ export async function submitAttempt(actor: string, input: unknown, expectedActiv
   }
   if (submission.roomId) {
     await validateActivityRoom(actor, submission.roomId, definition);
-    const updated = await StudyRoom.findOneAndUpdate(
-      {
-        roomId: submission.roomId,
-        status: 'active',
-        activeActivityId: definition.activityId,
-        participants: {
-          $elemMatch: { userId: actor, leftAt: { $exists: false }, hasSubmitted: { $ne: true } }
-        }
-      },
-      { $set: { 'participants.$.hasSubmitted': true }, $inc: { seq: 1 } },
-      { new: true }
-    );
+    // `participants` is a JSON column; the element that matched is rewritten
+    // from the row already read, which is the effect the positional `$set` had.
+    const current = await StudyRoom.findOne({
+      roomId: submission.roomId,
+      status: 'active',
+      activeActivityId: definition.activityId,
+      participants: {
+        $elemMatch: { userId: actor, leftAt: { $exists: false }, hasSubmitted: { $ne: true } }
+      }
+    });
+    const updated = current
+      ? await StudyRoom.findOneAndUpdate(
+          { roomId: current.roomId, status: 'active', seq: current.seq },
+          {
+            $set: {
+              participants: (current.participants || []).map((participant) =>
+                participant.userId === actor && !participant.leftAt
+                  ? { ...participant, hasSubmitted: true }
+                  : participant
+              )
+            },
+            $inc: { seq: 1 }
+          },
+          { new: true }
+        )
+      : null;
     if (updated) await broadcastRoomState(updated);
   }
   if (receipt.evidenceId) {
@@ -523,7 +572,7 @@ export async function getAttemptResult(
     userId: actor,
     attemptId,
     ...(expectedActivityId ? { activityId: expectedActivityId } : {})
-  }).lean();
+  });
   if (!receipt) throw new AttemptNotFoundError();
   if (!(await canReadCourse(actor, receipt.courseId))) throw new PublicationForbiddenError();
   if (receipt.protocolVersion !== 1)

@@ -6,6 +6,7 @@ import Joi from 'joi';
 import type { Response } from 'express';
 import User from '../models/User';
 import Coupon from '../models/Coupon';
+import { prisma } from '../../../../shared/database';
 import { sendSubscriptionExpiryNotice } from '../services/emailService';
 import { authenticate } from '@ednova/shared/auth';
 import { asyncHandler } from '@ednova/shared/middleware';
@@ -73,7 +74,7 @@ function getSubscriptionSnapshot(user: Pick<IUser, 'subscriptionEndAt' | 'tier'>
 }
 
 function withSubscriptionMeta(user: IUser) {
-  const safeUser = typeof user.toJSON === 'function' ? user.toJSON<IUser>() : user;
+  const safeUser = User.toJSON(user) as IUser;
   return {
     ...safeUser,
     ...getSubscriptionSnapshot(safeUser)
@@ -99,7 +100,7 @@ router.get(
     ) {
       user.tier = 'normal';
       user.tierChangedAt = new Date();
-      await user.save();
+      await User.save(user);
     }
 
     if (
@@ -116,7 +117,7 @@ router.get(
       user.renewalDate = null;
       user.canChangeAfter = null;
       user.autoRenew = false;
-      await user.save();
+      await User.save(user);
     }
 
     const snapshot = getSubscriptionSnapshot(user);
@@ -140,7 +141,7 @@ router.get(
           console.warn('Failed to send subscription expiry reminder:', err.message);
         });
         user.subscriptionExpiryNoticeSentAt = new Date();
-        await user.save();
+        await User.save(user);
       }
     }
 
@@ -223,7 +224,7 @@ router.post(
 
     if (storedCoupon) {
       // A crash after reservation is safe: retries reuse the original date.
-      // The once-only marker and entitlement update are atomic on the user.
+      // The once-only marker and entitlement update commit together.
       const fields = [
         'tier',
         'tierChangedAt',
@@ -238,17 +239,27 @@ router.post(
         'canChangeAfter'
       ] as const;
       const updates = Object.fromEntries(fields.map((field) => [field, user[field]]));
-      await User.updateOne(
-        { _id: user._id, appliedCouponIds: { $ne: String(storedCoupon._id) } },
-        {
-          $set: updates,
-          $addToSet: { appliedCouponIds: String(storedCoupon._id) }
-        }
-      );
+      const couponId = String(storedCoupon._id);
+      await prisma.$transaction(async (tx) => {
+        const current = await tx.user.findUnique({
+          where: { id: user._id },
+          select: { appliedCouponIds: true }
+        });
+        const alreadyApplied = current?.appliedCouponIds.includes(couponId) ?? false;
+        await tx.user.update({
+          where: { id: user._id },
+          data: {
+            ...updates,
+            appliedCouponIds: alreadyApplied
+              ? current!.appliedCouponIds
+              : [...(current?.appliedCouponIds ?? []), couponId]
+          }
+        });
+      });
       const refreshed = await User.findById(user._id);
-      if (refreshed) Object.assign(user, refreshed.toObject());
+      if (refreshed) Object.assign(user, refreshed);
     } else {
-      await user.save();
+      await User.save(user);
     }
 
     return res.json({
@@ -278,10 +289,7 @@ router.get(
       })
       .filter(Boolean);
 
-    const dbCoupons = await Coupon.find({ isActive: true })
-      .select('code targetTier durationDays expiresAt usageCount maxUses')
-      .sort({ createdAt: -1 })
-      .lean();
+    const dbCoupons = await Coupon.findMany({ isActive: true });
 
     return res.json({
       coupons: [

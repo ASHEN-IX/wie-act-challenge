@@ -149,7 +149,15 @@ const GRAPH_TERMS = [
 ];
 const PARAMETER_TERMS = ['newton', 'f = ma', 'f=ma', 'force', 'mass', 'acceleration', 'second law'];
 const SPATIAL_TERMS = ['projectile', 'trajectory', 'launch angle', 'ballistic', 'parabolic'];
-const FUNCTION_TERMS = ['quadratic', 'parabola', 'vertex', 'polynomial', 'discriminant', 'roots of', 'y = ax'];
+const FUNCTION_TERMS = [
+  'quadratic',
+  'parabola',
+  'vertex',
+  'polynomial',
+  'discriminant',
+  'roots of',
+  'y = ax'
+];
 function scoreEngines(concept: string) {
   const lowered = concept.toLowerCase();
   const score = (terms: string[]) => terms.filter((term) => lowered.includes(term)).length;
@@ -210,7 +218,7 @@ export async function planVisualLab(actor: string, rawInput: unknown): Promise<P
     const revision = await CourseRevision.findOne({
       courseId,
       revisionTag: published.revisionId
-    }).lean();
+    });
     if (!revision) throw new VisualLabUnavailableError('Exact revision is unavailable');
     const artifact = await verifyRevisionArtifact(revision);
     const authorized = new Set(published.authorizedDocumentIds);
@@ -264,7 +272,7 @@ export async function planVisualLab(actor: string, rawInput: unknown): Promise<P
     )
     .digest('hex');
 
-  const existing = await VisualLab.findOne({ ownerUserId: actor, generationKey }).lean();
+  const existing = await VisualLab.findOne({ ownerUserId: actor, generationKey });
   if (existing) return { kind: 'lab', lab: toPublicLab(fromDocument(existing)) };
 
   let candidate: LabCandidate | null = null;
@@ -350,11 +358,11 @@ export async function planVisualLab(actor: string, rawInput: unknown): Promise<P
   };
   try {
     const saved = await VisualLab.create(document);
-    return { kind: 'lab', lab: toPublicLab(fromDocument(saved.toObject())) };
+    return { kind: 'lab', lab: toPublicLab(fromDocument(saved)) };
   } catch (error) {
     if ((error as { code?: number }).code === 11000) {
       // A concurrent identical request won the race; reuse it rather than bill twice.
-      const winner = await VisualLab.findOne({ ownerUserId: actor, generationKey }).lean();
+      const winner = await VisualLab.findOne({ ownerUserId: actor, generationKey });
       if (winner) return { kind: 'lab', lab: toPublicLab(fromDocument(winner)) };
     }
     throw error;
@@ -393,7 +401,7 @@ async function loadOwned(
 ): Promise<{ stored: StoredLab; doc: IVisualLab }> {
   if (typeof labId !== 'string' || !/^lab_[a-f0-9]{20}$/.test(labId))
     throw new VisualLabNotFoundError();
-  const doc = await VisualLab.findOne({ labId, ownerUserId: actor }).lean();
+  const doc = await VisualLab.findOne({ labId, ownerUserId: actor });
   if (!doc) throw new VisualLabNotFoundError();
   if (doc.courseId && !(await canReadCourse(actor, doc.courseId)))
     throw new PublicationForbiddenError('Access to the source course is no longer available');
@@ -644,16 +652,15 @@ export async function listVisualLabs(actor: string): Promise<VisualLabSummary[]>
   const labs = await VisualLab.find({ ownerUserId: actor })
     .sort({ createdAt: -1 })
     .limit(60)
-    .select('labId title concept engine sourceMode courseId generationMode createdAt')
-    .lean();
-  return labs.map((lab) => ({
+    .select('labId title concept engine sourceMode courseId generationMode createdAt');
+  return labs.map((lab): VisualLabSummary => ({
     labId: lab.labId,
     title: lab.title,
     concept: lab.concept,
-    engine: lab.engine,
-    sourceMode: lab.sourceMode,
-    courseId: lab.courseId,
-    generationMode: lab.generationMode,
+    engine: lab.engine as VisualLabEngine,
+    sourceMode: lab.sourceMode as 'course' | 'topic',
+    courseId: lab.courseId ?? undefined,
+    generationMode: lab.generationMode as 'AI_PLANNED' | 'DETERMINISTIC_FALLBACK',
     createdAt: new Date(lab.createdAt).toISOString()
   }));
 }
@@ -671,11 +678,18 @@ export interface DiscoveredConcept {
  * can honestly represent. Keyword evidence only: it never invents a concept the
  * course text does not mention, and it says nothing about sections it skips.
  */
-export async function discoverVisualConcepts(actor: string, rawCourseId: unknown, rawRevisionId?: unknown) {
+export async function discoverVisualConcepts(
+  actor: string,
+  rawCourseId: unknown,
+  rawRevisionId?: unknown
+) {
   if (typeof rawCourseId !== 'string' || !/^[a-f\d]{24}$/i.test(rawCourseId))
     throw new VisualLabValidationError('INVALID_INPUT', 'A valid course is required');
   const courseId = rawCourseId;
-  if (rawRevisionId !== undefined && (typeof rawRevisionId !== 'string' || !rawRevisionId || rawRevisionId.length > 64))
+  if (
+    rawRevisionId !== undefined &&
+    (typeof rawRevisionId !== 'string' || !rawRevisionId || rawRevisionId.length > 64)
+  )
     throw new VisualLabValidationError('INVALID_INPUT', 'A valid revision is required');
   const revisionId = rawRevisionId as string | undefined;
   if (!(await canReadCourse(actor, courseId)))
@@ -689,7 +703,7 @@ export async function discoverVisualConcepts(actor: string, rawCourseId: unknown
   const revision = await CourseRevision.findOne({
     courseId,
     revisionTag: published.revisionId
-  }).lean();
+  });
   if (!revision) throw new VisualLabUnavailableError('Exact revision is unavailable');
   const artifact = await verifyRevisionArtifact(revision);
   const authorized = new Set(published.authorizedDocumentIds);

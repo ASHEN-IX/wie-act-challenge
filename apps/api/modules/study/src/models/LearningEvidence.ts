@@ -1,10 +1,15 @@
-import mongoose, { Document, Model, Schema } from 'mongoose';
+import type {
+  LearningEvidence as LearningEvidenceRow,
+  Prisma
+} from '../../../../src/generated/prisma/client';
+import { prisma } from '../../../../shared/database';
+import { table } from './_table';
 
-export interface ILearningEvidence extends Document {
-  evidenceId: string;
-  evidenceVersion: string;
-  userId: string;
-  attemptId: string;
+export type ILearningEvidence = Omit<
+  LearningEvidenceRow,
+  'activity' | 'evaluator' | 'rewardReference'
+> & {
+  _id: string;
   activity: {
     courseId: string;
     revisionId: string;
@@ -13,11 +18,6 @@ export interface ILearningEvidence extends Document {
     activityRevision: string;
     activityType: 'InteractiveQuiz' | 'GuidedProblem';
   };
-  objectiveId: string;
-  status: 'accepted';
-  bloomLevel: string;
-  score: number;
-  masteryAchieved: boolean;
   evaluator: {
     type: 'deterministic_rubric' | 'llm_evaluation';
     model?: string | null;
@@ -30,68 +30,27 @@ export interface ILearningEvidence extends Document {
     eventKey: string;
     finalAwardId?: string | null;
   } | null;
-  timestamp: Date;
-  createdAt: Date;
-  updatedAt: Date;
-}
+};
 
-const LearningEvidenceSchema = new Schema<ILearningEvidence>(
-  {
-    evidenceId: { type: String, required: true, unique: true, index: true },
-    evidenceVersion: { type: String, required: true, default: '1.0.0' },
-    userId: { type: String, required: true, index: true },
-    attemptId: { type: String, required: true, index: true },
-    activity: {
-      courseId: { type: String, required: true, index: true },
-      revisionId: { type: String, required: true },
-      contentHash: { type: String, required: true },
-      activityId: { type: String, required: true, index: true },
-      activityRevision: { type: String, required: true },
-      activityType: {
-        type: String,
-        required: true,
-        enum: ['InteractiveQuiz', 'GuidedProblem']
-      }
-    },
-    objectiveId: { type: String, required: true, index: true },
-    status: { type: String, required: true, default: 'accepted', enum: ['accepted'] },
-    bloomLevel: { type: String, required: true },
-    score: { type: Number, required: true, min: 0, max: 1 },
-    masteryAchieved: { type: Boolean, required: true },
-    evaluator: {
-      type: {
-        type: String,
-        required: true,
-        enum: ['deterministic_rubric', 'llm_evaluation']
-      },
-      model: { type: String, default: null },
-      validationVersion: { type: String, required: true, default: '1.0.0' },
-      executionMode: {
-        type: String,
-        required: true,
-        enum: ['REAL_APPROVED', 'MOCK_TEST', 'DETERMINISTIC_FALLBACK']
-      }
-    },
-    rewardReference: {
-      rewardCandidateId: { type: String },
-      policyVersion: { type: String },
-      eventKey: { type: String },
-      finalAwardId: { type: String, default: null }
-    },
-    timestamp: { type: Date, required: true, default: Date.now }
-  },
-  {
-    timestamps: true,
-    collection: 'learning_evidences'
-  }
-);
+export const LearningEvidence = table<ILearningEvidence>({
+  delegate: () => prisma.learningEvidence,
+  jsonColumns: ['activity', 'evaluator', 'rewardReference'],
+  defaults: () => ({ evidenceVersion: '1.0.0', status: 'accepted', timestamp: new Date() }),
+  columns: (row) => ({
+    evidenceId: row.evidenceId,
+    evidenceVersion: row.evidenceVersion,
+    userId: row.userId,
+    attemptId: row.attemptId,
+    activity: row.activity as unknown as Prisma.InputJsonValue,
+    objectiveId: row.objectiveId,
+    status: row.status,
+    bloomLevel: row.bloomLevel,
+    score: row.score,
+    masteryAchieved: row.masteryAchieved,
+    evaluator: row.evaluator as unknown as Prisma.InputJsonValue,
+    rewardReference: row.rewardReference as unknown as Prisma.InputJsonValue,
+    timestamp: row.timestamp
+  })
+});
 
-// Target unique index: (userId, attemptId) ensures exactly one accepted evidence per attempt
-LearningEvidenceSchema.index({ userId: 1, attemptId: 1 }, { unique: true });
-
-// Learner competency aggregation index
-LearningEvidenceSchema.index({ userId: 1, objectiveId: 1, masteryAchieved: 1 });
-
-export const LearningEvidence: Model<ILearningEvidence> =
-  mongoose.models.LearningEvidence ||
-  mongoose.model<ILearningEvidence>('LearningEvidence', LearningEvidenceSchema);
+export default LearningEvidence;

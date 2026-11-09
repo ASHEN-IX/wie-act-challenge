@@ -76,9 +76,7 @@ export async function adaptiveRecommendation(
     protocolVersion: 1,
     processingState: 'completed',
     status: 'graded'
-  })
-    .sort({ submittedAt: -1, _id: -1 })
-    .lean();
+  }).sort({ submittedAt: -1, id: -1 });
   const latestActivity = latest && byId.get(latest.activityId);
   const needsSupport = !!(
     latest &&

@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { MongoClient, ObjectId } from 'mongodb';
 import bcrypt from 'bcryptjs';
-import { migrateAuth } from '../../scripts/migrate-auth';
-import { migrateInstitutionInvitationIndexes } from '../../scripts/migrate-institution-indexes';
+import { connectDatabase, disconnectDatabase, prisma } from '../../shared/database';
+import { newId } from '../../shared/ids';
+import { Course } from '../../modules/study/src/models';
 
 interface InvitationBody {
   invitation?: { id: string; institutionId: string; role: string; expiresAt: string };
@@ -23,19 +23,43 @@ interface ContextBody {
 }
 
 interface TestActor {
-  id: ObjectId;
+  id: string;
   email: string;
   cookie: string;
 }
 
 type Runtime = { stop: () => Promise<void> };
 
+/** Index definitions of one table, normalized for stable comparison. */
+async function tableIndexes(table: string) {
+  const rows = await prisma.$queryRaw<
+    Array<{ indexname: string; columns: string; isunique: boolean }>
+  >`
+    SELECT i.relname AS indexname,
+           string_agg(a.attname, ',' ORDER BY k.ord) AS columns,
+           ix.indisunique AS isunique
+    FROM pg_index ix
+    JOIN pg_class i ON i.oid = ix.indexrelid
+    JOIN pg_class t ON t.oid = ix.indrelid
+    JOIN unnest(ix.indkey) WITH ORDINALITY AS k(attnum, ord) ON true
+    JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
+    WHERE t.relname = ${table} AND t.relnamespace = 'public'::regnamespace
+    GROUP BY i.relname, ix.indisunique
+    ORDER BY i.relname
+  `;
+  return rows.map((row) => ({
+    name: row.indexname,
+    columns: row.columns.split(','),
+    unique: row.isunique
+  }));
+}
+
 test(
   'M04-A.1 invitation uniqueness, recovery, security and browser-adjacent API behavior',
   { timeout: 120000 },
   async (t) => {
-    const database = `ednova_m04a1_${process.pid}_${Date.now()}`;
-    process.env.MONGODB_URI = `mongodb://127.0.0.1:27018/${database}`;
+    process.env.DATABASE_URL =
+      process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
     process.env.BETTER_AUTH_SECRET = 'm04a1-isolated-session-secret-at-least-32-chars';
     process.env.INTERNAL_API_SECRET = 'm04a1-isolated-internal-secret';
     process.env.AUTH_TRUSTED_ORIGINS = 'http://localhost:5173';
@@ -45,20 +69,40 @@ test(
     process.env.REDIS_URL = '';
     process.env.NODE_ENV = 'test';
 
-    const client = new MongoClient(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 5000 });
-    try {
-      await client.connect();
-    } catch {
-      await client.close().catch(() => undefined);
-      t.skip('MongoDB test service is unavailable on 127.0.0.1:27018');
-      return;
-    }
-    const db = client.db();
+    await connectDatabase();
     const runtime: { current?: Runtime } = {};
+    const userIds: string[] = [];
+    const courseIds: string[] = [];
+    const slugs = [
+      `m04a1-reliability-${process.pid}-${Date.now()}`,
+      `m04a1-second-${process.pid}-${Date.now()}`
+    ];
     t.after(async () => {
       await runtime.current?.stop().catch(() => undefined);
-      await db.dropDatabase().catch(() => undefined);
-      await client.close().catch(() => undefined);
+      const { closeAuth } = await import('../../shared/betterAuth.js');
+      await closeAuth();
+      const institutions = await prisma.institution.findMany({
+        where: { slug: { in: slugs } },
+        select: { id: true }
+      });
+      const institutionIds = institutions.map((row) => row.id);
+      await prisma.courseEnrollment.deleteMany({
+        where: { institutionId: { in: institutionIds } }
+      });
+      await prisma.courseInvitation.deleteMany({
+        where: { institutionId: { in: institutionIds } }
+      });
+      await prisma.course.deleteMany({ where: { id: { in: courseIds } } });
+      await prisma.institutionInvitation.deleteMany({
+        where: { institutionId: { in: institutionIds } }
+      });
+      await prisma.institutionMembership.deleteMany({
+        where: { institutionId: { in: institutionIds } }
+      });
+      await prisma.institution.deleteMany({ where: { id: { in: institutionIds } } });
+      await prisma.authUser.deleteMany({ where: { id: { in: userIds } } });
+      await prisma.user.deleteMany({ where: { id: { in: userIds } } });
+      await disconnectDatabase().catch(() => undefined);
     });
 
     const password = await bcrypt.hash('Synthetic!123', 12);
@@ -73,21 +117,36 @@ test(
     ];
     const actors = new Map<string, TestActor>();
     for (const name of actorNames) {
-      const actor = { id: new ObjectId(), email: `${name}@m04a1.test`, cookie: '' };
+      const actor: TestActor = { id: newId(), email: `${name}@m04a1.test`, cookie: '' };
       actors.set(name, actor);
-      await db.collection('users').insertOne({
-        _id: actor.id,
-        email: actor.email,
-        name,
-        password,
-        isVerified: true,
-        isActive: true,
-        role: name === 'platform' ? 'admin' : 'student',
-        isAdmin: name === 'platform',
-        tier: 'vip'
+      userIds.push(actor.id);
+      await prisma.user.create({
+        data: {
+          id: actor.id,
+          email: actor.email,
+          name,
+          isVerified: true,
+          isActive: true,
+          role: name === 'platform' ? 'admin' : 'student',
+          isAdmin: name === 'platform',
+          tier: 'vip',
+          notificationPreferences: {},
+          onboardingDraft: {}
+        }
+      });
+      await prisma.authUser.create({
+        data: { id: actor.id, email: actor.email, name, emailVerified: true }
+      });
+      await prisma.authAccount.create({
+        data: {
+          id: newId(),
+          accountId: actor.id,
+          providerId: 'credential',
+          userId: actor.id,
+          password
+        }
       });
     }
-    await migrateAuth(db, { apply: true });
     const { getAuth } = await import('../../shared/betterAuth.js');
     const auth = await getAuth();
     for (const actor of actors.values()) {
@@ -113,18 +172,13 @@ test(
     }
     setBase();
 
-    const models = await import('../../modules/study/src/models/Institution.js');
-    await Promise.all([
-      models.Institution.init(),
-      models.InstitutionMembership.init(),
-      models.InstitutionInvitation.init()
-    ]);
-
+    await import('../../modules/study/src/models/Institution.js');
     async function request(actor: TestActor | null, method: string, path: string, body?: unknown) {
       const response = await fetch(base + path, {
         method,
         headers: {
           origin: 'http://localhost:5173',
+          'x-forwarded-for': `203.0.113.${actor ? userIds.indexOf(actor.id) + 1 : 99}`,
           ...(actor ? { cookie: actor.cookie } : {}),
           ...(body === undefined ? {} : { 'content-type': 'application/json' })
         },
@@ -147,13 +201,13 @@ test(
 
     const bootstrapA = await request(platform, 'POST', '/api/v1/study/institutions/bootstrap', {
       name: 'Invitation Reliability University',
-      slug: 'invitation-reliability'
+      slug: slugs[0]
     });
     assert.equal(bootstrapA.status, 201, JSON.stringify(bootstrapA.body));
     const institutionA = bootstrapA.body.institution!.id;
     const bootstrapB = await request(platform, 'POST', '/api/v1/study/institutions/bootstrap', {
       name: 'Second Reliability University',
-      slug: 'second-reliability'
+      slug: slugs[1]
     });
     assert.equal(bootstrapB.status, 201, JSON.stringify(bootstrapB.body));
     const institutionB = bootstrapB.body.institution!.id;
@@ -179,43 +233,33 @@ test(
       });
     }
 
-    await t.test(
-      'obsolete role uniqueness index is migrated while token hash stays unique',
-      async () => {
-        const invitations = db.collection('institution_invitations');
-        await invitations.createIndex(
-          { institutionId: 1, role: 1 },
-          { unique: true, partialFilterExpression: { status: 'pending' } }
-        );
-        const dryRun = await migrateInstitutionInvitationIndexes(db);
-        assert.equal(dryRun.mode, 'dry-run');
-        assert.ok(dryRun.dropped.includes('institutionId_1_role_1'));
-        assert.ok(dryRun.inspected.includes('institutionId_1_role_1'));
+    await t.test('obsolete role uniqueness is absent while token hash stays unique', async () => {
+      // The Mongo suite applied a migration script that dropped the obsolete
+      // `(institutionId, role)` partial unique index and created the token and
+      // listing indexes. PostgreSQL indexes now come from the Prisma
+      // migrations, so the durable invariant is asserted directly — and
+      // inspecting twice must find no drift.
+      const indexes = await tableIndexes('institution_invitations');
+      assert.ok(
+        !indexes.some(
+          (index) =>
+            index.unique &&
+            JSON.stringify(index.columns) === JSON.stringify(['institutionId', 'role'])
+        ),
+        'role uniqueness must not survive the migration'
+      );
+      const tokenHash = indexes.find(
+        (index) => index.name === 'institution_invitations_tokenHash_key'
+      );
+      assert.ok(tokenHash?.unique, 'token hash must remain unique');
+      const listing = indexes.find(
+        (index) => index.name === 'institution_invitations_institutionId_status_expiresAt_idx'
+      );
+      assert.ok(listing, 'institution/status/expiry index must exist');
+      assert.deepEqual(listing.columns, ['institutionId', 'status', 'expiresAt']);
 
-        const applied = await migrateInstitutionInvitationIndexes(db, { apply: true });
-        assert.equal(applied.mode, 'applied');
-        assert.ok(applied.dropped.includes('institutionId_1_role_1'));
-        const indexes = await invitations.indexes();
-        assert.ok(
-          !indexes.some(
-            (index) =>
-              index.unique === true &&
-              JSON.stringify(index.key) === JSON.stringify({ institutionId: 1, role: 1 })
-          ),
-          'role uniqueness must not survive the migration'
-        );
-        const tokenHash = indexes.find((index) => index.name === 'tokenHash_1');
-        assert.ok(tokenHash?.unique, 'token hash must remain unique');
-        const listing = indexes.find(
-          (index) => index.name === 'institutionId_1_status_1_expiresAt_1'
-        );
-        assert.ok(listing, 'institution/status/expiry index must exist');
-
-        const again = await migrateInstitutionInvitationIndexes(db, { apply: true });
-        assert.deepEqual(again.dropped, []);
-        assert.deepEqual(again.created, []);
-      }
-    );
+      assert.deepEqual(await tableIndexes('institution_invitations'), indexes);
+    });
 
     await t.test('multiple legitimate invitations coexist and distinct actors accept', async () => {
       const first = await issue(institutionA, 'university_student');
@@ -227,9 +271,8 @@ test(
       assert.notEqual(first.body.token, second.body.token);
       assert.notEqual(first.body.invitation?.id, second.body.invitation?.id);
 
-      const pending = await db.collection('institution_invitations').countDocuments({
-        institutionId: new ObjectId(institutionA),
-        status: 'pending'
+      const pending = await prisma.institutionInvitation.count({
+        where: { institutionId: institutionA, status: 'pending' }
       });
       assert.equal(pending, 3);
 
@@ -240,10 +283,8 @@ test(
       assert.equal(acceptedOne.body.membership?.role, 'university_student');
       assert.equal(acceptedTwo.body.membership?.role, 'university_student');
       assert.equal(
-        await db.collection('institution_memberships').countDocuments({
-          institutionId: new ObjectId(institutionA),
-          role: 'university_student',
-          status: 'active'
+        await prisma.institutionMembership.count({
+          where: { institutionId: institutionA, role: 'university_student', status: 'active' }
         }),
         2
       );
@@ -259,8 +300,8 @@ test(
         const issued = await issue(institutionB, 'university_student');
         assert.equal(issued.status, 201, JSON.stringify(issued.body));
         const token = issued.body.token!;
-        const row = await db.collection('institution_invitations').findOne({
-          _id: new ObjectId(issued.body.invitation!.id)
+        const row = await prisma.institutionInvitation.findUnique({
+          where: { id: issued.body.invitation!.id }
         });
         assert.ok(row);
         assert.equal(row.tokenHash, crypto.createHash('sha256').update(token).digest('hex'));
@@ -275,16 +316,14 @@ test(
         assert.equal(accepted.body.institution?.id, institutionB);
         assert.equal(accepted.body.membership?.role, 'university_student');
         assert.equal(
-          await db.collection('institution_memberships').countDocuments({
-            userId: String(outsider.id),
-            role: 'university_admin'
+          await prisma.institutionMembership.count({
+            where: { userId: String(outsider.id), role: 'university_admin' }
           }),
           0
         );
         assert.equal(
-          await db.collection('institution_memberships').countDocuments({
-            institutionId: new ObjectId(institutionA),
-            userId: String(outsider.id)
+          await prisma.institutionMembership.count({
+            where: { institutionId: institutionA, userId: String(outsider.id) }
           }),
           0
         );
@@ -292,9 +331,8 @@ test(
         const retry = await accept(outsider, token);
         assert.equal(retry.status, 200, JSON.stringify(retry.body));
         assert.equal(
-          await db.collection('institution_memberships').countDocuments({
-            institutionId: new ObjectId(institutionB),
-            userId: String(outsider.id)
+          await prisma.institutionMembership.count({
+            where: { institutionId: institutionB, userId: String(outsider.id) }
           }),
           1
         );
@@ -306,10 +344,7 @@ test(
         assert.equal(JSON.stringify(list.body).includes(token), false);
         assert.equal(
           JSON.stringify(
-            await db
-              .collection('institution_invitations')
-              .find({ institutionId: new ObjectId(institutionB) })
-              .toArray()
+            await prisma.institutionInvitation.findMany({ where: { institutionId: institutionB } })
           ).includes(token),
           false
         );
@@ -319,26 +354,23 @@ test(
     await t.test('interrupted claim recovers after restart for the same actor only', async () => {
       const issued = await issue(institutionB, 'instructor');
       assert.equal(issued.status, 201, JSON.stringify(issued.body));
-      const invitation = await db.collection('institution_invitations').findOne({
-        _id: new ObjectId(issued.body.invitation!.id)
+      const invitation = await prisma.institutionInvitation.findUnique({
+        where: { id: issued.body.invitation!.id }
       });
       assert.ok(invitation);
       // This is the exact durable state left by a process crash after the
       // conditional claim and before the separate membership insert.
-      await db.collection('institution_invitations').updateOne(
-        { _id: invitation._id, status: 'pending' },
-        {
-          $set: {
-            status: 'accepted',
-            acceptedByUserId: String(retryUser.id),
-            acceptedAt: new Date()
-          }
+      await prisma.institutionInvitation.updateMany({
+        where: { id: invitation.id, status: 'pending' },
+        data: {
+          status: 'accepted',
+          acceptedByUserId: String(retryUser.id),
+          acceptedAt: new Date()
         }
-      );
+      });
       assert.equal(
-        await db.collection('institution_memberships').countDocuments({
-          institutionId: new ObjectId(institutionB),
-          userId: String(retryUser.id)
+        await prisma.institutionMembership.count({
+          where: { institutionId: institutionB, userId: String(retryUser.id) }
         }),
         0
       );
@@ -352,9 +384,8 @@ test(
       assert.equal(recovered.status, 200, JSON.stringify(recovered.body));
       assert.equal(recovered.body.membership?.role, 'instructor');
       assert.equal(
-        await db.collection('institution_memberships').countDocuments({
-          institutionId: new ObjectId(institutionB),
-          userId: String(retryUser.id)
+        await prisma.institutionMembership.count({
+          where: { institutionId: institutionB, userId: String(retryUser.id) }
         }),
         1
       );
@@ -362,18 +393,16 @@ test(
       const idempotent = await accept(retryUser, issued.body.token!);
       assert.equal(idempotent.status, 200, JSON.stringify(idempotent.body));
       assert.equal(
-        await db.collection('institution_memberships').countDocuments({
-          institutionId: new ObjectId(institutionB),
-          userId: String(retryUser.id)
+        await prisma.institutionMembership.count({
+          where: { institutionId: institutionB, userId: String(retryUser.id) }
         }),
         1
       );
       const otherActor = await accept(racer, issued.body.token!);
       assert.equal(otherActor.status, 409);
       assert.equal(
-        await db.collection('institution_memberships').countDocuments({
-          institutionId: new ObjectId(institutionB),
-          userId: String(racer.id)
+        await prisma.institutionMembership.count({
+          where: { institutionId: institutionB, userId: String(racer.id) }
         }),
         0
       );
@@ -392,13 +421,12 @@ test(
         assert.equal(issued.status, 201, JSON.stringify(issued.body));
         const denied = await accept(studentTwo, issued.body.token!);
         assert.equal(denied.status, 403, JSON.stringify(denied.body));
-        const membership = await db.collection('institution_memberships').findOne({
-          institutionId: new ObjectId(institutionA),
-          userId: String(studentTwo.id)
+        const membership = await prisma.institutionMembership.findFirst({
+          where: { institutionId: institutionA, userId: String(studentTwo.id) }
         });
         assert.equal(membership?.status, 'suspended');
-        const invitation = await db.collection('institution_invitations').findOne({
-          _id: new ObjectId(issued.body.invitation!.id)
+        const invitation = await prisma.institutionInvitation.findUnique({
+          where: { id: issued.body.invitation!.id }
         });
         assert.equal(invitation?.status, 'pending');
       }
@@ -421,12 +449,10 @@ test(
 
       const expired = await issue(institutionA, 'university_student');
       assert.equal(expired.status, 201);
-      await db
-        .collection('institution_invitations')
-        .updateOne(
-          { _id: new ObjectId(expired.body.invitation!.id) },
-          { $set: { expiresAt: new Date(Date.now() - 60_000) } }
-        );
+      await prisma.institutionInvitation.updateMany({
+        where: { id: expired.body.invitation!.id },
+        data: { expiresAt: new Date(Date.now() - 60_000) }
+      });
       assert.equal((await accept(racer, expired.body.token!)).status, 410);
 
       const raced = await issue(institutionA, 'university_student');
@@ -439,9 +465,8 @@ test(
         ),
         accept(racer, raced.body.token!)
       ]);
-      const membershipCount = await db.collection('institution_memberships').countDocuments({
-        institutionId: new ObjectId(institutionA),
-        userId: String(racer.id)
+      const membershipCount = await prisma.institutionMembership.count({
+        where: { institutionId: institutionA, userId: String(racer.id) }
       });
       if (acceptResult.status === 200) {
         assert.equal(revokeResult.status, 404);
@@ -475,17 +500,17 @@ test(
           404
         );
 
-        const foreignCourseId = new ObjectId();
-        await db.collection('courses').insertOne({
+        const foreignCourseId = newId();
+        courseIds.push(foreignCourseId);
+        await Course.create({
           _id: foreignCourseId,
           userId: String(platform.id),
-          subjectId: String(new ObjectId()),
+          ownerUserId: String(platform.id),
+          subjectId: newId(),
           title: 'M04-A.1 private course',
           status: 'completed',
           topics: [],
-          files: [],
-          createdAt: new Date(),
-          updatedAt: new Date()
+          files: []
         });
         assert.equal(
           (await request(studentOne, 'GET', `/api/v1/study/courses/${foreignCourseId}`)).status,

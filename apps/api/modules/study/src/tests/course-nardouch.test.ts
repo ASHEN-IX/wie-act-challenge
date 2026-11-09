@@ -2,7 +2,8 @@ jest.mock('../models/CourseNardouchProgress', () => ({
   CourseNardouchProgress: {
     findOne: jest.fn(),
     updateOne: jest.fn(),
-    collection: { createIndex: jest.fn() }
+    findOneAndUpdate: jest.fn(),
+    addToSet: jest.fn()
   }
 }));
 jest.mock('../services/courseReader', () => ({
@@ -70,9 +71,10 @@ describe('private persisted course progress', () => {
     );
     (canReadCourse as jest.Mock).mockResolvedValue(true);
     (learnerProgress as jest.Mock).mockResolvedValue({ masteredObjectiveIds: [] });
-    (Store.findOne as jest.Mock).mockReturnValue({ lean: async () => null });
+    (Store.findOne as jest.Mock).mockResolvedValue(null);
     (Store.updateOne as jest.Mock).mockResolvedValue({});
-    (Store.collection.createIndex as jest.Mock).mockResolvedValue('unique_course_owner');
+    (Store.findOneAndUpdate as jest.Mock).mockResolvedValue({ completedLessonIds: [] });
+    (Store.addToSet as jest.Mock).mockResolvedValue({ matchedCount: 1, modifiedCount: 1 });
   });
   test('fresh courses are Baby and lookups are scoped to actor, course and exact revision', async () => {
     expect((await getCourseNardouch('student', 'course-a', 'rev-a')).stage).toBe('baby');
@@ -87,14 +89,30 @@ describe('private persisted course progress', () => {
       courseId: 'course-b',
       revisionId: 'rev-b'
     });
-    expect(Store.updateOne).not.toHaveBeenCalled();
+    expect(Store.addToSet).not.toHaveBeenCalled();
   });
   test('completion is an atomic add-to-set, never a client-provided stage or score', async () => {
+    (Store.findOneAndUpdate as jest.Mock).mockResolvedValue({ completedLessonIds: [] });
+    (Store.updateOne as jest.Mock).mockResolvedValue({ matchedCount: 1, modifiedCount: 1 });
     await completeNardouchLesson('student', 'course', { revisionId: 'rev', lessonId: 'lesson-0' });
-    expect(Store.updateOne).toHaveBeenCalledWith(
+    // Create-if-missing on the unique key, then a guarded whole-array write that
+    // adds the lesson only once.
+    expect(Store.findOneAndUpdate).toHaveBeenCalledWith(
       { userId: 'student', courseId: 'course', revisionId: 'rev' },
-      { $addToSet: { completedLessonIds: 'lesson-0' } },
-      { upsert: true }
+      {
+        $setOnInsert: {
+          userId: 'student',
+          courseId: 'course',
+          revisionId: 'rev',
+          completedLessonIds: []
+        }
+      },
+      { upsert: true, new: true }
+    );
+    expect(Store.addToSet).toHaveBeenCalledWith(
+      { userId: 'student', courseId: 'course', revisionId: 'rev' },
+      'completedLessonIds',
+      'lesson-0'
     );
     await expect(
       completeNardouchLesson('student', 'course', {
@@ -122,12 +140,10 @@ describe('private persisted course progress', () => {
       await expect(completeNardouchLesson('student', 'course', input)).rejects.toMatchObject({
         status: 400
       });
-    expect(Store.updateOne).not.toHaveBeenCalled();
+    expect(Store.addToSet).not.toHaveBeenCalled();
   });
   test('graduation is recomputed from saved reading and current accepted evidence', async () => {
-    (Store.findOne as jest.Mock).mockReturnValue({
-      lean: async () => ({ completedLessonIds: ids })
-    });
+    (Store.findOne as jest.Mock).mockResolvedValue({ completedLessonIds: ids });
     expect((await getCourseNardouch('student', 'course')).stage).toBe('expert');
     (learnerProgress as jest.Mock).mockResolvedValue({ masteredObjectiveIds: ['objective'] });
     expect((await getCourseNardouch('student', 'course')).stage).toBe('graduate');
@@ -135,12 +151,19 @@ describe('private persisted course progress', () => {
     expect((await getCourseNardouch('student', 'course')).stage).toBe('expert');
   });
   test('concurrent first completions recover from a unique-key race', async () => {
-    (Store.updateOne as jest.Mock).mockRejectedValueOnce({ code: 11000 }).mockResolvedValue({});
+    // The first insert loses the unique-key race; the guarded add-to-set still
+    // applies to the winner's row, which stores the lesson exactly once.
+    (Store.findOneAndUpdate as jest.Mock).mockRejectedValueOnce({ code: 11000 });
     await completeNardouchLesson('student', 'course', { revisionId: 'rev', lessonId: 'lesson-0' });
-    expect(Store.updateOne).toHaveBeenCalledTimes(2);
-    expect(Store.updateOne).toHaveBeenLastCalledWith(
+    expect(Store.findOneAndUpdate).toHaveBeenCalledWith(
       { userId: 'student', courseId: 'course', revisionId: 'rev' },
-      { $addToSet: { completedLessonIds: 'lesson-0' } }
+      { $setOnInsert: expect.objectContaining({ completedLessonIds: [] }) },
+      { upsert: true, new: true }
+    );
+    expect(Store.addToSet).toHaveBeenCalledWith(
+      { userId: 'student', courseId: 'course', revisionId: 'rev' },
+      'completedLessonIds',
+      'lesson-0'
     );
   });
 });

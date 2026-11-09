@@ -14,7 +14,9 @@ pnpm dev
 
 `setup` creates missing API/web/AI env files with shared random secrets and consistent local ports. Existing files are never overwritten; `doctor` identifies mismatches without printing values. Review local files yourself when repairing an existing installation. Never commit env files or point test commands at production data.
 
-The development stack is `deploy/compose.development.yml`; the separate test stack is `deploy/compose.test.yml`. The dev project provides MongoDB 27018, RabbitMQ 5673 (management UI 15673), Redis 6381 and Mailpit SMTP 1026/UI 8026. Ports bind to loopback; credentials are local-development defaults. Volumes persist through `pnpm dev:infra:down`. Dev and test stacks share Mongo/Mailpit host ports: run one stack at a time. Integration/auth/browser commands use isolated database names; they can use the running dev Mongo/Mailpit.
+The development stack is `deploy/compose.development.yml`; the separate test stack is `deploy/compose.test.yml`. The dev project provides PostgreSQL 5433, RabbitMQ 5673 (management UI 15673), Redis 6381 and Mailpit SMTP 1026/UI 8026. Ports bind to loopback; credentials are local-development defaults. Volumes persist through `pnpm dev:infra:down`. Dev and test stacks share the PostgreSQL/Mailpit host ports: run one stack at a time. Integration/auth/browser commands use isolated database names; they can use the running dev PostgreSQL/Mailpit.
+
+Schema changes are Prisma migrations. Run `pnpm --filter api exec prisma migrate dev --name <name>` to create one and `prisma migrate deploy` (CI and production) to apply them. The client is generated into `apps/api/src/generated/prisma`; run `pnpm --filter api exec prisma generate` after pulling a schema change.
 
 For newly generated host configurations, `pnpm dev:setup` gives Node and Python the same absolute `INGEST_UPLOADS_DIR` and `FAISS_INDEX_DIR` paths under `var/`. The default `var/dev-uploads` and `var/dev-faiss` directories are excluded from Git because they contain private originals and indexes. Existing environment files are never overwritten: `pnpm dev:doctor` flags missing or mismatched paths, service keys and broker settings for manual correction. These host paths are distinct from Docker named volumes; sharing storage with containerized Python requires an explicit matching bind mount or a compatible shared volume.
 
@@ -28,7 +30,7 @@ Branch from current main per coherent task (`feat/ed-30-course-drafts`, for exam
 
 ## AI lifecycle
 
-See [AI service](ai-service.md). Use a compatible Python environment with Poetry; configure Mongo, reachable broker, optional Redis, `AI_SERVICE_API_KEY` and provider/model configuration. Node's `AI_SERVICE_API_KEY` must match Python. The API service key is a server-to-server secret, separate from model provider credentials.
+See [AI service](ai-service.md). Use a compatible Python environment with Poetry; configure PostgreSQL, reachable broker, optional Redis, `AI_SERVICE_API_KEY` and provider/model configuration. Node's `AI_SERVICE_API_KEY` must match Python. The API service key is a server-to-server secret, separate from model provider credentials.
 
 If Poetry is unavailable but the locked application environment is already installed, set `EDNOVA_AI_PYTHON` in `apps/ai/.env` to that environment's absolute Python executable. `pnpm dev:ai` and `pnpm dev:worker ingestion` then use it directly. `pnpm dev:doctor` checks the selected interpreter and basic dependencies. For external inference, see the separate approval and durable-budget prerequisites in [revision sources](runbooks/ednova-revision-sources.md); mock mode is not approved provider execution.
 
@@ -47,8 +49,8 @@ HTTP alone does not consume broker jobs. Launch ingestion/planner/schedule/coach
 | `pnpm lint`, `pnpm typecheck` | Both Node packages; strict API checks include test files |
 | `pnpm test` | API route checks + Jest + Node unit/real integration + auth lifecycle, then Vitest; stops on failure |
 | `pnpm test:integration` | API integration cases; real roundtrip opt-in separate |
-| `pnpm test:auth` | API build then Better Auth lifecycle/Nest tests; Mongo on 27018 |
-| `pnpm test:e2e` | Auth/workspace/smoke Playwright; test Mongo/Mailpit and browser required |
+| `pnpm test:auth` | API build then Better Auth lifecycle/Nest tests; PostgreSQL on 5433 |
+| `pnpm test:e2e` | Auth/workspace/smoke Playwright; test PostgreSQL/Mailpit and browser required |
 
 No root format command exists. Package `format` scripts are different and may have legacy globs; do not treat them as a repository-wide check. Python checks use its own environment. Full scenario gates and exact current failures are in [testing plan](testing-plan.md) and [validation](audit/validation.md).
 
@@ -69,7 +71,7 @@ The current CI and AI Docker recipe use Python 3.12 and Poetry 2.5.1 with the ex
 
 API `test:node` and `test:node:integration` execute `node:test` suites separately from Jest; both are included in the default API test command. The integration command points its AI HTTP boundary at an unavailable loopback port, exercising existing deterministic fallback without provider calls. This does not establish real inference. The production web builder includes the API-backed browser launchers' source/dependency context so the existing strict web check remains enabled.
 
-Install all browser prerequisites with `pnpm --filter web exec playwright install chromium ffmpeg`. Use only the dedicated Mongo/Mailpit test stack for the documented browser/auth runs. Current executed results, failures, preservation hashes and remaining ED-01 gates are recorded in [M01 baseline verification](../reports/EDNOVA-M01-BASELINE.md); a successful build is not a claim that repository-wide lint, full Python or the complete CI pipeline is green.
+Install all browser prerequisites with `pnpm --filter web exec playwright install chromium ffmpeg`. Use only the dedicated PostgreSQL/Mailpit test stack for the documented browser/auth runs. Current executed results, failures, preservation hashes and remaining ED-01 gates are recorded in [M01 baseline verification](../reports/EDNOVA-M01-BASELINE.md); a successful build is not a claim that repository-wide lint, full Python or the complete CI pipeline is green.
 
 ## Working conventions
 

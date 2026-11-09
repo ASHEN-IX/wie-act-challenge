@@ -8,14 +8,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import express, { type Response, type NextFunction } from 'express';
 import request from 'supertest';
-import mongoose from 'mongoose';
 import crypto from 'node:crypto';
+import { connectDatabase, disconnectDatabase } from '../../shared/database';
+import { newId } from '../../shared/ids';
 
 import {
   ActivityRecord,
   Course,
   CourseEnrollment,
   CourseRevision,
+  Institution,
   InstitutionMembership,
   LearningEvidence,
   StudentAttempt,
@@ -27,17 +29,15 @@ import { updateCourseDraft } from '../../modules/study/src/services/courseDraft'
 import { publishCourseRevision } from '../../modules/study/src/services/coursePublication';
 import type { DomainRequest } from '../../src/framework/contracts';
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27018/ednova-test';
-
 test('M17 / ED-07 & ED-29: Real Shared Room Synchronized Activity & Private Submission Integration', async (t) => {
-  await mongoose.connect(MONGO_URI);
+  await connectDatabase();
 
   const testPrefix = `m17_${Date.now()}`;
   const ownerUserId = `${testPrefix}_owner`;
   const instructorId = `${testPrefix}_instructor`;
   const presenterId = `${testPrefix}_presenter`;
   const studentId = `${testPrefix}_student`;
-  const institutionId = new mongoose.Types.ObjectId();
+  const institutionId = newId();
 
   let courseId: string;
   let publishedRevisionTag: string;
@@ -72,36 +72,44 @@ test('M17 / ED-07 & ED-29: Real Shared Room Synchronized Activity & Private Subm
     await cleanupCourseFixtures();
     try {
       if (courseId) {
-        await Course.deleteMany({ courseId });
         await CourseRevision.deleteMany({ courseId });
         await CourseEnrollment.deleteMany({ courseId });
         await ActivityRecord.deleteMany({ courseId });
         await StudentAttempt.deleteMany({ courseId });
-        await LearningEvidence.deleteMany({ 'activity.courseId': courseId });
+        // Evidence has no scalar courseId column; the suite's own users scope it.
+        await LearningEvidence.deleteMany({ userId: { contains: testPrefix } });
       }
+      await Course.deleteMany({ userId: { contains: testPrefix } });
       await InstitutionMembership.deleteMany({ institutionId });
-      await StudyRoom.deleteMany({ roomId });
+      await Institution.deleteMany({ _id: institutionId });
+      if (roomId) await StudyRoom.deleteMany({ roomId });
     } finally {
-      await mongoose.disconnect();
+      await disconnectDatabase().catch(() => {});
     }
   });
 
   await t.test(
     '1. Setup: Create published course, enrollments, and registered activities',
     async () => {
+      // Institution first: memberships and enrollments reference it.
+      await Institution.create({
+        id: institutionId,
+        name: 'M17 Thermodynamics Institution',
+        slug: `m17-${institutionId}`,
+        createdByUserId: ownerUserId,
+        status: 'active'
+      });
       // Institution memberships
-      await InstitutionMembership.create([
+      await InstitutionMembership.createMany([
         {
           institutionId,
           userId: instructorId,
-          email: `${instructorId}@test.edu`,
           role: 'instructor',
           status: 'active'
         },
         {
           institutionId,
           userId: studentId,
-          email: `${studentId}@test.edu`,
           role: 'university_student',
           status: 'active'
         }
@@ -110,26 +118,23 @@ test('M17 / ED-07 & ED-29: Real Shared Room Synchronized Activity & Private Subm
       // Create course draft
       const rawCourse = await Course.create({
         title: 'Thermodynamics & Heat Transfer',
-        slug: `thermo-${testPrefix}`,
         description: 'Core concepts in heat exchange and state functions',
         scope: 'institutional',
         institutionId,
         ownerUserId,
         userId: ownerUserId,
         subjectId: 'sub_thermo',
-        assignedInstructorIds: [instructorId],
-        settings: { isPublic: false }
+        assignedInstructorIds: [instructorId]
       });
       courseId = rawCourse._id.toString();
       await prepareCourseFixture(courseId, t);
 
       // The instructor publishes the revision, then two learners study it.
-      await CourseEnrollment.create(
+      await CourseEnrollment.createMany(
         [presenterId, studentId].map((userId) => ({
           courseId,
           institutionId,
           userId,
-          enrolledRole: 'student',
           status: 'active',
           enrolledAt: new Date()
         }))
@@ -390,7 +395,7 @@ test('M17 / ED-07 & ED-29: Real Shared Room Synchronized Activity & Private Subm
           activeActivityId: quizActivityId
         });
 
-      assert.equal(selectRes.status, 200);
+      assert.equal(selectRes.status, 200, `phase select failed: ${JSON.stringify(selectRes.body)}`);
       assert.equal(selectRes.body.currentPhase, 'individual_attempt');
       assert.equal(selectRes.body.activeActivityId, quizActivityId);
 

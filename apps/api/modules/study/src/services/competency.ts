@@ -128,7 +128,7 @@ async function upsertProfile({
   // Optimistic compare-and-set prevents concurrent evidence updates from
   // overwriting each other. Retrying a completed correlation is a no-op.
   for (let attempt = 0; attempt < 8; attempt++) {
-    const existing = await CompetencyProfile.findOne(filter).lean();
+    const existing = await CompetencyProfile.findOne(filter);
     const prevEvidence = existing?.evidence || [];
     if (prevEvidence.some((item) => item.correlationId === evidenceItem.correlationId))
       return existing;
@@ -140,14 +140,26 @@ async function upsertProfile({
       .slice(-MAX_EVIDENCE);
     const { score, confidence } = replayEvidence(newEvidence);
     try {
-      const updated = await CompetencyProfile.findOneAndUpdate(
-        { ...filter, __v: existing?.__v ?? { $exists: false } },
-        {
-          $set: { score, confidence, evidence: newEvidence, updatedAt: new Date() },
-          $inc: { __v: 1 }
-        },
-        { upsert: !existing, new: true, setDefaultsOnInsert: true }
-      );
+      // Compare-and-set on the `__v` counter. A concurrent writer that already
+      // advanced it makes this update match zero rows; the loop re-reads and
+      // replays the evidence instead of overwriting.
+      const updated = existing
+        ? await CompetencyProfile.findOneAndUpdate(
+            { ...filter, __v: existing.__v },
+            {
+              $set: { score, confidence, evidence: newEvidence, updatedAt: new Date() },
+              $inc: { __v: 1 }
+            },
+            { new: true }
+          )
+        : await CompetencyProfile.findOneAndUpdate(
+            filter,
+            {
+              $set: { score, confidence, evidence: newEvidence, updatedAt: new Date() },
+              $inc: { __v: 1 }
+            },
+            { upsert: true, new: true }
+          );
       if (updated) return updated;
     } catch (error) {
       if (errorDetails(error).code !== 11000) throw error;
@@ -172,9 +184,7 @@ async function rollupByTopics(userId: string, topicIds: string[]): Promise<Rollu
   const rows = await CompetencyProfile.find({
     userId,
     topicId: { $in: topicIds }
-  })
-    .select('bloomLevel score confidence')
-    .lean();
+  }).select('bloomLevel score confidence');
 
   if (rows.length === 0) return [];
 

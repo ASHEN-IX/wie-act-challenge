@@ -1,20 +1,19 @@
-import mongoose, { Document, Model, Schema } from 'mongoose';
+import type { Prisma } from '../../../../src/generated/prisma/client';
+import { prisma, toDocument } from '../../../../shared/database';
+import { newId } from '../../../../shared/ids';
+import { json, jsonOrNull } from './_helpers';
 
-/**
- * A small, reusable set of learners who study together.
- *
- * Deliberately minimal: a name, a subject, an owner, members and pending
- * invites. It has no messaging (Study Together chat covers that) and grants no
- * access to anything. Joining a group never opens a course, a document or an
- * institution's data; course-bound rooms still check enrollment on join.
- */
-export interface IStudyGroup extends Document {
+export const MAX_GROUP_MEMBERS = 10;
+export const MAX_GROUP_INVITES = 10;
+export const MAX_OWNED_GROUPS = 10;
+
+export interface IStudyGroup {
+  _id: string;
+  id: string;
   groupId: string;
   name: string;
   subject: string;
   ownerId: string;
-  members: Array<{ userId: string; joinedAt: Date }>;
-  invites: Array<{ userId: string; invitedBy: string; createdAt: Date }>;
   /** Last shared study room, so members can rejoin; cleared when stale. */
   activeSession?: {
     roomId: string;
@@ -23,46 +22,132 @@ export interface IStudyGroup extends Document {
     startedBy: string;
     startedAt: Date;
   } | null;
+  members: Array<{ userId: string; joinedAt: Date }>;
+  invites: Array<{ userId: string; invitedBy: string; createdAt: Date }>;
   createdAt: Date;
   updatedAt: Date;
 }
 
-export const MAX_GROUP_MEMBERS = 10;
-export const MAX_GROUP_INVITES = 10;
-export const MAX_OWNED_GROUPS = 10;
+const include = {
+  members: { orderBy: { joinedAt: 'asc' as const } },
+  invites: { orderBy: { createdAt: 'asc' as const } }
+};
 
-const schema = new Schema<IStudyGroup>(
-  {
-    groupId: { type: String, required: true, unique: true },
-    name: { type: String, required: true, trim: true, maxlength: 60 },
-    subject: { type: String, trim: true, maxlength: 60, default: '' },
-    ownerId: { type: String, required: true, index: true },
-    members: [
-      new Schema(
-        { userId: { type: String, required: true }, joinedAt: { type: Date, default: Date.now } },
-        { _id: false }
-      )
-    ],
-    invites: [
-      new Schema(
-        {
-          userId: { type: String, required: true },
-          invitedBy: { type: String, required: true },
-          createdAt: { type: Date, default: Date.now }
-        },
-        { _id: false }
-      )
-    ],
-    activeSession: { type: Schema.Types.Mixed, default: null }
+type GroupRow = Prisma.StudyGroupGetPayload<{ include: typeof include }>;
+
+function hydrate(row: GroupRow): IStudyGroup {
+  return toDocument(row) as unknown as IStudyGroup;
+}
+
+export const StudyGroup = {
+  async findById(id: string): Promise<IStudyGroup | null> {
+    const row = await prisma.studyGroup.findUnique({ where: { id }, include });
+    return row ? hydrate(row) : null;
   },
-  { timestamps: true, collection: 'study_groups' }
-);
-schema.index({ 'members.userId': 1 });
-schema.index({ 'invites.userId': 1 });
 
-const StudyGroup =
-  (mongoose.models.StudyGroup as Model<IStudyGroup>) ||
-  mongoose.model<IStudyGroup>('StudyGroup', schema);
+  async findOne(where: Prisma.StudyGroupWhereInput): Promise<IStudyGroup | null> {
+    const row = await prisma.studyGroup.findFirst({ where, include });
+    return row ? hydrate(row) : null;
+  },
+
+  async findMany(
+    where: Prisma.StudyGroupWhereInput = {},
+    options: { take?: number; orderBy?: Prisma.StudyGroupOrderByWithRelationInput } = {}
+  ): Promise<IStudyGroup[]> {
+    const rows = await prisma.studyGroup.findMany({ where, include, ...options });
+    return rows.map(hydrate);
+  },
+
+  async countDocuments(where: Prisma.StudyGroupWhereInput = {}): Promise<number> {
+    return prisma.studyGroup.count({ where });
+  },
+
+  async exists(where: Prisma.StudyGroupWhereInput): Promise<boolean> {
+    return (await prisma.studyGroup.findFirst({ where, select: { id: true } })) !== null;
+  },
+
+  async create(data: {
+    groupId: string;
+    name: string;
+    subject?: string;
+    ownerId: string;
+    members?: Array<{ userId: string; joinedAt?: Date }>;
+    invites?: Array<{ userId: string; invitedBy: string; createdAt?: Date }>;
+  }): Promise<IStudyGroup> {
+    const row = await prisma.studyGroup.create({
+      data: {
+        id: newId(),
+        groupId: data.groupId,
+        name: data.name,
+        subject: data.subject ?? '',
+        ownerId: data.ownerId,
+        members: {
+          create: (data.members ?? []).map((member) => ({
+            id: newId(),
+            userId: member.userId,
+            joinedAt: member.joinedAt ?? new Date()
+          }))
+        },
+        invites: {
+          create: (data.invites ?? []).map((invite) => ({
+            id: newId(),
+            userId: invite.userId,
+            invitedBy: invite.invitedBy,
+            createdAt: invite.createdAt ?? new Date()
+          }))
+        }
+      },
+      include
+    });
+    return hydrate(row);
+  },
+
+  async updateOne(where: Prisma.StudyGroupWhereInput, data: Prisma.StudyGroupUpdateInput) {
+    const result = await prisma.studyGroup.updateMany({ where, data });
+    return { matchedCount: result.count };
+  },
+
+  async findOneAndUpdate(
+    where: Prisma.StudyGroupWhereInput,
+    data: Prisma.StudyGroupUpdateInput
+  ): Promise<IStudyGroup | null> {
+    const existing = await prisma.studyGroup.findFirst({ where, select: { id: true } });
+    if (!existing) return null;
+    const row = await prisma.studyGroup.update({ where: { id: existing.id }, data, include });
+    return hydrate(row);
+  },
+
+  async deleteOne(where: Prisma.StudyGroupWhereInput) {
+    const existing = await prisma.studyGroup.findFirst({ where, select: { id: true } });
+    if (!existing) return { deletedCount: 0 };
+    await prisma.studyGroup.delete({ where: { id: existing.id } });
+    return { deletedCount: 1 };
+  },
+
+  async addMember(groupId: string, userId: string): Promise<void> {
+    await prisma.studyGroupMember.create({
+      data: { id: newId(), groupId, userId }
+    });
+  },
+
+  async removeMember(groupId: string, userId: string): Promise<void> {
+    await prisma.studyGroupMember.deleteMany({ where: { groupId, userId } });
+  },
+
+  async addInvite(groupId: string, userId: string, invitedBy: string): Promise<void> {
+    await prisma.studyGroupInvite.create({ data: { id: newId(), groupId, userId, invitedBy } });
+  },
+
+  async removeInvite(groupId: string, userId: string): Promise<void> {
+    await prisma.studyGroupInvite.deleteMany({ where: { groupId, userId } });
+  },
+
+  async setActiveSession(groupId: string, activeSession: IStudyGroup['activeSession']) {
+    await prisma.studyGroup.update({
+      where: { id: groupId },
+      data: { activeSession: activeSession ? json(activeSession) : jsonOrNull(null) }
+    });
+  }
+};
 
 export default StudyGroup;
-module.exports = StudyGroup;

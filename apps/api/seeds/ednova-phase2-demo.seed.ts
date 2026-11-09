@@ -5,18 +5,14 @@ import { config } from 'dotenv';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import crypto from 'node:crypto';
-import mongoose from 'mongoose';
-import {
-  Course,
-  CourseEnrollment,
-  CourseRevision,
-  Subject,
-} from '../modules/study/src/models';
+import { Prisma } from '../src/generated/prisma/client';
+import { connectDatabase, disconnectDatabase, prisma } from '../shared/database';
+import { newId } from '../shared/ids';
 import {
   contentHash,
   prepareRevisionSources,
   sourceRoots,
-  verifyRevisionArtifact,
+  verifyRevisionArtifact
 } from '../modules/study/src/services/revisionSources';
 import { publishCourseRevision } from '../modules/study/src/services/coursePublication';
 import { PHASE2_CORPUS } from '../fixtures/ednova-phase2-corpus';
@@ -31,7 +27,7 @@ const FILES = [
   { name: '02-programming.md', subject: 'programming' },
   { name: '03-networking.md', subject: 'networking' },
   { name: '04-science.md', subject: 'science' },
-  { name: '05-mixed.md', subject: 'mixed' },
+  { name: '05-mixed.md', subject: 'mixed' }
 ] as const;
 
 const TOPICS = [
@@ -48,11 +44,11 @@ const TOPICS = [
           {
             id: 'obj-quadratic-discriminant',
             statement: 'Interpret the discriminant of a quadratic equation',
-            bloomLevel: 'understand',
-          },
-        ],
-      },
-    ],
+            bloomLevel: 'understand'
+          }
+        ]
+      }
+    ]
   },
   {
     id: 'programming',
@@ -62,16 +58,17 @@ const TOPICS = [
       {
         id: 'binary-search',
         title: 'Search by halving the interval',
-        summary: 'Binary search requires sorted input and removes half the remaining range each step.',
+        summary:
+          'Binary search requires sorted input and removes half the remaining range each step.',
         learning_objectives: [
           {
             id: 'obj-binary-search',
             statement: 'Trace the interval used by binary search',
-            bloomLevel: 'apply',
-          },
-        ],
-      },
-    ],
+            bloomLevel: 'apply'
+          }
+        ]
+      }
+    ]
   },
   {
     id: 'networking',
@@ -86,11 +83,11 @@ const TOPICS = [
           {
             id: 'obj-tcp-handshake',
             statement: 'Order the messages in a TCP connection handshake',
-            bloomLevel: 'understand',
-          },
-        ],
-      },
-    ],
+            bloomLevel: 'understand'
+          }
+        ]
+      }
+    ]
   },
   {
     id: 'science',
@@ -100,16 +97,17 @@ const TOPICS = [
       {
         id: 'photosynthesis',
         title: 'Converting light into stored energy',
-        summary: 'Photosynthesis consumes carbon dioxide and water and produces glucose and oxygen.',
+        summary:
+          'Photosynthesis consumes carbon dioxide and water and produces glucose and oxygen.',
         learning_objectives: [
           {
             id: 'obj-photosynthesis',
             statement: 'Read the overall equation for photosynthesis',
-            bloomLevel: 'understand',
-          },
-        ],
-      },
-    ],
+            bloomLevel: 'understand'
+          }
+        ]
+      }
+    ]
   },
   {
     id: 'systems',
@@ -124,67 +122,82 @@ const TOPICS = [
           {
             id: 'obj-system-boundary',
             statement: 'Describe the order of checks at a request boundary',
-            bloomLevel: 'analyze',
-          },
-        ],
-      },
-    ],
-  },
+            bloomLevel: 'analyze'
+          }
+        ]
+      }
+    ]
+  }
 ];
 
 async function userFor(email: string): Promise<string> {
-  const user = await mongoose.connection
-    .collection('auth_users')
-    .findOne({ email }, { projection: { _id: 1 } });
+  const user = await prisma.authUser.findUnique({ where: { email }, select: { id: true } });
   if (!user) throw new Error(`Missing ${email}; run seed:learning-demo first`);
-  return user._id.toString();
+  return user.id;
 }
 
 async function main() {
-  if (process.env.ALLOW_DEMO_COURSES !== "1") {
-    console.log("Demo data is disabled. Upload your own course, or explicitly set ALLOW_DEMO_COURSES=1 in a disposable development database.");
+  if (process.env.ALLOW_DEMO_COURSES !== '1') {
+    console.log(
+      'Demo data is disabled. Upload your own course, or explicitly set ALLOW_DEMO_COURSES=1 in a disposable development database.'
+    );
     return;
   }
-  const uri = process.env.MONGODB_URI;
-  if (!uri || !['localhost', '127.0.0.1', '[::1]'].includes(new URL(uri).hostname))
-    throw new Error('Phase 2 demo requires a loopback MongoDB URI');
+  const url = process.env.DATABASE_URL;
+  if (!url || !['localhost', '127.0.0.1', '[::1]'].includes(new URL(url).hostname))
+    throw new Error('Phase 2 demo requires a loopback PostgreSQL database');
   if (process.env.NODE_ENV === 'production')
     throw new Error('Phase 2 demo seeding is development only');
-  await mongoose.connect(uri);
+  await connectDatabase();
   try {
     const instructor = await userFor('instructor@ednova.test');
     const learner = await userFor('learner@ednova.test');
-    const institution = await mongoose.connection
-      .collection('institutions')
-      .findOne({ slug: 'ednova-learning-demo' }, { projection: { _id: 1 } });
+    const institution = await prisma.institution.findUnique({
+      where: { slug: 'ednova-learning-demo' },
+      select: { id: true }
+    });
     if (!institution) throw new Error('Missing demo institution; run seed:learning-demo first');
 
-    let subject = await Subject.findOne({ userId: instructor, name: 'Applied Systems' });
-    if (!subject)
-      subject = await Subject.create({
-        userId: instructor,
-        name: 'Applied Systems',
-        description: 'Mathematics, programming, networking and science in one lesson.',
-        color: '#2563eb',
+    let subject = await prisma.subject.findFirst({
+      where: { userId: instructor, name: 'Applied Systems' },
+      select: { id: true }
+    });
+    if (!subject) {
+      subject = await prisma.subject.create({
+        data: {
+          id: newId(),
+          userId: instructor,
+          name: 'Applied Systems',
+          description: 'Mathematics, programming, networking and science in one lesson.',
+          color: '#2563eb'
+        },
+        select: { id: true }
       });
+    }
 
-    let course = await Course.findOne({ ownerUserId: instructor, title: PHASE2_COURSE_TITLE });
-    if (!course)
-      course = await Course.create({
-        title: PHASE2_COURSE_TITLE,
-        description:
-          'Representative mixed-content course: formulas, source tables, code highlighting, an evidence-backed chart, a walkthrough diagram and a safe media fallback.',
-        subjectId: subject._id.toString(),
-        userId: instructor,
-        ownerUserId: instructor,
-        assignedInstructorIds: [instructor],
-        institutionId: institution._id,
-        scope: 'institutional',
-        status: 'processing',
-        topics: TOPICS,
+    let course = await prisma.course.findFirst({
+      where: { ownerUserId: instructor, title: PHASE2_COURSE_TITLE }
+    });
+    if (!course) {
+      course = await prisma.course.create({
+        data: {
+          id: newId(),
+          title: PHASE2_COURSE_TITLE,
+          description:
+            'Representative mixed-content course: formulas, source tables, code highlighting, an evidence-backed chart, a walkthrough diagram and a safe media fallback.',
+          subjectId: subject.id,
+          userId: instructor,
+          ownerUserId: instructor,
+          assignedInstructorIds: [instructor],
+          institutionId: institution.id,
+          scope: 'institutional',
+          status: 'processing',
+          topics: TOPICS as Prisma.InputJsonValue
+        }
       });
+    }
 
-    const courseId = course._id.toString();
+    const courseId = course.id;
     const uploadDir = path.join(sourceRoots().uploads, 'courses', courseId);
     await fs.mkdir(uploadDir, { recursive: true });
     const files = [];
@@ -199,61 +212,73 @@ async function main() {
         originalName: entry.name,
         size: bytes.length,
         fileHash: contentHash(bytes).replace(/^sha256:/, ''),
-        uploadedAt: new Date(),
+        uploadedAt: new Date().toISOString()
       });
     }
-    course.files = files as never;
-    await course.save();
+    await prisma.course.update({
+      where: { id: courseId },
+      data: { files: files as unknown as Prisma.InputJsonValue }
+    });
 
     // Revision identity is content-derived. Re-running unchanged sources reuses
     // the same published revision; changing bytes creates a new draft rather
     // than replacing a prepared artifact or its index.
     const sourceDigest = crypto
       .createHash('sha256')
-      .update(files.map((file) => file.fileHash).sort().join(':'))
+      .update(
+        files
+          .map((file) => file.fileHash)
+          .sort()
+          .join(':')
+      )
       .digest('hex');
     const revisionTag = DEMO_REVISION_PREFIX + sourceDigest.slice(0, 20);
 
-    let revision = await CourseRevision.findOne({
-      courseId,
-      revisionTag,
+    let revision = await prisma.courseRevision.findFirst({
+      where: { courseId, revisionTag }
     });
     if (!revision) {
-      revision = await CourseRevision.create({
-        courseId,
-        revisionTag,
-        contentHash: sourceDigest,
-        status: 'draft',
-        isInstructorReviewed: true,
-        summary:
-          'A mixed-subject demonstration of deterministic source extraction and the trusted EdNova reader.',
-        topics: TOPICS,
+      revision = await prisma.courseRevision.create({
+        data: {
+          id: newId(),
+          courseId,
+          revisionTag,
+          contentHash: sourceDigest,
+          status: 'draft',
+          isInstructorReviewed: true,
+          summary:
+            'A mixed-subject demonstration of deterministic source extraction and the trusted EdNova reader.',
+          topics: TOPICS as Prisma.InputJsonValue
+        }
       });
     } else if (revision.status === 'draft') {
-      revision.isInstructorReviewed = true;
-      revision.topics = TOPICS as never;
-      await revision.save();
+      revision = await prisma.courseRevision.update({
+        where: { id: revision.id },
+        data: { isInstructorReviewed: true, topics: TOPICS as Prisma.InputJsonValue }
+      });
     }
 
     if (revision.status === 'draft' && revision.activationState !== 'prepared') {
       await prepareRevisionSources(instructor, courseId, revisionTag);
     }
-    const stored = await CourseRevision.findOne({ courseId, revisionTag });
+    const stored = await prisma.courseRevision.findFirst({ where: { courseId, revisionTag } });
     if (!stored) throw new Error('Published demo revision disappeared');
-    const verified = await verifyRevisionArtifact(stored);
-    let storedTopics = stored.topics || [];
+    const verified = await verifyRevisionArtifact(stored as never);
+    let storedTopics = (stored.topics ?? []) as Array<Record<string, unknown>>;
     if (revision.status === 'draft') {
       // Bind evidence while the revision is still a reviewable draft. The
       // published artifact and its source hashes remain untouched afterward.
+      const courseFiles = (course.files ?? []) as Array<{
+        filename?: string;
+        originalName?: string;
+      }>;
       const byOriginalName = new Map(
-        (course.files || []).flatMap((file) =>
-          file.filename && file.originalName
-            ? [[file.originalName, file.filename] as const]
-            : [],
-        ),
+        courseFiles.flatMap((file) =>
+          file.filename && file.originalName ? [[file.originalName, file.filename] as const] : []
+        )
       );
       const byDocument = new Map(
-        verified.metadata.documents.map((doc) => [doc.filename, doc.documentId] as const),
+        verified.metadata.documents.map((doc) => [doc.filename, doc.documentId] as const)
       );
       const withSpans = TOPICS.map((topic) => {
         const sourceSubject = topic.id === 'systems' ? 'mixed' : topic.id;
@@ -274,47 +299,55 @@ async function main() {
                 documentId: passage.documentId,
                 pageNumber: passage.pageNumber,
                 lineStart: 1,
-                lineEnd: passage.text.split(/\r?\n/).length,
-              },
-            ],
-          })),
+                lineEnd: passage.text.split(/\r?\n/).length
+              }
+            ]
+          }))
         };
       });
       // Source preparation freezes the manifest/index, not the reviewable
       // curriculum. Attach spans while the reviewed draft is still draft.
-      const changed = await CourseRevision.collection.updateOne(
-        { _id: stored._id, status: 'draft' },
-        { $set: { topics: withSpans } },
-      );
-      if (!changed.matchedCount)
+      const changed = await prisma.courseRevision.updateMany({
+        where: { id: stored.id, status: 'draft' },
+        data: { topics: withSpans as unknown as Prisma.InputJsonValue }
+      });
+      if (!changed.count)
         throw new Error('Demo draft changed while attaching verified source spans');
       storedTopics = withSpans;
     }
     const published = await publishCourseRevision(instructor, courseId, revisionTag);
-    const withSpans = storedTopics;
-    course.topics = withSpans as never;
-    course.status = 'completed';
-    course.ingestProgress = 1;
-    course.ingestDetail = 'Published from verified Phase 2 demo sources';
-    course.activeRevisionId = revisionTag;
-    await course.save();
-    await CourseEnrollment.updateOne(
-      { courseId: course._id, userId: learner },
-      {
-        $set: {
-          institutionId: institution._id,
-          status: 'active',
-          enrolledByUserId: instructor,
-        },
-        $setOnInsert: { enrolledAt: new Date() },
+    await prisma.course.update({
+      where: { id: courseId },
+      data: {
+        topics: storedTopics as unknown as Prisma.InputJsonValue,
+        status: 'completed',
+        ingestProgress: 1,
+        ingestDetail: 'Published from verified Phase 2 demo sources',
+        activeRevisionId: revisionTag
+      }
+    });
+    await prisma.courseEnrollment.upsert({
+      where: { courseId_userId: { courseId, userId: learner } },
+      update: {
+        institutionId: institution.id,
+        status: 'active',
+        enrolledByUserId: instructor
       },
-      { upsert: true },
-    );
+      create: {
+        id: newId(),
+        courseId,
+        userId: learner,
+        institutionId: institution.id,
+        status: 'active',
+        enrolledByUserId: instructor,
+        enrolledAt: new Date()
+      }
+    });
     console.log(`Phase 2 demo ready: ${courseId}`);
     console.log(`Revision: ${published.publishedRevisionTag}`);
     console.log(`Learner enrolled: learner@ednova.test`);
   } finally {
-    await mongoose.disconnect();
+    await disconnectDatabase();
   }
 }
 

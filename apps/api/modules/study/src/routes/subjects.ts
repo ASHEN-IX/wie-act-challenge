@@ -89,14 +89,12 @@ router.post('/', upload.single('image'), async (req: DomainRequest, res: Respons
       imageUrl = `data:${mime};base64,${b64}`;
     }
 
-    const subject = new Subject({
+    const subject = await Subject.create({
       name,
       description,
       userId,
       image: imageUrl
     });
-
-    await subject.save();
 
     try {
       const USER_PROFILE_URL = 'module://users';
@@ -191,7 +189,7 @@ router.put('/:subjectId', upload.single('image'), async (req: DomainRequest, res
       subject.image = `data:${mime};base64,${b64}`;
     }
 
-    await subject.save();
+    await Subject.save(subject);
 
     res.json({
       subject: {

@@ -1,14 +1,45 @@
-import { Schema, model, models } from 'mongoose';
-const schema = new Schema({
-  identity: { type: String, required: true, unique: true },
-  courseId: { type: String, required: true }, revisionId: { type: String, required: true },
-  revisionTag: { type: String, required: true }, draftVersion: { type: Number, required: true },
-  actor: { type: String, required: true }, documentId: { type: String, required: true },
-  documentHash: { type: String, required: true }, regionId: { type: String, required: true },
-  cropHash: { type: String, required: true }, page: Number, bbox: [Number], sourceText: String,
-  model: { type: String, required: true },
-  state: { type: String, enum: ['queued', 'running', 'completed', 'failed', 'cancelled', 'stale', 'uncertain'], default: 'queued' },
-  claim: String, startedAt: Date, finishedAt: Date, error: String, proposalId: String,
-  usage: Schema.Types.Mixed, result: Schema.Types.Mixed,
-}, { timestamps: true, strict: 'throw' });
-export const FormulaRecognitionJob = models.FormulaRecognitionJob || model('FormulaRecognitionJob', schema);
+import type {
+  FormulaRecognitionJob as FormulaRecognitionJobRow,
+  Prisma
+} from '../../../../src/generated/prisma/client';
+import { prisma } from '../../../../shared/database';
+import { table } from './_table';
+
+export type IFormulaRecognitionJob = Omit<FormulaRecognitionJobRow, 'usage' | 'result' | 'bbox'> & {
+  _id: string;
+  usage?: unknown;
+  result?: unknown;
+  bbox: number[];
+};
+
+export const FormulaRecognitionJob = table<IFormulaRecognitionJob>({
+  delegate: () => prisma.formulaRecognitionJob,
+  jsonColumns: ['usage', 'result'],
+  defaults: () => ({ bbox: [], state: 'queued' }),
+  columns: (row) => ({
+    identity: row.identity,
+    courseId: row.courseId,
+    revisionId: row.revisionId,
+    revisionTag: row.revisionTag,
+    draftVersion: row.draftVersion,
+    actor: row.actor,
+    documentId: row.documentId,
+    documentHash: row.documentHash,
+    regionId: row.regionId,
+    cropHash: row.cropHash,
+    page: row.page,
+    bbox: row.bbox,
+    sourceText: row.sourceText,
+    model: row.model,
+    state: row.state,
+    claim: row.claim,
+    startedAt: row.startedAt,
+    finishedAt: row.finishedAt,
+    error: row.error,
+    proposalId: row.proposalId,
+    usage: row.usage as unknown as Prisma.InputJsonValue,
+    result: row.result as unknown as Prisma.InputJsonValue
+  })
+});
+
+export default FormulaRecognitionJob;

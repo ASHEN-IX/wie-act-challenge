@@ -1,4 +1,9 @@
-import { Document, Model, Schema, model, models } from 'mongoose';
+import type {
+  Prisma,
+  RoomWhiteboard as RoomWhiteboardRow
+} from '../../../../src/generated/prisma/client';
+import { prisma } from '../../../../shared/database';
+import { table } from './_table';
 import type { BoardElement } from '../../../../shared/ednova/whiteboard';
 
 /**
@@ -9,31 +14,26 @@ import type { BoardElement } from '../../../../shared/ednova/whiteboard';
  * checked by the room routes on every read and write. `version` counts accepted
  * writes and is the optimistic-concurrency token.
  *
- * Retention: boards are purged 7 days after their last edit (TTL index on
- * `updatedAt`). Nobody can open a board once its room has closed, so the TTL
- * only bounds how long the data lingers.
+ * Retention: boards are purged 7 days after their last edit. MongoDB used a TTL
+ * index on `updatedAt`; PostgreSQL sweeps in `ednova_sweep_expired_rows`.
  */
-export interface IRoomWhiteboard extends Document {
-  roomId: string;
-  version: number;
-  /** When true only the room host may edit; everyone can still view. */
-  locked: boolean;
+export type IRoomWhiteboard = Omit<RoomWhiteboardRow, 'elements'> & {
+  _id: string;
   elements: BoardElement[];
-  updatedAt: Date;
-}
+};
 
 export const WHITEBOARD_RETENTION_SECONDS = 7 * 24 * 60 * 60;
 
-const schema = new Schema<IRoomWhiteboard>(
-  {
-    roomId: { type: String, required: true, unique: true },
-    version: { type: Number, required: true, default: 0 },
-    locked: { type: Boolean, required: true, default: false },
-    elements: { type: [{ type: Schema.Types.Mixed }], default: [] }
-  },
-  { collection: 'room_whiteboards', timestamps: true }
-);
-schema.index({ updatedAt: 1 }, { expireAfterSeconds: WHITEBOARD_RETENTION_SECONDS });
+export const RoomWhiteboard = table<IRoomWhiteboard>({
+  delegate: () => prisma.roomWhiteboard,
+  jsonColumns: ['elements'],
+  defaults: () => ({ version: 0, locked: false, elements: [] }),
+  columns: (row) => ({
+    roomId: row.roomId,
+    version: row.version,
+    locked: row.locked,
+    elements: row.elements as unknown as Prisma.InputJsonValue
+  })
+});
 
-export const RoomWhiteboard: Model<IRoomWhiteboard> =
-  models.RoomWhiteboard || model<IRoomWhiteboard>('RoomWhiteboard', schema);
+export default RoomWhiteboard;

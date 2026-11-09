@@ -12,7 +12,7 @@ const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => 
 afterAll(() => exitSpy.mockRestore());
 
 // ── Mock LearningObjective model ──────────────────────────────────────────────
-const mockBulkWrite = jest.fn().mockResolvedValue({ modifiedCount: 0 });
+const mockFindOneAndUpdate = jest.fn().mockResolvedValue({ id: 'obj-row' });
 const mockUpdateMany = jest.fn().mockResolvedValue({ modifiedCount: 0 });
 const mockDeleteMany = jest.fn().mockResolvedValue({ deletedCount: 0 });
 const mockFind = jest.fn();
@@ -22,7 +22,7 @@ jest.mock('../models/index', () => ({
     find: mockFind,
     updateMany: mockUpdateMany,
     deleteMany: mockDeleteMany,
-    bulkWrite: mockBulkWrite
+    findOneAndUpdate: mockFindOneAndUpdate
   }
 }));
 
@@ -115,9 +115,9 @@ describe('syncObjectivesForDocument()', () => {
 
   test('inserts new objectives at version 1 when no prior active objectives', async () => {
     mockFind.mockReturnValue({
-      select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) })
+      select: jest.fn().mockResolvedValue([])
     });
-    mockBulkWrite.mockResolvedValue({ modifiedCount: 1 });
+    mockFindOneAndUpdate.mockResolvedValue({ id: 'obj-row' });
 
     const stats = await syncObjectivesForDocument({
       userId: 'u1',
@@ -128,19 +128,22 @@ describe('syncObjectivesForDocument()', () => {
     expect(stats.inserted).toBe(1);
     expect(stats.updated).toBe(0);
     expect(stats.superseded).toBe(0);
-    expect(mockBulkWrite).toHaveBeenCalledTimes(1);
-    const op = mockBulkWrite.mock.calls[0][0][0];
-    expect(op.updateOne.update.$setOnInsert.version).toBe(1);
+    expect(mockFindOneAndUpdate).toHaveBeenCalledTimes(1);
+    const [filter, update] = mockFindOneAndUpdate.mock.calls[0];
+    expect(filter).toEqual({
+      documentId: 'doc-1',
+      topicId: 'topic_1',
+      textHash: sha256(SAMPLE_OBJECTIVE.text)
+    });
+    expect(update.$setOnInsert.version).toBe(1);
   });
 
   test('version bumps existing objective on re-ingestion (same text)', async () => {
     const priorActive = [{ topicId: 'topic_1', textHash: sha256(SAMPLE_OBJECTIVE.text) }];
     mockFind.mockReturnValue({
-      select: jest.fn().mockReturnValue({
-        lean: jest.fn().mockResolvedValue(priorActive)
-      })
+      select: jest.fn().mockResolvedValue(priorActive)
     });
-    mockBulkWrite.mockResolvedValue({ modifiedCount: 1 });
+    mockFindOneAndUpdate.mockResolvedValue({ id: 'obj-row' });
 
     const stats = await syncObjectivesForDocument({
       userId: 'u1',
@@ -151,9 +154,10 @@ describe('syncObjectivesForDocument()', () => {
     expect(stats.inserted).toBe(0);
     expect(stats.updated).toBe(1);
     expect(stats.superseded).toBe(0);
-    const op = mockBulkWrite.mock.calls[0][0][0];
-    expect(op.updateOne.update.$inc.version).toBe(1);
-    expect(op.updateOne.update.$set.isActive).toBe(true);
+    const [, update, options] = mockFindOneAndUpdate.mock.calls[0];
+    expect(update.$inc.version).toBe(1);
+    expect(update.$set.isActive).toBe(true);
+    expect(options.upsert).toBeUndefined();
   });
 
   test('supersedes objectives not in the incoming set', async () => {
@@ -162,12 +166,10 @@ describe('syncObjectivesForDocument()', () => {
       { topicId: 'topic_1', textHash: sha256(SAMPLE_OBJECTIVE.text) }
     ];
     mockFind.mockReturnValue({
-      select: jest.fn().mockReturnValue({
-        lean: jest.fn().mockResolvedValue(priorActive)
-      })
+      select: jest.fn().mockResolvedValue(priorActive)
     });
     mockUpdateMany.mockResolvedValue({ modifiedCount: 1 });
-    mockBulkWrite.mockResolvedValue({ modifiedCount: 1 });
+    mockFindOneAndUpdate.mockResolvedValue({ id: 'obj-row' });
 
     const stats = await syncObjectivesForDocument({
       userId: 'u1',
@@ -188,7 +190,7 @@ describe('syncObjectivesForDocument()', () => {
       topics: []
     });
     expect(stats).toEqual({ inserted: 0, updated: 0, superseded: 0 });
-    expect(mockBulkWrite).not.toHaveBeenCalled();
+    expect(mockFindOneAndUpdate).not.toHaveBeenCalled();
   });
 });
 

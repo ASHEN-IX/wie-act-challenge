@@ -1,9 +1,10 @@
-/** Real isolated Mongo reward protocol. Synthetic reviewed deterministic records;
+/** Real PostgreSQL reward protocol over shared synthetic reviewed records;
  * no provider/model result is relabelled as real inference. */
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import assert from 'node:assert/strict';
-import mongoose from 'mongoose';
+import { connectDatabase, disconnectDatabase, prisma } from '../../shared/database';
+import { newId } from '../../shared/ids';
 import { mkdtemp, rm } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
@@ -17,7 +18,8 @@ import {
   Institution,
   InstitutionMembership,
   StudentAttempt,
-  LearningEvidence
+  LearningEvidence,
+  ActivityRecord
 } from '../../modules/study/src/models';
 import Gamification from '../../modules/user-profile/src/models/Gamification';
 import { LearningRewardLedger } from '../../modules/user-profile/src/models/LearningRewardLedger';
@@ -36,29 +38,47 @@ import { materializeRevisionFixture } from '../helpers/revisionArtifactFixture';
 import type { DomainRequest } from '../../src/framework/contracts';
 
 test(
-  'ED-33/34 real Mongo learning reward claim/apply/confirm protocol',
+  'ED-33/34 real PostgreSQL learning reward claim/apply/confirm protocol',
   { timeout: 120000 },
   async (t) => {
-    const name = 'ednova_reward_' + process.pid + '_' + Date.now();
-    const uri = 'mongodb://127.0.0.1:27018/' + name;
+    const runTag = `${process.pid}_${Date.now()}`;
+    const databaseUrl =
+      process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
+    process.env.DATABASE_URL = databaseUrl;
     const temp = await mkdtemp(path.join(os.tmpdir(), 'ednova-rewards-'));
     process.env.INGEST_UPLOADS_DIR = path.join(temp, 'uploads');
     process.env.FAISS_INDEX_DIR = path.join(temp, 'faiss');
-    await mongoose.connect(uri);
-    t.after(async () => {
-      await mongoose.connection.dropDatabase();
-      await mongoose.disconnect();
-      await rm(temp, { recursive: true, force: true });
-    });
-    const instructor = 'rewards_instructor',
-      learner = 'rewards_learner';
+    await connectDatabase();
+    let courseId: string | undefined; // eslint-disable-line prefer-const -- assigned after fixture use
+    const instructor = 'rewards_instructor_' + runTag,
+      learner = 'rewards_learner_' + runTag,
+      legacyAdmin = 'legacy_admin_' + runTag;
     const institution = await Institution.create({
+      _id: newId(),
       name: 'Synthetic rewards',
-      slug: name,
+      slug: 'rewards-' + runTag,
       createdByUserId: instructor,
       status: 'active'
     });
-    await InstitutionMembership.create([
+    t.after(async () => {
+      try {
+        await LearningEvidence.deleteMany({ userId: { startsWith: 'rewards_' } });
+        await StudentAttempt.deleteMany({ userId: { startsWith: 'rewards_' } });
+        await prisma.learningRewardLedger.deleteMany({ where: { userId: learner } });
+        await prisma.gamification.deleteMany({ where: { userId: learner } });
+        await prisma.quest.deleteMany({ where: { userId: legacyAdmin } });
+        await ActivityRecord.deleteMany({ courseId: courseId ?? '__none__' });
+        await CourseEnrollment.deleteMany({ courseId: courseId ?? '__none__' });
+        await CourseRevision.deleteMany({ courseId: courseId ?? '__none__' });
+        await Course.deleteMany({ _id: courseId ?? '__none__' });
+        await InstitutionMembership.deleteMany({ institutionId: institution._id });
+        await Institution.deleteMany({ _id: institution._id });
+      } finally {
+        await disconnectDatabase().catch(() => {});
+        await rm(temp, { recursive: true, force: true });
+      }
+    });
+    await InstitutionMembership.createMany([
       { institutionId: institution._id, userId: instructor, role: 'instructor', status: 'active' },
       {
         institutionId: institution._id,
@@ -77,7 +97,7 @@ test(
       subjectId: 'fixture',
       status: 'completed'
     });
-    const courseId = String(course._id);
+    courseId = String(course._id);
     await CourseEnrollment.create({
       courseId,
       institutionId: institution._id,
@@ -202,7 +222,8 @@ test(
           results[0].awardId
         );
         assert.equal((await learningRewardSummary(learner)).totalXp, 20);
-        assert.equal(await LearningRewardLedger.countDocuments(), 1);
+        // The database is shared across suites now, so scope the count to this learner.
+        assert.equal(await LearningRewardLedger.countDocuments({ userId: learner }), 1);
       }
     );
     await t.test(
@@ -242,7 +263,7 @@ test(
             cwd: path.resolve(__dirname, '../..'),
             env: {
               ...process.env,
-              REWARD_TEST_URI: uri,
+              REWARD_TEST_DATABASE_URL: databaseUrl,
               REWARD_TEST_ACTOR: learner,
               REWARD_TEST_EVIDENCE: id
             },
@@ -277,12 +298,14 @@ test(
         assert.ok(old);
         const id = await evidence(20);
         await awardAcceptedLearningEvidence(learner, id);
-        old.awardXp(25, 'legacy_fixture');
-        await assert.rejects(old.save(), /version/i);
+        // A stale document (its updatedAt no longer matches) must be rejected.
+        await assert.rejects(
+          () => Gamification.awardXp(old, 25, 'legacy_fixture'),
+          /version|Record to update not found|No record was found for an update/i
+        );
         const current = await Gamification.findOne({ userId: learner });
         assert.ok(current);
-        current.awardXp(25, 'legacy_fixture');
-        await current.save();
+        await Gamification.awardXp(current, 25, 'legacy_fixture');
         assert.equal((await learningRewardSummary(learner)).totalXp, 325);
         assert.equal((await learningRewardSummary(learner)).legacyXp, 25);
       }
@@ -303,7 +326,7 @@ test(
         req.user = {
           userId: String(req.headers['x-test-actor']),
           email: 'synthetic@example.test',
-          role: req.headers['x-test-actor'] === 'legacy_admin' ? 'admin' : 'student'
+          role: req.headers['x-test-actor'] === legacyAdmin ? 'admin' : 'student'
         };
       next();
     });
@@ -375,7 +398,7 @@ test(
         ]) {
           const denied = await request(app)
             .post('/legacy/award-xp')
-            .set('x-test-actor', 'legacy_admin')
+            .set('x-test-actor', legacyAdmin)
             .send({ action, xp_amount: 9999, userId: learner });
           assert.equal(denied.status, 409);
           assert.equal(denied.body.code, 'LEARNING_EVIDENCE_REQUIRED');
@@ -395,7 +418,7 @@ test(
     await t.test(
       'legacy quest completion preserves bookkeeping without issuing unverified XP',
       async () => {
-        const actor = 'legacy_admin';
+        const actor = legacyAdmin;
         await Quest.create({
           userId: actor,
           type: 'daily',
@@ -412,7 +435,7 @@ test(
           .set('x-test-actor', actor)
           .send({ action: 'task_complete' });
         assert.equal(result.status, 200);
-        assert.equal((await Quest.findOne({ userId: actor }).lean())?.status, 'completed');
+        assert.equal((await Quest.findOne({ userId: actor }))?.status, 'completed');
         assert.equal((await learningRewardSummary(actor)).totalXp, before.totalXp);
         assert.ok(!JSON.stringify(result.body).includes('999'));
       }
@@ -420,9 +443,17 @@ test(
     await t.test('mock, failed, unverified, and revoked evidence cannot award', async () => {
       const id = await evidence(21, '', 'MOCK_TEST');
       await assert.rejects(awardAcceptedLearningEvidence(learner, id), /unavailable/);
+      // `evaluator` is a JSON column; the embedded mode is rewritten whole.
+      const mockEvidence = await LearningEvidence.findOne({ evidenceId: id }).lean();
+      assert.ok(mockEvidence);
       await LearningEvidence.updateOne(
         { evidenceId: id },
-        { $set: { 'evaluator.executionMode': 'DETERMINISTIC_FALLBACK', masteryAchieved: false } }
+        {
+          $set: {
+            evaluator: { ...mockEvidence.evaluator, executionMode: 'DETERMINISTIC_FALLBACK' },
+            masteryAchieved: false
+          }
+        }
       );
       await assert.rejects(awardAcceptedLearningEvidence(learner, id));
       await LearningEvidence.updateOne({ evidenceId: id }, { $set: { masteryAchieved: true } });

@@ -8,8 +8,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import express, { type Response, type NextFunction } from 'express';
 import request from 'supertest';
-import mongoose from 'mongoose';
 import crypto from 'node:crypto';
+import { connectDatabase, disconnectDatabase } from '../../shared/database';
+import { newId } from '../../shared/ids';
 
 import {
   ActivityRecord,
@@ -34,13 +35,13 @@ import { generateActivityCandidate } from '../../modules/study/src/services/cour
 import { registerActivity } from '../../modules/study/src/services/activityAttempt';
 import type { DomainRequest } from '../../src/framework/contracts';
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27018/ednova-test';
-
 test('M22 / ED-14: Master End-to-End Educational System Evaluation Scenario', async (t) => {
-  await mongoose.connect(MONGO_URI);
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
+  await connectDatabase();
 
   const testPrefix = `m22_e2e_${Date.now()}`;
-  const institutionId = new mongoose.Types.ObjectId();
+  const institutionId = newId();
   const adminUserId = `${testPrefix}_admin`;
   const instructorUserId = `${testPrefix}_instructor`;
   const student1UserId = `${testPrefix}_alice`;
@@ -89,16 +90,17 @@ test('M22 / ED-14: Master End-to-End Educational System Evaluation Scenario', as
         await CourseEnrollment.deleteMany({ courseId });
         await ActivityRecord.deleteMany({ courseId });
         await StudentAttempt.deleteMany({ courseId });
-        await LearningEvidence.deleteMany({ 'activity.courseId': courseId });
+        await LearningEvidence.deleteMany({ userId: { startsWith: testPrefix } });
       }
-      await Institution.deleteMany({ _id: institutionId });
       await InstitutionMembership.deleteMany({ institutionId });
+      await Institution.deleteMany({ _id: institutionId });
+      await Course.deleteMany({ userId: { startsWith: testPrefix } });
       if (roomId) {
         await StudyRoom.deleteMany({ roomId });
         await FacilitatorIntervention.deleteMany({ roomId });
       }
     } finally {
-      await mongoose.disconnect();
+      await disconnectDatabase().catch(() => {});
     }
   });
 
@@ -115,7 +117,7 @@ test('M22 / ED-14: Master End-to-End Educational System Evaluation Scenario', as
         status: 'active'
       });
 
-      await InstitutionMembership.create([
+      await InstitutionMembership.createMany([
         { institutionId, userId: adminUserId, role: 'university_admin', status: 'active' },
         { institutionId, userId: instructorUserId, role: 'instructor', status: 'active' },
         { institutionId, userId: student1UserId, role: 'university_student', status: 'active' },
@@ -130,7 +132,7 @@ test('M22 / ED-14: Master End-to-End Educational System Evaluation Scenario', as
         userId: adminUserId,
         ownerUserId: adminUserId,
         scope: 'institutional',
-        institutionId: institutionId.toString(),
+        institutionId,
         assignedInstructorIds: [instructorUserId],
         status: 'completed',
         topics: []
@@ -139,26 +141,23 @@ test('M22 / ED-14: Master End-to-End Educational System Evaluation Scenario', as
       await prepareCourseFixture(courseId, t);
 
       // Enroll students in course
-      await CourseEnrollment.create([
+      await CourseEnrollment.createMany([
         {
           courseId,
           institutionId,
           userId: student1UserId,
-          enrolledRole: 'student',
           status: 'active'
         },
         {
           courseId,
           institutionId,
           userId: student2UserId,
-          enrolledRole: 'student',
           status: 'active'
         },
         {
           courseId,
           institutionId,
           userId: student3UserId,
-          enrolledRole: 'student',
           status: 'active'
         }
       ]);
@@ -171,38 +170,40 @@ test('M22 / ED-14: Master End-to-End Educational System Evaluation Scenario', as
 
   // STEP 2: Course Studio Ingestion & Hierarchy Curation
   await t.test('Step 2: Course Studio draft hierarchy curation & provenance tracking', async () => {
+    const curatedTopics = [
+      {
+        id: 'topic_network_flow',
+        title: 'Maximum Flow and Minimum Cut Equivalence',
+        subtopics: [
+          {
+            id: 'subtopic_edmonds_karp',
+            title: 'Edmonds-Karp BFS Augmenting Paths',
+            learning_objectives: [
+              {
+                id: objectiveId,
+                text: 'Analyze the polynomial bound O(V*E^2) using shortest augmenting paths',
+                bloomLevel: 'analyze'
+              }
+            ]
+          }
+        ]
+      }
+    ];
+    // Only an ingested, topic-bearing draft is editable; the review confirms it.
     const initialRev = await CourseRevision.create({
       courseId,
       revisionTag: `rev_init_${Date.now()}`,
       contentHash: 'sha256:0000000000000000000000000000000000000000000000000000000000000000',
       status: 'draft',
       isInstructorReviewed: false,
-      topics: []
+      topics: curatedTopics
     });
 
     const draftUpdate = await updateCourseDraft(instructorUserId, courseId, {
       expectedRevisionTag: initialRev.revisionTag,
       summary: 'Curated curriculum covering Ford-Fulkerson and Edmonds-Karp complexity',
       isInstructorReviewed: true,
-      topics: [
-        {
-          id: 'topic_network_flow',
-          title: 'Maximum Flow and Minimum Cut Equivalence',
-          subtopics: [
-            {
-              id: 'subtopic_edmonds_karp',
-              title: 'Edmonds-Karp BFS Augmenting Paths',
-              learning_objectives: [
-                {
-                  id: objectiveId,
-                  text: 'Analyze the polynomial bound O(V*E^2) using shortest augmenting paths',
-                  bloomLevel: 'analyze'
-                }
-              ]
-            }
-          ]
-        }
-      ]
+      topics: curatedTopics
     });
 
     draftRevisionTag = draftUpdate.revisionTag;

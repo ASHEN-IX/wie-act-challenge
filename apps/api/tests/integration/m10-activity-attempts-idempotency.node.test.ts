@@ -8,13 +8,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import express, { type Response, type NextFunction } from 'express';
 import request from 'supertest';
-import mongoose from 'mongoose';
 import crypto from 'node:crypto';
+import { connectDatabase, disconnectDatabase } from '../../shared/database';
+import { newId } from '../../shared/ids';
 
 import {
+  ActivityRecord,
   Course,
   CourseEnrollment,
   CourseRevision,
+  Institution,
   InstitutionMembership,
   LearningEvidence,
   StudentAttempt
@@ -24,11 +27,8 @@ import { updateCourseDraft } from '../../modules/study/src/services/courseDraft'
 import { publishCourseRevision } from '../../modules/study/src/services/coursePublication';
 import type { DomainRequest } from '../../src/framework/contracts';
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27018/ednova-test';
-
 test('M10 / ED-29: Durable Activity Attempts, Assessment & Accepted Evidence Integration', async (t) => {
-  await mongoose.connect(MONGO_URI);
-  const db = mongoose.connection.db!;
+  await connectDatabase();
 
   const testPrefix = `m10_${Date.now()}`;
   const ownerUserId = `${testPrefix}_owner`;
@@ -36,7 +36,7 @@ test('M10 / ED-29: Durable Activity Attempts, Assessment & Accepted Evidence Int
   const studentId = `${testPrefix}_student`;
   const otherStudentId = `${testPrefix}_other_student`;
   const foreignUserId = `${testPrefix}_foreign_user`;
-  const institutionId = new mongoose.Types.ObjectId();
+  const institutionId = newId();
 
   let courseId: string;
   let publishedRevisionTag: string;
@@ -65,27 +65,33 @@ test('M10 / ED-29: Durable Activity Attempts, Assessment & Accepted Evidence Int
     await cleanupCourseFixtures();
     try {
       if (courseId) {
-        await db
-          .collection('course_revisions')
-          .deleteMany({ courseId: new mongoose.Types.ObjectId(courseId) });
-        await db.collection('activity_records').deleteMany({ courseId });
+        await CourseRevision.deleteMany({ courseId });
+        await ActivityRecord.deleteMany({ courseId });
       }
-      await db.collection('courses').deleteMany({ userId: { $regex: testPrefix } });
-      await db.collection('course_enrollments').deleteMany({ userId: { $regex: testPrefix } });
-      await db.collection('institution_memberships').deleteMany({ userId: { $regex: testPrefix } });
-      await db.collection('student_attempts').deleteMany({ userId: { $regex: testPrefix } });
-      await db.collection('learning_evidences').deleteMany({ userId: { $regex: testPrefix } });
+      await Course.deleteMany({ userId: { contains: testPrefix } });
+      await CourseEnrollment.deleteMany({ userId: { contains: testPrefix } });
+      await InstitutionMembership.deleteMany({ userId: { contains: testPrefix } });
+      await StudentAttempt.deleteMany({ userId: { contains: testPrefix } });
+      await LearningEvidence.deleteMany({ userId: { contains: testPrefix } });
+      await Institution.deleteMany({ _id: institutionId });
     } catch {
       // ignore
     } finally {
-      await mongoose.disconnect().catch(() => {});
+      await disconnectDatabase().catch(() => {});
     }
   });
 
   await t.test(
     '1. Setup: Create published course with active enrollment and registered activity',
     async () => {
-      // 1. Instructor membership
+      // 1. Institution before memberships (real foreign key).
+      await Institution.create({
+        id: institutionId,
+        name: 'M10 Real Analysis Institution',
+        slug: `m10-${institutionId}`,
+        createdByUserId: ownerUserId,
+        status: 'active'
+      });
       await InstitutionMembership.create({
         institutionId,
         userId: instructorId,

@@ -2,6 +2,7 @@ import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response } from 'express';
 import type { IUserProfile } from '../models/UserProfile';
 import type { FriendshipStatus } from '../models/Friendship';
+import type { Prisma } from '../../../../src/generated/prisma/client';
 import { errorDetails } from '@ednova/shared/errors';
 
 interface FriendProfileProjection {
@@ -9,8 +10,8 @@ interface FriendProfileProjection {
   name: string;
   avatar: string;
   level: number;
-  bio?: string;
-  friendCode: string;
+  bio?: string | null;
+  friendCode: string | null;
   onlineStatus: IUserProfile['onlineStatus'] | 'hidden';
   isFriend: boolean;
   stats?: IUserProfile['stats'];
@@ -76,16 +77,13 @@ router.get('/', async (req: DomainRequest, res: Response) => {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
 
-    const friendships = await Friendship.find({
-      $or: [{ requester: userId }, { recipient: userId }],
-      status: 'accepted'
-    })
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .lean();
+    const friendships = await Friendship.findMany(
+      { OR: [{ requester: userId }, { recipient: userId }], status: 'accepted' },
+      { skip: (page - 1) * limit, take: limit }
+    );
 
     const friendIds = friendships.map((f) => (f.requester === userId ? f.recipient : f.requester));
-    const profiles = await UserProfile.find({ userId: { $in: friendIds } }).lean();
+    const profiles = await UserProfile.findMany({ userId: { in: friendIds } });
     const profileMap: Record<
       string,
       Partial<Pick<IUserProfile, 'nickname' | 'avatar' | 'privacy' | 'onlineStatus'>>
@@ -95,9 +93,7 @@ router.get('/', async (req: DomainRequest, res: Response) => {
     });
 
     // Fetch actual levels from Gamification collection
-    const gamDocs = await Gamification.find({ userId: { $in: friendIds } })
-      .select('userId level')
-      .lean();
+    const gamDocs = await Gamification.findMany({ userId: { in: friendIds } });
     const levelMap: Record<string, number> = {};
     gamDocs.forEach((g) => {
       levelMap[g.userId] = g.level;
@@ -127,12 +123,13 @@ router.get('/', async (req: DomainRequest, res: Response) => {
 // GET /requests/incoming — Pending received
 router.get('/requests/incoming', async (req: DomainRequest, res: Response) => {
   try {
-    const requests = await Friendship.find({ recipient: req.user!.userId, status: 'pending' })
-      .sort({ createdAt: -1 })
-      .lean();
+    const requests = await Friendship.findMany(
+      { recipient: req.user!.userId, status: 'pending' },
+      { orderBy: { createdAt: 'desc' } }
+    );
 
     const userIds = requests.map((r) => r.requester);
-    const profiles = await UserProfile.find({ userId: { $in: userIds } }).lean();
+    const profiles = await UserProfile.findMany({ userId: { in: userIds } });
     const profileMap: Record<
       string,
       Partial<Pick<IUserProfile, 'nickname' | 'avatar' | 'privacy' | 'onlineStatus'>>
@@ -141,9 +138,7 @@ router.get('/requests/incoming', async (req: DomainRequest, res: Response) => {
       profileMap[p.userId] = p;
     });
 
-    const gamDocs = await Gamification.find({ userId: { $in: userIds } })
-      .select('userId level')
-      .lean();
+    const gamDocs = await Gamification.findMany({ userId: { in: userIds } });
     const levelMap: Record<string, number> = {};
     gamDocs.forEach((g) => {
       levelMap[g.userId] = g.level;
@@ -167,12 +162,13 @@ router.get('/requests/incoming', async (req: DomainRequest, res: Response) => {
 // GET /requests/outgoing — Pending sent
 router.get('/requests/outgoing', async (req: DomainRequest, res: Response) => {
   try {
-    const requests = await Friendship.find({ requester: req.user!.userId, status: 'pending' })
-      .sort({ createdAt: -1 })
-      .lean();
+    const requests = await Friendship.findMany(
+      { requester: req.user!.userId, status: 'pending' },
+      { orderBy: { createdAt: 'desc' } }
+    );
 
     const userIds = requests.map((r) => r.recipient);
-    const profiles = await UserProfile.find({ userId: { $in: userIds } }).lean();
+    const profiles = await UserProfile.findMany({ userId: { in: userIds } });
     const profileMap: Record<
       string,
       Partial<Pick<IUserProfile, 'nickname' | 'avatar' | 'privacy' | 'onlineStatus'>>
@@ -181,9 +177,7 @@ router.get('/requests/outgoing', async (req: DomainRequest, res: Response) => {
       profileMap[p.userId] = p;
     });
 
-    const gamDocs = await Gamification.find({ userId: { $in: userIds } })
-      .select('userId level')
-      .lean();
+    const gamDocs = await Gamification.findMany({ userId: { in: userIds } });
     const levelMap: Record<string, number> = {};
     gamDocs.forEach((g) => {
       levelMap[g.userId] = g.level;
@@ -238,7 +232,7 @@ router.post('/request', async (req: DomainRequest, res: Response) => {
 
     // Check if blocked
     const blocked = await Friendship.findOne({
-      $or: [
+      OR: [
         { requester: recipientId, recipient: requesterId, status: 'blocked' },
         { requester: requesterId, recipient: recipientId, status: 'blocked' }
       ]
@@ -253,7 +247,7 @@ router.post('/request', async (req: DomainRequest, res: Response) => {
 
     // Check existing relationship
     const existing = await Friendship.findOne({
-      $or: [
+      OR: [
         { requester: requesterId, recipient: recipientId },
         { requester: recipientId, recipient: requesterId }
       ]
@@ -273,7 +267,7 @@ router.post('/request', async (req: DomainRequest, res: Response) => {
         existing.status = 'pending';
         existing.requester = requesterId;
         existing.recipient = recipientId;
-        await existing.save();
+        await Friendship.save(existing);
         await notify(
           recipientId,
           'friend_request',
@@ -311,7 +305,7 @@ router.post('/request', async (req: DomainRequest, res: Response) => {
 router.put('/request/:friendshipId/accept', async (req: DomainRequest, res: Response) => {
   try {
     const friendship = await Friendship.findOne({
-      _id: req.params.friendshipId,
+      id: String(req.params.friendshipId),
       recipient: req.user!.userId,
       status: 'pending'
     });
@@ -319,7 +313,7 @@ router.put('/request/:friendshipId/accept', async (req: DomainRequest, res: Resp
     if (!friendship) return res.status(404).json({ error: 'Request not found' });
 
     friendship.status = 'accepted';
-    await friendship.save();
+    await Friendship.save(friendship);
 
     // Notify requester
     await notify(
@@ -360,7 +354,7 @@ router.put('/request/:friendshipId/accept', async (req: DomainRequest, res: Resp
 router.put('/request/:friendshipId/reject', async (req: DomainRequest, res: Response) => {
   try {
     const friendship = await Friendship.findOne({
-      _id: req.params.friendshipId,
+      id: String(req.params.friendshipId),
       recipient: req.user!.userId,
       status: 'pending'
     });
@@ -368,7 +362,7 @@ router.put('/request/:friendshipId/reject', async (req: DomainRequest, res: Resp
     if (!friendship) return res.status(404).json({ error: 'Request not found' });
 
     friendship.status = 'rejected';
-    await friendship.save();
+    await Friendship.save(friendship);
 
     res.json({ message: 'Friend request rejected' });
   } catch {
@@ -380,7 +374,7 @@ router.put('/request/:friendshipId/reject', async (req: DomainRequest, res: Resp
 router.delete('/request/:friendshipId', async (req: DomainRequest, res: Response) => {
   try {
     const result = await Friendship.findOneAndDelete({
-      _id: req.params.friendshipId,
+      id: String(req.params.friendshipId),
       requester: req.user!.userId,
       status: 'pending'
     });
@@ -396,10 +390,10 @@ router.delete('/request/:friendshipId', async (req: DomainRequest, res: Response
 router.delete('/:friendId', async (req: DomainRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
-    const friendId = req.params.friendId;
+    const friendId = String(req.params.friendId);
 
     const result = await Friendship.findOneAndDelete({
-      $or: [
+      OR: [
         { requester: userId, recipient: friendId, status: 'accepted' },
         { requester: friendId, recipient: userId, status: 'accepted' }
       ]
@@ -416,15 +410,15 @@ router.delete('/:friendId', async (req: DomainRequest, res: Response) => {
 router.post('/block/:userId', async (req: DomainRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
-    const blockId = req.params.userId;
+    const blockId = String(req.params.userId);
 
     // Remove existing friendship if any
     if (blockId === userId) return res.status(400).json({ error: 'Cannot block yourself' });
     // Never delete a block the other person placed against us.
     await Friendship.deleteMany({
-      $or: [
+      OR: [
         { requester: userId, recipient: blockId },
-        { requester: blockId, recipient: userId, status: { $ne: 'blocked' } }
+        { requester: blockId, recipient: userId, status: { not: 'blocked' } }
       ]
     });
 
@@ -441,7 +435,7 @@ router.delete('/block/:userId', async (req: DomainRequest, res: Response) => {
   try {
     await Friendship.findOneAndDelete({
       requester: req.user!.userId,
-      recipient: req.params.userId,
+      recipient: String(req.params.userId),
       status: 'blocked'
     });
     res.json({ message: 'User unblocked' });
@@ -453,12 +447,12 @@ router.delete('/block/:userId', async (req: DomainRequest, res: Response) => {
 // GET /blocked
 router.get('/blocked', async (req: DomainRequest, res: Response) => {
   try {
-    const blocked = await Friendship.find({
+    const blocked = await Friendship.findMany({
       requester: req.user!.userId,
       status: 'blocked'
-    }).lean();
+    });
     const userIds = blocked.map((b) => b.recipient);
-    const profiles = await UserProfile.find({ userId: { $in: userIds } }).lean();
+    const profiles = await UserProfile.findMany({ userId: { in: userIds } });
 
     res.json({
       blocked: profiles.map((p) => ({
@@ -494,7 +488,7 @@ router.post('/invite-to-room', async (req: DomainRequest, res: Response) => {
     if (friendId === userId) return res.status(400).json({ error: 'Cannot invite yourself' });
 
     const friendship = await Friendship.findOne({
-      $or: [
+      OR: [
         { requester: userId, recipient: friendId, status: 'accepted' },
         { requester: friendId, recipient: userId, status: 'accepted' }
       ]
@@ -518,7 +512,7 @@ router.post('/invite-to-room', async (req: DomainRequest, res: Response) => {
     if (!room || room.status !== 'active')
       return res.status(409).json({ error: 'Room is not active' });
 
-    const inviter = await UserProfile.findOne({ userId }).select('nickname').lean();
+    const inviter = await UserProfile.findOne({ userId });
     const inviterName = inviter?.nickname || 'A connection';
     await notify(
       friendId,
@@ -548,36 +542,36 @@ router.get('/search', async (req: DomainRequest, res: Response) => {
     if (q.length < 3 || q.length > 50) return res.json({ results: [] });
 
     // Get blocked users to exclude
-    const blockedDocs = await Friendship.find({
-      $or: [
+    const blockedDocs = await Friendship.findMany({
+      OR: [
         { requester: userId, status: 'blocked' },
         { recipient: userId, status: 'blocked' }
       ]
-    }).lean();
+    });
     const blockedIds = blockedDocs.map((b) => (b.requester === userId ? b.recipient : b.requester));
     blockedIds.push(userId); // exclude self
 
-    const query = {
-      userId: { $nin: blockedIds },
-      $or: [
-        {
-          nickname: { $regex: '^' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' },
-          'privacy.allowRequests': { $ne: 'nobody' }
-        },
-        { friendCode: q.toUpperCase() }
-      ]
+    // `startsWith` is a parameterized LIKE prefix; the pattern is never
+    // interpolated into the SQL text. Privacy filtering stays in application
+    // code because it lives inside a JSON column.
+    const query: Prisma.UserProfileWhereInput = {
+      userId: { notIn: blockedIds },
+      OR: [{ nickname: { startsWith: q, mode: 'insensitive' } }, { friendCode: q.toUpperCase() }]
     };
 
-    const profiles = await UserProfile.find(query).limit(20).lean();
+    const candidateProfiles = await UserProfile.findMany(query, { take: 20 });
+    const profiles = candidateProfiles.filter(
+      (profile) => profile.privacy?.allowRequests !== 'nobody'
+    );
 
     // Check friendship status for each result
     const resultUserIds = profiles.map((p) => p.userId);
-    const friendships = await Friendship.find({
-      $or: resultUserIds.flatMap((fid) => [
+    const friendships = await Friendship.findMany({
+      OR: resultUserIds.flatMap((fid) => [
         { requester: userId, recipient: fid },
         { requester: fid, recipient: userId }
       ])
-    }).lean();
+    });
 
     const friendshipMap: Record<string, FriendshipStatus> = {};
     friendships.forEach((f) => {
@@ -586,9 +580,7 @@ router.get('/search', async (req: DomainRequest, res: Response) => {
     });
 
     // Batch-fetch Gamification levels for search results
-    const searchGamDocs = await Gamification.find({ userId: { $in: resultUserIds } })
-      .select('userId level')
-      .lean();
+    const searchGamDocs = await Gamification.findMany({ userId: { in: resultUserIds } });
     const searchLevelMap: Record<string, number> = {};
     searchGamDocs.forEach((g) => {
       searchLevelMap[g.userId] = g.level;
@@ -614,21 +606,21 @@ router.get('/search', async (req: DomainRequest, res: Response) => {
 router.get('/:friendId/profile', async (req: DomainRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
-    const friendId = req.params.friendId;
+    const friendId = String(req.params.friendId);
 
     // Verify friendship
     const friendship = await Friendship.findOne({
-      $or: [
+      OR: [
         { requester: userId, recipient: friendId, status: 'accepted' },
         { requester: friendId, recipient: userId, status: 'accepted' }
       ]
     });
 
-    const profile = await UserProfile.findOne({ userId: friendId }).lean();
+    const profile = await UserProfile.findOne({ userId: friendId });
     if (!profile) return res.status(404).json({ error: 'Profile not found' });
 
     // Get actual level from Gamification
-    const gam = await Gamification.findOne({ userId: friendId }).select('level').lean();
+    const gam = await Gamification.findOne({ userId: friendId });
 
     const isFriend = !!friendship;
     const result: FriendProfileProjection = {
@@ -657,17 +649,19 @@ router.get('/:friendId/profile', async (req: DomainRequest, res: Response) => {
 router.get('/online', async (req: DomainRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
-    const friendships = await Friendship.find({
-      $or: [{ requester: userId }, { recipient: userId }],
+    const friendships = await Friendship.findMany({
+      OR: [{ requester: userId }, { recipient: userId }],
       status: 'accepted'
-    }).lean();
+    });
 
     const friendIds = friendships.map((f) => (f.requester === userId ? f.recipient : f.requester));
-    const onlineProfiles = await UserProfile.find({
-      userId: { $in: friendIds },
-      onlineStatus: { $ne: 'offline' },
-      'privacy.showOnlineStatus': { $ne: false }
-    }).lean();
+    const candidateProfiles = await UserProfile.findMany({
+      userId: { in: friendIds },
+      onlineStatus: { not: 'offline' }
+    });
+    const onlineProfiles = candidateProfiles.filter(
+      (profile) => profile.privacy?.showOnlineStatus !== false
+    );
 
     res.json({
       online: onlineProfiles.map((p) => {
@@ -690,7 +684,7 @@ router.get('/count', async (req: DomainRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
     const total = await Friendship.countDocuments({
-      $or: [{ requester: userId }, { recipient: userId }],
+      OR: [{ requester: userId }, { recipient: userId }],
       status: 'accepted'
     });
     const pending = await Friendship.countDocuments({
@@ -699,15 +693,14 @@ router.get('/count', async (req: DomainRequest, res: Response) => {
     });
 
     // Online count
-    const friendships = await Friendship.find({
-      $or: [{ requester: userId }, { recipient: userId }],
+    const friendships = await Friendship.findMany({
+      OR: [{ requester: userId }, { recipient: userId }],
       status: 'accepted'
-    }).lean();
-    const friendIds = friendships.map((f) => (f.requester === userId ? f.recipient : f.requester));
-    const online = await UserProfile.countDocuments({
-      userId: { $in: friendIds },
-      onlineStatus: { $ne: 'offline' }
     });
+    const friendIds = friendships.map((f) => (f.requester === userId ? f.recipient : f.requester));
+    const online = (
+      await UserProfile.findMany({ userId: { in: friendIds }, onlineStatus: { not: 'offline' } })
+    ).length;
 
     res.json({ total, online, pending });
   } catch {

@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import mongoose from 'mongoose';
+import { connectDatabase, disconnectDatabase, prisma } from '../../shared/database';
 import type { ActivityDefinition, Contract } from '../../shared/ednova/contracts';
 import {
   Course,
@@ -30,20 +30,32 @@ test('Adaptive reviewed evidence and requester-only graduated source support', a
   };
   process.env.INGEST_UPLOADS_DIR = path.join(storage, 'uploads');
   process.env.FAISS_INDEX_DIR = path.join(storage, 'faiss');
-  await mongoose.connect(
-    'mongodb://127.0.0.1:27018/ednova_final_adaptive_' + process.pid + '_' + Date.now()
-  );
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
+  await connectDatabase();
+  // The test database is shared, so the actor is run-unique and teardown deletes
+  // exactly the rows this suite created.
+  const actor = `adaptive_${process.pid}_${Date.now()}`;
+  let courseId = '';
   t.after(async () => {
     await cleanupRevisionFixtures();
-    await mongoose.connection.dropDatabase();
-    await mongoose.disconnect();
-    await rm(storage, { recursive: true, force: true });
-    for (const [key, value] of Object.entries(originalStorage)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
+    try {
+      if (courseId) {
+        await ActivityRecord.deleteMany({ courseId });
+        await LearningEvidence.deleteMany({ userId: actor });
+        await prisma.learningSupport.deleteMany({ where: { userId: actor } });
+        // Revisions cascade from the course row.
+        await Course.deleteMany({ userId: actor });
+      }
+    } finally {
+      await disconnectDatabase().catch(() => {});
+      await rm(storage, { recursive: true, force: true });
+      for (const [key, value] of Object.entries(originalStorage)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
     }
   });
-  const actor = 'adaptive_owner';
   const course = await Course.create({
     userId: actor,
     ownerUserId: actor,
@@ -52,7 +64,7 @@ test('Adaptive reviewed evidence and requester-only graduated source support', a
     subjectId: 'fixture',
     status: 'completed'
   });
-  const courseId = String(course._id);
+  courseId = String(course._id);
   await CourseRevision.create({
     courseId,
     revisionTag: 'rev_policy',
@@ -150,12 +162,12 @@ test('Adaptive reviewed evidence and requester-only graduated source support', a
       assert.equal((await choose()).activity?.activityId, records[1].definition.activityId);
       await answer(1, true);
       assert.equal((await choose()).activity?.activityId, records[2].definition.activityId);
-      const count = await LearningEvidence.countDocuments();
+      const count = await LearningEvidence.countDocuments({ userId: actor });
       await answer(2, false);
       const result = await choose();
       assert.equal(result.assessmentState, 'needs_support');
       assert.equal(result.activity?.activityId, records[0].definition.activityId);
-      assert.equal(await LearningEvidence.countDocuments(), count);
+      assert.equal(await LearningEvidence.countDocuments({ userId: actor }), count);
       await answer(2, true);
       assert.equal((await choose()).targetDemand, 3);
     }
@@ -209,6 +221,6 @@ test('Adaptive reviewed evidence and requester-only graduated source support', a
     await assert.rejects(() =>
       sourceLearningSupport(actor, courseId, { ...support, mode: 'explain' })
     );
-    assert.equal(await ActivityRecord.countDocuments(), 3);
+    assert.equal(await ActivityRecord.countDocuments({ courseId }), 3);
   });
 });

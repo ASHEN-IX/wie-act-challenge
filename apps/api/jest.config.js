@@ -16,11 +16,18 @@ module.exports = {
       'ts-jest',
       {
         isolatedModules: true,
-        diagnostics: false
+        diagnostics: false,
+        // The generated Prisma client loads its query compiler through a
+        // dynamic `import()`. Under Jest that only works when the client is
+        // compiled to CommonJS, so the test transform overrides `module`.
+        tsconfig: { module: 'commonjs' }
       }
     ]
   },
   moduleNameMapper: {
+    // The generated Prisma client is read from source so tests do not require a
+    // prior `tsc` run; the other `../src` mappings still resolve to dist.
+    '^\\.\\./src/generated/prisma/(.*)$': '<rootDir>/src/generated/prisma/$1',
     '^\\.\\./\\.\\./src/(.*)$': '<rootDir>/dist/$1',
     '^\\.\\./src/(.*)$': '<rootDir>/dist/$1'
   },

@@ -232,8 +232,7 @@ router.post('/:sessionId/task/complete', async (req: DomainRequest, res: Respons
       taskProgress.tasks[currentIndex + 1].startedAt = new Date();
     }
 
-    session.markModified('taskProgress');
-    await session.save();
+    await StudySession.save(session);
 
     // Sync completion back to the Task collection if taskId is a real MongoDB ObjectId
     if (completedTaskId && isObjectId(completedTaskId)) {
@@ -346,8 +345,7 @@ router.post('/:sessionId/task/skip', async (req: DomainRequest, res: Response) =
       taskProgress.tasks[currentIndex + 1].startedAt = new Date();
     }
 
-    session.markModified('taskProgress');
-    await session.save();
+    await StudySession.save(session);
 
     const allDone = currentIndex + 1 >= taskProgress.tasks.length;
 

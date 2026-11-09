@@ -1,11 +1,15 @@
 name: ednova-dev
 services:
-  mongodb:
-    image: mongo:7
-    ports: ['127.0.0.1:27018:27017']
-    volumes: ['mongo-data:/data/db']
+  postgres:
+    image: postgres:17-alpine
+    ports: ['127.0.0.1:5433:5432']
+    environment:
+      POSTGRES_USER: ednova
+      POSTGRES_PASSWORD: ednova
+      POSTGRES_DB: ednova
+    volumes: ['postgres-data:/var/lib/postgresql/data']
     healthcheck:
-      test: [CMD, mongosh, --quiet, --eval, "db.adminCommand('ping')"]
+      test: [CMD-SHELL, 'pg_isready -U ednova -d ednova']
       interval: 5s
       timeout: 5s
       retries: 12
@@ -34,5 +38,5 @@ services:
     image: axllent/mailpit:v1.31.4
     ports: ['127.0.0.1:1026:1025', '127.0.0.1:8026:8025']
 volumes:
-  mongo-data:
+  postgres-data:
   rabbit-data:

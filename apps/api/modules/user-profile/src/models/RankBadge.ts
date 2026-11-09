@@ -1,65 +1,46 @@
-import mongoose, { Document, Model, Schema } from 'mongoose';
+import type { Prisma, RankBadge as RankBadgeRow } from '../../../../src/generated/prisma/client';
+import { prisma, toDocument } from '../../../../shared/database';
+import { newId } from '../../../../shared/ids';
 
-export interface IRankBadge extends Document {
-  rankIndex: number;
-  rankName: string;
-  tier: string;
-  division: string | null;
-  badgeKey: 'first' | 'second' | 'third' | 'use';
-  imagePath: string;
-  isActive: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+export type IRankBadge = RankBadgeRow & { _id: string };
+
+function hydrate(row: RankBadgeRow): IRankBadge {
+  return toDocument(row) as unknown as IRankBadge;
 }
 
-const rankBadgeSchema = new Schema<IRankBadge>(
-  {
-    rankIndex: {
-      type: Number,
-      required: true,
-      unique: true,
-      index: true,
-      min: 0
-    },
-    rankName: {
-      type: String,
-      required: true,
-      trim: true
-    },
-    tier: {
-      type: String,
-      required: true,
-      lowercase: true,
-      trim: true,
-      index: true
-    },
-    division: {
-      type: String,
-      default: null
-    },
-    badgeKey: {
-      type: String,
-      required: true,
-      enum: ['first', 'second', 'third', 'use']
-    },
-    imagePath: {
-      type: String,
-      required: true
-    },
-    isActive: {
-      type: Boolean,
-      default: true,
-      index: true
-    }
+export const RankBadge = {
+  async findMany(
+    where: Prisma.RankBadgeWhereInput = {},
+    options: { orderBy?: Prisma.RankBadgeOrderByWithRelationInput } = {}
+  ): Promise<IRankBadge[]> {
+    const rows = await prisma.rankBadge.findMany({ where, ...options });
+    return rows.map(hydrate);
   },
-  {
-    timestamps: true
-  }
-);
 
-const RankBadge =
-  (mongoose.models.RankBadge as Model<IRankBadge>) ||
-  mongoose.model<IRankBadge>('RankBadge', rankBadgeSchema);
+  async findOne(where: Prisma.RankBadgeWhereInput): Promise<IRankBadge | null> {
+    const row = await prisma.rankBadge.findFirst({ where });
+    return row ? hydrate(row) : null;
+  },
+
+  async countDocuments(where: Prisma.RankBadgeWhereInput = {}): Promise<number> {
+    return prisma.rankBadge.count({ where });
+  },
+
+  async upsertByRankIndex(
+    data: Prisma.RankBadgeUncheckedCreateInput & { rankIndex: number }
+  ): Promise<IRankBadge> {
+    const row = await prisma.rankBadge.upsert({
+      where: { rankIndex: data.rankIndex },
+      update: data,
+      create: { ...data, id: data.id ?? newId() }
+    });
+    return hydrate(row);
+  },
+
+  async deleteMany(where: Prisma.RankBadgeWhereInput = {}) {
+    const result = await prisma.rankBadge.deleteMany({ where });
+    return { deletedCount: result.count };
+  }
+};
 
 export default RankBadge;
-module.exports = RankBadge;

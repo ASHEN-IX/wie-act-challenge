@@ -1,16 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MongoClient, ObjectId } from 'mongodb';
 import bcrypt from 'bcryptjs';
-import { migrateAuth } from '../../scripts/migrate-auth';
+import { connectDatabase, disconnectDatabase, prisma } from '../../shared/database';
+import { newId } from '../../shared/ids';
+import type { CourseStatus, Role, Tier } from '../../src/generated/prisma/client';
 import { rateLimiter } from '../../shared/middleware';
 
 test(
   'Step 8: Independent All-Channel Security and Adversarial Assessment',
   { timeout: 60000 },
   async (t) => {
-    const name = `step8_sec_${process.pid}_${Date.now()}`;
-    process.env.MONGODB_URI = `mongodb://127.0.0.1:27018/${name}`;
+    process.env.DATABASE_URL =
+      process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
+    // Token issuance is exercised without a media server; the JWT signing config
+    // is synthetic and local, exactly as the LiveKit token suite uses it.
+    process.env.LIVEKIT_URL = 'ws://127.0.0.1:7880';
+    process.env.LIVEKIT_API_KEY = 'test_lk_key';
+    process.env.LIVEKIT_API_SECRET = 'test_lk_secret_1234567890';
     process.env.BETTER_AUTH_SECRET = 'step8-security-matrix-secret-at-least-32-chars';
     process.env.AUTH_TRUSTED_ORIGINS = 'http://localhost:5173';
     process.env.BETTER_AUTH_URL = 'http://localhost:5173';
@@ -19,49 +25,85 @@ test(
     process.env.REDIS_URL = '';
     process.env.NODE_ENV = 'test';
 
-    const client = new MongoClient(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 5000 });
-    await client.connect();
-    const db = client.db();
+    await connectDatabase();
+    const runTag = `${process.pid}_${Date.now()}`;
+    const instructorId = newId();
+    const enrolledId = newId();
+    const peerId = newId();
+    const outsiderId = newId();
+    const instId = newId();
+    const courseId = newId();
+    const actorIds = [instructorId, enrolledId, peerId, outsiderId];
 
     t.after(async () => {
-      await db.dropDatabase();
-      await client.close();
+      try {
+        await prisma.studentAttempt.deleteMany({ where: { courseId } });
+        await prisma.courseEnrollment.deleteMany({ where: { courseId } });
+        await prisma.studyRoom.deleteMany({ where: { title: 'Security Study Room' } });
+        await prisma.course.deleteMany({ where: { id: courseId } });
+        await prisma.institutionMembership.deleteMany({ where: { institutionId: instId } });
+        await prisma.institution.deleteMany({ where: { id: instId } });
+        await prisma.authSession.deleteMany({ where: { userId: { in: actorIds } } });
+        await prisma.authAccount.deleteMany({ where: { userId: { in: actorIds } } });
+        await prisma.authUser.deleteMany({ where: { id: { in: actorIds } } });
+        await prisma.user.deleteMany({ where: { id: { in: actorIds } } });
+        await prisma.authRateLimit.deleteMany({});
+      } finally {
+        await disconnectDatabase().catch(() => {});
+      }
     });
 
     const password = await bcrypt.hash('Synthetic!123', 12);
     const instructor = {
-      id: new ObjectId(),
-      email: 'instructor@sec.test',
+      id: instructorId,
+      email: `instructor-${runTag}@sec.test`,
       name: 'Instructor',
-      role: 'instructor'
+      // Teaching authority comes from the active membership, not `users.role`.
+      role: 'student' as Role
     };
     const studentEnrolled = {
-      id: new ObjectId(),
-      email: 'enrolled@sec.test',
+      id: enrolledId,
+      email: `enrolled-${runTag}@sec.test`,
       name: 'Student Enrolled',
-      role: 'student'
+      role: 'student' as Role
+    };
+    const studentPeer = {
+      id: peerId,
+      email: `peer-${runTag}@sec.test`,
+      name: 'Student Peer',
+      role: 'student' as Role
     };
     const studentOutsider = {
-      id: new ObjectId(),
-      email: 'outsider@sec.test',
+      id: outsiderId,
+      email: `outsider-${runTag}@sec.test`,
       name: 'Student Outsider',
-      role: 'student'
+      role: 'student' as Role
     };
 
-    for (const u of [instructor, studentEnrolled, studentOutsider]) {
-      await db.collection('users').insertOne({
-        _id: u.id,
-        email: u.email,
-        name: u.name,
-        password,
-        isVerified: true,
-        isActive: true,
-        role: u.role,
-        tier: 'standard'
+    await prisma.authRateLimit.deleteMany({});
+    for (const u of [instructor, studentEnrolled, studentPeer, studentOutsider]) {
+      await prisma.user.create({
+        data: {
+          id: u.id,
+          email: u.email,
+          name: u.name,
+          password,
+          isVerified: true,
+          isActive: true,
+          role: u.role,
+          tier: 'normal' as Tier,
+          notificationPreferences: {},
+          onboardingDraft: {}
+        }
+      });
+      await prisma.authUser.create({
+        data: { id: u.id, email: u.email, name: u.name, emailVerified: true }
+      });
+      await prisma.authAccount.create({
+        data: { id: newId(), accountId: u.id, providerId: 'credential', userId: u.id, password }
       });
     }
 
-    await migrateAuth(db, { apply: true });
     const { getAuth } = await import('../../shared/betterAuth.js');
     const auth = await getAuth();
 
@@ -74,72 +116,64 @@ test(
       return res.headers.get('set-cookie')!;
     };
 
-    const instructorCookie = await getCookie(instructor);
+    await getCookie(instructor);
     const enrolledCookie = await getCookie(studentEnrolled);
+    const peerCookie = await getCookie(studentPeer);
     const outsiderCookie = await getCookie(studentOutsider);
 
-    // Seed institution & courses
-    const instId = new ObjectId();
-    await db.collection('institutions').insertOne({
-      _id: instId,
-      name: 'Sec Institution',
-      slug: 'sec-inst',
-      status: 'active',
-      memberships: [
-        { userId: instructor.id.toString(), role: 'instructor', joinedAt: new Date() },
-        { userId: studentEnrolled.id.toString(), role: 'student', joinedAt: new Date() }
+    // Seed institution, memberships, course and enrollment
+    await prisma.institution.create({
+      data: {
+        id: instId,
+        name: 'Sec Institution',
+        slug: `sec-inst-${runTag}`,
+        status: 'active',
+        createdByUserId: instructor.id
+      }
+    });
+    await prisma.institutionMembership.createMany({
+      data: [
+        {
+          id: newId(),
+          institutionId: instId,
+          userId: instructor.id,
+          role: 'instructor',
+          status: 'active'
+        },
+        {
+          id: newId(),
+          institutionId: instId,
+          userId: studentEnrolled.id,
+          role: 'university_student',
+          status: 'active'
+        }
       ]
     });
 
-    const courseId = new ObjectId();
-    await db.collection('courses').insertOne({
-      _id: courseId,
-      title: 'Secure Distributed Systems',
-      description: 'Security & Consensus',
-      userId: instructor.id.toString(),
-      institutionId: instId.toString(),
-      activeRevisionId: 'rev_sec_1',
-      status: 'published'
+    await prisma.course.create({
+      data: {
+        id: courseId,
+        title: 'Secure Distributed Systems',
+        description: 'Security & Consensus',
+        userId: instructor.id,
+        ownerUserId: instructor.id,
+        institutionId: instId,
+        scope: 'institutional',
+        assignedInstructorIds: [instructor.id],
+        activeRevisionId: 'rev_sec_1',
+        subjectId: 'sub_sec',
+        status: 'completed' as CourseStatus
+      }
     });
 
-    // Seed enrollment
-    await db.collection('course_enrollments').insertOne({
-      _id: new ObjectId(),
-      userId: studentEnrolled.id.toString(),
-      courseId: courseId.toString(),
-      role: 'student',
-      status: 'active',
-      enrolledAt: new Date()
-    });
-
-    // Seed study room
-    const roomId = new ObjectId();
-    await db.collection('study_rooms').insertOne({
-      _id: roomId,
-      name: 'Security Study Room',
-      hostId: instructor.id.toString(),
-      institutionId: instId.toString(),
-      courseId: courseId.toString(),
-      seq: 1,
-      presenterUserId: instructor.id.toString(),
-      currentPhase: 'discussion',
-      participants: [
-        {
-          userId: instructor.id.toString(),
-          name: 'Instructor',
-          role: 'host',
-          isOnline: true,
-          hasVoiceConsent: true
-        },
-        {
-          userId: studentEnrolled.id.toString(),
-          name: 'Enrolled',
-          role: 'participant',
-          isOnline: true,
-          hasVoiceConsent: false
-        }
-      ],
-      messages: []
+    await prisma.courseEnrollment.createMany({
+      data: [studentEnrolled.id, studentPeer.id].map((userId) => ({
+        id: newId(),
+        userId,
+        courseId,
+        institutionId: instId,
+        status: 'active'
+      }))
     });
 
     // Start Nest API
@@ -151,20 +185,22 @@ test(
     const port = (runtime.server.address() as { port: number }).port;
     const baseUrl = `http://127.0.0.1:${port}/api/v1`;
 
-    // Create real room via API using instructor
+    // Peer study rooms are student-only; the enrolled learner hosts it and the
+    // instructor joins as a peer so presenter-command checks still apply.
     const createRoomRes = await fetch(`${baseUrl}/study/rooms`, {
       method: 'POST',
-      headers: { cookie: instructorCookie, 'content-type': 'application/json' },
+      headers: { cookie: enrolledCookie, 'content-type': 'application/json' },
       body: JSON.stringify({ title: 'Security Study Room', enableVoice: true })
     });
     assert.equal(createRoomRes.status, 201);
     const roomData = await createRoomRes.json();
     const roomIdStr = roomData.roomId;
 
-    // Enrolled student joins room via inviteCode
+    // Teaching members cannot enter peer rooms, so a second learner joins as the
+    // non-presenter participant while presenter authority stays with the host.
     const joinRes = await fetch(`${baseUrl}/study/rooms/join`, {
       method: 'POST',
-      headers: { cookie: enrolledCookie, 'content-type': 'application/json' },
+      headers: { cookie: peerCookie, 'content-type': 'application/json' },
       body: JSON.stringify({ inviteCode: roomData.inviteCode })
     });
     assert.equal(joinRes.status, 200);
@@ -200,25 +236,36 @@ test(
       async () => {
         // Insert student attempt for enrolled student
         const attemptId = 'att_' + crypto.randomUUID().replace(/-/g, '').slice(0, 12);
-        await db.collection('student_attempts').insertOne({
-          attemptId,
-          userId: studentEnrolled.id.toString(),
-          roomId: roomIdStr,
-          activityId: 'act_sec_test',
-          status: 'submitted',
-          submittedAt: new Date()
+        await prisma.studentAttempt.create({
+          data: {
+            id: newId(),
+            attemptId,
+            userId: studentEnrolled.id,
+            courseId,
+            roomId: roomIdStr,
+            activityId: 'act_sec_test',
+            revisionId: 'rev_sec_1',
+            contentHash: 'sha256:' + 'e'.repeat(64),
+            activityRevision: 'rev_act_1',
+            activityType: 'InteractiveQuiz',
+            timeSpentSeconds: 1,
+            answers: { selectedOptionIds: [] },
+            payloadHash: 'sha256:' + 'd'.repeat(64),
+            status: 'submitted',
+            submittedAt: new Date()
+          }
         });
 
-        // Instructor calls debrief - instructor's privateOutcome must be 'untested' (they haven't submitted)
-        const instructorDebriefRes = await fetch(`${baseUrl}/study/rooms/${roomIdStr}/debrief`, {
-          headers: { cookie: instructorCookie }
+        // The peer calls debrief — their privateOutcome must be 'untested'
+        const peerDebriefRes = await fetch(`${baseUrl}/study/rooms/${roomIdStr}/debrief`, {
+          headers: { cookie: peerCookie }
         });
-        assert.equal(instructorDebriefRes.status, 200);
-        const instructorDebrief = await instructorDebriefRes.json();
+        assert.equal(peerDebriefRes.status, 200);
+        const peerDebrief = await peerDebriefRes.json();
         assert.equal(
-          instructorDebrief.privateOutcome.status,
+          peerDebrief.privateOutcome.status,
           'untested',
-          'Instructor must not see enrolled student outcome'
+          'A learner must not see another learner outcome'
         );
 
         // Outsider cannot even access debrief (403)
@@ -238,7 +285,7 @@ test(
       // Non-presenter tries to advance phase
       const nonPresenterRes = await fetch(`${baseUrl}/study/rooms/${roomIdStr}/phase`, {
         method: 'PUT',
-        headers: { cookie: enrolledCookie, 'content-type': 'application/json' },
+        headers: { cookie: peerCookie, 'content-type': 'application/json' },
         body: JSON.stringify({ currentPhase: 'peer_discussion' })
       });
       assert.equal(nonPresenterRes.status, 403, 'Non-presenter must be rejected with 403');
@@ -246,7 +293,7 @@ test(
       // Presenter with stale sequence using durable room command
       const staleRes = await fetch(`${baseUrl}/study/rooms/${roomIdStr}/phase`, {
         method: 'PUT',
-        headers: { cookie: instructorCookie, 'content-type': 'application/json' },
+        headers: { cookie: enrolledCookie, 'content-type': 'application/json' },
         body: JSON.stringify({
           commandId: crypto.randomUUID(),
           currentPhase: 'peer_discussion',
@@ -269,16 +316,16 @@ test(
     await t.test(
       'Adversarial 6: Voice consent withdrawal immediately denies audio publishing token',
       async () => {
-        // Grant consent to instructor
+        // Grant consent to the room host
         await fetch(`${baseUrl}/study/rooms/${roomIdStr}/voice-consent`, {
           method: 'PUT',
-          headers: { cookie: instructorCookie, 'content-type': 'application/json' },
+          headers: { cookie: enrolledCookie, 'content-type': 'application/json' },
           body: JSON.stringify({ hasVoiceConsent: true })
         });
 
         const hostTokenRes = await fetch(`${baseUrl}/study/rooms/${roomIdStr}/livekit-token`, {
           method: 'POST',
-          headers: { cookie: instructorCookie }
+          headers: { cookie: enrolledCookie }
         });
         assert.ok(
           hostTokenRes.status === 200 || hostTokenRes.status === 201,
@@ -290,7 +337,7 @@ test(
         // Revoke consent
         const consentRes = await fetch(`${baseUrl}/study/rooms/${roomIdStr}/voice-consent`, {
           method: 'PUT',
-          headers: { cookie: instructorCookie, 'content-type': 'application/json' },
+          headers: { cookie: enrolledCookie, 'content-type': 'application/json' },
           body: JSON.stringify({ hasVoiceConsent: false })
         });
         assert.equal(consentRes.status, 200);
@@ -298,7 +345,7 @@ test(
         // Token request now must return canPublishAudio: false
         const revokedTokenRes = await fetch(`${baseUrl}/study/rooms/${roomIdStr}/livekit-token`, {
           method: 'POST',
-          headers: { cookie: instructorCookie }
+          headers: { cookie: enrolledCookie }
         });
         assert.ok(
           revokedTokenRes.status === 200 || revokedTokenRes.status === 201,

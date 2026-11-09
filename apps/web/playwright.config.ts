@@ -4,6 +4,10 @@ const webPort = Number(process.env.AUTH_E2E_WEB_PORT || 5173);
 const apiPort = Number(process.env.AUTH_E2E_API_PORT || 3001);
 const origin = `http://localhost:${webPort}`;
 const database = `ednova_auth_browser_${process.pid}_${Date.now()}`;
+// A dedicated database per run; the API harness creates and migrates it.
+const testDatabaseUrl = new URL(
+  "postgresql://ednova:ednova@127.0.0.1:5433/" + database
+);
 process.env.AUTH_E2E_ORIGIN = origin;
 
 /**
@@ -56,7 +60,7 @@ export default defineConfig({
           url: origin,
           timeout: 120000,
           env: {
-            MONGODB_URI: `mongodb://127.0.0.1:27018/${database}`,
+            DATABASE_URL: testDatabaseUrl.toString(),
             BETTER_AUTH_SECRET:
               "isolated-browser-test-secret-at-least-32-characters",
             BETTER_AUTH_URL: origin,

@@ -4,15 +4,15 @@ This describes code present in this checkout, not certification of production be
 
 ## Boundaries and technologies
 
-One Git repository contains a pnpm workspace: API shell, web, shared package and seven domain packages (11 packages total). Python is separately operated and uses Poetry; it is not a pnpm package. All maintained documentation lives under `docs/`. Manifests declare Next ^16.4, React ^19.3, Nest ^12.1, MongoDB driver ^7.7, Mongoose ^8, Better Auth ^1.7.7, Node >=24 and pnpm 11.3.0. Python supports >=3.11,<3.15; Compose uses MongoDB 7, Redis 7 and RabbitMQ 3.
+One Git repository contains a pnpm workspace: API shell, web, shared package and seven domain packages (11 packages total). Python is separately operated and uses Poetry; it is not a pnpm package. All maintained documentation lives under `docs/`. Manifests declare Next ^16.4, React ^19.3, Nest ^12.1, Prisma ^7.10, Better Auth ^1.7.7, Node >=24 and pnpm 11.3.0. Python supports >=3.11,<3.15; Compose uses PostgreSQL 17, Redis 7 and RabbitMQ 3 (MongoDB 7 remains only for the Python service's own collections).
 
 ```text
-Browser -> Next (:5173) -> /api/auth -> Better Auth -> Mongo auth_* collections
-        -> /api/v1 rewrite or nginx -> Nest (:3000) -> domain contracts -> Mongo
+Browser -> Next (:5173) -> /api/auth -> Better Auth -> Postgres auth_* tables
+        -> /api/v1 rewrite or nginx -> Nest (:3000) -> domain contracts -> Postgres (Prisma)
         -> /ws/realtime, /ws/notifications -> notification module
 Browser <-> peer browser: WebRTC audio; WS carries signaling, not audio packets
 Nest -> independent FastAPI (:8000): authenticated HTTP
-Nest -> RabbitMQ -> separately launched Python worker -> result/progress -> Mongo
+Nest -> RabbitMQ -> separately launched Python worker -> result/progress -> Mongo (Python) / Postgres (API)
 Redis: cache/rate state; optional Python idempotency and evaluation session state
 ```
 
@@ -42,11 +42,11 @@ Authoritative endpoint registration is `src/domain-definitions.ts` and generated
 
 ## Identity, authorization and storage
 
-Better Auth uses `auth_users`, `auth_accounts`, `auth_sessions`, `auth_verifications` and `auth_rate_limits` alongside preserved domain `users`. Session identity is resolved from Mongo-backed cookies; bcrypt compatibility supports old passwords. API SessionGuard authenticates; domain roles and tier gates restrict operations. `operationPolicy.ts` scopes AI actor/resource references and namespaces evaluation conversation IDs. Existing global roles are student/admin; M04-A/M04-A.1 adds institution membership and invitation schemas, but no course enrollment or institutional course scope exists.
+Better Auth uses `auth_users`, `auth_accounts`, `auth_sessions`, `auth_verifications` and `auth_rate_limits` alongside preserved domain `users`. Session identity is resolved from Postgres-backed cookies; bcrypt compatibility supports old passwords. API SessionGuard authenticates; domain roles and tier gates restrict operations. `operationPolicy.ts` scopes AI actor/resource references and namespaces evaluation conversation IDs. Existing global roles are student/admin; M04-A/M04-A.1 adds institution membership and invitation schemas, but no course enrollment or institutional course scope exists.
 
 Owner filters exist on personal course reads/downloads. Team creation's course lookup, session-chat/voice HTTP resource checks and generic static `/uploads` mounts require review: presence of authentication is not proof of content isolation. WebSocket connect and inbound messages check identity and team membership; session broadcast/heartbeat behavior must also be tested under revocation. See ED-02 and [roles](roles-and-permissions.md).
 
-MongoDB stores business and auth state; Python repositories use configured Mongo databases/collections and derived course IDs. FAISS indexes and embeddings are also stored on disk; uploads use local/Compose volumes. Multiple schema views of learning objectives/eval results are intentional read/write boundaries, not automatically duplicate dead models. [Data model](data-model.md) records relationships and unresolved ownership boundaries.
+PostgreSQL stores business and auth state through Prisma; Python repositories keep their own MongoDB collections and derived course IDs. FAISS indexes and embeddings are also stored on disk; uploads use local/Compose volumes. Multiple schema views of learning objectives/eval results are intentional read/write boundaries, not automatically duplicate dead models. [Data model](data-model.md) records relationships and unresolved ownership boundaries.
 
 ## AI and background flow
 
@@ -58,7 +58,7 @@ Shared LiteLLM aliases are per agent; **no challenge compact/capable policy is i
 
 Team sessions support invite codes, participant lists and task progress. Realtime handles `chat_query`, voice signaling, mute and speaking updates. SessionChat stores query/result/coach messages, not a full peer-discussion/facilitation model. Browser WebRTC uses STUN; no managed SFU/TURN service is supplied. No tested synchronized PDF/page/exercise protocol, group misconception state machine or private tutor channel exists.
 
-Main Compose defines API, Next web, nginx edge (:8080), Mongo (:27017), Redis, RabbitMQ and Mailpit (:1025/:8025). Test Compose provides Mongo (:27018) and Mailpit (:1026/:8026). AI Compose is separate and mounts an external upload volume; path/DB/broker/secret alignment requires explicit configuration. Production override plus `deploy/Caddyfile` and nginx config require validation; there is no evidence for zero-downtime or deployed-state claims.
+Main Compose defines API, Next web, nginx edge (:8080), PostgreSQL (:5433 published), Mongo (:27017, Python only), Redis, RabbitMQ and Mailpit (:1025/:8025). Test Compose provides PostgreSQL (:5433) and Mailpit (:1026/:8026). AI Compose is separate and mounts an external upload volume; path/DB/broker/secret alignment requires explicit configuration. Production override plus `deploy/Caddyfile` and nginx config require validation; there is no evidence for zero-downtime or deployed-state claims.
 
 Root CI declares Node checks, E2E and AI checks, but its AI install references absent `requirements.txt`. The nested Python workflow reflects former repository layout and is not automatically a root GitHub Actions workflow. Python Docker dependencies differ from Poetry, and the HTTP image does not constitute worker deployment. These remain ED-01 work, without changes to infrastructure in this audit.
 

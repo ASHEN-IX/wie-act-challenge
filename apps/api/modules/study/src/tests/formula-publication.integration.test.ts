@@ -1,4 +1,5 @@
-import mongoose from 'mongoose';
+import { connectDatabase, disconnectDatabase } from '../../../../shared/database';
+import { newId } from '../../../../shared/ids';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -99,7 +100,7 @@ beforeAll(async () => {
     mediaType: 'application/pdf'
   };
   await fs.writeFile(path.join(root, doc.storageRef), bytes);
-  await mongoose.connect('mongodb://127.0.0.1:27017/test_formula_pub_' + process.pid);
+  await connectDatabase();
   jest.spyOn(aiClient, 'post').mockImplementation(async (url, body: any) => {
     if (url.endsWith('region-inspect'))
       return {
@@ -153,8 +154,7 @@ beforeAll(async () => {
 });
 afterAll(async () => {
   jest.restoreAllMocks();
-  await mongoose.connection.dropDatabase();
-  await mongoose.disconnect();
+  await disconnectDatabase();
   await fs.rm(root, { recursive: true, force: true });
 });
 beforeEach(async () => {

@@ -1,11 +1,13 @@
-/** Fresh-process recovery probe, only for isolated synthetic reward databases. */
-import mongoose from 'mongoose';
+/** Fresh-process recovery probe, only for the isolated synthetic reward fixture. */
+import { connectDatabase, disconnectDatabase } from '../../shared/database';
 import { awardAcceptedLearningEvidence } from '../../modules/user-profile/src/services/learningRewards';
+
 async function main() {
-  const uri = process.env.REWARD_TEST_URI || '';
-  if (!/^mongodb:\/\/127\.0\.0\.1:27018\/ednova_reward_[a-zA-Z0-9_]+$/.test(uri))
-    throw new Error('Isolated synthetic reward database required');
-  await mongoose.connect(uri);
+  const databaseUrl = process.env.REWARD_TEST_DATABASE_URL || '';
+  if (!/\/ednova(?:_{1,2})test$/.test(databaseUrl))
+    throw new Error('The shared synthetic reward database is required');
+  process.env.DATABASE_URL = databaseUrl;
+  await connectDatabase();
   try {
     const result = await awardAcceptedLearningEvidence(
       process.env.REWARD_TEST_ACTOR || '',
@@ -13,7 +15,7 @@ async function main() {
     );
     process.stdout.write(JSON.stringify(result) + '\n');
   } finally {
-    await mongoose.disconnect();
+    await disconnectDatabase();
   }
 }
 main().catch(() => {

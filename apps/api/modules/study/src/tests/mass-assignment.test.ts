@@ -39,30 +39,38 @@ jest.mock('../models', () => {
   const updateOneFn = jest.fn();
   const deleteOneFn = jest.fn().mockResolvedValue({ deletedCount: 1 });
 
+  // The converted models expose statics; writes that used to mutate and
+  // `save()` a document now call `Model.save(row)`.
+  const saveFn = jest
+    .fn()
+    .mockImplementation((doc: object) => Promise.resolve({ _id: 'new-1', ...doc }));
   return {
     Task: {
       create: createFn,
       find: findFn,
       findOne: findOneFn,
       updateOne: updateOneFn,
-      deleteOne: deleteOneFn
+      deleteOne: deleteOneFn,
+      save: saveFn
     },
     Topic: {
       create: createFn,
       find: findFn,
       findOne: findOneFn,
       updateOne: updateOneFn,
-      deleteOne: deleteOneFn
+      deleteOne: deleteOneFn,
+      save: saveFn
     },
     StudySession: {
       create: createFn,
       find: findFn,
       findOne: findOneFn,
       updateOne: updateOneFn,
-      deleteOne: deleteOneFn
+      deleteOne: deleteOneFn,
+      save: saveFn
     },
-    StudyPlan: { find: findFn, findOne: findOneFn },
-    Course: { find: findFn, findOne: findOneFn }
+    StudyPlan: { find: findFn, findOne: findOneFn, save: saveFn },
+    Course: { find: findFn, findOne: findOneFn, save: saveFn }
   };
 });
 
@@ -156,11 +164,12 @@ describe('SEC-10 task routes reject privileged fields', () => {
       .send({ status: 'completed', role: 'admin', isAdmin: true, tier: 'pro' });
 
     expect(res.status).toBe(200);
-    expect(task.save).toHaveBeenCalled();
-    expect(Reflect.get(task, 'role')).toBeUndefined();
-    expect(Reflect.get(task, 'isAdmin')).toBeUndefined();
-    expect(Reflect.get(task, 'tier')).toBeUndefined();
-    expect(task.status).toBe('completed');
+    expect(MockTask.save).toHaveBeenCalledWith(task);
+    const saved = MockTask.save.mock.calls[0][0];
+    expect(Reflect.get(saved, 'role')).toBeUndefined();
+    expect(Reflect.get(saved, 'isAdmin')).toBeUndefined();
+    expect(Reflect.get(saved, 'tier')).toBeUndefined();
+    expect(saved.status).toBe('completed');
   });
 });
 
@@ -190,6 +199,7 @@ describe('SEC-10 topic routes reject privileged fields', () => {
     const res = await request(app).put('/topics/topic-1').send({ name: 'Physics', role: 'admin' });
 
     expect(res.status).toBe(200);
+    expect(MockTopic.save).toHaveBeenCalledWith(topic);
     expect(topic.name).toBe('Physics');
     expect(Reflect.get(topic, 'role')).toBeUndefined();
   });
@@ -226,10 +236,12 @@ describe('SEC-10 core session routes reject privileged fields', () => {
       .send({ status: 'completed', role: 'admin', isAdmin: true });
 
     expect(res.status).toBe(200);
-    expect(session.save).toHaveBeenCalled();
-    expect(Reflect.get(session, 'role')).toBeUndefined();
-    expect(Reflect.get(session, 'isAdmin')).toBeUndefined();
-    expect(session.status).toBe('completed');
+    // The route persists through the model static; the same document is written.
+    expect(MockStudySession.save).toHaveBeenCalledWith(session);
+    const saved = MockStudySession.save.mock.calls[0][0];
+    expect(Reflect.get(saved, 'role')).toBeUndefined();
+    expect(Reflect.get(saved, 'isAdmin')).toBeUndefined();
+    expect(saved.status).toBe('completed');
   });
 });
 
@@ -248,11 +260,12 @@ describe('SEC-10 challenge session complete rejects privileged fields', () => {
     });
 
     expect(res.status).toBe(200);
-    expect(session.save).toHaveBeenCalled();
-    expect(Reflect.get(session, 'role')).toBeUndefined();
-    expect(session.mode).toBe('exam');
-    expect(session.status).toBe('completed');
-    expect(session.duration).toBe(30);
-    expect(Reflect.get(session, 'focusScore')).toBe(90);
+    expect(MockStudySession.save).toHaveBeenCalledWith(session);
+    const saved = MockStudySession.save.mock.calls[0][0];
+    expect(Reflect.get(saved, 'role')).toBeUndefined();
+    expect(saved.mode).toBe('exam');
+    expect(saved.status).toBe('completed');
+    expect(saved.duration).toBe(30);
+    expect(Reflect.get(saved, 'focusScore')).toBe(90);
   });
 });

@@ -7,7 +7,8 @@ import {
   writeWhiteboardElements
 } from '../services/roomWhiteboard';
 
-const lean = (value: unknown) => ({ lean: () => Promise.resolve(value) });
+// The converted model returns the row directly; `.lean()` no longer exists.
+const lean = (value: unknown) => Promise.resolve(value);
 const raw = (id: string, over: Record<string, unknown> = {}) => ({
   id,
   type: 'rectangle',

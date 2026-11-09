@@ -1,74 +1,47 @@
-import mongoose, { Document, Model, Schema } from 'mongoose';
+import type {
+  Prisma,
+  StudentAttempt as StudentAttemptRow
+} from '../../../../src/generated/prisma/client';
+import { prisma } from '../../../../shared/database';
+import { table } from './_table';
 
-export interface IStudentAttempt extends Document {
-  userId: string;
-  attemptId: string;
-  courseId: string;
-  revisionId: string;
-  contentHash: string;
-  activityId: string;
-  activityRevision: string;
-  activityType: 'InteractiveQuiz' | 'GuidedProblem';
-  roomId?: string | null;
-  timeSpentSeconds: number;
+export type IStudentAttempt = Omit<
+  StudentAttemptRow,
+  'answers' | 'assessmentResult' | 'submission' | 'preparedEvidence'
+> & {
+  _id: string;
   answers: Record<string, unknown>;
-  payloadHash: string;
-  status: 'in_progress' | 'submitted' | 'graded';
-  submittedAt: Date;
   assessmentResult?: Record<string, unknown> | null;
-  evidenceId?: string | null;
-  protocolVersion?: number;
-  processingState?: 'claimed' | 'prepared' | 'completed';
-  submission?: Record<string, unknown>;
+  submission?: Record<string, unknown> | null;
   preparedEvidence?: Record<string, unknown> | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
+};
 
-const StudentAttemptSchema = new Schema<IStudentAttempt>(
-  {
-    userId: { type: String, required: true, index: true },
-    attemptId: { type: String, required: true, index: true },
-    courseId: { type: String, required: true, index: true },
-    revisionId: { type: String, required: true },
-    contentHash: { type: String, required: true },
-    activityId: { type: String, required: true, index: true },
-    activityRevision: { type: String, required: true },
-    activityType: {
-      type: String,
-      required: true,
-      enum: ['InteractiveQuiz', 'GuidedProblem']
-    },
-    roomId: { type: String, default: null },
-    timeSpentSeconds: { type: Number, required: true, min: 0, max: 86400 },
-    answers: { type: Schema.Types.Mixed, required: true },
-    payloadHash: { type: String, required: true },
-    status: {
-      type: String,
-      required: true,
-      enum: ['in_progress', 'submitted', 'graded'],
-      default: 'submitted'
-    },
-    submittedAt: { type: Date, required: true, default: Date.now },
-    assessmentResult: { type: Schema.Types.Mixed, default: null },
-    evidenceId: { type: String, default: null },
-    protocolVersion: { type: Number },
-    processingState: { type: String, enum: ['claimed', 'prepared', 'completed'] },
-    submission: { type: Schema.Types.Mixed },
-    preparedEvidence: { type: Schema.Types.Mixed, default: null }
-  },
-  {
-    timestamps: true,
-    collection: 'student_attempts'
-  }
-);
+export const StudentAttempt = table<IStudentAttempt>({
+  delegate: () => prisma.studentAttempt,
+  jsonColumns: ['answers', 'assessmentResult', 'submission', 'preparedEvidence'],
+  defaults: () => ({ answers: {}, status: 'submitted', submittedAt: new Date() }),
+  columns: (row) => ({
+    userId: row.userId,
+    attemptId: row.attemptId,
+    courseId: row.courseId,
+    revisionId: row.revisionId,
+    contentHash: row.contentHash,
+    activityId: row.activityId,
+    activityRevision: row.activityRevision,
+    activityType: row.activityType,
+    roomId: row.roomId,
+    timeSpentSeconds: row.timeSpentSeconds,
+    answers: row.answers as unknown as Prisma.InputJsonValue,
+    payloadHash: row.payloadHash,
+    status: row.status,
+    submittedAt: row.submittedAt,
+    assessmentResult: row.assessmentResult as unknown as Prisma.InputJsonValue,
+    evidenceId: row.evidenceId,
+    protocolVersion: row.protocolVersion,
+    processingState: row.processingState,
+    submission: row.submission as unknown as Prisma.InputJsonValue,
+    preparedEvidence: row.preparedEvidence as unknown as Prisma.InputJsonValue
+  })
+});
 
-// Target unique index: (userId, attemptId) composite identity (ED-29 / Contract 05)
-StudentAttemptSchema.index({ userId: 1, attemptId: 1 }, { unique: true });
-
-// Retrieval by course and activity
-StudentAttemptSchema.index({ courseId: 1, revisionId: 1, activityId: 1, userId: 1 });
-
-export const StudentAttempt: Model<IStudentAttempt> =
-  mongoose.models.StudentAttempt ||
-  mongoose.model<IStudentAttempt>('StudentAttempt', StudentAttemptSchema);
+export default StudentAttempt;

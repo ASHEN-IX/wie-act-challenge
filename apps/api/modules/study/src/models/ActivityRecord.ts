@@ -1,60 +1,30 @@
-import mongoose, { Document, Model, Schema } from 'mongoose';
+import type {
+  ActivityRecord as ActivityRecordRow,
+  Prisma
+} from '../../../../src/generated/prisma/client';
+import { prisma } from '../../../../shared/database';
+import { table } from './_table';
 
-export interface IActivityRecord extends Document {
-  courseId: string;
-  revisionId: string;
-  contentHash: string;
-  activityId: string;
-  activityRevision: string;
-  activityType: 'InteractiveQuiz' | 'GuidedProblem';
-  objectiveId: string;
+export type IActivityRecord = Omit<ActivityRecordRow, 'publicDefinition' | 'serverEvaluation'> & {
+  _id: string;
   publicDefinition: Record<string, unknown>;
-  serverEvaluation: {
-    schemaVersion: string;
-    visibility: 'server_only';
-    activity: {
-      courseId: string;
-      revisionId: string;
-      contentHash: string;
-      activityId: string;
-      activityRevision: string;
-      activityType: 'InteractiveQuiz' | 'GuidedProblem';
-    };
-    evaluationRef: string;
-    evaluatorType: 'deterministic_rubric' | 'llm_evaluation';
-    rubricVersion: string;
-    rubric: string;
-    answerKey: string[];
-  };
-  createdAt: Date;
-  updatedAt: Date;
-}
+  serverEvaluation: Record<string, unknown>;
+};
 
-const ActivityRecordSchema = new Schema<IActivityRecord>(
-  {
-    courseId: { type: String, required: true, index: true },
-    revisionId: { type: String, required: true, index: true },
-    contentHash: { type: String, required: true },
-    activityId: { type: String, required: true, index: true },
-    activityRevision: { type: String, required: true },
-    activityType: {
-      type: String,
-      required: true,
-      enum: ['InteractiveQuiz', 'GuidedProblem']
-    },
-    objectiveId: { type: String, required: true, index: true },
-    publicDefinition: { type: Schema.Types.Mixed, required: true },
-    serverEvaluation: { type: Schema.Types.Mixed, required: true }
-  },
-  {
-    timestamps: true,
-    collection: 'activity_records'
-  }
-);
+export const ActivityRecord = table<IActivityRecord>({
+  delegate: () => prisma.activityRecord,
+  jsonColumns: ['publicDefinition', 'serverEvaluation'],
+  columns: (row) => ({
+    courseId: row.courseId,
+    revisionId: row.revisionId,
+    contentHash: row.contentHash,
+    activityId: row.activityId,
+    activityRevision: row.activityRevision,
+    activityType: row.activityType,
+    objectiveId: row.objectiveId,
+    publicDefinition: row.publicDefinition as unknown as Prisma.InputJsonValue,
+    serverEvaluation: row.serverEvaluation as unknown as Prisma.InputJsonValue
+  })
+});
 
-// Unique composite index: exactly one activity per (courseId, revisionId, activityId)
-ActivityRecordSchema.index({ courseId: 1, revisionId: 1, activityId: 1 }, { unique: true });
-
-export const ActivityRecord: Model<IActivityRecord> =
-  mongoose.models.ActivityRecord ||
-  mongoose.model<IActivityRecord>('ActivityRecord', ActivityRecordSchema);
+export default ActivityRecord;

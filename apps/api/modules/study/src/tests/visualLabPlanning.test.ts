@@ -64,8 +64,7 @@ function graphCandidate() {
   };
 }
 
-const leanFind = (value: unknown) =>
-  (VisualLab.findOne as jest.Mock).mockReturnValue({ lean: async () => value });
+const leanFind = (value: unknown) => (VisualLab.findOne as jest.Mock).mockResolvedValue(value);
 
 function storedLab(overrides: Record<string, unknown> = {}) {
   const candidate = graphCandidate();
@@ -108,8 +107,11 @@ function storedLab(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   jest.clearAllMocks();
   leanFind(null);
+  // `create()` returns the row directly now (no `toObject()`).
   (VisualLab.create as jest.Mock).mockImplementation(async (doc: Record<string, unknown>) => ({
-    toObject: () => ({ ...doc, createdAt: new Date('2026-11-01T10:00:00.000Z') })
+    ...doc,
+    _id: 'lab-row',
+    createdAt: new Date('2026-11-01T10:00:00.000Z')
   }));
   aiPost.mockResolvedValue({
     data: {

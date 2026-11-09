@@ -4,7 +4,9 @@
 **Date:** 18 October 2026  
 **Context:** IEEE Women in Engineering Annual Congress of Tunisia (WIE ACT 5.0)
 
-This document specifies the authoritative data architecture, storage ownership boundaries, and MongoDB collection schemas for EdNova. It reconciles current implementation schemas with the target models required for institutional access, Course Studio, intelligent activities, evidence tracking, and collaborative rooms.
+This document specifies the authoritative data architecture, storage ownership boundaries, and PostgreSQL table schemas for EdNova. It reconciles current implementation schemas with the target models required for institutional access, Course Studio, intelligent activities, evidence tracking, and collaborative rooms.
+
+**Persistence:** PostgreSQL 17 through Prisma 7. The schema of record is `apps/api/prisma/schema.prisma`; migrations live in `apps/api/prisma/migrations`. Primary keys are 24-character hex strings (`ObjectId`-shaped) so identifiers that already reached clients are unchanged. The API still serializes them as `_id`.
 
 ---
 
@@ -14,7 +16,8 @@ EdNova enforces strict storage boundaries to prevent duplication and ensure that
 
 | Storage Engine | Owned Data / Artifacts | Access Control / Scope |
 | :--- | :--- | :--- |
-| **MongoDB 7.0** | Domain entities (Users, Courses, Revisions, Activities, Attempts, Evidence, Competencies, Rooms, Gamification Ledger). | Authenticated Control Plane (NestJS) and read-only Python workers. |
+| **PostgreSQL 17** | Domain entities (Users, Courses, Revisions, Activities, Attempts, Evidence, Competencies, Rooms, Gamification Ledger). | Authenticated Control Plane (NestJS) through Prisma. |
+| **MongoDB 7.0** | Reserved for the Python AI service's own collections (queue state, FAISS chunk metadata, pacing/review memory, coach history). | Python workers only; the Node API does not connect to it. |
 | **Private Object Storage / Volume** | Original uploaded PDFs, syllabus files, extracted images, sanitized document assets. | Private storage ACLs; streamed only via authenticated NestJS endpoints. |
 | **FAISS Vector Store** | Dense text embeddings and vector indexes for course retrieval. | Disk-mounted Docker volume, namespaced by `courseId` and `revisionId`. |
 | **Redis 7-alpine** | Deduplication leases (`SET NX EX 3600`), room heartbeats, rate-limit sliding windows. | Ephemeral state only; zero persistent business records. |
@@ -23,11 +26,11 @@ EdNova enforces strict storage boundaries to prevent duplication and ensure that
 
 ---
 
-## 2. Core Domain Collections & Schema Specifications
+## 2. Core Domain Tables & Schema Specifications
 
 ### 2.1. Authentication & Identity
 * **`auth_users` & `users`**: Domain identity created by Better-Auth and enriched with EdNova profile fields.
-  - Fields: `_id` (ObjectId/string), `email` (string, unique), `name` (string), `hashedPassword` (string, bcrypt compatible), `emailVerified` (boolean), `createdAt` (Date).
+  - Fields: `id` (24-hex string, primary key; serialized as `_id`), `email` (string, unique), `name` (string), `password` (string, bcrypt compatible), `isVerified` (boolean), `createdAt`, `updatedAt`.
 * **`institutions`**: Represents university or organizational tenants.
   - Fields: `_id` (ObjectId), `name` (string), `domain` (string, e.g. `"polytechnique.tn"`), `slug` (string, unique), `isVerified` (boolean), `createdAt` (Date).
 * **`institution_memberships`**: Links users to institutions with contextual roles.

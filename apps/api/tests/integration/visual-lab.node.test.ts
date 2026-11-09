@@ -11,10 +11,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { MongoClient, ObjectId } from 'mongodb';
+import { connectDatabase, disconnectDatabase, prisma } from '../../shared/database';
+import { newId } from '../../shared/ids';
 import bcrypt from 'bcryptjs';
-import mongoose from 'mongoose';
-import { migrateAuth } from '../../scripts/migrate-auth';
 import { prepareCourseFixture } from '../helpers/reviewedActivityFixture';
 import {
   Course,
@@ -48,17 +47,9 @@ test(
   'Visual Learning Lab: authorization, generation, guidance, refusal and privacy',
   { timeout: 120000 },
   async (t) => {
-    const database = `ednova_visual_lab_${process.pid}_${Date.now()}`;
-    const mongoUri = `mongodb://127.0.0.1:27018/${database}`;
-    const probe = new MongoClient(mongoUri, { serverSelectionTimeoutMS: 1500 });
-    try {
-      await probe.connect();
-    } catch {
-      await probe.close().catch(() => {});
-      t.skip('MongoDB test service is unavailable on 127.0.0.1:27018');
-      return;
-    }
-    await probe.close();
+    process.env.DATABASE_URL =
+      process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
+    await connectDatabase();
 
     // Local AI stub: records what the gateway sent, never runs code.
     const seen: Array<{ url: string; body: Record<string, unknown> }> = [];
@@ -133,8 +124,7 @@ test(
 
     Object.assign(process.env, {
       NODE_ENV: 'test',
-      MONGODB_URI: mongoUri,
-      DB_NAME: database,
+      DATABASE_URL: process.env.DATABASE_URL,
       BETTER_AUTH_SECRET: 'visual-lab-test-secret-at-least-32-characters',
       BETTER_AUTH_URL: 'http://localhost:5173',
       AUTH_TRUSTED_ORIGINS: 'http://localhost:5173',
@@ -145,38 +135,56 @@ test(
       REDIS_URL: ''
     });
 
-    const client = await new MongoClient(mongoUri).connect();
-    const db = client.db();
     const runtime: {
       current?: Awaited<ReturnType<(typeof import('../../src/main.js'))['start']>>;
     } = {};
     let courseId = '';
     t.after(async () => {
       await runtime.current?.stop();
-      await db.dropDatabase();
-      await client.close();
+      await prisma.visualLab.deleteMany({});
+      await prisma.authSession.deleteMany({ where: { userId: { in: actors.map((a) => a.id) } } });
+      await prisma.authAccount.deleteMany({ where: { userId: { in: actors.map((a) => a.id) } } });
+      await prisma.authUser.deleteMany({ where: { id: { in: actors.map((a) => a.id) } } });
+      await prisma.user.deleteMany({ where: { id: { in: actors.map((a) => a.id) } } });
+      await disconnectDatabase();
     });
 
     const password = await bcrypt.hash('Synthetic!123', 12);
+    const runId = `${process.pid}_${Date.now()}`;
     const actors = ['owner', 'student', 'outsider'].map((name) => ({
-      id: new ObjectId(),
+      id: newId(),
       name,
-      email: `visual-lab-${name}@synthetic.test`,
+      // Run-unique: the test database is shared, not dropped per run.
+      email: `visual-lab-${runId}-${name}@synthetic.test`,
       cookie: ''
     }));
-    await db.collection('users').insertMany(
-      actors.map((actor) => ({
-        _id: actor.id,
-        email: actor.email,
-        name: actor.name,
-        password,
-        role: 'student',
-        tier: 'vip',
-        isActive: true,
-        isVerified: true
-      }))
-    );
-    await migrateAuth(db, { apply: true });
+    for (const actor of actors) {
+      await prisma.user.create({
+        data: {
+          id: actor.id,
+          email: actor.email,
+          name: actor.name,
+          role: 'student',
+          tier: 'vip',
+          isActive: true,
+          isVerified: true,
+          notificationPreferences: {},
+          onboardingDraft: {}
+        }
+      });
+      await prisma.authUser.create({
+        data: { id: actor.id, email: actor.email, name: actor.name, emailVerified: true }
+      });
+      await prisma.authAccount.create({
+        data: {
+          id: newId(),
+          accountId: actor.id,
+          providerId: 'credential',
+          userId: actor.id,
+          password
+        }
+      });
+    }
     const auth = await (await import('../../shared/betterAuth.js')).getAuth();
     for (const actor of actors) {
       const response = await auth.api.signInEmail({
@@ -219,8 +227,7 @@ test(
     }
 
     // ---- owner publishes a course with a verified source artifact ----
-    // mongoose's bson instance, not the standalone driver's, so Mongoose can serialize it.
-    const institutionId = new mongoose.Types.ObjectId();
+    const institutionId = newId();
     await Institution.create({
       _id: institutionId,
       name: 'Synthetic visual lab institution',
@@ -413,10 +420,18 @@ test(
       assert.ok(concepts.length >= 1);
       assert.equal(concepts[0].engine, 'weighted_graph');
       assert.equal(found.body.revisionId, published);
-      const pinned = await request(student, 'GET', `/api/v1/study/visual-lab/discover?courseId=${courseId}&revisionId=${encodeURIComponent(published)}`);
+      const pinned = await request(
+        student,
+        'GET',
+        `/api/v1/study/visual-lab/discover?courseId=${courseId}&revisionId=${encodeURIComponent(published)}`
+      );
       assert.equal(pinned.status, 200);
       assert.equal(pinned.body.revisionId, published);
-      const missing = await request(student, 'GET', `/api/v1/study/visual-lab/discover?courseId=${courseId}&revisionId=revision_that_does_not_exist`);
+      const missing = await request(
+        student,
+        'GET',
+        `/api/v1/study/visual-lab/discover?courseId=${courseId}&revisionId=revision_that_does_not_exist`
+      );
       assert.notEqual(missing.status, 200);
       const denied = await request(
         outsider,
@@ -502,8 +517,8 @@ test(
       assert.ok(outcome, 'exactly one option must be correct');
       assert.equal(outcome!.correctOptionId, 'correct');
       assert.ok(String(outcome!.explanation).includes('8'));
-      assert.equal(await db.collection('learning_evidence').countDocuments({}), 0);
-      assert.equal(await db.collection('rank_event_ledgers').countDocuments({}), 0);
+      assert.equal(await prisma.learningEvidence.count({ where: { userId: actors[0].id } }), 0);
+      assert.equal(await prisma.rankEventLedger.count({ where: { userId: actors[0].id } }), 0);
     });
 
     await t.test('open-topic labs work without a course and are labelled as such', async () => {
@@ -563,13 +578,13 @@ test(
         },
         executionMode: 'MOCK_TEST'
       };
-      const before = await db.collection('visual_labs').countDocuments({});
+      const before = await prisma.visualLab.count({});
       const response = await request(student, 'POST', '/api/v1/study/visual-lab/plan', {
         mode: 'topic',
         concept: 'Shakespearean sonnets'
       });
       assert.equal(response.status, 422);
-      assert.equal(await db.collection('visual_labs').countDocuments({}), before);
+      assert.equal(await prisma.visualLab.count({}), before);
     });
   }
 );

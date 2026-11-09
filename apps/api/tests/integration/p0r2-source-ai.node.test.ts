@@ -1,14 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MongoClient, ObjectId } from 'mongodb';
 import bcrypt from 'bcryptjs';
+import { connectDatabase, disconnectDatabase, prisma } from '../../shared/database';
+import { newId } from '../../shared/ids';
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import http from 'node:http';
-import { migrateAuth } from '../../scripts/migrate-auth';
 
 test(
   'P0-R2 real Nest/Python immutable source foundation',
@@ -16,8 +16,8 @@ test(
   async (t) => {
     const root = path.resolve(__dirname, '../../../..'),
       temp = await fs.mkdtemp(path.join(os.tmpdir(), 'ednova-p0r2-'));
-    const database = 'ednova_p0r2_' + process.pid + '_' + Date.now(),
-      uri = 'mongodb://127.0.0.1:27018/' + database;
+    process.env.DATABASE_URL =
+      process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
     const serviceSecret = 'p0r2-local-service-secret-at-least-32-characters';
     const reserve = http.createServer();
     await new Promise<void>((r) => reserve.listen(0, '127.0.0.1', r));
@@ -25,8 +25,6 @@ test(
     await new Promise<void>((r) => reserve.close(() => r()));
     Object.assign(process.env, {
       NODE_ENV: 'test',
-      MONGODB_URI: uri,
-      DB_NAME: database,
       BETTER_AUTH_SECRET: 'p0r2-auth-secret-with-at-least-32-characters',
       BETTER_AUTH_URL: 'http://localhost:5173',
       AUTH_TRUSTED_ORIGINS: 'http://localhost:5173',
@@ -40,18 +38,42 @@ test(
       REDIS_URL: '',
       RABBITMQ_URL: process.env.P0R2_BROKER_URL || 'amqp://127.0.0.1:1'
     });
-    const client = await new MongoClient(uri).connect(),
-      db = client.db();
+    await connectDatabase();
     const children: ChildProcess[] = [];
     // Teardown handles failed bootstrap.
     // eslint-disable-next-line prefer-const
     let runtime: Awaited<ReturnType<(typeof import('../../src/main.js'))['start']>> | undefined;
+    const actorIds = [newId(), newId(), newId()];
+    const courseIds: string[] = [];
+    const institutions: string[] = [];
     t.after(async () => {
       for (const child of children) child.kill('SIGTERM');
       await runtime?.stop();
-      await db.dropDatabase();
-      await client.close();
-      await fs.rm(temp, { recursive: true, force: true });
+      try {
+        const models: typeof import('../../modules/study/src/models/index.js') | undefined =
+          await import('../../modules/study/src/models/index.js').catch(() => undefined);
+        if (models && courseIds.length) {
+          await models.CourseRevision.deleteMany({ courseId: { $in: courseIds } });
+          await models.CourseEnrollment.deleteMany({ courseId: { $in: courseIds } });
+          await models.ActivityRecord.deleteMany({ courseId: { $in: courseIds } });
+          await models.StudentAttempt.deleteMany({ courseId: { $in: courseIds } });
+          await models.Course.deleteMany({ _id: { $in: courseIds } });
+        }
+        if (models && institutions.length) {
+          await models.InstitutionMembership.deleteMany({
+            institutionId: { $in: institutions }
+          });
+          await models.Institution.deleteMany({ _id: { $in: institutions } });
+        }
+        await prisma.authSession.deleteMany({ where: { userId: { in: actorIds } } });
+        await prisma.authAccount.deleteMany({ where: { userId: { in: actorIds } } });
+        await prisma.authUser.deleteMany({ where: { id: { in: actorIds } } });
+        await prisma.user.deleteMany({ where: { id: { in: actorIds } } });
+        await prisma.authRateLimit.deleteMany({});
+      } finally {
+        await disconnectDatabase().catch(() => {});
+        await fs.rm(temp, { recursive: true, force: true });
+      }
     });
     const output: string[] = [];
     async function startPython() {
@@ -86,27 +108,41 @@ test(
       throw new Error('Python readiness timeout ' + output.join(''));
     }
     let python = await startPython();
-    const instructor = { id: new ObjectId(), cookie: '' },
-      learner = { id: new ObjectId(), cookie: '' },
-      foreign = { id: new ObjectId(), cookie: '' };
-    for (const [i, a] of [instructor, learner, foreign].entries())
-      await db.collection('users').insertOne({
-        _id: a.id,
-        name: 'P0R2 ' + i,
-        email: 'p0r2-' + i + '@local.test',
-        password: await bcrypt.hash('Synthetic!123', 12),
-        role: 'student',
-        tier: 'vip',
-        isActive: true,
-        isVerified: true
+    const runTag = `${process.pid}_${Date.now()}`;
+    const instructor = { id: actorIds[0], cookie: '' },
+      learner = { id: actorIds[1], cookie: '' },
+      foreign = { id: actorIds[2], cookie: '' };
+    const password = await bcrypt.hash('Synthetic!123', 12);
+    await prisma.authRateLimit.deleteMany({});
+    for (const [i, a] of [instructor, learner, foreign].entries()) {
+      const email = `p0r2-${i}-${runTag}@local.test`;
+      await prisma.user.create({
+        data: {
+          id: a.id,
+          name: 'P0R2 ' + i,
+          email,
+          password,
+          role: 'student',
+          tier: 'vip',
+          isActive: true,
+          isVerified: true,
+          notificationPreferences: {},
+          onboardingDraft: {}
+        }
       });
-    await migrateAuth(db, { apply: true });
+      await prisma.authUser.create({
+        data: { id: a.id, email, name: 'P0R2 ' + i, emailVerified: true }
+      });
+      await prisma.authAccount.create({
+        data: { id: newId(), accountId: a.id, providerId: 'credential', userId: a.id, password }
+      });
+    }
     runtime = await (await import('../../src/main.js')).start({ port: 0, workers: false });
     const origin = 'http://127.0.0.1:' + (runtime.server.address() as { port: number }).port;
     const auth = await (await import('../../shared/betterAuth.js')).getAuth();
     for (const [i, a] of [instructor, learner, foreign].entries()) {
       const r = await auth.api.signInEmail({
-        body: { email: 'p0r2-' + i + '@local.test', password: 'Synthetic!123' },
+        body: { email: `p0r2-${i}-${runTag}@local.test`, password: 'Synthetic!123' },
         asResponse: true
       });
       assert.equal(r.status, 200);
@@ -141,7 +177,8 @@ test(
       slug: 'p0r2-' + Date.now(),
       createdByUserId: instructor.id.toString()
     });
-    await m.InstitutionMembership.create([
+    institutions.push(institution._id.toString());
+    await m.InstitutionMembership.createMany([
       {
         institutionId: institution._id,
         userId: instructor.id.toString(),
@@ -167,6 +204,7 @@ test(
       files: []
     });
     const id = course._id.toString();
+    courseIds.push(id);
     await m.CourseEnrollment.create({
       courseId: id,
       institutionId: institution._id,
@@ -369,7 +407,7 @@ test(
       }
     );
     await t.test(
-      'DIRECT MONGO: activation interruption resumes, repeat is idempotent and unknown revisions never fallback',
+      'DIRECT DATABASE: activation interruption resumes, repeat is idempotent and unknown revisions never fallback',
       async () => {
         const original = m.CourseRevision.updateOne.bind(m.CourseRevision);
         let interrupted = false;
@@ -391,11 +429,7 @@ test(
         await pub.publishCourseRevision(instructor.id.toString(), id, 'rev_alpha');
         await assert.rejects(pub.getPublishedCourseContext(learner.id.toString(), id, ''));
         await assert.rejects(
-          pub.getPublishedCourseContext(
-            learner.id.toString(),
-            new ObjectId().toString(),
-            'rev_alpha'
-          )
+          pub.getPublishedCourseContext(learner.id.toString(), newId(), 'rev_alpha')
         );
         assert.equal(
           (
@@ -552,7 +586,7 @@ test(
       }
     );
     await t.test(
-      'DIRECT MONGO: competing revision activations have exactly one winning pointer',
+      'DIRECT DATABASE: competing revision activations have exactly one winning pointer',
       async () => {
         for (const revisionTag of ['rev_compete_a', 'rev_compete_b']) {
           await m.CourseRevision.create({
@@ -587,7 +621,7 @@ test(
             }
             return write(filter as never, update as never, ...(args as []));
           })();
-        }) as typeof m.Course.findOneAndUpdate;
+        }) as unknown as typeof m.Course.findOneAndUpdate;
         let results: PromiseSettledResult<unknown>[];
         try {
           results = await Promise.allSettled(
@@ -596,10 +630,10 @@ test(
             )
           );
         } finally {
-          m.Course.findOneAndUpdate = write;
+          (m.Course as { findOneAndUpdate: unknown }).findOneAndUpdate = write;
         }
         assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1);
-        const current = await m.Course.findById(id).lean();
+        const current = await m.Course.findById(id);
         assert.ok(['rev_compete_a', 'rev_compete_b'].includes(current!.activeRevisionId!));
         assert.equal(
           await m.CourseRevision.countDocuments({
@@ -744,6 +778,7 @@ test(
           const body = await uploaded.json();
           assert.equal(uploaded.status, 202, JSON.stringify(body));
           const uploadedId = String(body.courseId);
+          courseIds.push(uploadedId);
           let completed = false;
           for (let i = 0; i < 300; i++) {
             const stored = await m.Course.findById(uploadedId).lean();
@@ -945,6 +980,7 @@ test(
                 const pdfBody = await pdfUpload.json();
                 assert.equal(pdfUpload.status, 202, JSON.stringify(pdfBody));
                 const pdfCourseId = String(pdfBody.courseId);
+                courseIds.push(pdfCourseId);
                 let pdfCompleted = false;
                 for (let i = 0; i < 300; i++) {
                   const stored = await m.Course.findById(pdfCourseId).lean();

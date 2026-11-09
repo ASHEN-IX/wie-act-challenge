@@ -15,7 +15,9 @@ const id = '0123456789abcdef01234567';
 const stranger = 'someone-else';
 
 function stored(doc: Record<string, unknown>) {
-  findById.mockReturnValue({ select: () => ({ lean: async () => doc }) });
+  // The converted `findById` is a promise-like cursor whose `select()` resolves
+  // the row directly.
+  findById.mockReturnValue({ select: async () => doc });
 }
 
 describe('public course read grant', () => {

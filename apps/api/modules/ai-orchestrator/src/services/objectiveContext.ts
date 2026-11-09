@@ -27,9 +27,7 @@ export async function resolveObjectiveContext(
     objectiveId,
     userId,
     isActive: true
-  })
-    .select('bloomLevel knowledgeType documentId')
-    .lean();
+  });
   if (!objective || !objective.bloomLevel || !(await canReadCourse(userId, objective.documentId)))
     return null;
   return {

@@ -23,15 +23,16 @@ interface FacilitatorEvent {
 import { listeningPort } from '../listening-port';
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
-import { MongoClient, ObjectId } from 'mongodb';
 import bcrypt from 'bcryptjs';
 import WebSocket from 'ws';
-import { migrateAuth } from '../../scripts/migrate-auth';
+import { connectDatabase, disconnectDatabase, prisma } from '../../shared/database';
+import { newId } from '../../shared/ids';
+import { FacilitatorIntervention, StudyRoom } from '../../modules/study/src/models';
 
 // Real Integration Test Suite for ED-09 (Pedagogical Facilitator Policy & Live WS Broadcast)
 async function runTests() {
-  const dbName = 'ed09_verify_test_' + process.pid + '_' + Date.now();
-  process.env.MONGODB_URI = `mongodb://127.0.0.1:27018/${dbName}`;
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
   process.env.BETTER_AUTH_SECRET = 'isolated-auth-test-secret-at-least-32-characters';
   process.env.AUTH_TRUSTED_ORIGINS = 'http://localhost:5173';
   process.env.BETTER_AUTH_URL = 'http://localhost:5173';
@@ -40,32 +41,47 @@ async function runTests() {
   process.env.REDIS_URL = '';
   process.env.NODE_ENV = 'test';
 
-  const client = new MongoClient(process.env.MONGODB_URI);
-  await client.connect();
-  const db = client.db();
+  await connectDatabase();
 
-  // Create 3 real test users in MongoDB
+  // Create 3 real test users in PostgreSQL. This suite shares one database, so
+  // the addresses are run-unique.
+  const run = `${process.pid}_${Date.now()}`;
   const users = [
-    { id: new ObjectId(), email: 'habib_f@test.ednova', name: 'Habib S.', role: 'student' },
-    { id: new ObjectId(), email: 'tasnim_f@test.ednova', name: 'Tasnim K.', role: 'student' },
-    { id: new ObjectId(), email: 'stranger_f@test.ednova', name: 'Stranger X.', role: 'student' }
+    { id: newId(), email: `habib_f_${run}@test.ednova`, name: 'Habib S.', role: 'student' },
+    { id: newId(), email: `tasnim_f_${run}@test.ednova`, name: 'Tasnim K.', role: 'student' },
+    { id: newId(), email: `stranger_f_${run}@test.ednova`, name: 'Stranger X.', role: 'student' }
   ];
 
   const hashedPw = await bcrypt.hash('Password!123', 12);
+  await prisma.authRateLimit.deleteMany({});
   for (const u of users) {
-    await db.collection('users').insertOne({
-      _id: u.id,
-      email: u.email,
-      name: u.name,
-      password: hashedPw,
-      isVerified: true,
-      isActive: true,
-      role: u.role,
-      tier: 'standard'
+    await prisma.user.create({
+      data: {
+        id: u.id,
+        email: u.email,
+        name: u.name,
+        password: hashedPw,
+        isVerified: true,
+        isActive: true,
+        role: 'student',
+        tier: 'normal',
+        notificationPreferences: {},
+        onboardingDraft: {}
+      }
+    });
+    await prisma.authUser.create({
+      data: { id: u.id, email: u.email, name: u.name, emailVerified: true }
+    });
+    await prisma.authAccount.create({
+      data: {
+        id: newId(),
+        accountId: u.id,
+        providerId: 'credential',
+        userId: u.id,
+        password: hashedPw
+      }
     });
   }
-
-  await migrateAuth(db, { apply: true });
 
   const { getAuth } = await import('../../shared/betterAuth.js');
   const auth = await getAuth();
@@ -95,9 +111,16 @@ async function runTests() {
     } catch {
       /* Best-effort test cleanup / ignore non-JSON transport frames. */
     }
+    const ids = users.map((u) => u.id);
     try {
-      await db.dropDatabase();
-      await client.close();
+      await FacilitatorIntervention.deleteMany({ roomId: { $exists: true } });
+      await StudyRoom.deleteMany({ hostUserId: { $in: ids } });
+      await prisma.authSession.deleteMany({ where: { userId: { in: ids } } });
+      await prisma.authAccount.deleteMany({ where: { userId: { in: ids } } });
+      await prisma.authUser.deleteMany({ where: { id: { in: ids } } });
+      await prisma.user.deleteMany({ where: { id: { in: ids } } });
+      await prisma.authRateLimit.deleteMany({});
+      await disconnectDatabase();
     } catch {
       /* Best-effort test cleanup / ignore non-JSON transport frames. */
     }
@@ -143,7 +166,7 @@ async function runTests() {
       '/api/v1/study/rooms',
       'POST',
       { title: 'Database Normalization Workshop', maxParticipants: 4 },
-      cookies['habib_f@test.ednova']
+      cookies[users[0].email]
     );
     assert.equal(createRes.status, 201);
     testRoomId = createRes.data.roomId;
@@ -156,7 +179,7 @@ async function runTests() {
       '/api/v1/study/rooms/join',
       'POST',
       { inviteCode: testInviteCode, hasVoiceConsent: true },
-      cookies['tasnim_f@test.ednova']
+      cookies[users[1].email]
     );
     assert.equal(joinRes.status, 200);
     assert.equal(joinRes.data.participantsCount, 2);
@@ -171,7 +194,7 @@ async function runTests() {
         actionType: 'ask_facilitator',
         promptText: 'What is the direct answer to question 2?'
       },
-      cookies['tasnim_f@test.ednova']
+      cookies[users[1].email]
     );
 
     assert.equal(res.status, 200);
@@ -189,10 +212,10 @@ async function runTests() {
     // Must target Habib as peer
     assert.equal(intervention.targetSpeakerName, 'Habib S.');
 
-    // Verify stored in MongoDB
-    const stored = await db
-      .collection('facilitatorinterventions')
-      .findOne({ interventionId: intervention.interventionId });
+    // Verify the stored row
+    const stored = await FacilitatorIntervention.findOne({
+      interventionId: intervention.interventionId
+    });
     assert.ok(stored);
     assert.equal(stored.strategy, 'SOCRATIC_NUDGE');
     assert.equal(stored.status, 'delivered');
@@ -208,7 +231,7 @@ async function runTests() {
           'I think a table is in 1NF as long as every student has a unique primary key ID.',
         actionType: 'statement'
       },
-      cookies['tasnim_f@test.ednova']
+      cookies[users[1].email]
     );
 
     assert.equal(res.status, 200);
@@ -225,7 +248,7 @@ async function runTests() {
     );
 
     // Verify seq incremented
-    const room = await db.collection('study_rooms').findOne({ roomId: testRoomId });
+    const room = await StudyRoom.findOne({ roomId: testRoomId });
     assert.ok(room, 'Expected persisted study room');
     assert.ok(room.seq >= 2);
   });
@@ -237,7 +260,7 @@ async function runTests() {
       `/api/v1/study/rooms/${testRoomId}/facilitator/action`,
       'POST',
       { actionType: 'request_hint', hintLevel: 1 },
-      cookies['habib_f@test.ednova']
+      cookies[users[0].email]
     );
     assert.equal(resL1.status, 200);
     assert.equal(resL1.data.intervened, true);
@@ -249,7 +272,7 @@ async function runTests() {
       `/api/v1/study/rooms/${testRoomId}/facilitator/action`,
       'POST',
       { actionType: 'request_hint', hintLevel: 2 },
-      cookies['habib_f@test.ednova']
+      cookies[users[0].email]
     );
     assert.equal(resL2.status, 200);
     assert.equal(resL2.data.intervened, true);
@@ -267,7 +290,7 @@ async function runTests() {
         actionType: 'ask_facilitator',
         promptText: 'Can you check if we are on the right track?'
       },
-      cookies['habib_f@test.ednova']
+      cookies[users[0].email]
     );
     const intId = genRes.data.intervention.interventionId;
 
@@ -279,15 +302,15 @@ async function runTests() {
         actionType: 'decline_prompt',
         interventionId: intId
       },
-      cookies['tasnim_f@test.ednova']
+      cookies[users[1].email]
     );
 
     assert.equal(declineRes.status, 200);
     assert.equal(declineRes.data.success, true);
     assert.equal(declineRes.data.status, 'declined');
 
-    // Verify DB updated to declined
-    const doc = await db.collection('facilitatorinterventions').findOne({ interventionId: intId });
+    // Verify the row updated to declined
+    const doc = await FacilitatorIntervention.findOne({ interventionId: intId });
     assert.ok(doc, 'Expected persisted facilitator intervention');
     assert.equal(doc.status, 'declined');
   });
@@ -296,15 +319,15 @@ async function runTests() {
   test('ED-09 Contract 13: Live authoritative WebSocket broadcast of FACILITATOR_INTERVENTION', async () => {
     // Open WebSocket connections for Habib and Tasnim
     const wsHabib = new WebSocket(
-      `${wsBaseUrl}/ws/realtime?roomId=${testRoomId}&userId=${users[0].id.toString()}`,
+      `${wsBaseUrl}/ws/realtime?roomId=${testRoomId}&userId=${users[0].id}`,
       {
-        headers: { cookie: cookies['habib_f@test.ednova'] }
+        headers: { cookie: cookies[users[0].email] }
       }
     );
     const wsTasnim = new WebSocket(
-      `${wsBaseUrl}/ws/realtime?roomId=${testRoomId}&userId=${users[1].id.toString()}`,
+      `${wsBaseUrl}/ws/realtime?roomId=${testRoomId}&userId=${users[1].id}`,
       {
-        headers: { cookie: cookies['tasnim_f@test.ednova'] }
+        headers: { cookie: cookies[users[1].email] }
       }
     );
 
@@ -327,7 +350,7 @@ async function runTests() {
       `/api/v1/study/rooms/${testRoomId}/facilitator/action`,
       'POST',
       { actionType: 'request_hint', hintLevel: 1 },
-      cookies['habib_f@test.ednova']
+      cookies[users[0].email]
     );
     assert.equal(hintRes.status, 200);
 
@@ -355,7 +378,7 @@ async function runTests() {
       `/api/v1/study/rooms/${testRoomId}/facilitator/interventions`,
       'GET',
       undefined,
-      cookies['habib_f@test.ednova']
+      cookies[users[0].email]
     );
     assert.equal(listRes.status, 200);
     assert.ok(Array.isArray(listRes.data.interventions));
@@ -366,7 +389,7 @@ async function runTests() {
       `/api/v1/study/rooms/${testRoomId}/facilitator/interventions`,
       'GET',
       undefined,
-      cookies['stranger_f@test.ednova']
+      cookies[users[2].email]
     );
     assert.equal(strangerRes.status, 403);
   });

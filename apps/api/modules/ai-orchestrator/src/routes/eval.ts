@@ -1,6 +1,6 @@
 import { canDeliverJob } from '../services/jobAccess';
 import type { IAiJob } from '../models/AiJob';
-import type { FilterQuery } from 'mongoose';
+import type { Prisma } from '../../../../src/generated/prisma/client';
 /**
  * Eval API (F04 / EVAL-09).
  *
@@ -93,7 +93,7 @@ router.post('/step', async (req, res, next) => {
         messageId
       });
     } catch {
-      await job.deleteOne(); // no silent loss, no orphan PENDING rows
+      await AiJob.deleteOne({ id: job.id }); // no silent loss, no orphan PENDING rows
       logger.error('eval_job_publish_failed_rolling_back', { jobId: job.jobId });
       return res.status(503).json({ error: 'AI job bus unavailable, retry later' });
     }
@@ -124,9 +124,9 @@ router.post('/step', async (req, res, next) => {
 
 router.get('/jobs/:jobId', async (req, res, next) => {
   try {
-    const query: FilterQuery<IAiJob> = { jobId: req.params.jobId, type: EVAL_JOB_TYPE };
+    const query: Prisma.AiJobWhereInput = { jobId: String(req.params.jobId), type: EVAL_JOB_TYPE };
     query.userId = req.user!.userId;
-    const job = await AiJob.findOne(query).lean();
+    const job = await AiJob.findOne(query);
     if (!job || job.userId !== req.user!.userId || !(await canDeliverJob(job)))
       return res.status(404).json({ error: 'eval job not found' });
     return res.json({

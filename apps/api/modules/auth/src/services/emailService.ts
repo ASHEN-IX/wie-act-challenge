@@ -28,7 +28,9 @@ async function getTransporter(): Promise<MailTransport> {
       host: process.env.SMTP_HOST,
       port: parseInt(process.env.SMTP_PORT || '587'),
       secure: process.env.SMTP_SECURE === 'true',
-      ...(process.env.SMTP_USER ? { auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } } : {}),
+      ...(process.env.SMTP_USER
+        ? { auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } }
+        : {}),
       connectionTimeout: 5000,
       greetingTimeout: 5000,
       socketTimeout: 10000
@@ -92,7 +94,8 @@ export async function sendCourseInvitationEmail(to: string, courseTitle: string,
     from: process.env.SMTP_FROM || FROM_ADDRESS,
     to,
     subject: 'Your invitation to join an EdNova course',
-    text: `You have been invited to join ${courseTitle}.
+    text:
+      `You have been invited to join ${courseTitle}.
 
 ` +
       `Sign in with this email address at ${joinUrl} and enter this code:

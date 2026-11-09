@@ -1,35 +1,34 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MongoClient } from 'mongodb';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
+import { connectDatabase, disconnectDatabase, prisma } from '../../shared/database';
 import { acquireApiInstance, productionApiInstance } from '../../src/framework/single-instance';
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-test('Single-instance realtime ownership uses actual Mongo leases and conservative delivery fencing', async (t) => {
-  const client = await new MongoClient('mongodb://127.0.0.1:27018').connect();
-  const db = client.db('ednova_final_fencing_' + process.pid + '_' + Date.now());
+test('Single-instance realtime ownership uses real PostgreSQL leases and conservative delivery fencing', async (t) => {
+  await connectDatabase();
   t.after(async () => {
-    await db.dropDatabase();
-    await client.close();
+    await prisma.apiInstanceLease.deleteMany({});
+    await disconnectDatabase();
   });
   await t.test('second API owner refused; intentional release enables replacement', async () => {
-    const first = await acquireApiInstance(db);
+    const first = await acquireApiInstance();
     try {
       first.assertActive();
-      await assert.rejects(() => acquireApiInstance(db), /Another API instance/);
+      await assert.rejects(() => acquireApiInstance(), /Another API instance/);
     } finally {
       await first.close();
     }
-    const replacement = await acquireApiInstance(db);
+    const replacement = await acquireApiInstance();
     replacement.assertActive();
     await replacement.close();
   });
   await t.test('healthy heartbeats retain exclusive ownership beyond initial expiry', async () => {
-    const lease = await acquireApiInstance(db, { leaseMs: 1000, heartbeatMs: 100 });
+    const lease = await acquireApiInstance({ leaseMs: 1000, heartbeatMs: 100 });
     try {
       await delay(1300);
       lease.assertActive();
-      await assert.rejects(() => acquireApiInstance(db), /Another API instance/);
+      await assert.rejects(() => acquireApiInstance(), /Another API instance/);
     } finally {
       await lease.close();
     }
@@ -38,7 +37,7 @@ test('Single-instance realtime ownership uses actual Mongo leases and conservati
     'stalled owner is fenced before server expiry; new owner cannot revive old delivery',
     async () => {
       let lost = 0;
-      const first = await acquireApiInstance(db, {
+      const first = await acquireApiInstance({
         leaseMs: 800,
         heartbeatMs: 10000,
         onLost: () => lost++
@@ -47,14 +46,14 @@ test('Single-instance realtime ownership uses actual Mongo leases and conservati
         await delay(520);
         assert.throws(() => first.assertActive(), /expired/);
         assert.equal(lost, 1);
-        await assert.rejects(() => acquireApiInstance(db), /Another API instance/);
+        await assert.rejects(() => acquireApiInstance(), /Another API instance/);
         await delay(330);
-        const next = await acquireApiInstance(db);
+        const next = await acquireApiInstance();
         try {
           next.assertActive();
           assert.throws(() => first.assertActive(), /expired/);
           await first.close();
-          await assert.rejects(() => acquireApiInstance(db), /Another API instance/);
+          await assert.rejects(() => acquireApiInstance(), /Another API instance/);
         } finally {
           await next.close();
         }
@@ -73,7 +72,7 @@ test('Single-instance realtime ownership uses actual Mongo leases and conservati
           '--tsconfig',
           'tsconfig.json',
           'tests/helpers/hold-api-instance-lease.ts',
-          'mongodb://127.0.0.1:27018/' + db.databaseName
+          process.env.DATABASE_URL as string
         ],
         { stdio: ['ignore', 'pipe', 'pipe'], detached: true }
       );
@@ -91,7 +90,7 @@ test('Single-instance realtime ownership uses actual Mongo leases and conservati
             }
           });
         });
-        await assert.rejects(() => acquireApiInstance(db), /Another API instance/);
+        await assert.rejects(() => acquireApiInstance(), /Another API instance/);
         try {
           process.kill(-child.pid!, 'SIGKILL');
         } catch {
@@ -99,7 +98,7 @@ test('Single-instance realtime ownership uses actual Mongo leases and conservati
         }
         await new Promise((resolve) => child.once('exit', resolve));
         await delay(1300);
-        const next = await acquireApiInstance(db);
+        const next = await acquireApiInstance();
         next.assertActive();
         await next.close();
       } finally {

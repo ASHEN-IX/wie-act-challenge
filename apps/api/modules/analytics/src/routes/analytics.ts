@@ -1,7 +1,7 @@
 import type { DomainRequest } from '../../../../src/framework/contracts';
-import type { FilterQuery } from 'mongoose';
+import type { Prisma } from '../../../../src/generated/prisma/client';
 import type { IAnalyticsEvent } from '../models/AnalyticsEvent';
-import { boundedInteger, activityRange } from '@ednova/shared/pagination';
+import { boundedInteger, activityRangeFilter } from '@ednova/shared/pagination';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { createContracts } = require('@ednova/shared/domainContracts');
 import Joi from 'joi';
@@ -93,12 +93,14 @@ router.get(
       return res.json(JSON.parse(cached));
     }
 
-    const filter: FilterQuery<IAnalyticsEvent> = { userId };
-    filter.timestamp = activityRange(startDate, endDate);
+    const filter: Prisma.AnalyticsEventWhereInput = { userId };
+    filter.timestamp = activityRangeFilter(startDate, endDate);
 
-    const events = await AnalyticsEvent.find(filter)
-      .sort({ timestamp: -1 })
-      .limit(boundedInteger(limit));
+    const events = await AnalyticsEvent.findMany(
+      filter,
+      { timestamp: 'desc' },
+      boundedInteger(limit)
+    );
 
     const payload = { events };
     await cache.setex(cacheKey, 60, JSON.stringify(payload));
@@ -122,28 +124,17 @@ router.get(
       return res.json(JSON.parse(cached));
     }
 
-    const filter: FilterQuery<IAnalyticsEvent> = { userId };
-    filter.timestamp = activityRange(startDate, endDate);
+    const filter: Prisma.AnalyticsEventWhereInput = { userId };
+    filter.timestamp = activityRangeFilter(startDate, endDate);
 
-    const grouped = await AnalyticsEvent.aggregate([
-      { $match: filter },
-      {
-        $group: {
-          _id: {
-            type: '$eventType',
-            day: { $dateToString: { format: '%Y-%m-%d', date: '$timestamp' } }
-          },
-          count: { $sum: 1 }
-        }
-      }
-    ]);
+    const grouped = await AnalyticsEvent.countByTypeAndDay(filter);
     const eventCounts: Record<string, number> = {};
     const days = new Set<string>();
     let totalEvents = 0;
     for (const group of grouped) {
-      eventCounts[group._id.type] = (eventCounts[group._id.type] || 0) + group.count;
+      eventCounts[group.type] = (eventCounts[group.type] || 0) + group.count;
       totalEvents += group.count;
-      days.add(group._id.day);
+      days.add(group.day);
     }
     const sortedDates = [...days].sort();
     let currentStreak = 0;
@@ -182,21 +173,12 @@ router.get(
     const { eventType } = req.params;
     const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
 
-    const filter: FilterQuery<IAnalyticsEvent> = { userId, eventType };
-    filter.timestamp = activityRange(startDate, endDate);
+    const filter: Prisma.AnalyticsEventWhereInput = { userId, eventType: String(eventType) };
+    filter.timestamp = activityRangeFilter(startDate, endDate);
 
-    const groups = await AnalyticsEvent.aggregate([
-      { $match: filter },
-      {
-        $group: {
-          _id: { $dateToString: { format: '%Y-%m-%d', date: '$timestamp' } },
-          count: { $sum: 1 }
-        }
-      },
-      { $sort: { _id: 1 } }
-    ]);
+    const groups = await AnalyticsEvent.countByDay(filter);
     const dailyStats = Object.fromEntries(
-      groups.map((group: { _id: string; count: number }) => [group._id, { count: group.count }])
+      groups.map((group) => [group.day, { count: group.count }])
     );
 
     res.json({
@@ -223,10 +205,7 @@ router.get(
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - parseInt(String(days)));
 
-    const events = await AnalyticsEvent.find({
-      userId,
-      timestamp: { $gte: startDate }
-    });
+    const events = await AnalyticsEvent.findMany({ userId, timestamp: { gte: startDate } });
 
     // Calculate insights
     const studySessions = events.filter((e) => e.eventType === 'study_session_completed');
@@ -343,10 +322,12 @@ router.get(
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - parseInt(String(days)));
 
-    const events = await AnalyticsEvent.find({
-      userId,
-      timestamp: { $gte: startDate }
-    }).sort({ timestamp: 1 });
+    const events = await AnalyticsEvent.findMany(
+      { userId, timestamp: { gte: startDate } },
+      {
+        timestamp: 'asc'
+      }
+    );
 
     const dailyMap: Record<
       string,

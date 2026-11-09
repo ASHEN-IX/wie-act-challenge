@@ -2,6 +2,7 @@ import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response } from 'express';
 import { createContracts } from '@ednova/shared/domainContracts';
 import Quest, { IQuest } from '../models/Quest';
+import { newId } from '../../../../shared/ids';
 
 type QuestTemplate = Pick<
   IQuest,
@@ -113,46 +114,43 @@ router.get('/', async (req: DomainRequest, res: Response) => {
 
     // Expire old quests
     await Quest.updateMany(
-      { userId, status: 'active', expiresAt: { $lt: now } },
+      { userId, status: 'active', expiresAt: { lt: now } },
       { status: 'expired' }
     );
 
     // Check for existing active daily quests
-    let dailyQuests = await Quest.find({ userId, type: 'daily', status: 'active' });
+    let dailyQuests = await Quest.findMany({ userId, type: 'daily', status: 'active' });
     if (dailyQuests.length === 0) {
       // Generate 2 random daily quests
       const templates = pickRandom(DAILY_QUEST_TEMPLATES, 2);
-      dailyQuests = await Quest.insertMany(
-        templates.map((t) => ({
-          userId,
-          type: 'daily',
-          ...t,
-          expiresAt: endOfDay()
-        }))
+      dailyQuests = await Promise.all(
+        templates.map((t) =>
+          Quest.create({ id: newId(), userId, type: 'daily', ...t, expiresAt: endOfDay() })
+        )
       );
     }
 
     // Check for existing active weekly quests
-    let weeklyQuests = await Quest.find({ userId, type: 'weekly', status: 'active' });
+    let weeklyQuests = await Quest.findMany({ userId, type: 'weekly', status: 'active' });
     if (weeklyQuests.length === 0) {
       // Generate 2 random weekly quests
       const templates = pickRandom(WEEKLY_QUEST_TEMPLATES, 2);
-      weeklyQuests = await Quest.insertMany(
-        templates.map((t) => ({
-          userId,
-          type: 'weekly',
-          ...t,
-          expiresAt: endOfWeek()
-        }))
+      weeklyQuests = await Promise.all(
+        templates.map((t) =>
+          Quest.create({ id: newId(), userId, type: 'weekly', ...t, expiresAt: endOfWeek() })
+        )
       );
     }
 
     // Also get recently completed quests (last 24h)
-    const recentCompleted = await Quest.find({
-      userId,
-      status: 'completed',
-      completedAt: { $gte: new Date(now.getTime() - 24 * 60 * 60 * 1000) }
-    }).sort({ completedAt: -1 });
+    const recentCompleted = await Quest.findMany(
+      {
+        userId,
+        status: 'completed',
+        completedAt: { gte: new Date(now.getTime() - 24 * 60 * 60 * 1000) }
+      },
+      { orderBy: { completedAt: 'desc' } }
+    );
 
     res.json({
       daily: dailyQuests,
@@ -176,14 +174,12 @@ router.post('/progress', requireInternal, async (req: DomainRequest, res: Respon
     }
 
     // Find all active quests that match this action
-    const quests = await Quest.find({ userId, status: 'active', action });
+    const quests = await Quest.findMany({ userId, status: 'active', action });
 
     const results = [];
     for (const quest of quests) {
-      const result = quest.incrementProgress();
+      const result = await Quest.incrementProgress(quest);
       if (result.changed) {
-        await quest.save();
-
         // Quest bookkeeping is not verified personal learning evidence. Preserve
         // completion without minting XP through this legacy action pathway.
         results.push({

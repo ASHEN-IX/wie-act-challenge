@@ -18,11 +18,13 @@ import assert from 'node:assert/strict';
  * only; the orchestrator portion of eval persistence is covered by EVAL-08/10).
  */
 
-const mongoose = require('mongoose');
+const { connectDatabase, disconnectDatabase } = require('../../shared/database');
+const { newId } = require('../../shared/ids');
 
 jest.setTimeout(30000);
 
-process.env.MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/ednova_test';
+process.env.DATABASE_URL =
+  process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
 process.env.NODE_ENV = 'test';
 
 const {
@@ -37,7 +39,7 @@ const { processEvalResult } = require('../../modules/study/src/services/competen
 import { getWeakCompetenciesForCourse } from '../../modules/study/src/services/competencyQueries';
 
 const USER = 'bloom-loop-user';
-const COURSE_ID = new mongoose.Types.ObjectId().toString();
+const COURSE_ID = newId();
 const TOPIC_A = 'sub-a-recursion';
 const TOPIC_B = 'sub-b-sorting';
 const OBJ_A = 'obj-loop-a';
@@ -89,14 +91,14 @@ function seedCourse() {
 
 describe('BLOOM-12 end-to-end loop (real Mongo + real services)', () => {
   beforeAll(async () => {
-    await mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 5000 });
+    await connectDatabase();
     await wipeLoopCollections();
     await seedCourse();
   });
 
   afterAll(async () => {
     await wipeLoopCollections();
-    await mongoose.disconnect();
+    await disconnectDatabase();
   });
 
   test('1. ingest → objectives: syncObjectivesForDocument persists classified objectives', async () => {

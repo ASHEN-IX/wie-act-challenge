@@ -219,7 +219,7 @@ async function handleIngestProgress(
       }
     }
   );
-  if (!current.modifiedCount) return;
+  if (!current) return;
   await CourseIngestionOperation.updateOne(
     { correlationId: progress.correlationId, state: { $in: ['prepared', 'queued', 'processing'] } },
     { $set: { state: 'processing' } }
@@ -289,7 +289,7 @@ async function handleIngestResult(
     },
     { $set: { status: terminalStatus } }
   );
-  if (!claimed.matchedCount) return;
+  if (!claimed) return;
 
   if (result.status === 'completed') {
     course.status = 'completed';
@@ -314,7 +314,7 @@ async function handleIngestResult(
           } else {
             const expectedIndex =
               'faiss/' + course._id.toString() + '/' + rev.revisionTag + '.faiss';
-              const canonical = result.payload.contentDocument;
+            const canonical = result.payload.contentDocument;
             const changed = await CourseRevision.updateOne(
               {
                 _id: rev._id,
@@ -337,13 +337,13 @@ async function handleIngestResult(
                 $inc: { __v: 1 }
               }
             );
-            if (changed.modifiedCount) course.set('topics', sanitizedTopics);
+            if (changed) Object.assign(course, { topics: sanitizedTopics });
           }
         } else {
-          course.set('topics', sanitizedTopics);
+          Object.assign(course, { topics: sanitizedTopics });
         }
       } else {
-        course.set('topics', sanitizedTopics);
+        Object.assign(course, { topics: sanitizedTopics });
       }
     }
     course.processedAt = new Date();
@@ -370,7 +370,7 @@ async function handleIngestResult(
       }
     }
   );
-  if (operation && applied.matchedCount)
+  if (operation && applied)
     await CourseIngestionOperation.updateOne(
       { _id: operation._id, state: { $nin: ['cancelled', 'superseded'] } },
       { $set: { state: terminalStatus, resultApplied: true } }

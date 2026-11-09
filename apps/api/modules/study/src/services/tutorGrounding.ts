@@ -8,8 +8,8 @@
  * - Validation of GroundingContext against Contract 03.
  */
 
-import mongoose from 'mongoose';
 import { CourseRevision } from '../models';
+import UserProfile from '../../../user-profile/src/models/UserProfile';
 import {
   normalizeLearningProfile,
   tutorPreferenceHints
@@ -80,9 +80,7 @@ export class TutorServiceUnavailableError extends Error {
  */
 export async function loadTutorStyle(userId: string) {
   try {
-    const doc = await mongoose.connection
-      .collection('user_profiles')
-      .findOne({ userId }, { projection: { learningProfile: 1 } });
+    const doc = await UserProfile.findOne({ userId });
     if (!doc?.learningProfile) return null;
     return tutorPreferenceHints(normalizeLearningProfile(doc.learningProfile));
   } catch {

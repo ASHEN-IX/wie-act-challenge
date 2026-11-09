@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import mongoose from 'mongoose';
+import { pathToFileURL } from 'node:url';
+import { connectDatabase, disconnectDatabase } from '../../shared/database';
 import { Course, CourseRevision } from '../../modules/study/src/models';
 import { CourseIngestionOperation } from '../../modules/study/src/models/CourseIngestionOperation';
 import {
@@ -17,19 +18,23 @@ import { setCustomPublisher } from '../../modules/study/src/services/ingestionJo
 import { handleIngestResult } from '../../modules/study/src/services/ingestStatus';
 
 test('Physical ingestion crash-boundary testing and concurrent outbox/replacement arbitration', async (t) => {
-  const dbUri = 'mongodb://127.0.0.1:27018/ednova_crash_outbox_' + process.pid + '_' + Date.now();
-  await mongoose.connect(dbUri);
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
+  await connectDatabase();
 
+  // The test database is shared, so the actor is run-unique and teardown deletes
+  // exactly the rows this suite (and its spawned child) created.
+  const actor = `crash_owner_${process.pid}_${Date.now()}`;
   t.after(async () => {
     setCustomPublisher(null);
     try {
-      await mongoose.connection.dropDatabase();
+      await CourseIngestionOperation.deleteMany({ userId: actor });
+      // Revisions cascade from the course row.
+      await Course.deleteMany({ userId: actor });
     } finally {
-      await mongoose.disconnect();
+      await disconnectDatabase().catch(() => {});
     }
   });
-
-  const actor = 'crash_test_owner';
 
   async function createCourseFixture(overrides?: Partial<Record<string, unknown>>) {
     const course = await Course.create({
@@ -165,10 +170,10 @@ test('Physical ingestion crash-boundary testing and concurrent outbox/replacemen
   );
 
   await t.test(
-    'Physical process kill (SIGKILL) right after MongoDB reservation survives and reconciles',
+    'Physical process kill (SIGKILL) right after the database reservation survives and reconciles',
     async () => {
-      // We spawn a child process that creates a course and reserves an ingestion operation in MongoDB,
-      // but is killed via SIGKILL before publishing to RabbitMQ.
+      // We spawn a child process that creates a course and reserves an ingestion
+      // operation in PostgreSQL, but is killed via SIGKILL before publishing.
       const fixtureParams = await createCourseFixture({ status: 'completed' });
       const targetCourseId = fixtureParams.courseId;
       const targetRevisionId = 'rev_sigkill_' + crypto.randomUUID().slice(0, 8);
@@ -192,56 +197,46 @@ test('Physical ingestion crash-boundary testing and concurrent outbox/replacemen
         ]
       });
 
+      const databaseModule = pathToFileURL(
+        path.resolve(__dirname, '../../shared/database.ts')
+      ).href;
       const childScript = `
-        const mongoose = require('mongoose');
-        const crypto = require('crypto');
-        
-        async function run() {
-          await mongoose.connect('${dbUri}');
-          const messageId = '${crypto.randomUUID()}';
-          const correlationId = '${crypto.randomUUID()}';
-          
-          const CourseIngestionOperation = mongoose.model(
-            'CourseIngestionOperation',
-            new mongoose.Schema({ _id: String }, { strict: false, collection: 'course_ingestion_operations' })
-          );
-          const Course = mongoose.model('Course', new mongoose.Schema({}, { strict: false, collection: 'courses' }));
-          
-          await CourseIngestionOperation.create({
-            _id: messageId,
-            correlationId: correlationId,
-            courseId: new mongoose.Types.ObjectId('${targetCourseId}'),
-            revisionId: '${targetRevisionId}',
-            userId: '${actor}',
-            fileRef: 'courses/${targetCourseId}',
-            files: [],
-            state: 'prepared',
-            createdAt: new Date(),
-            updatedAt: new Date()
-          });
-          
-          await Course.updateOne(
-            { _id: new mongoose.Types.ObjectId('${targetCourseId}') },
-            {
-              $set: {
-                jobId: messageId,
-                correlationId: correlationId,
-                status: 'processing',
-                ingestStage: null,
-                ingestProgress: 0,
-                ingestDetail: 'queued',
-                ingestError: ''
-              }
+        const { randomUUID } = require('node:crypto');
+        (async () => {
+          const { prisma } = await import('${databaseModule}');
+          const messageId = randomUUID();
+          const correlationId = randomUUID();
+
+          await prisma.courseIngestionOperation.create({
+            data: {
+              id: messageId,
+              correlationId,
+              courseId: ${JSON.stringify(targetCourseId)},
+              revisionId: ${JSON.stringify(targetRevisionId)},
+              userId: ${JSON.stringify(actor)},
+              fileRef: 'courses/' + ${JSON.stringify(targetCourseId)},
+              files: [],
+              state: 'prepared'
             }
-          );
-          
-          // Send message to parent that persistence reservation is committed to MongoDB
+          });
+
+          await prisma.course.updateMany({
+            where: { id: ${JSON.stringify(targetCourseId)} },
+            data: {
+              jobId: messageId,
+              correlationId,
+              status: 'processing',
+              ingestStage: null,
+              ingestProgress: 0,
+              ingestDetail: 'queued',
+              ingestError: ''
+            }
+          });
+
+          // The reservation is committed; report it, then wait to be SIGKILLed.
           process.send({ ready: true, messageId, correlationId });
-          
-          // Wait indefinitely to be killed by SIGKILL from parent
           await new Promise(() => {});
-        }
-        run().catch(err => {
+        })().catch((err) => {
           console.error(err);
           process.exit(1);
         });
@@ -250,14 +245,11 @@ test('Physical ingestion crash-boundary testing and concurrent outbox/replacemen
       let killedJobId = '';
       let killedCorrelationId = '';
 
-      const child = spawn(process.execPath, ['-e', childScript], {
+      const child = spawn(process.execPath, ['--import', 'tsx', '-e', childScript], {
         cwd: path.resolve(__dirname, '../..'),
         env: {
           ...process.env,
-          NODE_PATH:
-            path.resolve(__dirname, '../../node_modules') +
-            ':' +
-            path.resolve(__dirname, '../../../../node_modules')
+          DATABASE_URL: process.env.DATABASE_URL
         },
         stdio: ['pipe', 'pipe', 'pipe', 'ipc']
       });
@@ -303,7 +295,7 @@ test('Physical ingestion crash-boundary testing and concurrent outbox/replacemen
 
       const crashedOp = await CourseIngestionOperation.findById(killedJobId).lean();
       assert.equal(crashedOp?.state, 'prepared');
-      assert.equal(String(crashedOp?.courseId), targetCourseId);
+      assert.equal(crashedOp?.courseId, targetCourseId);
 
       // Now parent process performs recovery / reconciliation:
       let republishCalledWith: { messageId: string; correlationId: string } | undefined;
@@ -401,7 +393,7 @@ test('Physical ingestion crash-boundary testing and concurrent outbox/replacemen
       const cancelledCourse = await Course.findById(params.courseId).lean();
       assert.equal(cancelledCourse?.status, 'failed');
       assert.equal(cancelledCourse?.ingestDetail, 'cancelled');
-      assert.equal(cancelledCourse?.correlationId, undefined);
+      assert.equal(cancelledCourse?.correlationId, null, 'Cancellation clears the correlation');
 
       // Late arriving worker result for cancelled correlationId is rejected
       await handleIngestResult(terminalResult(op.correlationId, params.revisionId));

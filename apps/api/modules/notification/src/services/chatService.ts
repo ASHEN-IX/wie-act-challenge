@@ -136,11 +136,11 @@ export interface GetHistoryArgs {
 }
 
 export async function getHistory({ sessionId, limit = 50, offset = 0 }: GetHistoryArgs) {
-  const items = await SessionChat.find({ sessionId, messageType: { $ne: 'peer_stream' } })
-    .sort({ createdAt: -1 })
-    .skip(offset)
-    .limit(limit)
-    .lean();
+  const items = await SessionChat.findMany(
+    { sessionId, messageType: { not: 'peer_stream' } },
+    { createdAt: 'desc' },
+    { skip: offset, take: limit }
+  );
   return items;
 }
 
@@ -155,11 +155,11 @@ export async function deleteMessage({
   messageId,
   userId
 }: DeleteMessageArgs): Promise<{ deleted: boolean; reason?: string }> {
-  const message = await SessionChat.findOne({ _id: messageId, sessionId });
+  const message = await SessionChat.findOne({ id: messageId, sessionId });
   if (!message) return { deleted: false, reason: 'not_found' };
   if (message.messageType === 'peer_stream' || String(message.userId) !== String(userId)) {
     return { deleted: false, reason: 'forbidden' };
   }
-  await SessionChat.deleteOne({ _id: messageId });
+  await SessionChat.deleteOne({ id: messageId });
   return { deleted: true };
 }

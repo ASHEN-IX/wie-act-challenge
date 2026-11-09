@@ -42,7 +42,7 @@ A separately authorized migration must inventory and back up both collections on
 
 ## Local verification
 
-Infrastructure is isolated synthetic Mongo on 27018 and the mission-owned RabbitMQ on 5678. Existing environments and credentials are not replaced. The browser harness starts real Nest, Next, Better Auth, local FastAPI and a RabbitMQ ingestion worker, and uses a deterministic local embedding fixture. No paid model calls or model downloads are required.
+Infrastructure is isolated synthetic PostgreSQL on 5433 and the mission-owned RabbitMQ on 5678. Existing environments and credentials are not replaced. The browser harness starts real Nest, Next, Better Auth, local FastAPI and a RabbitMQ ingestion worker, and uses a deterministic local embedding fixture. No paid model calls or model downloads are required.
 
 ```sh
 P0R2_PYTHON=/path/to/locked/python3.12 \

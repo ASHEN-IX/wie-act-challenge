@@ -2,10 +2,11 @@ import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import SessionChat, { type IPeerMessage } from '../../modules/notification/src/models/SessionChat';
 import assert from 'node:assert/strict';
-import { MongoClient, ObjectId } from 'mongodb';
 import bcrypt from 'bcryptjs';
 import WebSocket from 'ws';
-import { migrateAuth } from '../../scripts/migrate-auth';
+import { connectDatabase, disconnectDatabase, prisma } from '../../shared/database';
+import { newId } from '../../shared/ids';
+import { Course, StudyRoom } from '../../modules/study/src/models';
 
 interface RoomResponse {
   message: IPeerMessage;
@@ -28,10 +29,9 @@ interface RoomEvent {
   participants: Array<Record<string, unknown>>;
 }
 
-test('ED-07 public peer text real Nest/Mongo', { timeout: 90000 }, async (t) => {
-  // Always create and delete only this run's synthetic database.
-  const name = `ed07_peer_text_${process.pid}_${Date.now()}`;
-  process.env.MONGODB_URI = `mongodb://127.0.0.1:27018/${name}`;
+test('ED-07 public peer text real Nest/PostgreSQL', { timeout: 90000 }, async (t) => {
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
   process.env.BETTER_AUTH_SECRET = 'isolated-ed07-security-secret-at-least-32-characters';
   process.env.AUTH_TRUSTED_ORIGINS = 'http://localhost:5173';
   process.env.BETTER_AUTH_URL = 'http://localhost:5173';
@@ -40,36 +40,64 @@ test('ED-07 public peer text real Nest/Mongo', { timeout: 90000 }, async (t) => 
   process.env.REDIS_URL = '';
   process.env.AI_SERVICE_URL = 'http://127.0.0.1:1';
   process.env.NODE_ENV = 'test';
-  const client = new MongoClient(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 5000 });
-  await client.connect();
-  const db = client.db();
+  await connectDatabase();
   const cleanups: Array<() => Promise<void>> = [];
   const sockets: WebSocket[] = [];
+  const password = await bcrypt.hash('Synthetic!123', 12);
+  // This suite shares one migrated database; keep run-unique identities.
+  const run = `${process.pid}_${Date.now()}`;
+  const actors = ['Host', 'Peer', 'Outsider'].map((name) => ({
+    id: newId(),
+    name,
+    email: `${name.toLowerCase()}_${run}@ed07.test`,
+    cookie: ''
+  }));
+  const courseIds: string[] = [];
+  const roomIds: string[] = [];
   t.after(async () => {
     for (const socket of sockets) socket.terminate();
     for (const cleanup of cleanups) await cleanup();
-    await db.dropDatabase();
-    await client.close();
+    await StudyRoom.deleteMany({ hostUserId: { $in: actors.map((actor) => actor.id) } });
+    if (roomIds.length)
+      await prisma.sessionChat.deleteMany({ where: { sessionId: { in: roomIds } } });
+    if (courseIds.length) await Course.deleteMany({ _id: { $in: courseIds } });
+    const ids = actors.map((actor) => actor.id);
+    await prisma.authSession.deleteMany({ where: { userId: { in: ids } } });
+    await prisma.authAccount.deleteMany({ where: { userId: { in: ids } } });
+    await prisma.authUser.deleteMany({ where: { id: { in: ids } } });
+    await prisma.user.deleteMany({ where: { id: { in: ids } } });
+    await prisma.authRateLimit.deleteMany({});
+    await disconnectDatabase().catch(() => {});
   });
-  const password = await bcrypt.hash('Synthetic!123', 12);
-  const actors = ['Host', 'Peer', 'Outsider'].map((name) => ({
-    id: new ObjectId(),
-    name,
-    email: `${name.toLowerCase()}@ed07.test`,
-    cookie: ''
-  }));
-  for (const actor of actors)
-    await db.collection('users').insertOne({
-      _id: actor.id,
-      email: actor.email,
-      name: actor.name,
-      password,
-      isVerified: true,
-      isActive: true,
-      role: 'student',
-      tier: 'standard'
+  await prisma.authRateLimit.deleteMany({});
+  for (const actor of actors) {
+    await prisma.user.create({
+      data: {
+        id: actor.id,
+        email: actor.email,
+        name: actor.name,
+        password,
+        isVerified: true,
+        isActive: true,
+        role: 'student',
+        tier: 'normal',
+        notificationPreferences: {},
+        onboardingDraft: {}
+      }
     });
-  await migrateAuth(db, { apply: true });
+    await prisma.authUser.create({
+      data: { id: actor.id, email: actor.email, name: actor.name, emailVerified: true }
+    });
+    await prisma.authAccount.create({
+      data: {
+        id: newId(),
+        accountId: actor.id,
+        providerId: 'credential',
+        userId: actor.id,
+        password
+      }
+    });
+  }
   const { getAuth } = await import('../../shared/betterAuth.js');
   const auth = await getAuth();
   for (const actor of actors) {
@@ -106,6 +134,7 @@ test('ED-07 public peer text real Nest/Mongo', { timeout: 90000 }, async (t) => 
   async function create() {
     const response = await request(host, '/api/v1/study/rooms', 'POST', { enableVoice: false });
     assert.equal(response.status, 201);
+    roomIds.push(response.body.roomId as string);
     return response.body.roomId as string;
   }
   async function join(id: string) {
@@ -117,7 +146,7 @@ test('ED-07 public peer text real Nest/Mongo', { timeout: 90000 }, async (t) => 
     );
   }
   async function snapshot(id: string) {
-    return db.collection('study_rooms').findOne({ roomId: id });
+    return StudyRoom.findOne({ roomId: id });
   }
   async function connect(id: string, actor: typeof host, queryOnly = false) {
     const received: RoomEvent[] = [];
@@ -148,8 +177,18 @@ test('ED-07 public peer text real Nest/Mongo', { timeout: 90000 }, async (t) => 
     request(actor, chatPath(roomId) + '/messages', 'POST', body);
   const history = (actor: typeof host | null, query = '', roomId = id) =>
     request(actor, chatPath(roomId) + '/history?kind=peer' + query);
-  const journal = (roomId = id) =>
-    db.collection('sessionchats').findOne({ sessionId: roomId, messageType: 'peer_stream' });
+  // The peer journal is one deterministic row per room; read it through the model.
+  const journal = async (roomId = id) => {
+    const row = await prisma.sessionChat.findFirst({
+      where: { sessionId: roomId, messageType: 'peer_stream' }
+    });
+    if (!row) return null;
+    return {
+      ...row,
+      _id: row.id,
+      peerMessages: row.peerMessages as unknown as IPeerMessage[]
+    };
+  };
   const baselineRoom = await snapshot(id);
   const submission = { submissionId: randomUUID(), text: 'First public contribution' };
   let accepted: Awaited<ReturnType<typeof send>>;
@@ -161,7 +200,7 @@ test('ED-07 public peer text real Nest/Mongo', { timeout: 90000 }, async (t) => 
     async () => {
       accepted = await send(host, submission);
       assert.equal(accepted.status, 201);
-      assert.equal(accepted.body.message.senderUserId, host.id.toString());
+      assert.equal(accepted.body.message.senderUserId, host.id);
       assert.equal(accepted.body.message.senderName, host.name);
       assert.equal(accepted.body.message.seq, 1);
       assert.equal((await journal())!.peerMessages.length, 1);
@@ -215,7 +254,7 @@ test('ED-07 public peer text real Nest/Mongo', { timeout: 90000 }, async (t) => 
         null,
         [],
         {},
-        { ...submission, senderUserId: outsider.id.toString() },
+        { ...submission, senderUserId: outsider.id },
         { ...submission, attachment: { url: 'javascript:alert(1)' } },
         { submissionId: 'bad', text: 'text' },
         { ...submission, text: '' },
@@ -309,16 +348,16 @@ test('ED-07 public peer text real Nest/Mongo', { timeout: 90000 }, async (t) => 
   await t.test(
     'pre-write failure returns uncertainty without accepting a logical message',
     async () => {
-      const original = SessionChat.collection.findOneAndUpdate;
-      SessionChat.collection.findOneAndUpdate = (async () => {
+      const original = SessionChat.appendPeerMessage;
+      SessionChat.appendPeerMessage = async () => {
         throw new Error('Synthetic before write');
-      }) as typeof original;
+      };
       const body = { submissionId: randomUUID(), text: 'Persistence retry' };
       const before = await journal();
       try {
         assert.equal((await send(host, body)).status, 503);
       } finally {
-        SessionChat.collection.findOneAndUpdate = original;
+        SessionChat.appendPeerMessage = original;
       }
       assert.deepEqual(await journal(), before);
       assert.equal((await send(host, body)).status, 201);
@@ -327,16 +366,16 @@ test('ED-07 public peer text real Nest/Mongo', { timeout: 90000 }, async (t) => 
   await t.test(
     'actual commit with lost acknowledgement recovers on retry and through history',
     async () => {
-      const original = SessionChat.collection.findOneAndUpdate;
-      SessionChat.collection.findOneAndUpdate = (async (...args: Parameters<typeof original>) => {
-        await original.apply(SessionChat.collection, args);
+      const original = SessionChat.appendPeerMessage;
+      SessionChat.appendPeerMessage = async (...args: Parameters<typeof original>) => {
+        await original.apply(SessionChat, args);
         throw new Error('Synthetic acknowledgement lost after real commit');
-      }) as typeof original;
+      };
       const body = { submissionId: randomUUID(), text: 'Committed acknowledgement lost' };
       try {
         assert.equal((await send(host, body)).status, 503);
       } finally {
-        SessionChat.collection.findOneAndUpdate = original;
+        SessionChat.appendPeerMessage = original;
       }
       const stored = (await journal())!.peerMessages.find(
         (m: IPeerMessage) => m.submissionId === body.submissionId
@@ -420,26 +459,27 @@ test('ED-07 public peer text real Nest/Mongo', { timeout: 90000 }, async (t) => 
   await t.test(
     'source revocation rejects send, replay, history and subscribed delivery',
     async () => {
-      const courseId = new ObjectId();
-      await db.collection('courses').insertOne({
-        _id: courseId,
-        userId: host.id.toString(),
+      const courseId = newId();
+      courseIds.push(courseId);
+      await Course.create({
+        id: courseId,
+        userId: host.id,
         title: 'Synthetic source',
+        subjectId: 'synthetic',
         status: 'completed'
       });
       const created = await request(host, '/api/v1/study/rooms', 'POST', {
-        courseId: courseId.toString(),
+        courseId,
         enableVoice: false
       });
       assert.equal(created.status, 201);
       const roomId = created.body.roomId;
+      roomIds.push(roomId);
       const body = { submissionId: randomUUID(), text: 'Allowed before source revocation' };
       assert.equal((await send(host, body, roomId)).status, 201);
       const connection = await connect(roomId, host);
       await waitFor(() => connection.received.some((e) => e.type === 'ROOM_STATE_SYNC'));
-      await db
-        .collection('courses')
-        .updateOne({ _id: courseId }, { $set: { userId: outsider.id.toString() } });
+      await Course.updateOne({ _id: courseId }, { userId: outsider.id });
       assert.equal((await send(host, body, roomId)).status, 403);
       assert.equal((await history(host, '', roomId)).status, 403);
       const { broadcastToSession } = await import('../../modules/notification/src/realtime.js');
@@ -503,12 +543,10 @@ test('ED-07 public peer text real Nest/Mongo', { timeout: 90000 }, async (t) => 
         submissionId: index ? randomUUID() : first.submissionId,
         seq: index + 1
       }));
-      await db
-        .collection('sessionchats')
-        .updateOne(
-          { sessionId: fullId, messageType: 'peer_stream' },
-          { $set: { peerSeq: 1000, peerMessages: fixture } }
-        );
+      await prisma.sessionChat.updateMany({
+        where: { sessionId: fullId, messageType: 'peer_stream' },
+        data: { peerSeq: 1000, peerMessages: fixture as unknown as object[] }
+      });
       assert.equal(
         (await send(host, { submissionId: randomUUID(), text: 'Capacity denied' }, fullId)).status,
         409

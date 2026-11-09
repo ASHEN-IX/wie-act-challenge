@@ -1,92 +1,55 @@
-import mongoose, { Document, Model, Schema, Types } from 'mongoose';
+import type { Payment as PaymentRow, Prisma } from '../../../../src/generated/prisma/client';
+import { prisma, toDocument } from '../../../../shared/database';
+import { newId } from '../../../../shared/ids';
 
-export interface IPayment extends Document {
-  userId: Types.ObjectId;
-  stripeEventId?: string;
-  stripeCheckoutSessionId?: string;
-  stripeSubscriptionId?: string;
-  stripeCustomerId?: string;
-  tier: 'normal' | 'vip' | 'vip_plus';
-  durationMonths: number;
-  monthlyPriceCents?: number | null;
-  discountPercentage: number;
-  status: 'pending' | 'succeeded' | 'failed' | 'canceled';
-  amount?: number;
-  currency: string;
-  metadata: Record<string, unknown>;
-  createdAt: Date;
-  updatedAt: Date;
+export type IPayment = PaymentRow & { _id: string };
+
+function hydrate(row: PaymentRow): IPayment {
+  return toDocument(row) as IPayment;
 }
 
-const paymentSchema = new Schema<IPayment>(
-  {
-    userId: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
-      index: true
-    },
-    stripeEventId: {
-      type: String,
-      unique: true,
-      sparse: true,
-      index: true
-    },
-    stripeCheckoutSessionId: {
-      type: String,
-      index: true,
-      unique: true,
-      sparse: true
-    },
-    stripeSubscriptionId: {
-      type: String,
-      index: true
-    },
-    stripeCustomerId: {
-      type: String,
-      index: true
-    },
-    tier: {
-      type: String,
-      enum: ['normal', 'vip', 'vip_plus'],
-      required: true
-    },
-    durationMonths: {
-      type: Number,
-      default: 1
-    },
-    monthlyPriceCents: {
-      type: Number,
-      default: null
-    },
-    discountPercentage: {
-      type: Number,
-      default: 0
-    },
-    status: {
-      type: String,
-      enum: ['pending', 'succeeded', 'failed', 'canceled'],
-      default: 'pending',
-      index: true
-    },
-    amount: {
-      type: Number
-    },
-    currency: {
-      type: String,
-      default: 'usd'
-    },
-    metadata: {
-      type: Schema.Types.Mixed,
-      default: {}
-    }
+export const Payment = {
+  async findById(id: string): Promise<IPayment | null> {
+    const row = await prisma.payment.findUnique({ where: { id } });
+    return row ? hydrate(row) : null;
   },
-  {
-    timestamps: true
+
+  async findOne(where: Prisma.PaymentWhereInput): Promise<IPayment | null> {
+    const row = await prisma.payment.findFirst({ where });
+    return row ? hydrate(row) : null;
+  },
+
+  async findMany(
+    where: Prisma.PaymentWhereInput = {},
+    order: Prisma.PaymentOrderByWithRelationInput = { createdAt: 'desc' }
+  ): Promise<IPayment[]> {
+    const rows = await prisma.payment.findMany({ where, orderBy: order });
+    return rows.map(hydrate);
+  },
+
+  async countDocuments(where: Prisma.PaymentWhereInput = {}): Promise<number> {
+    return prisma.payment.count({ where });
+  },
+
+  async create(data: Prisma.PaymentUncheckedCreateInput): Promise<IPayment> {
+    return hydrate(await prisma.payment.create({ data: { ...data, id: data.id ?? newId() } }));
+  },
+
+  async findOneAndUpdate(
+    where: Prisma.PaymentWhereInput,
+    data: Prisma.PaymentUpdateInput,
+    { new: returnNew = false }: { new?: boolean } = {}
+  ): Promise<IPayment | null> {
+    const existing = await prisma.payment.findFirst({ where, select: { id: true } });
+    if (!existing) return null;
+    const row = await prisma.payment.update({ where: { id: existing.id }, data });
+    return returnNew ? hydrate(row) : hydrate(row);
+  },
+
+  async updateOne(where: Prisma.PaymentWhereInput, data: Prisma.PaymentUpdateInput) {
+    const result = await prisma.payment.updateMany({ where, data });
+    return { matchedCount: result.count };
   }
-);
+};
 
-paymentSchema.index({ status: 1, createdAt: -1 });
-
-const Payment: Model<IPayment> = mongoose.model<IPayment>('Payment', paymentSchema);
 export default Payment;

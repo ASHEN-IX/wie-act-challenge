@@ -6,7 +6,8 @@ import crypto from 'node:crypto';
 import { spawn, execFileSync } from 'node:child_process';
 import { config } from 'dotenv';
 import bcrypt from 'bcryptjs';
-import { MongoClient, ObjectId } from 'mongodb';
+import { connectDatabase, disconnectDatabase, prisma } from '../shared/database';
+import { newId } from '../shared/ids';
 
 /** The broker container: `rabbitmq` when present, else the QA stack's name. */
 function detectBroker(): string {
@@ -37,21 +38,10 @@ async function main() {
   const broker = process.env.FINAL_QA_RABBITMQ_CONTAINER || detectBroker();
   const rabbitUser = process.env.RABBITMQ_USER || 'ednova';
   run(['exec', broker, 'rabbitmqctl', 'add_vhost', name]);
-  run([
-    'exec',
-    broker,
-    'rabbitmqctl',
-    'set_permissions',
-    '-p',
-    name,
-    rabbitUser,
-    '.*',
-    '.*',
-    '.*'
-  ]);
+  run(['exec', broker, 'rabbitmqctl', 'set_permissions', '-p', name, rabbitUser, '.*', '.*', '.*']);
   Object.assign(process.env, {
     NODE_ENV: 'test',
-    MONGODB_URI: 'mongodb://127.0.0.1:27017/' + name,
+    DATABASE_URL: `postgresql://ednova:ednova@127.0.0.1:5433/${name}`,
     BETTER_AUTH_SECRET: 'isolated-final-browser-secret-at-least-32-chars',
     BETTER_AUTH_URL: 'http://localhost:5360',
     AUTH_TRUSTED_ORIGINS: 'http://localhost:5360',
@@ -87,16 +77,14 @@ async function main() {
   // Get the exact existing alias; no other LLM operation is approved.
   const alias = 'course_multimodal_prototype';
   const env: Record<string, string> = {
-    ...Object.fromEntries(
-      ['MONGODB_URI', 'RABBITMQ_URL', 'AI_SERVICE_API_KEY'].map((k) => [k, process.env[k]!])
-    ),
+    ...Object.fromEntries(['RABBITMQ_URL', 'AI_SERVICE_API_KEY'].map((k) => [k, process.env[k]!])),
     DB_NAME: name,
     EDNOVA_FINAL_QA: '1',
     NODE_ENV: 'test',
     INGEST_UPLOADS_DIR: '/qa/uploads',
     FAISS_INDEX_DIR: '/qa/indexes',
     GEMINI_API_KEY: 'isolated-qa-never-sent',
-    LLM_BUDGET_MONGODB_URI: process.env.MONGODB_URI!,
+    MONGODB_URI: `mongodb://127.0.0.1:27017/${name}`,
     LLM_BUDGET_DB_NAME: name,
     LLM_APPROVALS_JSON: JSON.stringify({ [alias]: approval }),
     LLM_MODE: 'REAL_APPROVED',
@@ -117,16 +105,19 @@ async function main() {
   // AI service, which silently disabled the manifest branch of ingestion and
   // forced the legacy parser — the root cause of the C1 chapter discrepancy.
   const mongoHost = network ? 'ednova-qa-mongo' : 'host.docker.internal';
-  for (const k of ['MONGODB_URI', 'LLM_BUDGET_MONGODB_URI'])
+  // The Python QA service still reads MongoDB, so its URI is rewritten for
+  // the container network. PostgreSQL belongs to the Node runtime only.
+  for (const k of ['MONGODB_URI'])
     env[k] = env[k]
       .replace(/@127\.0\.0\.1:/, '@' + mongoHost + ':')
       .replace(/@localhost:/, '@' + mongoHost + ':')
       .replace('127.0.0.1', mongoHost);
   env.RABBITMQ_URL = network
     ? env.RABBITMQ_URL.replace(/@(127\.0\.0\.1|localhost|host\.docker\.internal):/, '@rabbitmq:')
-    : env.RABBITMQ_URL
-        .replace(/@127\.0\.0\.1:/, '@host.docker.internal:')
-        .replace(/@localhost:/, '@host.docker.internal:');
+    : env.RABBITMQ_URL.replace(/@127\.0\.0\.1:/, '@host.docker.internal:').replace(
+        /@localhost:/,
+        '@host.docker.internal:'
+      );
   const args = [
     'run',
     '--rm',
@@ -178,17 +169,20 @@ async function main() {
     { stdio: 'inherit' }
   );
   let runtime: any, worker: any, ingestion: any;
-  const client = new MongoClient(process.env.MONGODB_URI!);
-  await client.connect();
-  const db = client.db();
+  require('./helpers/provision-test-database')
+    .provision(name)
+    .catch(() => process.exit(1));
+  await connectDatabase();
   async function stop() {
+    await disconnectDatabase();
+    await require('./helpers/provision-test-database')
+      .deprovision(name)
+      .catch(() => undefined);
     if (worker) worker.kill('SIGTERM');
     try {
       run(['stop', '-t', '5', container]);
     } catch {}
     if (runtime) await Promise.race([runtime.stop(), new Promise((r) => setTimeout(r, 5000))]);
-    await client.db().dropDatabase();
-    await client.close();
     try {
       run(['exec', broker, 'rabbitmqctl', 'delete_vhost', name]);
     } catch {}
@@ -209,58 +203,64 @@ async function main() {
     ['cccccccccccccccccccccccc', 'final-student@example.test', 'student'],
     ['dddddddddddddddddddddddd', 'final-outsider@example.test', 'student']
   ]) {
-    await db
-      .collection('users')
-      .insertOne({
-        _id: new ObjectId(id),
+    const password = await bcrypt.hash('FinalPass!123', 12);
+    await prisma.user.create({
+      data: {
+        id,
         email,
         name: role,
-        password: await bcrypt.hash('FinalPass!123', 12),
         isVerified: true,
         isActive: true,
         role: 'student',
-        tier: 'vip'
-      });
+        tier: 'vip',
+        notificationPreferences: {},
+        onboardingDraft: {}
+      }
+    });
+    await prisma.authUser.create({
+      data: { id, email, name: role, emailVerified: true }
+    });
+    await prisma.authAccount.create({
+      data: { id: newId(), accountId: id, providerId: 'credential', userId: id, password }
+    });
   }
-  const institutionId = new ObjectId('eeeeeeeeeeeeeeeeeeeeeeee');
-  await db
-    .collection('institutions')
-    .insertOne({
-      _id: institutionId,
+  const institutionId = 'eeeeeeeeeeeeeeeeeeeeeeee';
+  await prisma.institution.create({
+    data: {
+      id: institutionId,
       name: 'Isolated QA',
       slug: name,
       status: 'active',
       createdByUserId: 'aaaaaaaaaaaaaaaaaaaaaaaa'
-    });
+    }
+  });
   for (const [userId, role] of [
     ['aaaaaaaaaaaaaaaaaaaaaaaa', 'instructor'],
     ['cccccccccccccccccccccccc', 'university_student']
-  ])
-    await db
-      .collection('institution_memberships')
-      .insertOne({ institutionId, userId, role, status: 'active' });
-  await db
-    .collection('subjects')
-    .insertOne({
-      _id: new ObjectId('bbbbbbbbbbbbbbbbbbbbbbbb'),
+  ] as const)
+    await prisma.institutionMembership.create({
+      data: { id: newId(), institutionId, userId, role, status: 'active' }
+    });
+  await prisma.subject.create({
+    data: {
+      id: 'bbbbbbbbbbbbbbbbbbbbbbbb',
       userId: 'aaaaaaaaaaaaaaaaaaaaaaaa',
       name: 'Final QA'
-    });
-  const { migrateAuth } = require('../scripts/migrate-auth');
-  await migrateAuth(db, { apply: true });
+    }
+  });
   // Batch 4 M4.1: seed a published revision the planning suite can drive.
   // It writes the same artifacts ingestion writes, and the application still
   // verifies every hash before rendering, so this is a fixture, not a bypass.
   if (process.env.FINAL_QA_SEED_M41 === 'true') {
     const { seedPlanningFixture } = require('./m41-fixture');
-    const seeded = await seedPlanningFixture('mongodb://127.0.0.1:27017/' + name, root);
+    const seeded = await seedPlanningFixture(root);
     console.log('m41-fixture-seeded', seeded.courseId, seeded.revisionTag);
   }
   const { start } = require('../dist/main');
   runtime = await start({ port: 5361, workers: true });
-  await db
-    .collection('formula_provider_eligibility')
-    .insertOne({
+  await prisma.formulaProviderEligibility.create({
+    data: {
+      id: newId(),
       provider: 'gemini',
       model: approval.model,
       freeTier: true,
@@ -269,7 +269,8 @@ async function main() {
       keySha256: crypto.createHash('sha256').update(env.GEMINI_API_KEY).digest('hex'),
       verifiedBy: 'isolated SDK test only',
       projectId: 'not-a-real-provider-project'
-    });
+    }
+  });
   ingestion = spawn(
     'docker',
     ['exec', container, '/opt/venv/bin/python', '-m', 'workers.ingestion_worker'],

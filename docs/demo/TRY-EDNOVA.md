@@ -54,6 +54,6 @@ The earlier demo setup encountered **RabbitMQ ACCESS_REFUSED**; this was a histo
 
 ## Repeat the user seed
 
-Run `pnpm --filter api seed:learning-demo`. It loads `apps/api/.env`, requires a loopback development MongoDB URI, creates missing demo accounts using Better Auth, verifies password login, and establishes memberships through the institution invitation service. It does not overwrite existing passwords, suspended memberships or unrelated users. If a demo password was changed, supply that common password through `DEMO_USER_PASSWORD` or review the account manually.
+Run `pnpm --filter api seed:learning-demo`. It loads `apps/api/.env`, requires a loopback development PostgreSQL URL, creates missing demo accounts using Better Auth, verifies password login, and establishes memberships through the institution invitation service. It does not overwrite existing passwords, suspended memberships or unrelated users. If a demo password was changed, supply that common password through `DEMO_USER_PASSWORD` or review the account manually.
 
 Actual setup verification: all four Next `/api/auth/sign-in/email` requests returned 200, and their cookies each returned 200 from Nest `/api/v1/study/institutions` with the expected institution role. Verification sessions were logged out. The local web auth secret was aligned with the API to enable shared sessions; other environment settings were preserved.

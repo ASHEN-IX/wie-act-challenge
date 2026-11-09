@@ -6,21 +6,33 @@ import { randomUUID } from 'node:crypto';
 import { mkdtemp, mkdir, writeFile, rm, symlink } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { MongoClient, ObjectId } from 'mongodb';
 import bcrypt from 'bcryptjs';
-import { migrateAuth } from '../../scripts/migrate-auth';
+import { connectDatabase, disconnectDatabase, prisma } from '../../shared/database';
+import { newId } from '../../shared/ids';
+import {
+  Course,
+  LearningObjective,
+  StudyPlan,
+  StudySession,
+  Task
+} from '../../modules/study/src/models';
+import { StudyRoom } from '../../modules/study/src/models/StudyRoom';
+import AiJob from '../../modules/ai-orchestrator/src/models/AiJob';
 
-// Real identity, Nest dispatch and Mongo. No broker or inference is required.
+// Real identity, Nest dispatch and PostgreSQL. No broker or inference is required.
 test(
   'M02 resource isolation across real HTTP, internal dispatch and callbacks',
   { timeout: 90000 },
   async (t) => {
-    const database = `ednova_m02_${process.pid}_${Date.now()}`;
+    // The suite shares the migrated test database with the rest of the run, so
+    // every synthetic identity and row is unique to this process and removed at
+    // the end.
+    process.env.DATABASE_URL =
+      process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
     const uploads = await mkdtemp(path.join(os.tmpdir(), 'ednova-m02-uploads-'));
     t.after(() => rm(uploads, { recursive: true, force: true }));
     Object.assign(process.env, {
       INGEST_UPLOADS_DIR: uploads,
-      MONGODB_URI: `mongodb://127.0.0.1:27018/${database}`,
       BETTER_AUTH_SECRET: 'm02-isolated-session-secret-at-least-thirty-two-characters',
       INTERNAL_API_SECRET: 'm02-isolated-internal-secret',
       AUTH_TRUSTED_ORIGINS: 'http://localhost:5173',
@@ -30,10 +42,14 @@ test(
       REDIS_URL: '',
       NODE_ENV: 'test'
     });
-    const client = await new MongoClient(process.env.MONGODB_URI!, {
-      serverSelectionTimeoutMS: 5000
-    }).connect();
-    const db = client.db();
+    await connectDatabase();
+    const userIds: string[] = [];
+    const sessionIds: string[] = [];
+    const roomIds: string[] = [];
+    const planIds: string[] = [];
+    const taskIds: string[] = [];
+    const evalCorrelationIds: string[] = [];
+    let createdCourseId = '';
     let aiCalls = 0;
     let lastAiBody: Record<string, unknown> = {};
     let holdAi = false;
@@ -82,29 +98,65 @@ test(
       await new Promise<void>((resolve) => ai.close(() => resolve()));
       const { closeAuth } = await import('../../shared/betterAuth.js');
       await closeAuth();
-      await db.dropDatabase();
-      await client.close();
+      // Rows first (foreign keys point at the courses/users created above), then
+      // the identities. Never drop the shared database.
+      if (createdCourseId) await prisma.course.deleteMany({ where: { id: createdCourseId } });
+      await prisma.learningObjective.deleteMany({ where: { documentId: createdCourseId || '-' } });
+      if (evalCorrelationIds.length)
+        await prisma.evalResult.deleteMany({
+          where: { correlationId: { in: evalCorrelationIds } }
+        });
+      await prisma.aiJob.deleteMany({ where: { userId: { in: userIds } } });
+      await prisma.taskRecord.deleteMany({ where: { id: { in: taskIds } } });
+      await prisma.studyPlan.deleteMany({ where: { id: { in: planIds } } });
+      await prisma.sessionChat.deleteMany({ where: { sessionId: { in: roomIds } } });
+      await prisma.studyRoom.deleteMany({ where: { id: { in: roomIds } } });
+      await prisma.voiceSession.deleteMany({ where: { sessionId: { in: sessionIds } } });
+      await prisma.studySession.deleteMany({ where: { id: { in: sessionIds } } });
+      await prisma.authUser.deleteMany({ where: { id: { in: userIds } } });
+      await prisma.user.deleteMany({ where: { id: { in: userIds } } });
       for (const file of cleanupPaths) await rm(file, { recursive: true, force: true });
+      await disconnectDatabase().catch(() => {});
     });
     const password = await bcrypt.hash('Synthetic!123', 12);
     const actors = ['owner', 'peer', 'outsider', 'admin'].map((name) => ({
-      id: new ObjectId(),
+      id: newId(),
       name,
       email: `${name}@m02.test`,
       cookie: ''
     }));
-    for (const actor of actors)
-      await db.collection('users').insertOne({
-        _id: actor.id,
-        name: actor.name,
-        email: actor.email,
-        password,
-        isActive: true,
-        isVerified: true,
-        role: actor.name === 'admin' ? 'admin' : 'student',
-        tier: 'vip_plus'
+    for (const actor of actors) {
+      userIds.push(actor.id);
+      // The old suite inserted the `users` document and then ran `migrateAuth`;
+      // the migrated schema needs the identity, the Better Auth user and its
+      // credential account up front.
+      await prisma.user.create({
+        data: {
+          id: actor.id,
+          name: actor.name,
+          email: actor.email,
+          isActive: true,
+          isVerified: true,
+          role: actor.name === 'admin' ? 'admin' : 'student',
+          isAdmin: actor.name === 'admin',
+          tier: 'vip_plus',
+          notificationPreferences: {},
+          onboardingDraft: {}
+        }
       });
-    await migrateAuth(db, { apply: true });
+      await prisma.authUser.create({
+        data: { id: actor.id, email: actor.email, name: actor.name, emailVerified: true }
+      });
+      await prisma.authAccount.create({
+        data: {
+          id: newId(),
+          accountId: actor.id,
+          providerId: 'credential',
+          userId: actor.id,
+          password
+        }
+      });
+    }
     const { getAuth } = await import('../../shared/betterAuth.js');
     const auth = await getAuth();
     for (const actor of actors) {
@@ -148,7 +200,8 @@ test(
       return { socket, events, status };
     }
 
-    const courseId = new ObjectId();
+    const courseId = newId();
+    createdCourseId = courseId;
     const privateRoot = path.resolve(
       __dirname,
       '../../modules/study/uploads/courses',
@@ -168,10 +221,11 @@ test(
     const linkFile = path.join(path.dirname(publicFile), `m02-link-${process.pid}.png`);
     await symlink(path.join(sourceRoot, 'private.pdf'), linkFile);
     cleanupPaths.push(privateRoot, sourceRoot, publicFile, linkFile);
-    await db.collection('courses').insertOne({
+    await Course.create({
       _id: courseId,
       userId: String(owner.id),
-      subjectId: String(new ObjectId()),
+      ownerUserId: String(owner.id),
+      subjectId: newId(),
       title: 'M02 private course',
       status: 'completed',
       files: [
@@ -260,8 +314,9 @@ test(
           );
       }
     );
-    const team = new ObjectId();
-    await db.collection('studysessions').insertOne({
+    const team = newId();
+    sessionIds.push(team);
+    await StudySession.create({
       _id: team,
       userId: String(owner.id),
       type: 'team',
@@ -289,12 +344,12 @@ test(
       }
     });
     await t.test('outsider cannot skip another team task or change stored state', async () => {
-      const before = await db.collection('studysessions').findOne({ _id: team });
+      const before = await StudySession.findById(team);
       assert.equal(
         (await request(outsider, `/api/v1/study/sessions/${team}/task/skip`, 'POST', {})).status,
         403
       );
-      assert.deepEqual(await db.collection('studysessions').findOne({ _id: team }), before);
+      assert.deepEqual(await StudySession.findById(team), before);
     });
     await t.test('voice HTTP checks membership before persistence and reads', async () => {
       const routes: Array<[string, string, unknown?]> = [
@@ -310,10 +365,7 @@ test(
           (await request(outsider, `/api/v1/voice/${team}/${suffix}`, method, body)).status,
           403
         );
-      assert.equal(
-        await db.collection('voicesessions').countDocuments({ sessionId: String(team) }),
-        0
-      );
+      assert.equal(await prisma.voiceSession.count({ where: { sessionId: String(team) } }), 0);
       assert.equal((await request(peer, `/api/v1/voice/${team}/start`, 'POST', {})).status, 403);
       assert.equal(
         (
@@ -324,30 +376,29 @@ test(
         200
       );
       assert.equal((await request(peer, `/api/v1/voice/${team}/start`, 'POST', {})).status, 201);
-      await db
-        .collection('studysessions')
-        .updateOne({ _id: team }, { $set: { 'participants.1.leftAt': new Date() } });
+      // Mongo addressed `participants.1.leftAt` with a dotted path; the column is
+      // JSON, so the roster is read, edited and written back as a whole.
+      const session = await StudySession.findById(team);
+      assert.ok(session);
+      const participants = structuredClone(session.participants);
+      participants[1].leftAt = new Date();
+      await StudySession.updateOne({ _id: team }, { participants });
       assert.equal((await request(peer, `/api/v1/voice/${team}/status`)).status, 403);
     });
     await t.test(
       'completed legacy sessions deny transport even with stale active roster flags',
       async () => {
-        await db
-          .collection('studysessions')
-          .updateOne({ _id: team }, { $set: { status: 'completed' } });
+        await StudySession.updateOne({ _id: team }, { status: 'completed' });
         assert.equal((await request(owner, `/api/v1/voice/${team}/status`)).status, 403);
-        await db
-          .collection('studysessions')
-          .updateOne({ _id: team }, { $set: { status: 'active' } });
+        await StudySession.updateOne({ _id: team }, { status: 'active' });
       }
     );
     await t.test('source grant is independent of legacy team invite or membership', async () => {
-      await db
-        .collection('studysessions')
-        .updateOne(
-          { _id: team },
-          { $set: { courseId: String(courseId) }, $unset: { 'participants.1.leftAt': '' } }
-        );
+      const session = await StudySession.findById(team);
+      assert.ok(session);
+      const participants = structuredClone(session.participants);
+      delete participants[1].leftAt;
+      await StudySession.updateOne({ _id: team }, { courseId: String(courseId), participants });
       assert.equal(
         (await request(peer, `/api/v1/study/sessions/team/${team}/participants`)).status,
         403
@@ -382,8 +433,6 @@ test(
         200
       );
     });
-    const AiJob = (await import('../../modules/ai-orchestrator/src/models/AiJob.js'))
-      .default as unknown as typeof import('../../modules/ai-orchestrator/src/models/AiJob').default;
     const job = await AiJob.createPending({
       type: 'study.eval.step',
       userId: String(owner.id),
@@ -396,6 +445,7 @@ test(
         step: 1
       }
     });
+    evalCorrelationIds.push(job.correlationId);
     await t.test('AI/eval jobs do not grant admin or peer access to private results', async () => {
       for (const route of [`/api/v1/ai/jobs/${job.jobId}`, `/api/v1/eval/jobs/${job.jobId}`]) {
         assert.equal((await request(owner, route)).status, 200);
@@ -413,6 +463,7 @@ test(
           requestId: 'm02-legacy',
           result: { private: 'M02_PRIVATE_SOURCE_SENTINEL' }
         });
+        evalCorrelationIds.push(legacy.correlationId);
         assert.equal((await request(owner, `/api/v1/ai/jobs/${legacy.jobId}`)).status, 404);
         const fresh = await AiJob.createPending({
           type: 'study.search.query',
@@ -421,11 +472,13 @@ test(
           messageId: randomUUID(),
           requestId: 'm02-free'
         });
+        evalCorrelationIds.push(fresh.correlationId);
         assert.equal((await request(owner, `/api/v1/ai/jobs/${fresh.jobId}`)).status, 200);
         assert.equal((await request(admin, `/api/v1/search/jobs/${fresh.jobId}`)).status, 404);
-        await db
-          .collection('ai_jobs')
-          .updateOne({ jobId: fresh.jobId }, { $set: { resourceScope: [] } });
+        await prisma.aiJob.updateMany({
+          where: { jobId: fresh.jobId },
+          data: { resourceScope: [] }
+        });
         assert.equal((await request(owner, `/api/v1/ai/jobs/${fresh.jobId}`)).status, 404);
       }
     );
@@ -436,7 +489,7 @@ test(
       );
     });
     await t.test('foreign objective cannot be resolved before evaluator dispatch', async () => {
-      await db.collection('learning_objectives').insertOne({
+      await LearningObjective.create({
         userId: String(owner.id),
         documentId: String(courseId),
         objectiveId: 'm02-private-objective',
@@ -444,7 +497,9 @@ test(
         bloomLevel: 'Apply',
         knowledgeType: 'Conceptual',
         topicId: 'private-topic',
-        text: 'Private objective'
+        verb: 'Apply',
+        text: 'Private objective',
+        textHash: 'm02-private-objective-hash'
       });
       const result = await request(peer, '/api/v1/eval/step', 'POST', {
         sessionId: 'synthetic',
@@ -487,7 +542,13 @@ test(
           await handleResult(forged);
           assert.equal((await AiJob.findById(job._id))!.status, 'PENDING');
         }
-        assert.equal(await db.collection('eval_results').countDocuments({}), 0);
+        // The Mongo assertion counted every document in the database because the
+        // suite owned a private one. Shared here, the equivalent is "this job
+        // wrote no result row".
+        assert.equal(
+          await prisma.evalResult.count({ where: { correlationId: job.correlationId } }),
+          0
+        );
       }
     );
 
@@ -511,12 +572,12 @@ test(
       assert.equal(aiCalls, before);
       assert.equal((await request(owner, vector)).status, 200);
       assert.equal(aiCalls, before + 1);
-      assert.equal((await request(owner, vector + '?courseId=' + new ObjectId())).status, 422);
+      assert.equal((await request(owner, vector + '?courseId=' + newId())).status, 422);
       assert.equal(
         (
           await request(owner, '/api/v1/ai/plan', 'POST', {
             courseId: String(courseId),
-            course_id: String(new ObjectId())
+            course_id: String(newId())
           })
         ).status,
         422
@@ -573,7 +634,8 @@ test(
         const room = await request(owner, '/api/v1/study/rooms', 'POST', { enableVoice: true });
         assert.equal(room.status, 201);
         const id = String(room.data.roomId);
-        const doc = await db.collection('study_rooms').findOne({ roomId: id });
+        roomIds.push(id);
+        const doc = await StudyRoom.findOne({ roomId: id });
         assert.ok(doc);
         assert.equal(
           (
@@ -592,6 +654,7 @@ test(
         const other = await request(outsider, '/api/v1/study/rooms', 'POST', {
           enableVoice: false
         });
+        roomIds.push(String(other.data.roomId));
         const c = await connect(String(other.data.roomId), outsider);
         a1.socket.send(
           JSON.stringify({
@@ -623,18 +686,21 @@ test(
         assert.equal((await request(owner, `/api/v1/study/rooms/${id}`)).status, 200);
       }
     );
-    const materializedPlanId = new ObjectId();
-    const materializedTaskId = new ObjectId();
-    await db.collection('studyplans').insertOne({
+    const materializedPlanId = newId();
+    const materializedTaskId = newId();
+    planIds.push(materializedPlanId);
+    taskIds.push(materializedTaskId);
+    await StudyPlan.create({
       _id: materializedPlanId,
       userId: String(owner.id),
       courseId: String(courseId),
       resourceScope: { courseId: String(courseId) },
       goal: 'M02_PRIVATE_SOURCE_SENTINEL',
+      availableTimeMinutes: 0,
       status: 'created',
       taskGraph: { tasks: [] }
     });
-    await db.collection('tasks').insertOne({
+    await Task.create({
       _id: materializedTaskId,
       userId: String(owner.id),
       studyPlanId: String(materializedPlanId),
@@ -663,15 +729,15 @@ test(
         await handleResult({ ...result, payload: { ...result.payload, mastery_score: 0.1 } });
         assert.deepEqual((await AiJob.findById(job._id))!.result, accepted!.result);
         assert.equal(
-          (await db.collection('eval_results').findOne({ correlationId: job.correlationId }))!
+          (await prisma.evalResult.findFirst({ where: { correlationId: job.correlationId } }))!
             .masteryScore,
           (accepted!.result as { mastery_score: number }).mastery_score
         );
         assert.equal((await AiJob.findById(job._id))!.status, 'COMPLETED');
         assert.equal(
-          await db
-            .collection('eval_results')
-            .countDocuments({ correlationId: job.correlationId, userId: String(owner.id) }),
+          await prisma.evalResult.count({
+            where: { correlationId: job.correlationId, userId: String(owner.id) }
+          }),
           1
         );
         assert.equal((await request(owner, `/api/v1/eval/jobs/${job.jobId}`)).status, 200);
@@ -680,13 +746,12 @@ test(
           enableVoice: false
         });
         assert.equal(sourceRoom.status, 201);
+        roomIds.push(String(sourceRoom.data.roomId));
         const sourceSocket = await connect(String(sourceRoom.data.roomId), owner);
         holdAi = true;
         const inFlight = request(owner, `/api/v1/ai/vector/status/${courseId}`);
         await until(() => !!pendingAi, 'held synthetic inference response');
-        await db
-          .collection('courses')
-          .updateOne({ _id: courseId }, { $set: { userId: String(outsider.id) } });
+        await Course.updateOne({ _id: courseId }, { userId: String(outsider.id) });
         pendingAi!.setHeader('content-type', 'application/json');
         pendingAi!.end(JSON.stringify({ marker: 'M02_PRIVATE_SOURCE_SENTINEL' }));
         holdAi = false;

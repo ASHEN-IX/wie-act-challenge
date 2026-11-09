@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { Types } from 'mongoose';
+import { isDuplicateKey } from '../models/_table';
 import {
   IInstitution,
   IInstitutionInvitation,
@@ -16,9 +16,9 @@ const INVITATION_TOKEN = /^[A-Za-z0-9_-]{32,200}$/;
 const DEFAULT_INVITATION_HOURS = 168;
 const MAX_INVITATION_HOURS = 720;
 
-type LeanInstitution = IInstitution & { _id: Types.ObjectId };
-type LeanMembership = IInstitutionMembership & { _id: Types.ObjectId };
-type LeanInvitation = IInstitutionInvitation & { _id: Types.ObjectId };
+type LeanInstitution = IInstitution & { _id: string };
+type LeanMembership = IInstitutionMembership & { _id: string };
+type LeanInvitation = IInstitutionInvitation & { _id: string };
 
 export class InstitutionError extends Error {
   constructor(
@@ -69,7 +69,7 @@ function parseUserId(value: string): string {
 
 function publicInstitution(institution: LeanInstitution) {
   return {
-    id: institution._id.toString(),
+    id: String(institution._id),
     name: institution.name,
     slug: institution.slug,
     ...(institution.domain ? { domain: institution.domain } : {}),
@@ -79,7 +79,7 @@ function publicInstitution(institution: LeanInstitution) {
 
 function publicMembership(membership: LeanMembership) {
   return {
-    id: membership._id.toString(),
+    id: String(membership._id),
     role: membership.role,
     status: membership.status,
     createdAt: membership.createdAt
@@ -98,18 +98,14 @@ async function activeMembership(userId: string, institutionId: string) {
     institutionId,
     userId,
     status: 'active'
-  }).lean<LeanMembership>();
+  });
 }
 
 async function anyMembership(userId: string, institutionId: string) {
   return InstitutionMembership.findOne({
     institutionId,
     userId
-  }).lean<LeanMembership>();
-}
-
-function isDuplicateKey(error: unknown): boolean {
-  return (error as { code?: number }).code === 11000;
+  });
 }
 
 // Acceptance is a durable claim followed by a separate membership write. On a
@@ -124,8 +120,8 @@ async function completeAcceptedInvitation(
   if (invitation.acceptedByUserId !== actorUserId) {
     throw new InstitutionError(409, 'Invitation has already been used');
   }
-  const institutionId = invitation.institutionId.toString();
-  let membership = await anyMembership(actorUserId, invitation.institutionId.toString());
+  const institutionId = String(invitation.institutionId);
+  let membership = await anyMembership(actorUserId, String(invitation.institutionId));
   if (!membership) {
     try {
       membership = await InstitutionMembership.findOneAndUpdate(
@@ -148,7 +144,7 @@ async function completeAcceptedInvitation(
           runValidators: true,
           setDefaultsOnInsert: true
         }
-      ).lean<LeanMembership>();
+      );
     } catch (error) {
       if (!isDuplicateKey(error)) throw error;
       // A concurrent retry inserted the same unique membership first.
@@ -164,7 +160,7 @@ async function completeAcceptedInvitation(
   if (membership.status !== 'active') {
     throw new InstitutionError(409, 'Institution membership is not active');
   }
-  const institution = await Institution.findById(invitation.institutionId).lean<LeanInstitution>();
+  const institution = await Institution.findById(invitation.institutionId);
   if (!institution) throw new InstitutionError(404, 'Institution not found');
   return context(institution, membership);
 }
@@ -179,18 +175,16 @@ async function requireInstitutionAdmin(userId: string, institutionId: string) {
 }
 
 export async function listInstitutionContexts(userId: string): Promise<InstitutionContext[]> {
-  const memberships = await InstitutionMembership.find({ userId, status: 'active' })
-    .sort({ createdAt: 1 })
-    .lean<LeanMembership[]>();
+  const memberships = await InstitutionMembership.find({ userId, status: 'active' }).sort({
+    createdAt: 1
+  });
   if (!memberships.length) return [];
   const institutions = await Institution.find({
     _id: { $in: memberships.map((membership) => membership.institutionId) }
-  }).lean<LeanInstitution[]>();
-  const byId = new Map(
-    institutions.map((institution) => [institution._id.toString(), institution])
-  );
+  });
+  const byId = new Map(institutions.map((institution) => [String(institution._id), institution]));
   return memberships.flatMap((membership) => {
-    const institution = byId.get(membership.institutionId.toString());
+    const institution = byId.get(String(membership.institutionId));
     return institution ? [context(institution, membership)] : [];
   });
 }
@@ -202,7 +196,7 @@ export async function getInstitutionContext(
   const institutionId = parseInstitutionId(rawInstitutionId);
   const membership = await activeMembership(userId, institutionId);
   if (!membership) throw new InstitutionError(404, 'Institution not found');
-  const institution = await Institution.findById(institutionId).lean<LeanInstitution>();
+  const institution = await Institution.findById(institutionId);
   if (!institution) throw new InstitutionError(404, 'Institution not found');
   return context(institution, membership);
 }
@@ -224,7 +218,7 @@ export async function bootstrapInstitution(input: {
       createdByUserId: input.actorUserId
     })) as unknown as LeanInstitution;
   } catch (error) {
-    if ((error as { code?: number }).code === 11000) {
+    if (isDuplicateKey(error)) {
       throw new InstitutionError(409, 'Institution identity already exists');
     }
     throw error;
@@ -260,7 +254,7 @@ export async function updateInstitutionMetadata(
     institutionId,
     { $set: set },
     { new: true, runValidators: true }
-  ).lean<LeanInstitution>();
+  );
   if (!institution) throw new InstitutionError(404, 'Institution not found');
   return context(institution, membership);
 }
@@ -302,8 +296,8 @@ export async function issueInstitutionInvitation(input: {
   })) as unknown as LeanInvitation;
   return {
     invitation: {
-      id: invitation._id.toString(),
-      institutionId: invitation.institutionId.toString(),
+      id: String(invitation._id),
+      institutionId: String(invitation.institutionId),
       role: invitation.role,
       expiresAt: invitation.expiresAt
     },
@@ -320,7 +314,7 @@ export async function acceptInstitutionInvitation(input: {
     throw new InstitutionError(400, 'A valid invitation token is required');
   }
   const tokenHash = crypto.createHash('sha256').update(input.token).digest('hex');
-  const invitation = await InstitutionInvitation.findOne({ tokenHash }).lean<LeanInvitation>();
+  const invitation = await InstitutionInvitation.findOne({ tokenHash });
   if (!invitation) throw new InstitutionError(404, 'Invitation not found');
   const now = new Date();
   if (invitation.status === 'revoked' || invitation.status === 'expired') {
@@ -336,7 +330,7 @@ export async function acceptInstitutionInvitation(input: {
     );
     throw new InstitutionError(410, 'Invitation has expired');
   }
-  const existing = await anyMembership(input.actorUserId, invitation.institutionId.toString());
+  const existing = await anyMembership(input.actorUserId, String(invitation.institutionId));
   if (existing) {
     if (existing.status === 'suspended') {
       throw new InstitutionError(403, 'Institution membership is suspended');
@@ -358,9 +352,9 @@ export async function acceptInstitutionInvitation(input: {
       }
     },
     { new: true }
-  ).lean<LeanInvitation>();
+  );
   if (!claimed) {
-    const latest = await InstitutionInvitation.findById(invitation._id).lean<LeanInvitation>();
+    const latest = await InstitutionInvitation.findById(invitation._id);
     if (!latest) throw new InstitutionError(404, 'Invitation not found');
     if (latest.status === 'revoked' || latest.status === 'expired') {
       throw new InstitutionError(410, 'Invitation is no longer available');
@@ -396,9 +390,9 @@ export async function revokeInstitutionInvitation(input: {
     { _id: invitationId, institutionId, status: 'pending' },
     { $set: { status: 'revoked', revokedAt: new Date() } },
     { new: true }
-  ).lean<LeanInvitation>();
+  );
   if (!invitation) throw new InstitutionError(404, 'Pending invitation not found');
-  return { id: invitation._id.toString(), status: invitation.status };
+  return { id: String(invitation._id), status: invitation.status };
 }
 
 export async function suspendInstitutionMembership(input: {
@@ -416,7 +410,7 @@ export async function suspendInstitutionMembership(input: {
     institutionId,
     userId: targetUserId,
     status: 'active'
-  }).lean<LeanMembership>();
+  });
   if (!target) throw new InstitutionError(404, 'Active membership not found');
   if (target.role === 'university_admin') {
     throw new InstitutionError(403, 'Administrator membership requires platform setup');
@@ -425,10 +419,10 @@ export async function suspendInstitutionMembership(input: {
     { _id: target._id, status: 'active' },
     { $set: { status: 'suspended' } },
     { new: true }
-  ).lean<LeanMembership>();
+  );
   if (!updated) throw new InstitutionError(409, 'Membership changed concurrently; retry');
   return {
-    id: updated._id.toString(),
+    id: String(updated._id),
     userId: updated.userId,
     role: updated.role,
     status: updated.status

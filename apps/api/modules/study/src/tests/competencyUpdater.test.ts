@@ -62,9 +62,7 @@ describe('resolveCompetencyKey', () => {
   beforeEach(() => jest.resetAllMocks());
 
   test('returns topicId + knowledgeType from the objective', async () => {
-    LearningObjective.findOne.mockReturnValue({
-      lean: jest.fn().mockResolvedValue({ topicId: 't1', knowledgeType: 'procedural' })
-    });
+    LearningObjective.findOne.mockResolvedValue({ topicId: 't1', knowledgeType: 'procedural' });
     const key = await resolveCompetencyKey('obj-1', 'user-1');
     expect(key).toEqual({ topicId: 't1', knowledgeType: 'procedural' });
     expect(LearningObjective.findOne).toHaveBeenCalledWith({
@@ -75,9 +73,7 @@ describe('resolveCompetencyKey', () => {
   });
 
   test('defaults knowledgeType to declarative when missing on objective', async () => {
-    LearningObjective.findOne.mockReturnValue({
-      lean: jest.fn().mockResolvedValue({ topicId: 't1' })
-    });
+    LearningObjective.findOne.mockResolvedValue({ topicId: 't1' });
     const key = await resolveCompetencyKey('obj-1', 'user-1');
     expect(key!.knowledgeType).toBe('declarative');
   });
@@ -89,16 +85,12 @@ describe('resolveCompetencyKey', () => {
   });
 
   test('returns null when objective is not found', async () => {
-    LearningObjective.findOne.mockReturnValue({
-      lean: jest.fn().mockResolvedValue(null)
-    });
+    LearningObjective.findOne.mockResolvedValue(null);
     expect(await resolveCompetencyKey('obj-missing', 'user-1')).toBeNull();
   });
 
   test('returns null when objective has no topicId', async () => {
-    LearningObjective.findOne.mockReturnValue({
-      lean: jest.fn().mockResolvedValue({ knowledgeType: 'declarative' })
-    });
+    LearningObjective.findOne.mockResolvedValue({ knowledgeType: 'declarative' });
     expect(await resolveCompetencyKey('obj-notopic', 'user-1')).toBeNull();
   });
 });
@@ -121,8 +113,9 @@ describe('processEvalResult', () => {
 
   test('claims, resolves, and calls upsertProfile with the evidence item', async () => {
     EvalResultRecord.findOneAndUpdate.mockResolvedValue({ correlationId: 'corr-1' });
-    LearningObjective.findOne.mockReturnValue({
-      lean: jest.fn().mockResolvedValue({ topicId: 'topic-1', knowledgeType: 'conceptual' })
+    LearningObjective.findOne.mockResolvedValue({
+      topicId: 'topic-1',
+      knowledgeType: 'conceptual'
     });
     (upsertProfile as jest.Mock).mockResolvedValue(undefined);
 
@@ -166,9 +159,7 @@ describe('processEvalResult', () => {
 
   test('skips with no_objective when objective is missing', async () => {
     EvalResultRecord.findOneAndUpdate.mockResolvedValue({ correlationId: 'corr-1' });
-    LearningObjective.findOne.mockReturnValue({
-      lean: jest.fn().mockResolvedValue(null)
-    });
+    LearningObjective.findOne.mockResolvedValue(null);
 
     const result = await processEvalResult(baseResult);
     expect(result.skipped).toBe('no_objective');
@@ -208,17 +199,14 @@ describe('runOnce', () => {
 
     EvalResultRecord.find.mockReturnValue({
       sort: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(),
-      lean: jest.fn().mockResolvedValue(candidates)
+      limit: jest.fn().mockResolvedValue(candidates)
     });
 
     EvalResultRecord.findOneAndUpdate
       .mockResolvedValueOnce({ correlationId: 'c1' })
       .mockResolvedValueOnce({ correlationId: 'c2' });
 
-    LearningObjective.findOne.mockReturnValue({
-      lean: jest.fn().mockResolvedValue({ topicId: 't1', knowledgeType: 'declarative' })
-    });
+    LearningObjective.findOne.mockResolvedValue({ topicId: 't1', knowledgeType: 'declarative' });
 
     (upsertProfile as jest.Mock).mockResolvedValue(undefined);
 
@@ -256,8 +244,7 @@ describe('runOnce', () => {
 
     EvalResultRecord.find.mockReturnValue({
       sort: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(),
-      lean: jest.fn().mockResolvedValue(candidates)
+      limit: jest.fn().mockResolvedValue(candidates)
     });
 
     // c1 already claimed, c2 is new
@@ -265,9 +252,7 @@ describe('runOnce', () => {
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ correlationId: 'c2' });
 
-    LearningObjective.findOne.mockReturnValue({
-      lean: jest.fn().mockResolvedValue({ topicId: 't1', knowledgeType: 'declarative' })
-    });
+    LearningObjective.findOne.mockResolvedValue({ topicId: 't1', knowledgeType: 'declarative' });
 
     (upsertProfile as jest.Mock).mockResolvedValue(undefined);
 
@@ -282,8 +267,7 @@ describe('runOnce', () => {
   test('returns zero totals when no candidates exist', async () => {
     EvalResultRecord.find.mockReturnValue({
       sort: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(),
-      lean: jest.fn().mockResolvedValue([])
+      limit: jest.fn().mockResolvedValue([])
     });
 
     const stats = await runOnce();
@@ -317,8 +301,7 @@ describe('runOnce', () => {
 
     EvalResultRecord.find.mockReturnValue({
       sort: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(),
-      lean: jest.fn().mockResolvedValue(candidates)
+      limit: jest.fn().mockResolvedValue(candidates)
     });
 
     const dbErr = new Error('connection lost');
@@ -326,9 +309,7 @@ describe('runOnce', () => {
       .mockRejectedValueOnce(dbErr)
       .mockResolvedValueOnce({ correlationId: 'c2' });
 
-    LearningObjective.findOne.mockReturnValue({
-      lean: jest.fn().mockResolvedValue({ topicId: 't1', knowledgeType: 'declarative' })
-    });
+    LearningObjective.findOne.mockResolvedValue({ topicId: 't1', knowledgeType: 'declarative' });
 
     (upsertProfile as jest.Mock).mockResolvedValue(undefined);
 
@@ -341,9 +322,7 @@ describe('runOnce', () => {
   test('respects POLL_LIMIT in query', async () => {
     EvalResultRecord.find.mockReturnValue({
       sort: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnValue({
-        lean: jest.fn().mockResolvedValue([])
-      })
+      limit: jest.fn().mockResolvedValue([])
     });
 
     await runOnce();

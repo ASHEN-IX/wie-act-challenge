@@ -1,7 +1,7 @@
 import type { DomainRequest } from '../../../../src/framework/contracts';
-import type { FilterQuery } from 'mongoose';
+import type { Prisma } from '../../../../src/generated/prisma/client';
 import type { IUser } from '../models/User';
-import type { IPayment } from '../models/Payment';
+import { prisma } from '../../../../shared/database';
 import { createContracts } from '@ednova/shared/domainContracts';
 import Joi from 'joi';
 import crypto from 'crypto';
@@ -38,8 +38,8 @@ const couponUpdateSchema = Joi.object({
 router.get('/users', async (req: DomainRequest, res: Response) => {
   try {
     const { tier, isActive, query, page = 1, limit = 50 } = req.query;
-    const filter: FilterQuery<IUser> = {};
-    if (tier) filter.tier = tier;
+    const filter: Prisma.UserWhereInput = {};
+    if (tier) filter.tier = String(tier) as Prisma.UserWhereInput['tier'];
     if (typeof isActive !== 'undefined') {
       filter.isActive = String(isActive).toLowerCase() === 'true';
     }
@@ -48,10 +48,12 @@ router.get('/users', async (req: DomainRequest, res: Response) => {
       // straight into $regex — crafted patterns (e.g. (a+)+) can stall the
       // query (ReDoS). Escape regex metacharacters and coerce to a string so
       // operator-injection via ?query[$regex]=... is neutralized too.
-      const safeQuery = String(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      filter.$or = [
-        { email: { $regex: safeQuery, $options: 'i' } },
-        { name: { $regex: safeQuery, $options: 'i' } }
+      // Prisma parameterizes LIKE patterns; escaping `%` and `_` keeps the
+      // search literal, which is the property SEC-09 requires.
+      const safeQuery = String(query);
+      filter.OR = [
+        { email: { contains: safeQuery, mode: 'insensitive' } },
+        { name: { contains: safeQuery, mode: 'insensitive' } }
       ];
     }
 
@@ -59,13 +61,40 @@ router.get('/users', async (req: DomainRequest, res: Response) => {
     const pageNumber = boundedInteger(page, 1, 10000);
     const pageSize = boundedInteger(limit, 50, 100);
     const skip = (pageNumber - 1) * pageSize;
-    const users = await User.find(filter)
-      .select('-password -refreshTokens -verificationToken -resetPasswordToken')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(pageSize)
-      .lean();
-
+    const rows = await prisma.user.findMany({
+      where: filter,
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: pageSize,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        isAdmin: true,
+        isActive: true,
+        isVerified: true,
+        lastLogin: true,
+        tier: true,
+        trialStartedAt: true,
+        trialExpiresAt: true,
+        tierChangedAt: true,
+        subscriptionId: true,
+        subscriptionStartAt: true,
+        subscriptionEndAt: true,
+        subscriptionDurationMonths: true,
+        autoRenew: true,
+        renewalDate: true,
+        canChangeAfter: true,
+        subscriptionExpiryNoticeSentAt: true,
+        entitlementPurchasedAt: true,
+        stripeCustomerId: true,
+        onboardingCompletedAt: true,
+        createdAt: true,
+        updatedAt: true
+      }
+    });
+    const users = rows.map((row) => ({ ...row, _id: row.id }));
     const total = await User.countDocuments(filter);
 
     return res.json({ users, total, page: pageNumber, limit: pageSize });
@@ -78,9 +107,19 @@ router.get('/users', async (req: DomainRequest, res: Response) => {
 // GET /admin/users/:userId — User detail
 router.get('/users/:userId', async (req: DomainRequest, res: Response) => {
   try {
-    const user = await User.findById(req.params.userId)
-      .select('-password -refreshTokens -verificationToken -resetPasswordToken')
-      .lean();
+    const userRow = await prisma.user.findUnique({
+      where: { id: String(req.params.userId) },
+      omit: {
+        password: true,
+        verificationToken: true,
+        verificationExpires: true,
+        verificationOtp: true,
+        verificationOtpExpires: true,
+        resetPasswordToken: true,
+        resetPasswordExpires: true
+      }
+    });
+    const user = userRow ? { ...userRow, _id: userRow.id } : null;
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -126,12 +165,16 @@ router.put('/users/:userId', async (req: DomainRequest, res: Response) => {
       return res.status(400).json({ error: 'No valid fields provided for update' });
     }
 
-    const user = await User.findByIdAndUpdate(req.params.userId, { $set: updates }, { new: true });
+    const user = await User.findByIdAndUpdate(
+      String(req.params.userId),
+      updates as Prisma.UserUpdateInput,
+      { new: true }
+    );
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    return res.json({ message: 'User updated', user: user.toJSON() });
+    return res.json({ message: 'User updated', user: User.toJSON(user) });
   } catch (error) {
     console.error('Error updating user:', error);
     return res.status(500).json({ error: 'Failed to update user' });
@@ -141,15 +184,16 @@ router.put('/users/:userId', async (req: DomainRequest, res: Response) => {
 // DELETE /admin/users/:userId — Soft deactivate user
 router.delete('/users/:userId', async (req: DomainRequest, res: Response) => {
   try {
-    const user = await User.findByIdAndUpdate(
-      req.params.userId,
-      { $set: { isActive: false, refreshTokens: [] } },
-      { new: true }
-    );
-    if (!user) {
+    const existing = await User.findById(String(req.params.userId));
+    if (!existing) {
       return res.status(404).json({ error: 'User not found' });
     }
-    return res.json({ message: 'User deactivated', user: user.toJSON() });
+    await prisma.$transaction([
+      prisma.refreshToken.deleteMany({ where: { userId: existing.id } }),
+      prisma.user.update({ where: { id: existing.id }, data: { isActive: false } })
+    ]);
+    const user = await User.findById(existing.id);
+    return res.json({ message: 'User deactivated', user: user ? User.toJSON(user) : null });
   } catch (error) {
     console.error('Error deactivating user:', error);
     return res.status(500).json({ error: 'Failed to deactivate user' });
@@ -159,7 +203,7 @@ router.delete('/users/:userId', async (req: DomainRequest, res: Response) => {
 // PUT /admin/users/:userId/tier — Change a user's tier
 router.put('/users/:userId/tier', async (req: DomainRequest, res: Response) => {
   try {
-    const { userId } = req.params;
+    const userId = String(req.params.userId);
     const { tier } = req.body;
     const validTiers = ['trial', 'normal', 'vip', 'vip_plus'];
 
@@ -178,9 +222,9 @@ router.put('/users/:userId/tier', async (req: DomainRequest, res: Response) => {
       user.trialStartedAt = new Date();
       user.trialExpiresAt = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000);
     }
-    await user.save();
+    const saved = await User.save(user);
 
-    return res.json({ message: 'Tier updated', user: user.toJSON() });
+    return res.json({ message: 'Tier updated', user: User.toJSON(saved) });
   } catch (error) {
     console.error('Error updating user tier:', error);
     return res.status(500).json({ error: 'Failed to update tier' });
@@ -190,12 +234,12 @@ router.put('/users/:userId/tier', async (req: DomainRequest, res: Response) => {
 // GET /admin/stats — Tier distribution
 router.get('/stats', async (req: DomainRequest, res: Response) => {
   try {
-    const stats = await User.aggregate([{ $group: { _id: '$tier', count: { $sum: 1 } } }]);
+    const stats = await prisma.user.groupBy({ by: ['tier'], _count: { _all: true } });
 
     const total = await User.countDocuments();
     const distribution: Record<string, number> = {};
     stats.forEach((s) => {
-      distribution[s._id || 'unknown'] = s.count;
+      distribution[s.tier || 'unknown'] = s._count._all;
     });
 
     return res.json({ total, distribution });
@@ -211,25 +255,39 @@ router.get('/analytics/revenue', async (req: DomainRequest, res: Response) => {
     const now = new Date();
     const startOfYear = new Date(now.getFullYear(), 0, 1);
 
-    const monthly = await Payment.aggregate([
-      {
-        $match: {
-          status: 'succeeded',
-          createdAt: { $gte: startOfYear }
-        }
-      },
-      {
-        $group: {
-          _id: {
-            year: { $year: '$createdAt' },
-            month: { $month: '$createdAt' }
-          },
-          revenueCents: { $sum: { $ifNull: ['$amount', 0] } },
-          count: { $sum: 1 }
-        }
-      },
-      { $sort: { '_id.year': 1, '_id.month': 1 } }
-    ]);
+    const grouped = await prisma.payment.groupBy({
+      by: ['createdAt'],
+      where: { status: 'succeeded', createdAt: { gte: startOfYear } },
+      _count: { _all: true }
+    });
+    const byMonth = new Map<
+      string,
+      { year: number; month: number; revenueCents: number; count: number }
+    >();
+    for (const row of grouped) {
+      const year = row.createdAt.getUTCFullYear();
+      const month = row.createdAt.getUTCMonth() + 1;
+      const key = `${year}-${month}`;
+      const entry = byMonth.get(key) ?? { year, month, revenueCents: 0, count: 0 };
+      entry.count += row._count._all;
+      byMonth.set(key, entry);
+    }
+    const succeeded = await prisma.payment.findMany({
+      where: { status: 'succeeded', createdAt: { gte: startOfYear } },
+      select: { createdAt: true, amount: true }
+    });
+    for (const row of succeeded) {
+      const key = `${row.createdAt.getUTCFullYear()}-${row.createdAt.getUTCMonth() + 1}`;
+      const entry = byMonth.get(key);
+      if (entry) entry.revenueCents += row.amount ?? 0;
+    }
+    const monthly = [...byMonth.values()]
+      .sort((a, b) => a.year - b.year || a.month - b.month)
+      .map((entry) => ({
+        _id: { year: entry.year, month: entry.month },
+        revenueCents: entry.revenueCents,
+        count: entry.count
+      }));
 
     const totalRevenueCents = monthly.reduce((sum, row) => sum + row.revenueCents, 0);
     const avgMonthlyRevenueCents = monthly.length
@@ -253,13 +311,13 @@ router.get('/analytics/revenue', async (req: DomainRequest, res: Response) => {
 router.get('/subscriptions', async (req: DomainRequest, res: Response) => {
   try {
     const { status = 'succeeded', tier, page = 1, limit = 50 } = req.query;
-    const filter: FilterQuery<IPayment> = {};
+    const filter: Prisma.PaymentWhereInput = {};
 
     if (status && status !== 'all') {
-      filter.status = status;
+      filter.status = String(status) as Prisma.PaymentWhereInput['status'];
     }
     if (tier) {
-      filter.tier = tier;
+      filter.tier = String(tier) as Prisma.PaymentWhereInput['tier'];
     }
 
     const { boundedInteger } = require('@ednova/shared/pagination');
@@ -267,12 +325,27 @@ router.get('/subscriptions', async (req: DomainRequest, res: Response) => {
     const pageSize = boundedInteger(limit, 50, 100);
     const skip = (pageNumber - 1) * pageSize;
 
-    const subscriptions = await Payment.find(filter)
-      .populate('userId', 'email name tier subscriptionStartAt subscriptionEndAt')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(pageSize)
-      .lean();
+    const payments = await Payment.findMany(filter);
+    const userIds = [...new Set(payments.map((payment) => payment.userId))];
+    const users = await prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        tier: true,
+        subscriptionStartAt: true,
+        subscriptionEndAt: true
+      }
+    });
+    const usersById = new Map(users.map((user) => [user.id, user]));
+    const subscriptions = payments
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(skip, skip + pageSize)
+      .map((payment) => ({
+        ...payment,
+        userId: usersById.get(payment.userId) ?? payment.userId
+      }));
 
     const total = await Payment.countDocuments(filter);
     return res.json({ subscriptions, total, page: pageNumber, limit: pageSize });
@@ -285,15 +358,16 @@ router.get('/subscriptions', async (req: DomainRequest, res: Response) => {
 // PUT /admin/subscriptions/:paymentId/cancel — force cancel subscription and downgrade user
 router.put('/subscriptions/:paymentId/cancel', async (req: DomainRequest, res: Response) => {
   try {
-    const payment = await Payment.findById(req.params.paymentId);
+    const payment = await Payment.findById(String(req.params.paymentId));
     if (!payment) {
       return res.status(404).json({ error: 'Subscription payment not found' });
     }
 
+    await Payment.updateOne({ id: payment.id }, { status: 'canceled' });
     payment.status = 'canceled';
-    await payment.save();
 
     const user = await User.findById(payment.userId);
+    let savedUser = null;
     if (user) {
       user.tier = 'normal';
       user.tierChangedAt = new Date();
@@ -304,13 +378,13 @@ router.put('/subscriptions/:paymentId/cancel', async (req: DomainRequest, res: R
       user.renewalDate = null;
       user.canChangeAfter = null;
       user.autoRenew = false;
-      await user.save();
+      savedUser = await User.save(user);
     }
 
     return res.json({
       message: 'Subscription canceled',
       payment,
-      user: user?.toJSON?.() || null
+      user: savedUser ? User.toJSON(savedUser) : null
     });
   } catch (error) {
     console.error('Error canceling subscription:', error);
@@ -321,10 +395,22 @@ router.put('/subscriptions/:paymentId/cancel', async (req: DomainRequest, res: R
 // GET /admin/coupons — list all coupons
 router.get('/coupons', async (req: DomainRequest, res: Response) => {
   try {
-    const coupons = await Coupon.find()
-      .populate('createdBy', 'email name')
-      .sort({ createdAt: -1 })
-      .lean();
+    const coupons = (await Coupon.findMany())
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .map((coupon) => ({
+        id: coupon.id,
+        _id: coupon._id,
+        code: coupon.code,
+        targetTier: coupon.targetTier,
+        durationDays: coupon.durationDays,
+        createdBy: coupon.createdBy,
+        expiresAt: coupon.expiresAt,
+        isActive: coupon.isActive,
+        maxUses: coupon.maxUses,
+        usageCount: coupon.usageCount,
+        createdAt: coupon.createdAt,
+        updatedAt: coupon.updatedAt
+      }));
     return res.json({ coupons });
   } catch (error) {
     console.error('Error fetching coupons:', error);
@@ -357,7 +443,7 @@ router.post('/coupons', async (req: DomainRequest, res: Response) => {
       expiresAt: value.expiresAt || null,
       createdBy: req.user!.userId,
       isActive: true
-    });
+    } as Prisma.CouponUncheckedCreateInput);
 
     return res.status(201).json({ message: 'Coupon created', coupon });
   } catch (error) {
@@ -374,11 +460,9 @@ router.put('/coupons/:couponId', async (req: DomainRequest, res: Response) => {
       return res.status(400).json({ error: error.details[0].message });
     }
 
-    const coupon = await Coupon.findByIdAndUpdate(
-      req.params.couponId,
-      { $set: value },
-      { new: true }
-    );
+    const coupon = await Coupon.findByIdAndUpdate(String(req.params.couponId), value, {
+      new: true
+    });
     if (!coupon) {
       return res.status(404).json({ error: 'Coupon not found' });
     }
@@ -394,9 +478,11 @@ router.put('/coupons/:couponId', async (req: DomainRequest, res: Response) => {
 router.delete('/coupons/:couponId', async (req: DomainRequest, res: Response) => {
   try {
     const coupon = await Coupon.findByIdAndUpdate(
-      req.params.couponId,
-      { $set: { isActive: false } },
-      { new: true }
+      String(req.params.couponId),
+      { isActive: false },
+      {
+        new: true
+      }
     );
     if (!coupon) {
       return res.status(404).json({ error: 'Coupon not found' });
@@ -412,12 +498,16 @@ router.delete('/coupons/:couponId', async (req: DomainRequest, res: Response) =>
 // GET /admin/coupons/:couponId/usage — usage history
 router.get('/coupons/:couponId/usage', async (req: DomainRequest, res: Response) => {
   try {
-    const coupon = await Coupon.findById(req.params.couponId)
-      .populate('usageHistory.userId', 'email name')
-      .lean();
+    const coupon = await Coupon.findById(String(req.params.couponId));
     if (!coupon) {
       return res.status(404).json({ error: 'Coupon not found' });
     }
+
+    const usageUsers = await prisma.user.findMany({
+      where: { id: { in: coupon.usageHistory.map((entry) => entry.userId) } },
+      select: { id: true, email: true, name: true }
+    });
+    const usageById = new Map(usageUsers.map((user) => [user.id, user]));
 
     return res.json({
       coupon: {
@@ -427,7 +517,10 @@ router.get('/coupons/:couponId/usage', async (req: DomainRequest, res: Response)
         durationDays: coupon.durationDays,
         maxUses: coupon.maxUses,
         usageCount: coupon.usageCount,
-        usageHistory: coupon.usageHistory || []
+        usageHistory: coupon.usageHistory.map((entry) => ({
+          ...entry,
+          userId: usageById.get(entry.userId) ?? entry.userId
+        }))
       }
     });
   } catch (error) {

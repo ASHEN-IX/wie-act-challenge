@@ -1,8 +1,9 @@
-import type { FilterQuery } from 'mongoose';
+import type { Prisma } from '../../../../src/generated/prisma/client';
 import type { IUserRankProfile } from '../models/UserRankProfile';
 import type { IUserProfile } from '../models/UserProfile';
 import type { RankLadderItem } from '../models/rankingConfig';
 import RankEventLedger from '../models/RankEventLedger';
+import { prisma } from '../../../../shared/database';
 import UserRankProfile from '../models/UserRankProfile';
 import RankBadge from '../models/RankBadge';
 import Friendship from '../models/Friendship';
@@ -71,7 +72,7 @@ export async function getRankBadge(rankIndex: number) {
     const badge = await RankBadge.findOne({
       rankIndex: fallback.rankIndex,
       isActive: true
-    }).lean();
+    });
 
     if (!badge) return fallback;
 
@@ -90,7 +91,7 @@ export async function getRankBadge(rankIndex: number) {
 
 export async function getAllRankBadges() {
   try {
-    const badges = await RankBadge.find({ isActive: true }).sort({ rankIndex: 1 }).lean();
+    const badges = await RankBadge.findMany({ isActive: true }, { orderBy: { rankIndex: 'asc' } });
     if (badges.length > 0) {
       return badges.map((badge) => ({
         rankIndex: badge.rankIndex,
@@ -154,13 +155,10 @@ export async function getRankHistory(userId: string, limit: number = 20) {
   const season = await seasonService.getOrCreateActiveSeason();
   const safeLimit = Math.max(1, Math.min(100, Number(limit) || 20));
 
-  const events = await RankEventLedger.find({
-    userId,
-    seasonId: season._id
-  })
-    .sort({ occurredAt: -1 })
-    .limit(safeLimit)
-    .lean();
+  const events = await RankEventLedger.findMany(
+    { userId, seasonId: season.id },
+    { orderBy: { occurredAt: 'desc' }, take: safeLimit }
+  );
 
   return { season, events };
 }
@@ -177,35 +175,28 @@ export async function getRankLeaderboard({
   const season = await seasonService.getOrCreateActiveSeason();
   const safeLimit = Math.max(1, Math.min(100, Number(limit) || 20));
 
-  const query: FilterQuery<IUserRankProfile> = { currentSeasonId: season._id };
+  const query: Prisma.UserRankProfileWhereInput = { currentSeasonId: season.id };
 
   if (scope === 'friends') {
-    const friendships = await Friendship.find({
-      $or: [
+    const friendships = await Friendship.findMany({
+      OR: [
         { requester: userId, status: 'accepted' },
         { recipient: userId, status: 'accepted' }
       ]
-    })
-      .select('requester recipient')
-      .lean();
+    });
 
     const friendIds = friendships.map((f) => (f.requester === userId ? f.recipient : f.requester));
     friendIds.push(userId);
-    query.userId = { $in: [...new Set(friendIds)] };
+    query.userId = { in: [...new Set(friendIds)] };
   }
 
-  const rows = await UserRankProfile.find(query)
-    .sort({ knowledgePoints: -1, updatedAt: 1 })
-    .limit(safeLimit)
-    .select(
-      'userId knowledgePoints rankIndex rankName seasonPeakRankIndex seasonPeakKp currentStreak learningSkillRating'
-    )
-    .lean();
+  const rows = await UserRankProfile.findMany(query, {
+    orderBy: { knowledgePoints: 'desc' },
+    take: safeLimit
+  });
 
   const userIds = rows.map((row) => row.userId);
-  const profiles = await UserProfile.find({ userId: { $in: userIds } })
-    .select('userId nickname avatar')
-    .lean();
+  const profiles = await UserProfile.findMany({ userId: { in: userIds } });
 
   const profileMap = new Map<string, Pick<IUserProfile, 'nickname' | 'avatar'>>();
   profiles.forEach((profile) => {
@@ -240,11 +231,9 @@ export async function getSessionResult(userId: string, sessionId: string | null 
   if (!resolvedSessionId) {
     const latestSessionEvent = await RankEventLedger.findOne({
       userId,
-      seasonId: season._id,
-      contextSessionId: { $ne: null }
-    })
-      .sort({ occurredAt: -1 })
-      .lean();
+      seasonId: season.id,
+      contextSessionId: { not: null }
+    });
 
     resolvedSessionId = latestSessionEvent?.contextSessionId || null;
   }
@@ -258,23 +247,27 @@ export async function getSessionResult(userId: string, sessionId: string | null 
     };
   }
 
-  let events = await RankEventLedger.find({
-    userId,
-    seasonId: season._id,
-    contextSessionId: resolvedSessionId
-  })
-    .sort({ occurredAt: 1 })
-    .lean();
+  let events = await RankEventLedger.findMany(
+    { userId, seasonId: season.id, contextSessionId: resolvedSessionId },
+    { orderBy: { occurredAt: 'asc' } }
+  );
 
   // Backward-compat query path for events written before contextSessionId existed.
   if (events.length === 0) {
-    events = await RankEventLedger.find({
-      userId,
-      seasonId: season._id,
-      'metadata.sessionId': resolvedSessionId
-    })
-      .sort({ occurredAt: 1 })
-      .lean();
+    // Events written before `contextSessionId` existed carry the id only in
+    // `metadata`; that JSON field is filtered in the database.
+    const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT "id" FROM "rankeventledgers"
+      WHERE "userId" = ${userId}
+        AND "seasonId" = ${season.id}
+        AND ("metadata" ->> 'sessionId') = ${resolvedSessionId}
+      ORDER BY "occurredAt" ASC
+    `;
+    const ids = rows.map((row) => row.id);
+    events =
+      ids.length === 0
+        ? []
+        : await RankEventLedger.findMany({ id: { in: ids } }, { orderBy: { occurredAt: 'asc' } });
   }
 
   const normalizedEvents = events.map((event) => ({

@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MongoClient, ObjectId } from 'mongodb';
 import bcrypt from 'bcryptjs';
 import WebSocket from 'ws';
-import { migrateAuth } from '../../scripts/migrate-auth';
+import { connectDatabase, disconnectDatabase, prisma } from '../../shared/database';
+import { newId } from '../../shared/ids';
+import { StudyRoom } from '../../modules/study/src/models';
 
 interface RoomResponse {
   roomId: string;
@@ -21,10 +22,9 @@ interface RoomEvent {
   participants: Array<Record<string, unknown>>;
 }
 
-test('ED-07 real Nest/Mongo presence lifecycle', { timeout: 90000 }, async (t) => {
-  // Always create and delete only this run's synthetic database.
-  const name = `ed07_presence_test_${process.pid}_${Date.now()}`;
-  process.env.MONGODB_URI = `mongodb://127.0.0.1:27018/${name}`;
+test('ED-07 real Nest/PostgreSQL presence lifecycle', { timeout: 90000 }, async (t) => {
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
   process.env.BETTER_AUTH_SECRET = 'isolated-ed07-security-secret-at-least-32-characters';
   process.env.AUTH_TRUSTED_ORIGINS = 'http://localhost:5173';
   process.env.BETTER_AUTH_URL = 'http://localhost:5173';
@@ -32,36 +32,59 @@ test('ED-07 real Nest/Mongo presence lifecycle', { timeout: 90000 }, async (t) =
   process.env.RABBITMQ_URL = 'amqp://localhost:5672';
   process.env.REDIS_URL = '';
   process.env.NODE_ENV = 'test';
-  const client = new MongoClient(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 5000 });
-  await client.connect();
-  const db = client.db();
+  await connectDatabase();
   const cleanups: Array<() => Promise<void>> = [];
   const sockets: WebSocket[] = [];
+  const password = await bcrypt.hash('Synthetic!123', 12);
+  // This suite shares one migrated database; keep run-unique identities.
+  const run = `${process.pid}_${Date.now()}`;
+  const actors = ['Host', 'Peer', 'Outsider'].map((name) => ({
+    id: newId(),
+    name,
+    email: `${name.toLowerCase()}_${run}@ed07.test`,
+    cookie: ''
+  }));
   t.after(async () => {
     for (const socket of sockets) socket.terminate();
     for (const cleanup of cleanups) await cleanup();
-    await db.dropDatabase();
-    await client.close();
+    await StudyRoom.deleteMany({ hostUserId: { $in: actors.map((actor) => actor.id) } });
+    const ids = actors.map((actor) => actor.id);
+    await prisma.authSession.deleteMany({ where: { userId: { in: ids } } });
+    await prisma.authAccount.deleteMany({ where: { userId: { in: ids } } });
+    await prisma.authUser.deleteMany({ where: { id: { in: ids } } });
+    await prisma.user.deleteMany({ where: { id: { in: ids } } });
+    await prisma.authRateLimit.deleteMany({});
+    await disconnectDatabase().catch(() => {});
   });
-  const password = await bcrypt.hash('Synthetic!123', 12);
-  const actors = ['Host', 'Peer', 'Outsider'].map((name) => ({
-    id: new ObjectId(),
-    name,
-    email: `${name.toLowerCase()}@ed07.test`,
-    cookie: ''
-  }));
-  for (const actor of actors)
-    await db.collection('users').insertOne({
-      _id: actor.id,
-      email: actor.email,
-      name: actor.name,
-      password,
-      isVerified: true,
-      isActive: true,
-      role: 'student',
-      tier: 'standard'
+  await prisma.authRateLimit.deleteMany({});
+  for (const actor of actors) {
+    await prisma.user.create({
+      data: {
+        id: actor.id,
+        email: actor.email,
+        name: actor.name,
+        password,
+        isVerified: true,
+        isActive: true,
+        role: 'student',
+        tier: 'normal',
+        notificationPreferences: {},
+        onboardingDraft: {}
+      }
     });
-  await migrateAuth(db, { apply: true });
+    await prisma.authUser.create({
+      data: { id: actor.id, email: actor.email, name: actor.name, emailVerified: true }
+    });
+    await prisma.authAccount.create({
+      data: {
+        id: newId(),
+        accountId: actor.id,
+        providerId: 'credential',
+        userId: actor.id,
+        password
+      }
+    });
+  }
   const { getAuth } = await import('../../shared/betterAuth.js');
   const auth = await getAuth();
   for (const actor of actors) {
@@ -109,7 +132,7 @@ test('ED-07 real Nest/Mongo presence lifecycle', { timeout: 90000 }, async (t) =
     );
   }
   async function snapshot(id: string) {
-    return db.collection('study_rooms').findOne({ roomId: id });
+    return StudyRoom.findOne({ roomId: id });
   }
   async function connect(id: string, actor: typeof host, queryOnly = false) {
     const received: RoomEvent[] = [];
@@ -135,8 +158,8 @@ test('ED-07 real Nest/Mongo presence lifecycle', { timeout: 90000 }, async (t) =
 
   const id = await create();
   await join(id);
-  const hostId = host.id.toString();
-  const peerId = peer.id.toString();
+  const hostId = host.id;
+  const peerId = peer.id;
   const before = await snapshot(id);
   let observer: Awaited<ReturnType<typeof connect>>;
   let first: Awaited<ReturnType<typeof connect>>;
@@ -252,7 +275,7 @@ test('ED-07 real Nest/Mongo presence lifecycle', { timeout: 90000 }, async (t) =
       assert.ok(
         (await snapshot(id))!.participants.find(
           (p: { userId: string; leftAt?: unknown }) => p.userId === hostId
-        ).leftAt
+        )?.leftAt
       );
       const accepted = await snapshot(id);
       assert.equal((await request(host, path(id, '/leave'), 'POST', body)).status, 200);
@@ -369,7 +392,7 @@ test('ED-07 real Nest/Mongo presence lifecycle', { timeout: 90000 }, async (t) =
         await waitFor(() => unresponsive.readyState === WebSocket.CLOSED);
         await waitFor(() => online(watcher, peerId) === false);
         assert.equal(closeCode, 1006);
-        assert.equal(online(watcher, outsider.id.toString()), true);
+        assert.equal(online(watcher, outsider.id), true);
         assert.deepEqual(await snapshot(timeoutId), stable);
       } finally {
         await stop();

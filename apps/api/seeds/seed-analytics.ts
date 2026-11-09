@@ -1,6 +1,11 @@
-import mongoose from 'mongoose';
+import { config } from 'dotenv';
+import path from 'node:path';
+import { Prisma } from '../src/generated/prisma/client';
+import { connectDatabase, disconnectDatabase, prisma } from '../shared/database';
+import { newId } from '../shared/ids';
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://host.docker.internal:27017/ednova';
+config({ path: path.resolve(__dirname, '../.env') });
+
 const EMAIL = process.argv[2] || 'kammounaziz12@gmail.com';
 const SEED_BATCH = `seed-${Date.now()}`;
 
@@ -60,7 +65,13 @@ const sessionPlan: SessionPlanItem[] = [
 ];
 
 const buildEvents = (userId: string) => {
-  const events: any[] = [];
+  const events: Array<{
+    id: string;
+    userId: string;
+    eventType: string;
+    metadata: Prisma.InputJsonValue;
+    timestamp: Date;
+  }> = [];
 
   sessionPlan.forEach((session, sessionIndex) => {
     const sessionId = `session-${SEED_BATCH}-${sessionIndex}`;
@@ -68,6 +79,7 @@ const buildEvents = (userId: string) => {
     const completedAt = daysAgo(session.daysAgo, session.hour, Math.min(55, session.duration));
 
     events.push({
+      id: newId(),
       userId,
       eventType: 'study_session_started',
       metadata: { seedBatch: SEED_BATCH, sessionId, topic: session.topic },
@@ -81,6 +93,7 @@ const buildEvents = (userId: string) => {
         Math.min(55, 5 + taskIndex * 10)
       );
       events.push({
+        id: newId(),
         userId,
         eventType: 'task_completed',
         metadata: {
@@ -98,6 +111,7 @@ const buildEvents = (userId: string) => {
     if (sessionIndex % 2 === 0) {
       const focusTimestamp = daysAgo(session.daysAgo, session.hour, 15);
       events.push({
+        id: newId(),
         userId,
         eventType: 'focus_tracked',
         metadata: { seedBatch: SEED_BATCH, sessionId, focusScore: session.focus },
@@ -106,6 +120,7 @@ const buildEvents = (userId: string) => {
     }
 
     events.push({
+      id: newId(),
       userId,
       eventType: 'study_session_completed',
       metadata: {
@@ -141,6 +156,7 @@ const buildEvents = (userId: string) => {
 
   loginPlan.forEach((login, i) => {
     events.push({
+      id: newId(),
       userId,
       eventType: 'login',
       metadata: { seedBatch: SEED_BATCH, loginIndex: i },
@@ -153,47 +169,90 @@ const buildEvents = (userId: string) => {
 
 async function run(): Promise<void> {
   try {
-    await mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 10000 });
-    console.log('Connected to MongoDB');
+    if (process.env.NODE_ENV === 'production') throw new Error('Demo seeding is development only');
+    const url = process.env.DATABASE_URL;
+    if (!url || !['localhost', '127.0.0.1', '[::1]'].includes(new URL(url).hostname))
+      throw new Error('Analytics seeding requires a loopback PostgreSQL database');
 
-    const db = mongoose.connection.db;
-    if (!db) {
-      throw new Error('Database connection not established');
-    }
-    const users = db.collection('users');
-    const events = db.collection('analytics_events');
-    const profiles = db.collection('user_profiles');
+    await connectDatabase();
+    console.log('Connected to PostgreSQL');
 
-    const user = await users.findOne({ email: EMAIL.toLowerCase() });
+    const user = await prisma.user.findUnique({
+      where: { email: EMAIL.toLowerCase() },
+      select: { id: true }
+    });
     if (!user) {
       throw new Error(`No user found with email ${EMAIL}`);
     }
-    const userId = user._id.toString();
+    const userId = user.id;
     console.log(`Found user: ${userId}`);
 
     const allEvents = buildEvents(userId);
     console.log(`Generated ${allEvents.length} events`);
 
-    await events.deleteMany({ userId, 'metadata.seedBatch': { $regex: '^seed-' } });
-    await events.insertMany(allEvents, { ordered: false });
+    // Clear only this seed's earlier batches; other analytics stay untouched.
+    const existing = await prisma.analyticsEvent.findMany({
+      where: { userId },
+      select: { id: true, metadata: true }
+    });
+    const stale = existing
+      .filter((row) => {
+        const metadata = row.metadata as Record<string, unknown> | null;
+        return (
+          metadata &&
+          typeof metadata.seedBatch === 'string' &&
+          metadata.seedBatch.startsWith('seed-')
+        );
+      })
+      .map((row) => row.id);
+    if (stale.length) await prisma.analyticsEvent.deleteMany({ where: { id: { in: stale } } });
+    await prisma.analyticsEvent.createMany({ data: allEvents, skipDuplicates: true });
     console.log('Events inserted');
 
     const totalStudyTime = sessionPlan.reduce((sum, s) => sum + s.duration, 0);
     const totalTasks = sessionPlan.reduce((sum, s) => sum + s.tasks, 0);
 
-    await profiles.updateOne(
-      { userId },
-      {
-        $inc: {
-          'stats.totalStudyTime': totalStudyTime,
-          'stats.completedTasks': totalTasks,
-          'stats.currentStreak': 7,
-          'stats.longestStreak': 14
-        },
-        $set: { 'stats.activeDays': 14 }
-      },
-      { upsert: true }
-    );
+    // `stats` is a JSON column; a read-modify-write keeps the previous totals and
+    // applies the same increments the Mongo `$inc` used to.
+    const profile = await prisma.userProfile.findUnique({ where: { userId } });
+    const previous = (profile?.stats ?? {}) as Record<string, number>;
+    const stats = {
+      ...previous,
+      totalStudyTime: (previous.totalStudyTime ?? 0) + totalStudyTime,
+      completedTasks: (previous.completedTasks ?? 0) + totalTasks,
+      currentStreak: (previous.currentStreak ?? 0) + 7,
+      longestStreak: (previous.longestStreak ?? 0) + 14,
+      activeDays: 14
+    };
+    if (profile) {
+      await prisma.userProfile.update({
+        where: { id: profile.id },
+        data: { stats: stats as Prisma.InputJsonValue }
+      });
+    } else {
+      await prisma.userProfile.create({
+        data: {
+          id: newId(),
+          userId,
+          avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix',
+          stats: stats as Prisma.InputJsonValue,
+          privacy: {
+            showOnlineStatus: true,
+            showStudyActivity: true,
+            showStats: true,
+            allowRequests: 'everyone'
+          },
+          level: { current: 1, xp: 0, title: 'Novice Explorer' },
+          preferences: {
+            studyTime: 'evening',
+            notifications: { email: true, push: true },
+            theme: 'dark',
+            language: 'en'
+          },
+          goals: []
+        }
+      });
+    }
     console.log(`Profile stats updated: ${totalStudyTime} min, ${totalTasks} tasks`);
 
     console.log('\nSeed complete! Summary:');
@@ -201,15 +260,11 @@ async function run(): Promise<void> {
     console.log(`  Completed tasks: ${totalTasks}`);
     console.log(`  Total study time: ${totalStudyTime} min`);
     console.log(`  Days covered: ${sessionPlan.length} days`);
-
-    await mongoose.disconnect();
-    process.exit(0);
   } catch (error: any) {
     console.error('Seed failed:', error.message);
-    try {
-      await mongoose.disconnect();
-    } catch {}
-    process.exit(1);
+    process.exitCode = 1;
+  } finally {
+    await disconnectDatabase();
   }
 }
 

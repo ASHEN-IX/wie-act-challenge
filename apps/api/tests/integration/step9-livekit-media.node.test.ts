@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import mongoose from 'mongoose';
+import { connectDatabase, disconnectDatabase } from '../../shared/database';
 import request from 'supertest';
 import express from 'express';
 import roomsRouter from '../../modules/study/src/routes/rooms';
@@ -15,16 +15,21 @@ import {
 } from '../../modules/study/src/services/livekitControl';
 
 test('ED-17 & ED-25: Step 9 LiveKit Media SFU Integration and Permission Enforcement', async (t) => {
-  const dbUri = `mongodb://127.0.0.1:27018/ednova_step9_livekit_${Date.now()}`;
-  await mongoose.connect(dbUri);
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
+  // Synthetic local signing config; the media assertions need the SFU at 7880.
+  process.env.LIVEKIT_URL = process.env.LIVEKIT_URL || 'ws://127.0.0.1:7880';
+  process.env.LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || 'test_lk_key';
+  process.env.LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || 'test_lk_secret_1234567890';
+  await connectDatabase();
 
   const { apiKey, apiSecret, livekitUrl, httpUrl } = getLiveKitConfig();
 
   t.after(async () => {
     try {
-      await mongoose.connection.dropDatabase();
+      await StudyRoom.deleteMany({ roomId: { startsWith: 'step9_room_' } });
     } finally {
-      await mongoose.disconnect();
+      await disconnectDatabase().catch(() => {});
     }
   });
 
@@ -50,7 +55,6 @@ test('ED-17 & ED-25: Step 9 LiveKit Media SFU Integration and Permission Enforce
   await StudyRoom.create({
     roomId: testRoomId,
     title: 'LiveKit Multi-Learner SFU Integration Room',
-    ownerUserId: aliceId,
     hostUserId: aliceId,
     presenterUserId: aliceId,
     inviteCode: 'LK9SFU',
@@ -97,7 +101,12 @@ test('ED-17 & ED-25: Step 9 LiveKit Media SFU Integration and Permission Enforce
       const err = await res.text();
       throw new Error(`Failed to list LiveKit participants: ${res.status} ${err}`);
     }
-    const data = (await res.json()) as { participants?: Array<{ identity: string; permission?: { canPublish?: boolean; canSubscribe?: boolean } }> };
+    const data = (await res.json()) as {
+      participants?: Array<{
+        identity: string;
+        permission?: { canPublish?: boolean; canSubscribe?: boolean };
+      }>;
+    };
     return data.participants || [];
   }
 
@@ -127,117 +136,137 @@ test('ED-17 & ED-25: Step 9 LiveKit Media SFU Integration and Permission Enforce
   let wsCharlie: WebSocket | null = null;
 
   t.after(() => {
-    try { wsAlice?.close(); } catch {}
-    try { wsBob?.close(); } catch {}
-    try { wsCharlie?.close(); } catch {}
+    try {
+      wsAlice?.close();
+    } catch {}
+    try {
+      wsBob?.close();
+    } catch {}
+    try {
+      wsCharlie?.close();
+    } catch {}
   });
 
-  await t.test('1. Issue tokens via API and verify voice consent governs publish permission', async () => {
-    // Alice has voice consent
-    currentActor = { userId: aliceId, name: 'Alice Learner' };
-    const resAlice = await request(app).post(`/api/v1/study/rooms/${testRoomId}/livekit-token`);
-    assert.equal(resAlice.status, 200);
-    assert.equal(resAlice.body.canPublishAudio, true);
-    assert.ok(resAlice.body.token);
+  await t.test(
+    '1. Issue tokens via API and verify voice consent governs publish permission',
+    async () => {
+      // Alice has voice consent
+      currentActor = { userId: aliceId, name: 'Alice Learner' };
+      const resAlice = await request(app).post(`/api/v1/study/rooms/${testRoomId}/livekit-token`);
+      assert.equal(resAlice.status, 200);
+      assert.equal(resAlice.body.canPublishAudio, true);
+      assert.ok(resAlice.body.token);
 
-    // Bob has NO voice consent
-    currentActor = { userId: bobId, name: 'Bob Learner' };
-    const resBob = await request(app).post(`/api/v1/study/rooms/${testRoomId}/livekit-token`);
-    assert.equal(resBob.status, 200);
-    assert.equal(resBob.body.canPublishAudio, false);
-    assert.ok(resBob.body.token);
+      // Bob has NO voice consent
+      currentActor = { userId: bobId, name: 'Bob Learner' };
+      const resBob = await request(app).post(`/api/v1/study/rooms/${testRoomId}/livekit-token`);
+      assert.equal(resBob.status, 200);
+      assert.equal(resBob.body.canPublishAudio, false);
+      assert.ok(resBob.body.token);
 
-    // Charlie has voice consent
-    currentActor = { userId: charlieId, name: 'Charlie Learner' };
-    const resCharlie = await request(app).post(`/api/v1/study/rooms/${testRoomId}/livekit-token`);
-    assert.equal(resCharlie.status, 200);
-    assert.equal(resCharlie.body.canPublishAudio, true);
-    assert.ok(resCharlie.body.token);
-  });
+      // Charlie has voice consent
+      currentActor = { userId: charlieId, name: 'Charlie Learner' };
+      const resCharlie = await request(app).post(`/api/v1/study/rooms/${testRoomId}/livekit-token`);
+      assert.equal(resCharlie.status, 200);
+      assert.equal(resCharlie.body.canPublishAudio, true);
+      assert.ok(resCharlie.body.token);
+    }
+  );
 
-  await t.test('2. Establish multi-participant WebRTC signaling sessions on local LiveKit SFU', async () => {
-    const tokenAlice = generateLiveKitToken({
-      roomName: testRoomId,
-      identity: aliceId,
-      name: 'Alice Learner',
-      canPublishAudio: true
-    });
-    const tokenBob = generateLiveKitToken({
-      roomName: testRoomId,
-      identity: bobId,
-      name: 'Bob Learner',
-      canPublishAudio: false
-    });
-    const tokenCharlie = generateLiveKitToken({
-      roomName: testRoomId,
-      identity: charlieId,
-      name: 'Charlie Learner',
-      canPublishAudio: true
-    });
+  await t.test(
+    '2. Establish multi-participant WebRTC signaling sessions on local LiveKit SFU',
+    async () => {
+      const tokenAlice = generateLiveKitToken({
+        roomName: testRoomId,
+        identity: aliceId,
+        name: 'Alice Learner',
+        canPublishAudio: true
+      });
+      const tokenBob = generateLiveKitToken({
+        roomName: testRoomId,
+        identity: bobId,
+        name: 'Bob Learner',
+        canPublishAudio: false
+      });
+      const tokenCharlie = generateLiveKitToken({
+        roomName: testRoomId,
+        identity: charlieId,
+        name: 'Charlie Learner',
+        canPublishAudio: true
+      });
 
-    // Connect all three learners concurrently
-    const [connAlice, connBob, connCharlie] = await Promise.all([
-      connectLiveKitWebSocket(tokenAlice),
-      connectLiveKitWebSocket(tokenBob),
-      connectLiveKitWebSocket(tokenCharlie)
-    ]);
+      // Connect all three learners concurrently
+      const [connAlice, connBob, connCharlie] = await Promise.all([
+        connectLiveKitWebSocket(tokenAlice),
+        connectLiveKitWebSocket(tokenBob),
+        connectLiveKitWebSocket(tokenCharlie)
+      ]);
 
-    wsAlice = connAlice.ws;
-    wsBob = connBob.ws;
-    wsCharlie = connCharlie.ws;
+      wsAlice = connAlice.ws;
+      wsBob = connBob.ws;
+      wsCharlie = connCharlie.ws;
 
-    assert.equal(wsAlice.readyState, WebSocket.OPEN);
-    assert.equal(wsBob.readyState, WebSocket.OPEN);
-    assert.equal(wsCharlie.readyState, WebSocket.OPEN);
+      assert.equal(wsAlice.readyState, WebSocket.OPEN);
+      assert.equal(wsBob.readyState, WebSocket.OPEN);
+      assert.equal(wsCharlie.readyState, WebSocket.OPEN);
 
-    // Allow LiveKit SFU state to settle
-    await new Promise((r) => setTimeout(r, 200));
+      // Allow LiveKit SFU state to settle
+      await new Promise((r) => setTimeout(r, 200));
 
-    // Verify participants on LiveKit server via Twirp
-    const participants = await queryLiveKitParticipants(testRoomId);
-    assert.equal(participants.length, 3, `Expected 3 participants on LiveKit, got: ${participants.length}`);
+      // Verify participants on LiveKit server via Twirp
+      const participants = await queryLiveKitParticipants(testRoomId);
+      assert.equal(
+        participants.length,
+        3,
+        `Expected 3 participants on LiveKit, got: ${participants.length}`
+      );
 
-    const pAlice = participants.find((p) => p.identity === aliceId);
-    const pBob = participants.find((p) => p.identity === bobId);
-    const pCharlie = participants.find((p) => p.identity === charlieId);
+      const pAlice = participants.find((p) => p.identity === aliceId);
+      const pBob = participants.find((p) => p.identity === bobId);
+      const pCharlie = participants.find((p) => p.identity === charlieId);
 
-    assert.ok(pAlice, 'Alice must be in LiveKit participant list');
-    assert.ok(pBob, 'Bob must be in LiveKit participant list');
-    assert.ok(pCharlie, 'Charlie must be in LiveKit participant list');
+      assert.ok(pAlice, 'Alice must be in LiveKit participant list');
+      assert.ok(pBob, 'Bob must be in LiveKit participant list');
+      assert.ok(pCharlie, 'Charlie must be in LiveKit participant list');
 
-    // Permissions check
-    const getCanPublish = (p: any) => p?.permission?.can_publish ?? p?.permission?.canPublish;
-    const getCanSubscribe = (p: any) => p?.permission?.can_subscribe ?? p?.permission?.canSubscribe;
+      // Permissions check
+      const getCanPublish = (p: any) => p?.permission?.can_publish ?? p?.permission?.canPublish;
+      const getCanSubscribe = (p: any) =>
+        p?.permission?.can_subscribe ?? p?.permission?.canSubscribe;
 
-    assert.equal(getCanPublish(pAlice), true, 'Alice has canPublish=true');
-    assert.equal(getCanPublish(pBob), false, 'Bob has canPublish=false (no consent)');
-    assert.equal(getCanPublish(pCharlie), true, 'Charlie has canPublish=true');
-  });
+      assert.equal(getCanPublish(pAlice), true, 'Alice has canPublish=true');
+      assert.equal(getCanPublish(pBob), false, 'Bob has canPublish=false (no consent)');
+      assert.equal(getCanPublish(pCharlie), true, 'Charlie has canPublish=true');
+    }
+  );
 
-  await t.test('3. Dynamic server-side permission revocation when voice consent is withdrawn', async () => {
-    const getCanPublish = (p: any) => p?.permission?.can_publish ?? p?.permission?.canPublish;
-    // Alice withdraws voice consent
-    currentActor = { userId: aliceId, name: 'Alice Learner' };
-    const consentRes = await request(app)
-      .put(`/api/v1/study/rooms/${testRoomId}/voice-consent`)
-      .send({ hasVoiceConsent: false });
+  await t.test(
+    '3. Dynamic server-side permission revocation when voice consent is withdrawn',
+    async () => {
+      const getCanPublish = (p: any) => p?.permission?.can_publish ?? p?.permission?.canPublish;
+      // Alice withdraws voice consent
+      currentActor = { userId: aliceId, name: 'Alice Learner' };
+      const consentRes = await request(app)
+        .put(`/api/v1/study/rooms/${testRoomId}/voice-consent`)
+        .send({ hasVoiceConsent: false });
 
-    assert.equal(consentRes.status, 200);
-    assert.equal(consentRes.body.hasVoiceConsent, false);
+      assert.equal(consentRes.status, 200);
+      assert.equal(consentRes.body.hasVoiceConsent, false);
 
-    // Allow SFU Twirp UpdateParticipant to apply
-    await new Promise((r) => setTimeout(r, 250));
+      // Allow SFU Twirp UpdateParticipant to apply
+      await new Promise((r) => setTimeout(r, 250));
 
-    // Inspect LiveKit participants on the running server
-    const participants = await queryLiveKitParticipants(testRoomId);
-    const pAlice = participants.find((p) => p.identity === aliceId);
-    assert.ok(pAlice);
-    assert.equal(
-      getCanPublish(pAlice),
-      false,
-      'LiveKit SFU must enforce canPublish=false immediately after consent withdrawal'
-    );
-  });
+      // Inspect LiveKit participants on the running server
+      const participants = await queryLiveKitParticipants(testRoomId);
+      const pAlice = participants.find((p) => p.identity === aliceId);
+      assert.ok(pAlice);
+      assert.equal(
+        getCanPublish(pAlice),
+        false,
+        'LiveKit SFU must enforce canPublish=false immediately after consent withdrawal'
+      );
+    }
+  );
 
   await t.test('4. Force server-side disconnect when participant leaves room', async () => {
     // Setup listener for Bob's WebSocket close event
@@ -302,7 +331,10 @@ test('ED-17 & ED-25: Step 9 LiveKit Media SFU Integration and Permission Enforce
     };
     const encH = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
     const encP = Buffer.from(JSON.stringify(expiredPayload)).toString('base64url');
-    const expSig = crypto.createHmac('sha256', apiSecret).update(`${encH}.${encP}`).digest('base64url');
+    const expSig = crypto
+      .createHmac('sha256', apiSecret)
+      .update(`${encH}.${encP}`)
+      .digest('base64url');
     const expiredToken = `${encH}.${encP}.${expSig}`;
 
     let expiredRejected = false;
@@ -359,8 +391,14 @@ test('ED-17 & ED-25: Step 9 LiveKit Media SFU Integration and Permission Enforce
     const policyDurationMs = tPolicyEnd - tPolicyStart;
     const totalLatencyMs = performance.now() - t0;
 
-    assert.ok(policyDurationMs < 50, `Policy evaluation latency ${policyDurationMs}ms exceeds 50ms`);
-    assert.ok(totalLatencyMs < 1500, `End-of-speech to response onset ${totalLatencyMs}ms exceeds 1500ms budget`);
+    assert.ok(
+      policyDurationMs < 50,
+      `Policy evaluation latency ${policyDurationMs}ms exceeds 50ms`
+    );
+    assert.ok(
+      totalLatencyMs < 1500,
+      `End-of-speech to response onset ${totalLatencyMs}ms exceeds 1500ms budget`
+    );
 
     connModerator.ws.close();
   });

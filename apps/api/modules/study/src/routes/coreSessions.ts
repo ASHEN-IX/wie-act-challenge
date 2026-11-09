@@ -1,6 +1,6 @@
 import { canReadCourse } from '../services/resourceAccess';
-import type { FilterQuery } from 'mongoose';
-import type { IStudySession } from '../models';
+/** Prisma-shaped filter: a plain object of column predicates. */
+type FilterQuery = Record<string, unknown>;
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response } from 'express';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -71,13 +71,14 @@ router.get(
     const userId = req.user!.userId;
     const { topicId, taskId, startDate, endDate } = req.query;
 
-    const filter: FilterQuery<IStudySession> = { userId };
+    const filter: FilterQuery = { userId };
     if (topicId) filter.topicId = topicId;
     if (taskId) filter.taskId = taskId;
     if (startDate || endDate) {
-      filter.completedAt = {};
-      if (startDate) filter.completedAt.$gte = new Date(String(startDate));
-      if (endDate) filter.completedAt.$lte = new Date(String(endDate));
+      const completedAt: Record<string, Date> = {};
+      if (startDate) completedAt.$gte = new Date(String(startDate));
+      if (endDate) completedAt.$lte = new Date(String(endDate));
+      filter.completedAt = completedAt;
     }
 
     const sessions = await StudySession.find(filter).sort({ completedAt: -1 });
@@ -159,7 +160,7 @@ router.put(
       session.duration = Math.round(diffMs / 60000); // Minutes
     }
 
-    await session.save();
+    await StudySession.save(session);
 
     // Award daily streak XP if the user studied yesterday too
     let completionRewards = null;
@@ -198,11 +199,12 @@ router.get(
     const userId = req.user!.userId;
     const { startDate, endDate } = req.query;
 
-    const filter: FilterQuery<IStudySession> = { userId };
+    const filter: FilterQuery = { userId };
     if (startDate || endDate) {
-      filter.completedAt = {};
-      if (startDate) filter.completedAt.$gte = new Date(String(startDate));
-      if (endDate) filter.completedAt.$lte = new Date(String(endDate));
+      const completedAt: Record<string, Date> = {};
+      if (startDate) completedAt.$gte = new Date(String(startDate));
+      if (endDate) completedAt.$lte = new Date(String(endDate));
+      filter.completedAt = completedAt;
     }
 
     const sessions = await StudySession.find(filter);

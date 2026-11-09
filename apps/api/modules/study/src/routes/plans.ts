@@ -2,9 +2,10 @@ import { canReadCourse, canReadPlanContext, canReadPlanSource } from '../service
 import type { JobResourceScope } from '../../../ai-orchestrator/src/models/AiJob';
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response } from 'express';
-import type { FilterQuery } from 'mongoose';
+/** Prisma-shaped filter: a plain object of column predicates. */
+type FilterQuery = Record<string, unknown>;
 import type { AxiosResponse } from '@ednova/shared/moduleClient';
-import type { ICourse, IStudyPlan, IStudyPlanTask } from '../models';
+import type { ICourse, IStudyPlanTask } from '../models';
 import { errorDetails } from '@ednova/shared/errors';
 interface SchedulerSession {
   taskId?: string;
@@ -41,8 +42,9 @@ function schedulerDetail(error: unknown): unknown {
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { createContracts } = require('@ednova/shared/domainContracts');
 import Joi from 'joi';
-import mongoose from 'mongoose';
 import { StudyPlan, Task, Course } from '../models';
+import { CalendarEntry } from '../models/CalendarEntry';
+import AiJob from '../../../ai-orchestrator/src/models/AiJob';
 import { getWeakCompetenciesForCourse } from '../services/competencyQueries';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { tierGate } = require('@ednova/shared/tierGate');
@@ -50,13 +52,6 @@ const { tierGate } = require('@ednova/shared/tierGate');
 const { logger } = require('@ednova/shared');
 
 const router = createContracts();
-
-// Ensure indexes on the raw calendar collection (idempotent)
-mongoose.connection.once('open', () => {
-  const cal = mongoose.connection.collection('calendar');
-  cal.createIndex({ userId: 1, startTime: 1 }, { background: true }).catch(() => {});
-  cal.createIndex({ userId: 1, taskId: 1, source: 1 }, { background: true }).catch(() => {});
-});
 
 // Validation schemas
 const createPlanSchema = Joi.object({
@@ -175,13 +170,12 @@ router.post('/create-status', async (req: DomainRequest, res: Response) => {
       return res.status(400).json({ error: 'correlationId is required' });
     }
 
-    // Read the AiJob directly via the study service's mongoose connection
-    const aiJobsColl = mongoose.connection.collection<PlannerJob>('ai_jobs');
-    const job = await aiJobsColl.findOne({
+    // Read the orchestrator-owned AiJob through its model.
+    const job = (await AiJob.findOne({
       correlationId,
       userId: req.user!.userId,
       type: 'study.plan.generate'
-    });
+    })) as unknown as PlannerJob | null;
 
     if (
       !job ||
@@ -276,7 +270,7 @@ router.get('/', async (req: DomainRequest, res: Response) => {
     const userId = req.user!.userId;
     const { status, courseId } = req.query;
 
-    const filter: FilterQuery<IStudyPlan> = { userId };
+    const filter: FilterQuery = { userId };
     if (status) filter.status = status;
     if (courseId) filter.courseId = courseId;
 
@@ -316,15 +310,10 @@ router.get('/calendar', async (req: DomainRequest, res: Response) => {
     const end = new Date(start);
     end.setDate(end.getDate() + weeks * 7);
 
-    const calendarColl = mongoose.connection.collection('calendar');
-
-    const entries = await calendarColl
-      .find({
-        userId,
-        startTime: { $gte: start, $lte: end }
-      })
-      .sort({ startTime: 1 })
-      .toArray();
+    const entries = await CalendarEntry.findMany({
+      userId,
+      startTime: { gte: start, lte: end }
+    });
 
     const authorized = [];
     for (const entry of entries) {
@@ -350,7 +339,7 @@ router.get('/:planId([0-9a-fA-F]{24})', async (req: DomainRequest, res: Response
     const userId = req.user!.userId;
     const { planId } = req.params;
 
-    const plan = await StudyPlan.findOne({ _id: planId, userId }).lean();
+    const plan = await StudyPlan.findOne({ _id: planId, userId });
 
     if (!plan || !(await canReadPlanSource(userId, plan))) {
       return res.status(404).json({ error: 'Study plan not found' });
@@ -428,7 +417,6 @@ router.post(
         const schedule = schedulerResponse.data.schedule;
 
         try {
-          const calendarColl = mongoose.connection.collection('calendar');
           const entries = (schedule.sessions || schedule || []).map((s: SchedulerSession) => ({
             userId,
             planId: plan._id.toString(),
@@ -448,7 +436,7 @@ router.post(
           }));
 
           if (entries.length > 0) {
-            await calendarColl.insertMany(entries);
+            await CalendarEntry.insertMany(entries);
           }
         } catch (saveErr) {
           logger.error('calendar_save_failed', { error: errorDetails(saveErr).message });
@@ -456,7 +444,7 @@ router.post(
 
         plan.status = 'scheduled';
         plan.scheduledAt = new Date();
-        await plan.save();
+        await StudyPlan.save(plan);
 
         res.json({
           message: 'Study plan scheduled successfully',
@@ -573,15 +561,12 @@ router.post(
         return res.status(400).json({ error: 'No tasks found to schedule' });
       }
 
-      const calendarColl = mongoose.connection.collection('calendar');
       const taskIdsToSchedule = tasks.map((t) => t._id.toString());
-      const existingScheduled = await calendarColl
-        .find({
-          userId,
-          taskId: { $in: taskIdsToSchedule },
-          source: 'auto'
-        })
-        .toArray();
+      const existingScheduled = await CalendarEntry.findMany({
+        userId,
+        taskId: { in: taskIdsToSchedule },
+        source: 'auto'
+      });
 
       if (existingScheduled.length > 0) {
         const scheduledTaskIds = new Set(existingScheduled.map((e) => e.taskId));
@@ -637,7 +622,7 @@ router.post(
           );
 
           if (calendarEntries.length > 0) {
-            await calendarColl.insertMany(calendarEntries);
+            await CalendarEntry.insertMany(calendarEntries);
           }
         } catch (saveErr) {
           logger.error('calendar_save_failed', { error: errorDetails(saveErr).message });

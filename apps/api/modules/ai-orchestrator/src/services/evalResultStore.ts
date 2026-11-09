@@ -6,10 +6,11 @@
  * double-counted. `listStepsForSession` returns the ordered per-step history a
  * backend can use to resume a session.
  *
- * This is the only writer to the eval_results collection — the Python agents
- * only publish ai.results events and never touch MongoDB.
+ * This is the only writer to the eval_results table — the Python agents only
+ * publish ai.results events and never touch the database.
  */
 
+import { Prisma } from '../../../../src/generated/prisma/client';
 import EvalResult from '../models/EvalResult';
 import { EvalResultRecord } from './evalResultBuilder';
 
@@ -26,17 +27,13 @@ export async function upsertByCorrelation(record: EvalResultRecord): Promise<str
     step: record.step,
     status: record.status,
     masteryScore: record.masteryScore,
-    scores: record.scores,
+    scores: record.scores as unknown as Prisma.InputJsonValue,
     nextQuestion: record.nextQuestion,
     demonstratedBloomLevel: record.demonstratedBloomLevel,
     objectiveId: record.objectiveId,
     targetBloomLevel: record.targetBloomLevel || null
   };
-  await EvalResult.updateOne(
-    { correlationId: record.correlationId },
-    { $setOnInsert: doc },
-    { upsert: true }
-  );
+  await EvalResult.upsertByCorrelation(doc);
   return doc.correlationId;
 }
 
@@ -45,7 +42,7 @@ export async function upsertByCorrelation(record: EvalResultRecord): Promise<str
  * @returns {Promise<Array>} step records ascending by step
  */
 export async function listStepsForSession(sessionId: string, userId: string) {
-  return EvalResult.find({ sessionId, userId }).sort({ step: 1 }).lean();
+  return EvalResult.findMany({ sessionId, userId }, { step: 'asc' });
 }
 
 export default { upsertByCorrelation, listStepsForSession };

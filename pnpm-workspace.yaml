@@ -5,6 +5,8 @@ packages:
   - apps/web
 
 allowBuilds:
+  '@prisma/engines': true
   esbuild: true
+  prisma: true
 
 nodeLinker: isolated

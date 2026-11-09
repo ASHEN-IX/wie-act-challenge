@@ -32,7 +32,7 @@ export async function getConversation(userId: string, id: string) {
     _id: id,
     userId,
     expiresAt: { $gt: new Date() }
-  }).lean();
+  });
   if (!record) throw new NardouchError(404, 'Conversation not found');
   if (!(await canReadCourse(userId, record.courseId)))
     throw new PublicationForbiddenError('Course access denied');
@@ -72,7 +72,7 @@ export async function submitTurn(userId: string, raw: unknown) {
   const revision = await CourseRevision.findOne({
     courseId: input.courseId,
     revisionTag: context.revisionId
-  }).lean();
+  });
   if (!revision) throw new NardouchError(503, 'Course materials are unavailable');
   const artifact = await verifyRevisionArtifact(revision);
   let record;
@@ -86,17 +86,15 @@ export async function submitTurn(userId: string, raw: unknown) {
       throw new NardouchError(409, 'Start a new conversation for these course materials');
   } else {
     if (input.expectedVersion !== 0) throw new NardouchError(409, 'Start a new conversation');
-    record = (
-      await Conversations.create({
-        userId,
-        courseId: input.courseId,
-        revisionId: context.revisionId,
-        contentHash: context.contentHash,
-        mode: input.mode,
-        language: input.language,
-        expiresAt: retention()
-      })
-    ).toObject();
+    record = await Conversations.create({
+      userId,
+      courseId: input.courseId,
+      revisionId: context.revisionId,
+      contentHash: context.contentHash,
+      mode: input.mode,
+      language: input.language,
+      expiresAt: retention()
+    });
   }
   if (record.messages.length >= 80)
     throw new NardouchError(409, 'Start a new conversation to continue');
@@ -110,7 +108,7 @@ export async function submitTurn(userId: string, raw: unknown) {
     },
     { $set: { lockToken, lockedUntil: new Date(Date.now() + 90_000) } },
     { new: true }
-  ).lean();
+  );
   if (!locked)
     throw new NardouchError(409, 'Conversation changed or is busy. Reload it before retrying.');
   try {
@@ -174,7 +172,7 @@ export async function submitTurn(userId: string, raw: unknown) {
         $unset: { lockedUntil: 1, lockToken: 1 }
       },
       { new: true }
-    ).lean();
+    );
     if (!saved) throw new NardouchError(409, 'Conversation changed. Reload it before retrying.');
     return publicConversation(saved);
   } finally {

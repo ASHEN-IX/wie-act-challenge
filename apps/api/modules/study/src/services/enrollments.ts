@@ -1,5 +1,5 @@
-import type { FilterQuery } from 'mongoose';
-import type { ICourseInvitation } from '../models/CourseInvitation';
+/** Prisma-shaped filter: a plain object of column predicates. */
+type FilterQuery = Record<string, unknown>;
 import crypto from 'node:crypto';
 import {
   Course,
@@ -166,9 +166,10 @@ export async function issueCourseInvitation(
   );
   const expiresAt = new Date(Date.now() + hours * 3600 * 1000);
 
-  const rawToken = role === 'student'
-    ? Array.from({ length: 16 }, () => INVITATION_ALPHABET[crypto.randomInt(32)]).join('')
-    : crypto.randomBytes(32).toString('hex');
+  const rawToken =
+    role === 'student'
+      ? Array.from({ length: 16 }, () => INVITATION_ALPHABET[crypto.randomInt(32)]).join('')
+      : crypto.randomBytes(32).toString('hex');
   const tokenHash = sha256(rawToken);
 
   const invitation = await CourseInvitation.create({
@@ -219,7 +220,11 @@ export async function acceptCourseInvitation(userId: string, rawToken: string, e
   });
 }
 
-export async function acceptAddressedCourseInvitation(userId: string, email: string | undefined, invitationId: unknown) {
+export async function acceptAddressedCourseInvitation(
+  userId: string,
+  email: string | undefined,
+  invitationId: unknown
+) {
   if (!email || typeof invitationId !== 'string' || !OBJECT_ID.test(invitationId)) {
     throw new EnrollmentError(404, 'Invitation not found or invalid');
   }
@@ -239,10 +244,16 @@ export async function listAddressedCourseInvitations(email?: string) {
     expiresAt: { $gt: new Date() }
   };
   const [rows, pendingCount] = await Promise.all([
-    CourseInvitation.find(filter).select('courseId expiresAt').sort({ createdAt: -1 }).limit(50).lean(),
+    CourseInvitation.find(filter)
+      .select('courseId expiresAt')
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean(),
     CourseInvitation.countDocuments(filter)
   ]);
-  const courses = await Course.find({ _id: { $in: rows.map((row) => row.courseId) } }).select('title').lean();
+  const courses = await Course.find({ _id: { $in: rows.map((row) => row.courseId) } })
+    .select('title')
+    .lean();
   const titles = new Map(courses.map((course) => [course._id.toString(), course.title]));
   const invitations = rows.flatMap((row) => {
     const title = titles.get(row.courseId.toString());
@@ -251,7 +262,7 @@ export async function listAddressedCourseInvitations(email?: string) {
   return { invitations, pendingCount };
 }
 
-async function claimCourseInvitation(userId: string, selector: FilterQuery<ICourseInvitation>) {
+async function claimCourseInvitation(userId: string, selector: FilterQuery) {
   const now = new Date();
   const claimed = await CourseInvitation.findOneAndUpdate(
     {
@@ -352,9 +363,10 @@ async function claimCourseInvitation(userId: string, selector: FilterQuery<ICour
     { upsert: true, new: true }
   );
 
+  if (!enrollment) throw new EnrollmentError(503, 'Enrollment could not be persisted');
   return {
-    courseId: claimed.courseId.toString(),
-    enrollmentId: enrollment._id.toString(),
+    courseId: String(claimed.courseId),
+    enrollmentId: enrollment._id,
     status: enrollment.status
   };
 }
@@ -411,10 +423,11 @@ export async function enrollStudentDirectly(
     { upsert: true, new: true }
   );
 
+  if (!enrollment) throw new EnrollmentError(503, 'Enrollment could not be persisted');
   return {
-    courseId: course._id.toString(),
+    courseId: course._id,
     userId: studentUserId,
-    enrollmentId: enrollment._id.toString(),
+    enrollmentId: enrollment._id,
     status: enrollment.status
   };
 }
@@ -446,7 +459,7 @@ export async function withdrawOrRevokeEnrollment(
   const newStatus: CourseEnrollmentStatus = isSelf ? 'dropped' : 'revoked';
   enrollment.status = newStatus;
   enrollment.revokedAt = new Date();
-  await enrollment.save();
+  await CourseEnrollment.save(enrollment);
 
   return {
     courseId,

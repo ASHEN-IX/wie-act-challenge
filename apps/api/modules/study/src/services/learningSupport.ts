@@ -1,37 +1,38 @@
 /** Requester-only source scaffolding. Never returns server rubrics or answer keys. */
-import mongoose, { Schema, type Model } from 'mongoose';
 import { resolveStoredActivity, ActivityBoundaryError } from './activityResolution';
 import { verifyRevisionArtifact } from './revisionSources';
 import { canReadCourse } from './resourceAccess';
 import { PublicationForbiddenError } from './coursePublication';
 import { assessConfusion } from './confusionSignals';
-import { StudentAttempt } from '../models/StudentAttempt';
+import { prisma } from '../../../../shared/database';
+import { table } from '../models/_table';
 import { learningStyleCue } from './learningStyle';
-interface SupportState {
+export interface SupportState {
+  id: string;
+  _id: string;
   userId: string;
   courseId: string;
   revisionId: string;
   activityId: string;
   activityRevision: string;
   hintLevel: number;
+  createdAt: Date;
+  updatedAt: Date;
 }
-const schema = new Schema<SupportState>(
-  {
-    userId: { type: String, required: true },
-    courseId: { type: String, required: true },
-    revisionId: { type: String, required: true },
-    activityId: { type: String, required: true },
-    activityRevision: { type: String, required: true },
-    hintLevel: { type: Number, default: 0 }
-  },
-  { timestamps: true }
-);
-schema.index(
-  { userId: 1, courseId: 1, revisionId: 1, activityId: 1, activityRevision: 1 },
-  { unique: true }
-);
-const Support: Model<SupportState> =
-  mongoose.models.LearningSupport || mongoose.model<SupportState>('LearningSupport', schema);
+
+const Support = table<SupportState>({
+  delegate: () => prisma.learningSupport,
+  defaults: () => ({ hintLevel: 0 }),
+  columns: (row) => ({
+    userId: row.userId,
+    courseId: row.courseId,
+    revisionId: row.revisionId,
+    activityId: row.activityId,
+    activityRevision: row.activityRevision,
+    hintLevel: row.hintLevel
+  })
+});
+
 /** Trim at a word boundary so a hint never ends mid-word. */
 function excerpt(text: string, max: number): string {
   if (text.length <= max) return text;
@@ -82,16 +83,10 @@ export async function sourceLearningSupport(
     activityId: definition.activityId,
     activityRevision: definition.activityRevision
   };
-  await Support.collection.createIndex(
-    { userId: 1, courseId: 1, revisionId: 1, activityId: 1, activityRevision: 1 },
-    { unique: true }
-  );
-  try {
-    await Support.updateOne(key, { $setOnInsert: { ...key, hintLevel: 0 } }, { upsert: true });
-  } catch (error) {
-    if ((error as { code?: number }).code !== 11000) throw error;
-  }
-  let state = await Support.findOne(key).lean();
+  // The unique (userId, courseId, revisionId, activityId, activityRevision)
+  // index makes this upsert idempotent; a concurrent insert converges on it.
+  await Support.findOneAndUpdate(key, { $setOnInsert: { ...key, hintLevel: 0 } }, { upsert: true });
+  let state = await Support.findOne(key);
   if (input.mode === 'explain' && (!state || Number(state.hintLevel) < 1))
     throw new ActivityBoundaryError(
       409,
@@ -101,15 +96,18 @@ export async function sourceLearningSupport(
   if (!(await canReadCourse(actor, courseId))) throw new PublicationForbiddenError();
   if (input.mode === 'hint') {
     await Support.updateOne({ ...key, hintLevel: { $lt: 2 } }, { $inc: { hintLevel: 1 } });
-    state = await Support.findOne(key).lean();
+    state = await Support.findOne(key);
   }
   if (!(await canReadCourse(actor, courseId))) throw new PublicationForbiddenError();
   const hintLevel = Number(state?.hintLevel || 1);
-  const wrongAttempts = await StudentAttempt.countDocuments({
-    userId: actor,
-    courseId,
-    activityId: definition.activityId,
-    'assessmentResult.isCorrect': false
+  // `assessmentResult` is JSON: filter the nested flag through a JSON path.
+  const wrongAttempts = await prisma.studentAttempt.count({
+    where: {
+      userId: actor,
+      courseId,
+      activityId: definition.activityId,
+      assessmentResult: { path: ['isCorrect'], equals: false }
+    }
   });
   // Private, provisional phrasing cue from the learner's own probe (hints only).
   const styleCue = input.mode === 'hint' ? await learningStyleCue(actor) : null;
@@ -121,8 +119,8 @@ export async function sourceLearningSupport(
     // Reasons only: no grades, rubrics or evidence. Tentative by design.
     confusion: assessConfusion({ wrongAttempts, hintLevel }),
     executionMode: 'DETERMINISTIC_FALLBACK',
-    text: (
-      input.mode === 'explain'
+    text:
+      (input.mode === 'explain'
         ? 'Source explanation: compare each part of your answer with this reviewed passage. This is source scaffolding, not a new verified correction.\n' +
           passage.text
         : hintLevel === 1

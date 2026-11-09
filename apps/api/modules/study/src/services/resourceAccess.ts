@@ -8,23 +8,21 @@ export type CourseAccessRole = 'owner' | 'instructor' | 'admin' | 'student';
  */
 async function courseGrant(userId: string, courseId: unknown) {
   if (!userId || typeof courseId !== 'string' || !/^[a-f\d]{24}$/i.test(courseId)) return null;
-  const course = await Course.findById(courseId)
-    .select(
-      'scope visibility userId ownerUserId institutionId assignedInstructorIds activeRevisionId'
-    )
-    .lean();
+  const course = await Course.findById(courseId).select(
+    'scope visibility userId ownerUserId institutionId assignedInstructorIds activeRevisionId'
+  );
   if (!course) return null;
   return (await memberGrant(userId, courseId, course)) || (await publicGrant(course));
 }
 
 interface GrantCourse {
-  scope?: string;
-  visibility?: string;
-  userId?: string;
-  ownerUserId?: string;
-  institutionId?: unknown;
-  assignedInstructorIds?: string[];
-  activeRevisionId?: string;
+  scope?: string | null;
+  visibility?: string | null;
+  userId?: string | null;
+  ownerUserId?: string | null;
+  institutionId?: string | null;
+  assignedInstructorIds?: string[] | null;
+  activeRevisionId?: string | null;
 }
 
 /** Anyone signed in may read a course its publisher made public, but only once it is
@@ -108,16 +106,14 @@ export async function canManageEnrollments(userId: string, courseId: unknown): P
 /** Materialized task/plan content inherits its current source grant. Legacy
  * plans with no source provenance cannot be upgraded into a sharing grant. */
 export async function canReadPlanContext(userId: string, planId: string): Promise<boolean> {
-  const plan = await StudyPlan.findOne({ _id: planId, userId })
-    .select('courseId resourceScope')
-    .lean();
+  const plan = await StudyPlan.findOne({ _id: planId, userId }).select('courseId resourceScope');
   if (!plan) return false;
   return canReadPlanSource(userId, plan);
 }
 
 export async function canReadPlanSource(
   userId: string,
-  plan: { courseId?: string; resourceScope?: { courseId?: string } }
+  plan: { courseId?: string | null; resourceScope?: { courseId?: string } | null }
 ): Promise<boolean> {
   const courseId = plan.courseId || plan.resourceScope?.courseId;
   return courseId ? canReadCourse(userId, courseId) : !!plan.resourceScope;

@@ -16,7 +16,7 @@ const {
 const { authenticate } = require('@ednova/shared/auth');
 
 // --- Environment validation (fail-fast on missing secrets) ---
-requireEnv(['MONGODB_URI'], { serviceName: 'analytics' });
+requireEnv(['DATABASE_URL'], { serviceName: 'analytics' });
 
 const app: Application = express();
 app.set('trust proxy', 1);

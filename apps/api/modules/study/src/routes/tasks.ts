@@ -1,6 +1,6 @@
 import { canReadPlanContext } from '../services/resourceAccess';
-import type { FilterQuery } from 'mongoose';
-import type { ITask } from '../models';
+/** Prisma-shaped filter: a plain object of column predicates. */
+type FilterQuery = Record<string, unknown>;
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response } from 'express';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -45,7 +45,7 @@ router.get(
     const userId = req.user!.userId;
     const { status, priority, topicId } = req.query;
 
-    const filter: FilterQuery<ITask> = { userId };
+    const filter: FilterQuery = { userId };
     if (status) filter.status = status;
     if (priority) filter.priority = priority;
     if (topicId) filter.topicId = topicId;
@@ -125,7 +125,7 @@ router.put(
       task.completedAt = new Date();
     }
 
-    await task.save();
+    await Task.save(task);
 
     // Auto-award XP on task completion
     if (req.body.status === 'completed' && !wasCompleted) {

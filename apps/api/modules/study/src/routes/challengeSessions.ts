@@ -143,7 +143,7 @@ router.put('/challenge/:sessionId/complete', async (req: DomainRequest, res: Res
       session.duration = Math.max(1, Math.round(diffMs / 60000));
     }
 
-    await session.save();
+    await StudySession.save(session);
 
     const completionRewards = completedSuccessfully
       ? await processSessionCompletionRewards({

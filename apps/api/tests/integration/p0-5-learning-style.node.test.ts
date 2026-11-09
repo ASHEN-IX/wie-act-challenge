@@ -1,9 +1,9 @@
 /**
- * P0-5 — private, provisional learning-style profile against real MongoDB.
+ * P0-5 — private, provisional learning-style profile against real PostgreSQL.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import mongoose from 'mongoose';
+import { connectDatabase, disconnectDatabase, prisma } from '../../shared/database';
 import {
   getLearningStyle,
   learningStyleCue,
@@ -19,12 +19,17 @@ const answersWith = (optionId: string) =>
   Object.fromEntries(LEARNING_STYLE_PROBE.map((q) => [q.id, optionId]));
 
 test('P0-5 learning style: private provisional profile saved, read and used for hint cues', async (t) => {
-  await mongoose.connect(
-    'mongodb://127.0.0.1:27018/ednova_learning_style_' + process.pid + '_' + Date.now()
-  );
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
+  await connectDatabase();
   t.after(async () => {
-    await mongoose.connection.dropDatabase();
-    await mongoose.disconnect();
+    try {
+      await prisma.learningStyleProfile.deleteMany({
+        where: { userId: { startsWith: 'style_learner' } }
+      });
+    } finally {
+      await disconnectDatabase().catch(() => {});
+    }
   });
 
   const learner = 'style_learner';
@@ -45,15 +50,12 @@ test('P0-5 learning style: private provisional profile saved, read and used for 
   const retake = await saveLearningStyle(learner, answersWith('b'));
   assert.equal(retake.primary, 'analogy');
   assert.equal(await learningStyleCue(learner), STYLE_CUES.analogy);
-  const documents = await mongoose.connection
-    .collection('learningstyleprofiles')
-    .countDocuments({ userId: learner });
+  const documents = await prisma.learningStyleProfile.count({
+    where: { userId: learner }
+  });
   assert.equal(documents, 1);
 
   // Incomplete or unknown answers never create or change a profile.
-  await assert.rejects(
-    () => saveLearningStyle(learner, { q1: 'a' }),
-    LearningStyleValidationError
-  );
+  await assert.rejects(() => saveLearningStyle(learner, { q1: 'a' }), LearningStyleValidationError);
   assert.equal((await getLearningStyle(learner))?.primary, 'analogy');
 });

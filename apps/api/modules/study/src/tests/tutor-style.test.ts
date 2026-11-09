@@ -1,7 +1,7 @@
 const findOne = jest.fn();
-jest.mock('mongoose', () => ({
+jest.mock('../../../user-profile/src/models/UserProfile', () => ({
   __esModule: true,
-  default: { connection: { collection: () => ({ findOne }) } }
+  default: { findOne }
 }));
 jest.mock('../models', () => ({ CourseRevision: {} }));
 jest.mock('../services/revisionSources', () => ({ verifyRevisionArtifact: jest.fn() }));

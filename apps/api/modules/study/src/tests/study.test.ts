@@ -7,7 +7,8 @@ import type { Response, NextFunction } from 'express';
 import express from 'express';
 
 process.env.JWT_SECRET = 'test-secret-key';
-process.env.MONGODB_URI = 'mongodb://localhost:27017/test_ednova';
+process.env.DATABASE_URL =
+  process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
 process.env.NODE_ENV = 'test';
 
 // Prevent process.exit() from killing tests
@@ -15,6 +16,18 @@ const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => 
   throw new Error(`Unexpected process.exit(${code})`);
 });
 afterAll(() => exitSpy.mockRestore());
+
+/** A cursor that resolves to `rows` and tolerates the `.lean()` chain. */
+const asCursor = (rows: unknown[]) => {
+  const promise = Promise.resolve(rows);
+  return {
+    lean: () => promise,
+    exec: () => promise,
+    then: promise.then.bind(promise),
+    catch: promise.catch.bind(promise),
+    finally: promise.finally.bind(promise)
+  };
+};
 
 // ── Mock Models ──────────────────────────────────
 const mockCourse = {
@@ -50,7 +63,11 @@ jest.mock('../models/index', () => ({
     find: jest.fn().mockReturnValue({ distinct: jest.fn().mockResolvedValue([]) })
   },
   PublicCourseJoin: {
-    find: jest.fn().mockReturnValue({ select: () => ({ lean: async () => [] }) })
+    find: jest.fn().mockReturnValue({ select: async () => [] })
+  },
+  Institution: {
+    find: jest.fn().mockReturnValue({ select: async () => [] }),
+    exists: jest.fn().mockResolvedValue(false)
   },
   Course: {
     exists: jest.fn().mockResolvedValue({ _id: '64a000000000000000000001' }),
@@ -77,9 +94,8 @@ jest.mock('../models/index', () => ({
   Topic: {},
   Subject: {},
   LearningObjective: {
-    find: jest.fn().mockReturnValue({
-      select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) })
-    }),
+    find: jest.fn().mockReturnValue({ select: async () => [] }),
+    findOneAndUpdate: jest.fn().mockResolvedValue({ id: 'obj-1' }),
     updateMany: jest.fn().mockResolvedValue({ modifiedCount: 0 }),
     deleteMany: jest.fn().mockResolvedValue({ deletedCount: 0 })
   }
@@ -204,9 +220,11 @@ describe('POST /api/v1/study/learning-objectives (route)', () => {
 describe('Study Service', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // The converted models return the row directly; `select()` stays chainable
+    // but no longer needs `.lean()`.
     Course.findById.mockImplementation(() =>
       Object.assign(Promise.resolve(mockCourse), {
-        select: () => ({ lean: async () => mockCourse })
+        select: () => Promise.resolve(mockCourse)
       })
     );
   });
@@ -215,10 +233,9 @@ describe('Study Service', () => {
   describe('Courses', () => {
     describe('GET /api/v1/study/courses', () => {
       it('should return user courses', async () => {
+        // The model returns a cursor: awaitable, and chainable with .lean().
         Course.find.mockReturnValue({
-          sort: jest.fn().mockReturnValue({
-            lean: jest.fn().mockResolvedValue([mockCourse])
-          })
+          sort: jest.fn().mockReturnValue(asCursor([mockCourse]))
         });
 
         const res = await request(app).get('/api/v1/study/courses');
@@ -258,9 +275,7 @@ describe('Study Service', () => {
     describe('GET /api/v1/study/plans', () => {
       it('should return user study plans', async () => {
         StudyPlan.find.mockReturnValue({
-          sort: jest.fn().mockReturnValue({
-            lean: jest.fn().mockResolvedValue([mockPlan])
-          })
+          sort: jest.fn().mockReturnValue(asCursor([mockPlan]))
         });
 
         const res = await request(app).get('/api/v1/study/plans');
@@ -270,10 +285,7 @@ describe('Study Service', () => {
 
     describe('GET /api/v1/study/plans/:id', () => {
       it('should return a specific plan', async () => {
-        StudyPlan.findOne.mockReturnValue({
-          select: jest.fn().mockReturnThis(),
-          lean: jest.fn().mockResolvedValue(mockPlan)
-        });
+        StudyPlan.findOne.mockResolvedValue(mockPlan);
         Task.find.mockReturnValue({
           lean: jest.fn().mockResolvedValue([])
         });
@@ -283,10 +295,7 @@ describe('Study Service', () => {
       });
 
       it('should return 404 for missing plan', async () => {
-        StudyPlan.findOne.mockReturnValue({
-          select: jest.fn().mockReturnThis(),
-          lean: jest.fn().mockResolvedValue(null)
-        });
+        StudyPlan.findOne.mockResolvedValue(null);
 
         const res = await request(app).get('/api/v1/study/plans/507f1f77bcf86cd799439012');
         expect(res.status).toBe(404);

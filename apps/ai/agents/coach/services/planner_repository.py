@@ -5,7 +5,11 @@ from agents.coach.models.schemas import ScheduledTask
 MONGO_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
 DB_NAME = os.getenv("DB_NAME", "ednova")
 TASK_SCHEDULING_COLLECTION = os.getenv("TASK_SCHEDULING_COLLECTION", "task_scheduling")
-STUDY_PLAN_COLLECTION = os.getenv("STUDY_PLAN_COLLECTION", "study_plans")
+# The study plan lives in the API's PostgreSQL `studyplans` table now. This
+# reader cannot join across engines, so it yields no scheduled tasks and the
+# coach falls back to the plan text it already has. Point it at a served
+# endpoint before relying on task-level scheduling here.
+STUDY_PLAN_COLLECTION = os.getenv("STUDY_PLAN_COLLECTION", "studyplans")
 
 
 class PlannerRepository:
@@ -27,7 +31,7 @@ class PlannerRepository:
             if not study_plan_id:
                 return self._get_mock_tasks()
 
-            # Fetch the study plan to get task details
+            # Study plans moved to PostgreSQL; the collection is no longer written.
             study_plan = self.study_plan_collection.find_one({"_id": study_plan_id})
             if not study_plan:
                 return self._get_mock_tasks()

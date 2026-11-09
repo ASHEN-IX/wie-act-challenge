@@ -36,15 +36,13 @@ beforeEach(() => {
   // The learner reaches the hierarchy through enrolled courses, not ownership.
   CourseEnrollment.find.mockReturnValue({ distinct: jest.fn().mockResolvedValue(['course-1']) });
   CourseRevision.find.mockReturnValue({
-    select: jest.fn().mockReturnThis(),
-    lean: jest.fn().mockResolvedValue([])
+    select: jest.fn().mockResolvedValue([])
   });
 });
 
 function courseQueryResult(doc: typeof courseDoc) {
   return {
-    select: jest.fn().mockReturnThis(),
-    lean: jest.fn().mockResolvedValue([doc])
+    select: jest.fn().mockResolvedValue([doc])
   };
 }
 
@@ -52,8 +50,7 @@ describe('getWeakCompetenciesForCourse', () => {
   test('returns [] when the course is not reachable', async () => {
     CourseEnrollment.find.mockReturnValue({ distinct: jest.fn().mockResolvedValue([]) });
     Course.find.mockReturnValue({
-      select: jest.fn().mockReturnThis(),
-      lean: jest.fn().mockResolvedValue([])
+      select: jest.fn().mockResolvedValue([])
     });
     const out = await getWeakCompetenciesForCourse('user-123', 'course-x');
     expect(out).toEqual([]);
@@ -61,14 +58,12 @@ describe('getWeakCompetenciesForCourse', () => {
 
   test('computes scores, progression-gated unlocked levels and current level', async () => {
     Course.find.mockReturnValue(courseQueryResult(courseDoc));
-    CompetencyProfile.find.mockReturnValue({
-      lean: jest.fn().mockResolvedValue([
-        // Sorting: remember strong, understand strong, apply weak
-        { topicId: 'sorting', bloomLevel: 'REMEMBER', score: 0.9 },
-        { topicId: 'sorting', bloomLevel: 'UNDERSTAND', score: 0.8 },
-        { topicId: 'sorting', bloomLevel: 'APPLY', score: 0.4 }
-      ])
-    });
+    CompetencyProfile.find.mockResolvedValue([
+      // Sorting: remember strong, understand strong, apply weak
+      { topicId: 'sorting', bloomLevel: 'REMEMBER', score: 0.9 },
+      { topicId: 'sorting', bloomLevel: 'UNDERSTAND', score: 0.8 },
+      { topicId: 'sorting', bloomLevel: 'APPLY', score: 0.4 }
+    ]);
 
     const out = await getWeakCompetenciesForCourse('user-123', 'course-1');
     expect(CourseEnrollment.find).toHaveBeenCalledWith({ userId: 'user-123', status: 'active' });
@@ -84,14 +79,12 @@ describe('getWeakCompetenciesForCourse', () => {
 
   test('normalizes British ANALYSE and uppercase levels to lowercase keys', async () => {
     Course.find.mockReturnValue(courseQueryResult(courseDoc));
-    CompetencyProfile.find.mockReturnValue({
-      lean: jest.fn().mockResolvedValue([
-        { topicId: 'sorting', bloomLevel: 'REMEMBER', score: 0.9 },
-        { topicId: 'sorting', bloomLevel: 'UNDERSTAND', score: 0.8 },
-        { topicId: 'sorting', bloomLevel: 'APPLY', score: 0.7 },
-        { topicId: 'sorting', bloomLevel: 'ANALYSE', score: 0.3 }
-      ])
-    });
+    CompetencyProfile.find.mockResolvedValue([
+      { topicId: 'sorting', bloomLevel: 'REMEMBER', score: 0.9 },
+      { topicId: 'sorting', bloomLevel: 'UNDERSTAND', score: 0.8 },
+      { topicId: 'sorting', bloomLevel: 'APPLY', score: 0.7 },
+      { topicId: 'sorting', bloomLevel: 'ANALYSE', score: 0.3 }
+    ]);
     const out = await getWeakCompetenciesForCourse('user-123', 'course-1');
     const sorting = out.find((w) => w.topic_id === 'sorting');
     assert.ok(sorting);
@@ -102,14 +95,12 @@ describe('getWeakCompetenciesForCourse', () => {
 
   test('ranks weakest-first and respects limit', async () => {
     Course.find.mockReturnValue(courseQueryResult(courseDoc));
-    CompetencyProfile.find.mockReturnValue({
-      lean: jest.fn().mockResolvedValue([
-        { topicId: 'arrays', bloomLevel: 'REMEMBER', score: 0.5 },
-        { topicId: 'graphs', bloomLevel: 'REMEMBER', score: 0.9 },
-        { topicId: 'graphs', bloomLevel: 'UNDERSTAND', score: 0.8 },
-        { topicId: 'sorting', bloomLevel: 'REMEMBER', score: 0.7 }
-      ])
-    });
+    CompetencyProfile.find.mockResolvedValue([
+      { topicId: 'arrays', bloomLevel: 'REMEMBER', score: 0.5 },
+      { topicId: 'graphs', bloomLevel: 'REMEMBER', score: 0.9 },
+      { topicId: 'graphs', bloomLevel: 'UNDERSTAND', score: 0.8 },
+      { topicId: 'sorting', bloomLevel: 'REMEMBER', score: 0.7 }
+    ]);
     // limit 2 of 3 topics
     const out = await getWeakCompetenciesForCourse('user-123', 'course-1', 2);
     expect(out).toHaveLength(2);
@@ -121,12 +112,10 @@ describe('getWeakCompetenciesForCourse', () => {
 
   test('a topic with no competency rows is not-started and ranks weakest', async () => {
     Course.find.mockReturnValue(courseQueryResult(courseDoc));
-    CompetencyProfile.find.mockReturnValue({
-      lean: jest.fn().mockResolvedValue([
-        { topicId: 'sorting', bloomLevel: 'REMEMBER', score: 0.9 },
-        { topicId: 'sorting', bloomLevel: 'UNDERSTAND', score: 0.8 }
-      ])
-    });
+    CompetencyProfile.find.mockResolvedValue([
+      { topicId: 'sorting', bloomLevel: 'REMEMBER', score: 0.9 },
+      { topicId: 'sorting', bloomLevel: 'UNDERSTAND', score: 0.8 }
+    ]);
     const out = await getWeakCompetenciesForCourse('user-123', 'course-1', 10);
     const sorting = out.find((w) => w.topic_id === 'sorting');
     assert.ok(sorting);

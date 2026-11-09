@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MongoClient, ObjectId } from 'mongodb';
 import bcrypt from 'bcryptjs';
 import WebSocket from 'ws';
-import { migrateAuth } from '../../scripts/migrate-auth';
+import { connectDatabase, disconnectDatabase, prisma } from '../../shared/database';
+import { newId } from '../../shared/ids';
+import { Course, StudyRoom } from '../../modules/study/src/models';
+import SessionChat from '../../modules/notification/src/models/SessionChat';
 
 interface RoomResponse {
   roomId: string;
@@ -19,10 +21,9 @@ interface RoomEvent {
   participants: Array<Record<string, unknown>>;
 }
 
-test('ED-07 real Nest/Mongo authorization regressions', { timeout: 60000 }, async (t) => {
-  // Always create and delete only this run's synthetic database.
-  const name = `ed07_security_test_${process.pid}_${Date.now()}`;
-  process.env.MONGODB_URI = `mongodb://127.0.0.1:27018/${name}`;
+test('ED-07 real Nest/PostgreSQL authorization regressions', { timeout: 60000 }, async (t) => {
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
   process.env.BETTER_AUTH_SECRET = 'isolated-ed07-security-secret-at-least-32-characters';
   process.env.AUTH_TRUSTED_ORIGINS = 'http://localhost:5173';
   process.env.BETTER_AUTH_URL = 'http://localhost:5173';
@@ -30,36 +31,62 @@ test('ED-07 real Nest/Mongo authorization regressions', { timeout: 60000 }, asyn
   process.env.RABBITMQ_URL = 'amqp://localhost:5672';
   process.env.REDIS_URL = '';
   process.env.NODE_ENV = 'test';
-  const client = new MongoClient(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 5000 });
-  await client.connect();
-  const db = client.db();
+  await connectDatabase();
   const cleanups: Array<() => Promise<void>> = [];
   const sockets: WebSocket[] = [];
+  const password = await bcrypt.hash('Synthetic!123', 12);
+  // This suite shares one migrated database; keep run-unique identities.
+  const run = `${process.pid}_${Date.now()}`;
+  const actors = ['Host', 'Peer', 'Outsider'].map((name) => ({
+    id: newId(),
+    name,
+    email: `${name.toLowerCase()}_${run}@ed07.test`,
+    cookie: ''
+  }));
+  const courseIds: string[] = [];
   t.after(async () => {
     for (const socket of sockets) socket.terminate();
     for (const cleanup of cleanups) await cleanup();
-    await db.dropDatabase();
-    await client.close();
+    await StudyRoom.deleteMany({ hostUserId: { $in: actors.map((actor) => actor.id) } });
+    await SessionChat.deleteOne({ content: 'room-only text' });
+    if (courseIds.length) await Course.deleteMany({ _id: { $in: courseIds } });
+    const ids = actors.map((actor) => actor.id);
+    await prisma.authSession.deleteMany({ where: { userId: { in: ids } } });
+    await prisma.authAccount.deleteMany({ where: { userId: { in: ids } } });
+    await prisma.authUser.deleteMany({ where: { id: { in: ids } } });
+    await prisma.user.deleteMany({ where: { id: { in: ids } } });
+    await prisma.authRateLimit.deleteMany({});
+    await disconnectDatabase().catch(() => {});
   });
-  const password = await bcrypt.hash('Synthetic!123', 12);
-  const actors = ['Host', 'Peer', 'Outsider'].map((name) => ({
-    id: new ObjectId(),
-    name,
-    email: `${name.toLowerCase()}@ed07.test`,
-    cookie: ''
-  }));
-  for (const actor of actors)
-    await db.collection('users').insertOne({
-      _id: actor.id,
-      email: actor.email,
-      name: actor.name,
-      password,
-      isVerified: true,
-      isActive: true,
-      role: 'student',
-      tier: 'standard'
+  await prisma.authRateLimit.deleteMany({});
+  for (const actor of actors) {
+    await prisma.user.create({
+      data: {
+        id: actor.id,
+        email: actor.email,
+        name: actor.name,
+        password,
+        isVerified: true,
+        isActive: true,
+        role: 'student',
+        tier: 'normal',
+        notificationPreferences: {},
+        onboardingDraft: {}
+      }
     });
-  await migrateAuth(db, { apply: true });
+    await prisma.authUser.create({
+      data: { id: actor.id, email: actor.email, name: actor.name, emailVerified: true }
+    });
+    await prisma.authAccount.create({
+      data: {
+        id: newId(),
+        accountId: actor.id,
+        providerId: 'credential',
+        userId: actor.id,
+        password
+      }
+    });
+  }
   const { getAuth } = await import('../../shared/betterAuth.js');
   const auth = await getAuth();
   for (const actor of actors) {
@@ -107,7 +134,7 @@ test('ED-07 real Nest/Mongo authorization regressions', { timeout: 60000 }, asyn
     );
   }
   async function snapshot(id: string) {
-    return db.collection('study_rooms').findOne({ roomId: id });
+    return StudyRoom.findOne({ roomId: id });
   }
   async function connect(id: string, actor: typeof host, queryOnly = false) {
     const received: RoomEvent[] = [];
@@ -195,20 +222,19 @@ test('ED-07 real Nest/Mongo authorization regressions', { timeout: 60000 }, asyn
     assert.equal(
       (
         await request(host, path('room_missing', '/presenter'), 'PUT', {
-          presenterUserId: peer.id.toString()
+          presenterUserId: peer.id
         })
       ).status,
       404
     );
     assert.equal((await snapshot(id))!.seq, before!.seq);
-    assert.equal((await snapshot(id))!.presenterUserId, host.id.toString());
+    assert.equal((await snapshot(id))!.presenterUserId, host.id);
   });
   await t.test('after handoff only the active presenter controls the shared view', async () => {
     const id = await create();
     await join(id);
     assert.equal(
-      (await request(host, path(id, '/presenter'), 'PUT', { presenterUserId: peer.id.toString() }))
-        .status,
+      (await request(host, path(id, '/presenter'), 'PUT', { presenterUserId: peer.id })).status,
       200
     );
     assert.equal(
@@ -233,25 +259,27 @@ test('ED-07 real Nest/Mongo authorization regressions', { timeout: 60000 }, asyn
     assert.ok(!list.body.rooms.some((r) => r.roomId === id));
   });
   await t.test('completed ingestion is not a course enrollment grant', async () => {
-    const courseId = new ObjectId();
-    await db.collection('courses').insertOne({
-      _id: courseId,
-      userId: host.id.toString(),
+    const courseId = newId();
+    courseIds.push(courseId);
+    await Course.create({
+      id: courseId,
+      userId: host.id,
       title: 'Private',
+      subjectId: 'synthetic',
       status: 'completed'
     });
-    const response = await request(outsider, '/api/v1/study/rooms', 'POST', {
-      courseId: courseId.toString()
-    });
+    const response = await request(outsider, '/api/v1/study/rooms', 'POST', { courseId });
     assert.equal(response.status, 403);
-    assert.equal(
-      await db.collection('study_rooms').countDocuments({ courseId: courseId.toString() }),
-      0
-    );
+    assert.equal(await StudyRoom.countDocuments({ courseId }), 0);
   });
   await t.test('no cross-room history disclosure through notification HTTP', async () => {
     const id = await create();
-    await db.collection('sessionchats').insertOne({ sessionId: id, content: 'room-only text' });
+    await SessionChat.create({
+      sessionId: id,
+      userId: host.id,
+      messageType: 'query',
+      content: 'room-only text'
+    });
     assert.equal((await request(outsider, `/api/v1/session-chat/${id}/history`)).status, 403);
   });
   await t.test(
@@ -311,16 +339,14 @@ test('ED-07 real Nest/Mongo authorization regressions', { timeout: 60000 }, asyn
   await t.test(
     'source-free rooms reject revision pins without an authorized published course context',
     async () => {
-      const countBefore = await db.collection('study_rooms').countDocuments({});
+      const countBefore = await StudyRoom.countDocuments({});
       const response = await request(host, '/api/v1/study/rooms', 'POST', {
         revisionId: 'forged_revision'
       });
       assert.equal(response.status, 403);
-      assert.equal(await db.collection('study_rooms').countDocuments({}), countBefore);
+      assert.equal(await StudyRoom.countDocuments({}), countBefore);
       const id = await create();
-      await db
-        .collection('study_rooms')
-        .updateOne({ roomId: id }, { $set: { revisionId: 'unverifiable' } });
+      await StudyRoom.updateOne({ roomId: id }, { revisionId: 'unverifiable' });
       assert.equal((await request(host, path(id))).status, 403);
       assert.equal(
         (await request(peer, '/api/v1/study/rooms/join', 'POST', { roomId: id })).status,
@@ -332,22 +358,20 @@ test('ED-07 real Nest/Mongo authorization regressions', { timeout: 60000 }, asyn
     'course authorization is rechecked before HTTP reads and socket delivery',
     async () => {
       const id = await create();
-      const courseId = new ObjectId();
-      await db.collection('courses').insertOne({
-        _id: courseId,
-        userId: host.id.toString(),
+      const courseId = newId();
+      courseIds.push(courseId);
+      await Course.create({
+        id: courseId,
+        userId: host.id,
         title: 'Private',
+        subjectId: 'synthetic',
         status: 'completed'
       });
-      await db
-        .collection('study_rooms')
-        .updateOne({ roomId: id }, { $set: { courseId: courseId.toString() } });
+      await StudyRoom.updateOne({ roomId: id }, { courseId });
       assert.equal((await request(host, path(id))).status, 200);
       const { socket, received } = await connect(id, host);
       await waitFor(() => received.some((m) => m.type === 'ROOM_STATE_SYNC'));
-      await db
-        .collection('courses')
-        .updateOne({ _id: courseId }, { $set: { userId: outsider.id.toString() } });
+      await Course.updateOne({ _id: courseId }, { userId: outsider.id });
       assert.equal((await request(host, path(id))).status, 403);
       received.length = 0;
       const { broadcastToSession } = await import('../../modules/notification/src/realtime.js');

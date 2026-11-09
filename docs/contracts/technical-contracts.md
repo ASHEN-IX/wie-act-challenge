@@ -45,7 +45,7 @@ All producers and consumers must validate payloads strictly against these schema
 * **Consumer**: Python `agents.course_ingestion` worker
 * **Transport**: RabbitMQ topic exchange `mindflow.jobs`, routing key `study.ingest.course`
 * **Idempotency**: Handled via `correlationId` and Redis lock `lease:ingest:{courseId}:{documentId}`.
-* **Failure Behavior**: Retryable errors re-queue via exponential backoff; terminal errors write failure status to MongoDB and route to DLQ `ai.dlq.study.ingest.course`.
+* **Failure Behavior**: Retryable errors re-queue via exponential backoff; terminal errors write failure status to PostgreSQL and route to DLQ `ai.dlq.study.ingest.course`.
 
 ### Schema & Payload (Node → Python)
 ```json
@@ -166,7 +166,7 @@ All producers and consumers must validate payloads strictly against these schema
 }
 ```
 
-`revisionId` is the immutable `revisionTag`, scoped by `courseId`; it is not the MongoDB `_id`. The public `PublishedContext` candidate excludes `vectorIndexRef`. The server-only `SourceResolution` carries the exact relative index artifact `faiss/<courseId>/<revisionId>.faiss`; the future metadata sidecar is `faiss/<courseId>/<revisionId>.meta.json`. The current Python adapter is still course-scoped and is not evidence that revision-aware retrieval is implemented.
+`revisionId` is the immutable `revisionTag`, scoped by `courseId`; it is not the row's 24-hex `id`. The public `PublishedContext` candidate excludes `vectorIndexRef`. The server-only `SourceResolution` carries the exact relative index artifact `faiss/<courseId>/<revisionId>.faiss`; the future metadata sidecar is `faiss/<courseId>/<revisionId>.meta.json`. The current Python adapter is still course-scoped and is not evidence that revision-aware retrieval is implemented.
 
 ---
 
@@ -273,7 +273,7 @@ The candidate `Graded` variant makes both `socraticHint` and `recommendedNextSte
 * **Producer**: NestJS `study` evaluator service
 * **Consumer**: NestJS `user-profile` (competency & gamification engines)
 * **Transport**: In-process dispatch (`module://user-profile/record-evidence`)
-* **Database Target**: MongoDB collection `learning_evidence`
+* **Database Target**: PostgreSQL table `learning_evidences`
 * **Idempotency**: Unique compound index on `{ userId: 1, attemptId: 1 }`; evidence must prove attempt ownership. An `attemptId`-only lookup is not a global uniqueness constraint.
 
 ### Schema & Payload
@@ -304,7 +304,7 @@ The candidate `Graded` variant makes both `socraticHint` and `recommendedNextSte
 * **Purpose**: Updates the learner's knowledge level for a specific educational objective based on accumulated learning evidence.
 * **Owner**: Tasnim (Individual Learning)
 * **Producer**: NestJS `user-profile` competency service
-* **Consumer**: MongoDB collection `competencies`, Learner Dashboard UI
+* **Consumer**: PostgreSQL table `competency_profiles`, Learner Dashboard UI
 * **Transport**: Internal database transaction
 
 ### Schema & Payload
@@ -329,7 +329,7 @@ The candidate `Graded` variant makes both `socraticHint` and `recommendedNextSte
 * **Purpose**: Awards XP and unlocks achievements through an append-only ledger following verified learning evidence.
 * **Owner**: Tasnim (Individual Learning)
 * **Producer**: NestJS `user-profile` gamification engine
-* **Consumer**: MongoDB collections `rank_event_ledger`, `users`
+* **Consumer**: PostgreSQL tables `rankeventledgers`, `users`
 * **Anti-Farming Rule**: Enforces daily caps per topic (`maxDailyXP: 300`) and unique `eventKey` (`xp:{userId}:{evidenceId}`).
 
 ### Schema & Payload
@@ -401,7 +401,7 @@ Example on the existing `PUT /api/v1/study/rooms/:roomId/phase`:
 ```
 
 - Accepted receipt identity is `(roomId, authenticated actorId, commandId)`, with UUIDs normalized to lowercase. Creation uses `(authenticated hostUserId, commandId)` until its room ID exists, enforced by the partial unique `room_creation_command` index. Actor identity always comes from the session, never the body. Command kind and normalized validated payload, including `expectedSeq`, are hashed; key order is irrelevant. Reusing an accepted ID for a different payload or operation returns 409.
-- The room mutation and receipt (original HTTP status and explicit public response projection) are one journaled, majority-acknowledged MongoDB document write. No separate claim, multi-document transaction, Redis lease or broker is involved. Distinct commands at one sequence compete through conditional writes. Same-target no-ops store a receipt without advancing the public sequence or broadcasting.
+- The room mutation and receipt (original HTTP status and explicit public response projection) are one journaled PostgreSQL row update inside a serializable transaction. No separate claim, multi-document transaction, Redis lease or broker is involved. Distinct commands at one sequence compete through a conditional update on the room's `seq`. Same-target no-ops store a receipt without advancing the public sequence or broadcasting.
 - Identical completed retries return the original status/body, not the latest state, with no mutation or new publication. Current room membership, presenter authority where required, and course access are rechecked before replay. Loss of authority returns 403 even if a command previously succeeded. A completed join cannot restore left/revoked membership.
 - The sole membership exception is an actor replaying their own completed **leave**: it returns only the stored `{ "success": true, "roomId": "..." }` acknowledgement. It grants no room reads, new mutations, roster, or source access; current course access is still checked.
 - Validation, authorization, stale-sequence, unsupported integration and capacity errors do not claim an ID and are not cached. After a known rejection, correct/reload and issue a new command. After 503 or a lost response, retry the **same ID and exact payload** because the write may already have committed. A stale unaccepted command stays rejected; an accepted receipt is found before checking the now-old expected sequence.
@@ -536,7 +536,7 @@ The existing SessionChat router/model now support dedicated `room_` public peer 
 
 - `submissionId` is a client UUID v4, normalized to lowercase and scoped by `(roomId, authenticated senderUserId)`. The server derives sender ID/name; unknown fields, actor claims, objects/attachments, absent/empty/whitespace text, malformed Unicode and non-text controls are rejected. Trimmed text is limited to 2,000 UTF-16 units/8,000 UTF-8 bytes; the parsed JSON body's serialized UTF-8 representation is capped at 12,000 bytes. Existing shared request parsing/rate limiting remains in force. Text, including HTML/Markdown-looking text, is rendered literally with React escaping; no rich links or executable markup.
 - Success is `201 { message }` only after journaled majority-acknowledged persistence. A message projects exactly `{ roomId, messageId, submissionId, senderUserId, senderName, text, seq, createdAt }`. `messageId` is server-generated, `createdAt` is a server timestamp and `seq` is a contiguous, per-room **message** acceptance sequence. Timestamp/arrival/presence order is not authoritative message order. Ordinary members may send; presenter status is irrelevant.
-- The existing `sessionchats` collection stores one `messageType: peer_stream` journal per room, enforced by partial unique index `peer_room_journal`. Its bounded append assigns the next sequence and persists the public message in one atomic MongoDB update. This supports standalone Mongo without a two-document counter/message gap or a multi-document transaction. It creates no second chat collection, gateway, connection registry, broker or offline queue. Legacy AI history excludes the journal and legacy deletion cannot remove it.
+- The existing `sessionchats` table stores one `messageType: peer_stream` journal per room, enforced by the partial unique index `sessionchats_peer_journal_key`. Its bounded append assigns the next sequence and persists the public message in one transaction. This keeps sequence and message consistent without a two-row counter/message gap. It creates no second chat collection, gateway, connection registry, broker or offline queue. Legacy AI history excludes the journal and legacy deletion cannot remove it.
 - Same scoped ID and normalized text returns the original `201 { message }`; conflicting text returns 409. Concurrent duplicates append once. Current authentication, active membership/room status and source authorization are checked on every send/replay/history request through the existing study-owned boundary. Unauthorized/left/source-revoked participants cannot use replay for access. Authorization and acceptance across separate domain records are not a cross-document transaction.
 - The journal retains **at most 1,000 accepted messages per room**. No TTL, eviction, pruning or archive is implemented. At capacity new submissions return 409; retained authorized replays/history continue working. Deduplication lasts while that journal is retained; deleting the room/journal/index is outside the guarantee. This is bounded retained history, not unlimited growth or an indefinite archival SLA.
 - Validation/authorization/capacity errors do not accept an ID. A persistence error or lost acknowledgement may be an uncertain commit: retry the **same ID and exact text**. UI pending/failed/retryable states preserve the draft and ID while the room page remains mounted. Refresh recovers accepted history; unsent drafts/uncertain IDs are not separately persisted across page destruction.
@@ -556,7 +556,7 @@ The existing SessionChat router/model now support dedicated `room_` public peer 
 
 Items are ascending by immutable message `seq`; `afterSeq` excludes earlier accepted positions. A cursor beyond the current stream returns 409, requiring recovery from zero. Empty history and unavailable history are distinct. With no pruning and atomic contiguous appends, accepted positions are never skipped by delayed writes; concurrent appends may appear on the next page/recovery. The UI recovers all retained pages after its authorized `ROOM_STATE_SYNC` on initial connect/reconnect and supports manual recovery. It merges history, acknowledgements and live events by immutable identities/order, discards obsolete recovery responses, and does not replace newer records with older history. A detected sequence gap is shown as incomplete history.
 
-**Realtime:** existing `/ws/realtime` publishes `{ type: "ROOM_PEER_MESSAGE", roomId, message }` after a newly accepted write, using the existing recipient session/membership/source revalidation. No raw persistence document, private records, credentials or socket IDs are broadcast. Replays do not rebroadcast. Publication is best effort; failure after persistence does not revoke acceptance. History recovers missing publications; no exactly-once delivery or durable outbox is claimed. Live fanout remains single API instance; Mongo persistence/order is not evidence of distributed live delivery.
+**Realtime:** existing `/ws/realtime` publishes `{ type: "ROOM_PEER_MESSAGE", roomId, message }` after a newly accepted write, using the existing recipient session/membership/source revalidation. No raw persistence document, private records, credentials or socket IDs are broadcast. Replays do not rebroadcast. Publication is best effort; failure after persistence does not revoke acceptance. History recovers missing publications; no exactly-once delivery or durable outbox is claimed. Live fanout remains single API instance; database persistence/order is not evidence of distributed live delivery.
 
 Room command `seq`/receipts and `presenceEpoch`/`presenceVersion` are unchanged. Neither message acceptance nor heartbeat activity awards learning credit or creates a private attempt. Evidence: [peer-text verification](../../reports/ED-07-PEER-TEXT-VERIFICATION.md). Full ED-07 remains PARTIAL.
 

@@ -37,8 +37,11 @@ jest.mock('../models', () => ({
   LearningObjective: {},
   Competency: {}
 }));
-jest.mock('mongoose', () => ({
-  connection: { collection: jest.fn(), once: jest.fn() }
+// The AiJob lookup now goes through the orchestrator model, not a raw collection.
+const mockAiJobFindOne = jest.fn();
+jest.mock('../../../ai-orchestrator/src/models/AiJob', () => ({
+  __esModule: true,
+  default: { findOne: (...args: unknown[]) => mockAiJobFindOne(...args) }
 }));
 jest.mock('@ednova/shared/moduleClient', () => ({
   post: jest.fn().mockResolvedValue({ data: {} })
@@ -61,8 +64,6 @@ jest.mock('@ednova/shared', () => ({
 const { Task, Topic, StudySession, StudyPlan } = require('../models');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const moduleClient = require('@ednova/shared/moduleClient');
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const mongooseMock = require('mongoose');
 
 const app = express();
 app.use(express.json());
@@ -134,7 +135,7 @@ describe('SEC-12 sessions are isolated per user', () => {
 });
 
 describe('SEC-12 plans are isolated per user', () => {
-  const fakeAiJobColl = { findOne: jest.fn() };
+  const fakeAiJobColl = { findOne: mockAiJobFindOne };
   const OBJECT_ID = '64b000000000000000000001';
 
   it("GET /plans/:planId 404s for another user's plan", async () => {
@@ -148,7 +149,6 @@ describe('SEC-12 plans are isolated per user', () => {
   });
 
   it('POST /plans/create-status hides jobs when the job belongs to another user', async () => {
-    mongooseMock.connection.collection.mockReturnValue(fakeAiJobColl);
     fakeAiJobColl.findOne.mockResolvedValue({
       correlationId: 'job-1',
       userId: 'user-b',
@@ -175,7 +175,6 @@ describe('SEC-12 plans are isolated per user', () => {
   });
 
   it('POST /plans/create-status 201s when the requester owns the job', async () => {
-    mongooseMock.connection.collection.mockReturnValue(fakeAiJobColl);
     fakeAiJobColl.findOne.mockResolvedValue({
       correlationId: 'job-2',
       userId: 'user-a',
@@ -207,7 +206,6 @@ describe('SEC-12 plans are isolated per user', () => {
   });
 
   it('POST /plans/create-status denies admin access to private foreign jobs', async () => {
-    mongooseMock.connection.collection.mockReturnValue(fakeAiJobColl);
     fakeAiJobColl.findOne.mockResolvedValue({
       correlationId: 'job-3',
       userId: 'user-b',

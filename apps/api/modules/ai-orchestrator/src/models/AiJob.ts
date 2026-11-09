@@ -3,11 +3,13 @@
  *
  * Every AI operation creates an AiJob in PENDING and returns its jobId
  * immediately (202). Result events correlate via correlationId. Terminal jobs
- * get expireAt = +30d so Mongo's TTL index cleans them up.
+ * get expireAt = +30d; the column is indexed and swept by the cleanup job.
  */
 
-import mongoose, { Document, Model, Schema } from 'mongoose';
 import crypto from 'crypto';
+import { Prisma, type AiJob as AiJobRow } from '../../../../src/generated/prisma/client';
+import { prisma, toDocument } from '../../../../shared/database';
+import { newId } from '../../../../shared/ids';
 
 export type JobStatus = 'PENDING' | 'PROCESSING' | 'RETRYING' | 'COMPLETED' | 'FAILED';
 
@@ -18,6 +20,11 @@ export const JOB_STATUSES: JobStatus[] = [
   'COMPLETED',
   'FAILED'
 ];
+
+/** Statuses a correlated result may still move to a terminal state. */
+const ACTIVE_STATUSES: JobStatus[] = ['PENDING', 'PROCESSING', 'RETRYING'];
+
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 // Allowed transitions; anything else is rejected.
 // PENDING -> COMPLETED/FAILED covers result races (worker finishes before
@@ -37,183 +44,190 @@ export interface JobResourceScope {
   step?: number;
 }
 
-export interface IAiJob extends Document {
-  resourceScope?: JobResourceScope;
-  jobId: string;
-  type: string;
-  userId: string;
-  requestId?: string;
-  correlationId: string;
-  messageId: string;
-  status: JobStatus;
+export interface IAiJob extends Omit<AiJobRow, 'resourceScope' | 'result'> {
+  _id: string;
+  resourceScope: JobResourceScope | null;
   result: unknown;
-  error: string | null;
-  attempts: number;
-  fallbackUsed: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-  expireAt: Date | null;
   transitionTo(nextStatus: JobStatus | string): Promise<IAiJob>;
 }
 
-export interface IAiJobModel extends Model<IAiJob> {
-  createPending(params: {
+export type JobBinding = Pick<AiJobRow, 'userId' | 'messageId' | 'type' | 'requestId'>;
+
+function hydrate(row: AiJobRow): IAiJob {
+  const job = {
+    ...toDocument(row),
+    resourceScope: (row.resourceScope ?? null) as JobResourceScope | null,
+    result: row.result
+  } as unknown as IAiJob;
+  job.transitionTo = (nextStatus) => transitionTo(job, nextStatus);
+  return job;
+}
+
+function invalidTransitionError(from: string, to: string): Error & { code?: string } {
+  const err = new Error(`invalid job transition ${from} -> ${to}`) as Error & {
+    code?: string;
+  };
+  err.code = 'EINVALIDTRANSITION';
+  return err;
+}
+
+/**
+ * Move a job to `nextStatus`, enforcing the transition table. Terminal states
+ * schedule the TTL sweep.
+ *
+ * The in-memory document is mutated optimistically (as the previous Mongoose
+ * instance method did) and validated synchronously, so an illegal move throws
+ * before any I/O.
+ */
+function transitionTo(job: IAiJob, nextStatus: JobStatus | string): Promise<IAiJob> {
+  const allowed = TRANSITIONS[job.status] || [];
+  if (!allowed.includes(nextStatus)) {
+    throw invalidTransitionError(job.status, nextStatus);
+  }
+  const updatedAt = new Date();
+  job.status = nextStatus as JobStatus;
+  job.updatedAt = updatedAt;
+  if (nextStatus === 'COMPLETED' || nextStatus === 'FAILED') {
+    job.expireAt = new Date(updatedAt.getTime() + THIRTY_DAYS_MS);
+  }
+  return prisma.aiJob
+    .update({
+      where: { id: job.id },
+      data: { status: job.status, expireAt: job.expireAt, updatedAt }
+    })
+    .then(() => job);
+}
+
+export const AiJob = {
+  async create(
+    data: Omit<Prisma.AiJobUncheckedCreateInput, 'id' | 'jobId'> & {
+      id?: string;
+      jobId?: string;
+    }
+  ): Promise<IAiJob> {
+    const row = await prisma.aiJob.create({
+      data: {
+        ...(data as Prisma.AiJobUncheckedCreateInput),
+        id: data.id ?? newId(),
+        jobId: data.jobId ?? crypto.randomUUID()
+      }
+    });
+    return hydrate(row);
+  },
+
+  async findById(id: string): Promise<IAiJob | null> {
+    const row = await prisma.aiJob.findUnique({ where: { id } });
+    return row ? hydrate(row) : null;
+  },
+
+  async findOne(where: Prisma.AiJobWhereInput = {}): Promise<IAiJob | null> {
+    const row = await prisma.aiJob.findFirst({ where, orderBy: { createdAt: 'asc' } });
+    return row ? hydrate(row) : null;
+  },
+
+  async findMany(
+    where: Prisma.AiJobWhereInput = {},
+    order: Prisma.AiJobOrderByWithRelationInput = { createdAt: 'desc' },
+    take?: number
+  ): Promise<IAiJob[]> {
+    const rows = await prisma.aiJob.findMany({ where, orderBy: order, take });
+    return rows.map(hydrate);
+  },
+
+  async countDocuments(where: Prisma.AiJobWhereInput = {}): Promise<number> {
+    return prisma.aiJob.count({ where });
+  },
+
+  async deleteOne(where: Prisma.AiJobWhereInput): Promise<number> {
+    const result = await prisma.aiJob.deleteMany({ where });
+    return result.count;
+  },
+
+  async deleteMany(where: Prisma.AiJobWhereInput = {}): Promise<number> {
+    const result = await prisma.aiJob.deleteMany({ where });
+    return result.count;
+  },
+
+  /** Create a PENDING job from a published envelope's identifiers. */
+  async createPending({
+    type,
+    userId,
+    requestId,
+    correlationId,
+    messageId,
+    payloadSnapshot = undefined
+  }: {
     type: string;
     userId: string;
     requestId?: string;
     correlationId: string;
     messageId: string;
     payloadSnapshot?: unknown;
-  }): Promise<IAiJob>;
-  completeByCorrelation(
+  }): Promise<IAiJob> {
+    const source =
+      payloadSnapshot && typeof payloadSnapshot === 'object'
+        ? (payloadSnapshot as Record<string, unknown>)
+        : {};
+    const resourceScope: JobResourceScope = {};
+    for (const field of ['courseId', 'sessionId', 'objectiveId'] as const) {
+      const value = source[field] ?? source[field.replace(/[A-Z]/g, (c) => '_' + c.toLowerCase())];
+      if (typeof value === 'string' && value) resourceScope[field] = value;
+    }
+    if (typeof source.step === 'number') resourceScope.step = source.step;
+    return AiJob.create({
+      type,
+      userId,
+      requestId,
+      correlationId,
+      messageId,
+      status: 'PENDING',
+      // An explicit empty object marks an authorized source-free job; never
+      // collapse it to NULL.
+      resourceScope: resourceScope as unknown as Prisma.InputJsonValue
+    });
+  },
+
+  /**
+   * Correlated completion — idempotent: replayed results are ignored once the
+   * job is terminal. Only rows still PENDING/PROCESSING/RETRYING are moved.
+   */
+  async completeByCorrelation(
     correlationId: string,
     payload?: unknown,
-    binding?: Pick<IAiJob, 'userId' | 'messageId' | 'type' | 'requestId'>
-  ): Promise<IAiJob | null>;
-  failByCorrelation(
+    binding?: JobBinding
+  ): Promise<IAiJob | null> {
+    const where: Prisma.AiJobWhereInput = { correlationId, ...binding };
+    await prisma.aiJob.updateMany({
+      where: { ...where, status: { in: ACTIVE_STATUSES } },
+      data: {
+        status: 'COMPLETED',
+        result: (payload || {}) as unknown as Prisma.InputJsonValue,
+        updatedAt: new Date(),
+        expireAt: new Date(Date.now() + THIRTY_DAYS_MS)
+      }
+    });
+    return AiJob.findOne(where);
+  },
+
+  /** Correlated failure — idempotent in the same way as completion. */
+  async failByCorrelation(
     correlationId: string,
     sanitizedError?: string,
-    binding?: Pick<IAiJob, 'userId' | 'messageId' | 'type' | 'requestId'>
-  ): Promise<IAiJob | null>;
-}
-
-const aiJobSchema = new Schema<IAiJob, IAiJobModel>(
-  {
-    jobId: { type: String, default: () => crypto.randomUUID(), unique: true },
-    type: { type: String, required: true },
-    userId: { type: String, required: true, index: true },
-    requestId: { type: String },
-    correlationId: { type: String, required: true, index: true },
-    messageId: { type: String, required: true },
-    status: {
-      type: String,
-      enum: JOB_STATUSES,
-      default: 'PENDING',
-      index: true
-    },
-    resourceScope: { type: Schema.Types.Mixed },
-    result: { type: Schema.Types.Mixed, default: null },
-    error: {
-      type: String,
-      default: null,
-      maxlength: 512 // sanitized only — no stacks / connection strings
-    },
-    attempts: { type: Number, default: 0 },
-    fallbackUsed: { type: Boolean, default: false },
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now },
-    expireAt: { type: Date, default: null }
-  },
-  {
-    collection: 'ai_jobs',
-    minimize: false // An explicit empty scope identifies authorized source-free jobs.
-  }
-);
-
-aiJobSchema.index({ userId: 1, createdAt: -1 });
-
-// TTL sweep for terminal jobs (expireAt set on completion/failure).
-aiJobSchema.index({ expireAt: 1 }, { expireAfterSeconds: 0 });
-
-aiJobSchema.methods.transitionTo = function transitionTo(nextStatus: string) {
-  const allowed = TRANSITIONS[this.status] || [];
-  if (!allowed.includes(nextStatus)) {
-    const err = new Error(`invalid job transition ${this.status} -> ${nextStatus}`) as Error & {
-      code?: string;
-    };
-    err.code = 'EINVALIDTRANSITION';
-    throw err;
-  }
-  this.status = nextStatus as JobStatus;
-  if (nextStatus === 'COMPLETED' || nextStatus === 'FAILED') {
-    this.expireAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-  }
-  this.updatedAt = new Date();
-  return this.save();
-};
-
-/** Create a PENDING job from a published envelope's identifiers. */
-aiJobSchema.statics.createPending = function createPending({
-  type,
-  userId,
-  requestId,
-  correlationId,
-  messageId,
-  payloadSnapshot = undefined
-}: {
-  type: string;
-  userId: string;
-  requestId?: string;
-  correlationId: string;
-  messageId: string;
-  payloadSnapshot?: unknown;
-}) {
-  const source =
-    payloadSnapshot && typeof payloadSnapshot === 'object'
-      ? (payloadSnapshot as Record<string, unknown>)
-      : {};
-  const resourceScope: JobResourceScope = {};
-  for (const field of ['courseId', 'sessionId', 'objectiveId'] as const) {
-    const value = source[field] ?? source[field.replace(/[A-Z]/g, (c) => '_' + c.toLowerCase())];
-    if (typeof value === 'string' && value) resourceScope[field] = value;
-  }
-  if (typeof source.step === 'number') resourceScope.step = source.step;
-  return this.create({
-    type,
-    userId,
-    requestId,
-    correlationId,
-    messageId,
-    status: 'PENDING',
-    resourceScope
-  });
-};
-
-/** Correlated completion — idempotent: replayed results are ignored once terminal. */
-aiJobSchema.statics.completeByCorrelation = async function completeByCorrelation(
-  correlationId: string,
-  payload?: unknown,
-  binding?: Pick<IAiJob, 'userId' | 'messageId' | 'type' | 'requestId'>
-) {
-  const filter = { correlationId, ...binding };
-  const job = await this.findOneAndUpdate(
-    { ...filter, status: { $in: ['PENDING', 'PROCESSING', 'RETRYING'] } },
-    {
-      $set: {
-        status: 'COMPLETED',
-        result: payload || {},
-        updatedAt: new Date(),
-        expireAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-      }
-    },
-    { new: true }
-  );
-  return job || this.findOne(filter);
-};
-
-aiJobSchema.statics.failByCorrelation = async function failByCorrelation(
-  correlationId: string,
-  sanitizedError?: string,
-  binding?: Pick<IAiJob, 'userId' | 'messageId' | 'type' | 'requestId'>
-) {
-  const filter = { correlationId, ...binding };
-  const job = await this.findOneAndUpdate(
-    { ...filter, status: { $in: ['PENDING', 'PROCESSING', 'RETRYING'] } },
-    {
-      $set: {
+    binding?: JobBinding
+  ): Promise<IAiJob | null> {
+    const where: Prisma.AiJobWhereInput = { correlationId, ...binding };
+    await prisma.aiJob.updateMany({
+      where: { ...where, status: { in: ACTIVE_STATUSES } },
+      data: {
         status: 'FAILED',
         error: String(sanitizedError || 'AI job failed').slice(0, 512),
         updatedAt: new Date(),
-        expireAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        expireAt: new Date(Date.now() + THIRTY_DAYS_MS)
       }
-    },
-    { new: true }
-  );
-  return job || this.findOne(filter);
+    });
+    return AiJob.findOne(where);
+  }
 };
 
-const AiJob =
-  (mongoose.models.AiJob as IAiJobModel) ||
-  mongoose.model<IAiJob, IAiJobModel>('AiJob', aiJobSchema);
 export default AiJob;
 module.exports = AiJob;

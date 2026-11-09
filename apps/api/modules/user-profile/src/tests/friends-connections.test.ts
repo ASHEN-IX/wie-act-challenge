@@ -3,14 +3,15 @@ import express from 'express';
 import request from 'supertest';
 
 process.env.JWT_SECRET = 'test-secret-key';
-process.env.MONGODB_URI = 'mongodb://localhost:27017/test_ednova';
+process.env.DATABASE_URL =
+  process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
 process.env.NODE_ENV = 'test';
 
 jest.mock('../models/Friendship', () => ({
   __esModule: true,
   default: {
     findOne: jest.fn(),
-    find: jest.fn(),
+    findMany: jest.fn(),
     create: jest.fn(),
     countDocuments: jest.fn(),
     deleteMany: jest.fn(),
@@ -19,11 +20,11 @@ jest.mock('../models/Friendship', () => ({
 }));
 jest.mock('../models/UserProfile', () => ({
   __esModule: true,
-  default: { findOne: jest.fn(), find: jest.fn() }
+  default: { findOne: jest.fn(), findMany: jest.fn() }
 }));
 jest.mock('../models/Gamification', () => ({
   __esModule: true,
-  default: { find: jest.fn(), findOne: jest.fn() }
+  default: { findMany: jest.fn(), findOne: jest.fn() }
 }));
 jest.mock('@ednova/shared/moduleClient', () => ({
   __esModule: true,
@@ -33,6 +34,7 @@ jest.mock('@ednova/shared/moduleClient', () => ({
 /* eslint-disable @typescript-eslint/no-require-imports */
 const Friendship = require('../models/Friendship').default;
 const UserProfile = require('../models/UserProfile').default;
+const Gamification = require('../models/Gamification').default;
 const moduleClient = require('@ednova/shared/moduleClient').default;
 const friendsRoutes = require('../routes/friends');
 /* eslint-enable @typescript-eslint/no-require-imports */
@@ -146,21 +148,31 @@ describe('connections: requests, blocking, search', () => {
     const res = await request(app).post('/api/v1/users/friends/block/bob');
     expect(res.status).toBe(200);
     const filter = Friendship.deleteMany.mock.calls[0][0];
-    expect(JSON.stringify(filter)).toContain('"$ne":"blocked"');
+    // The other person's block must survive this delete.
+    expect(JSON.stringify(filter)).toContain('"not":"blocked"');
   });
 
   it('does not search for very short or oversized queries', async () => {
     const short = await request(app).get('/api/v1/users/friends/search?q=ab');
     expect(short.body.results).toEqual([]);
-    expect(UserProfile.find).not.toHaveBeenCalled();
+    expect(UserProfile.findMany).not.toHaveBeenCalled();
   });
 
   it('excludes people who accept no requests from name search', async () => {
-    Friendship.find.mockReturnValue({ lean: () => Promise.resolve([]) });
-    UserProfile.find.mockReturnValue({ limit: () => ({ lean: () => Promise.resolve([]) }) });
-    await request(app).get('/api/v1/users/friends/search?q=sam');
-    expect(JSON.stringify(UserProfile.find.mock.calls[0][0])).toContain(
-      '"allowRequests":{"$ne":"nobody"}'.replace('allowRequests', 'privacy.allowRequests')
-    );
+    Friendship.findMany.mockResolvedValue([]);
+    Gamification.findMany.mockResolvedValue([]);
+    Gamification.findOne.mockResolvedValue(null);
+    UserProfile.findMany.mockResolvedValue([
+      {
+        userId: 'sam',
+        nickname: 'Sam',
+        friendCode: 'SAM',
+        privacy: { allowRequests: 'nobody' },
+        onlineStatus: 'offline'
+      }
+    ]);
+    const res = await request(app).get('/api/v1/users/friends/search?q=sam');
+    // The filter runs after the query, so a "nobody" profile never reaches the result.
+    expect(res.body.results).toEqual([]);
   });
 });

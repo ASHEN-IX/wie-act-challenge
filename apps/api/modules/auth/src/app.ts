@@ -15,7 +15,7 @@ import {
 import { authenticate } from '@ednova/shared/auth';
 
 // --- Environment validation (fail-fast on missing secrets) ---
-requireEnv(['MONGODB_URI'], { serviceName: 'auth' });
+requireEnv(['DATABASE_URL'], { serviceName: 'auth' });
 
 // Stripe keys must be provided together (billing enabled) or not at all.
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;

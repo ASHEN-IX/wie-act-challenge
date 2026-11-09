@@ -1,4 +1,9 @@
-import mongoose, { Document, Model, Schema } from 'mongoose';
+import type {
+  VoiceSession as VoiceSessionRow,
+  Prisma
+} from '../../../../src/generated/prisma/client';
+import { prisma, toDocument } from '../../../../shared/database';
+import { newId } from '../../../../shared/ids';
 
 export interface IParticipant {
   userId: string;
@@ -13,65 +18,73 @@ export interface IParticipant {
   lastHeartbeat: Date;
 }
 
-export interface IVoiceSession extends Document {
-  sessionId: string;
-  startedAt: Date;
-  endedAt?: Date | null;
-  isActive: boolean;
-  recordingUrl?: string | null;
+export type IVoiceSession = Omit<VoiceSessionRow, 'participants'> & {
+  _id: string;
   participants: IParticipant[];
-  createdAt: Date;
-  updatedAt: Date;
+};
+
+/**
+ * Domain voice session. The Mongo collection `voicesessions` is now the
+ * `voicesessions` table; `participants` is a JSONB column with the same field
+ * shape, and `sessionId` keeps its unique constraint.
+ */
+function hydrate(row: VoiceSessionRow): IVoiceSession {
+  return {
+    ...toDocument(row),
+    participants: (row.participants as unknown as IParticipant[]) ?? []
+  } as IVoiceSession;
 }
 
-const participantSchema = new Schema<IParticipant>(
-  {
-    userId: { type: String, required: true },
-    peerId: { type: String, default: '' },
-    joinedAt: { type: Date, default: Date.now },
-    leftAt: { type: Date, default: null },
-    isMuted: { type: Boolean, default: false },
-    speakingStatus: {
-      type: String,
-      enum: ['silent', 'speaking', 'loud'],
-      default: 'silent'
-    },
-    connectionState: {
-      type: String,
-      enum: ['connecting', 'connected', 'disconnected', 'failed'],
-      default: 'connecting'
-    },
-    speakingTime: { type: Number, default: 0 },
-    mutedDuration: { type: Number, default: 0 },
-    lastHeartbeat: { type: Date, default: Date.now }
-  },
-  { _id: false }
-);
+export interface CreateVoiceSessionInput {
+  id?: string;
+  sessionId: string;
+  startedAt?: Date;
+  isActive?: boolean;
+  participants?: IParticipant[];
+}
 
-const voiceSessionSchema = new Schema<IVoiceSession>(
-  {
-    sessionId: {
-      type: String,
-      required: true,
-      unique: true,
-      index: true
-    },
-    startedAt: { type: Date, default: Date.now },
-    endedAt: { type: Date, default: null },
-    isActive: { type: Boolean, default: true },
-    recordingUrl: { type: String, default: null },
-    participants: {
-      type: [participantSchema],
-      default: []
-    }
+export const VoiceSession = {
+  async create(data: CreateVoiceSessionInput): Promise<IVoiceSession> {
+    const row = await prisma.voiceSession.create({
+      data: {
+        id: data.id ?? newId(),
+        sessionId: data.sessionId,
+        startedAt: data.startedAt ?? new Date(),
+        isActive: data.isActive ?? true,
+        participants: data.participants as unknown as Prisma.InputJsonValue
+      }
+    });
+    return hydrate(row);
   },
-  {
-    timestamps: true
+
+  async findOne(where: Prisma.VoiceSessionWhereInput): Promise<IVoiceSession | null> {
+    const row = await prisma.voiceSession.findFirst({ where });
+    return row ? hydrate(row) : null;
+  },
+
+  async findMany(
+    where: Prisma.VoiceSessionWhereInput = {},
+    order: Prisma.VoiceSessionOrderByWithRelationInput = { startedAt: 'desc' },
+    { skip, take }: { skip?: number; take?: number } = {}
+  ): Promise<IVoiceSession[]> {
+    const rows = await prisma.voiceSession.findMany({ where, orderBy: order, skip, take });
+    return rows.map(hydrate);
+  },
+
+  /** Persist mutable fields of an in-memory document, like `doc.save()`. */
+  async save(session: IVoiceSession): Promise<IVoiceSession> {
+    const row = await prisma.voiceSession.update({
+      where: { id: session.id },
+      data: {
+        startedAt: session.startedAt,
+        endedAt: session.endedAt,
+        isActive: session.isActive,
+        recordingUrl: session.recordingUrl,
+        participants: session.participants as unknown as Prisma.InputJsonValue
+      }
+    });
+    return hydrate(row);
   }
-);
+};
 
-const VoiceSession: Model<IVoiceSession> = mongoose.model<IVoiceSession>(
-  'VoiceSession',
-  voiceSessionSchema
-);
 export default VoiceSession;

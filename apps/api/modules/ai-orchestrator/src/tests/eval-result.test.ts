@@ -15,8 +15,8 @@ jest.mock('../models/AiJob', () => ({
   failByCorrelation: jest.fn()
 }));
 jest.mock('../models/EvalResult', () => ({
-  updateOne: jest.fn(),
-  find: jest.fn()
+  upsertByCorrelation: jest.fn(),
+  findMany: jest.fn()
 }));
 
 jest.mock('../services/evalResultStore', () => ({
@@ -153,9 +153,9 @@ describe('evalResultStore (mocked model)', () => {
     jest.clearAllMocks();
   });
 
-  test('upsertByCorrelation is keyed by correlationId with upsert flag', async () => {
-    EvalResult.updateOne.mockResolvedValue({});
-    await storeUpsert({
+  test('upsertByCorrelation is keyed by correlationId and preserves the record', async () => {
+    EvalResult.upsertByCorrelation.mockResolvedValue({ correlationId: 'corr-1' });
+    const written = await storeUpsert({
       correlationId: 'corr-1',
       messageId: 'msg-1',
       userId: 'user-123',
@@ -169,21 +169,32 @@ describe('evalResultStore (mocked model)', () => {
       objectiveId: 'obj-9',
       targetBloomLevel: 'APPLY'
     });
-    expect(EvalResult.updateOne).toHaveBeenCalledTimes(1);
-    expect(EvalResult.updateOne).toHaveBeenCalledWith(
-      { correlationId: 'corr-1' },
-      { $setOnInsert: expect.objectContaining({ sessionId: 'sess-1', step: 2 }) },
-      { upsert: true }
+    expect(written).toBe('corr-1');
+    expect(EvalResult.upsertByCorrelation).toHaveBeenCalledTimes(1);
+    expect(EvalResult.upsertByCorrelation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        correlationId: 'corr-1',
+        messageId: 'msg-1',
+        userId: 'user-123',
+        sessionId: 'sess-1',
+        step: 2,
+        status: 'CONTINUE',
+        masteryScore: 0.7,
+        nextQuestion: 'q',
+        demonstratedBloomLevel: 'UNDERSTAND',
+        objectiveId: 'obj-9',
+        targetBloomLevel: 'APPLY'
+      })
     );
   });
 
   test('listStepsForSession queries by sessionId and sorts ascending', async () => {
-    EvalResult.find.mockReturnValue({
-      sort: jest.fn().mockReturnThis(),
-      lean: jest.fn().mockResolvedValue([{ step: 1 }, { step: 2 }])
-    });
+    EvalResult.findMany.mockResolvedValue([{ step: 1 }, { step: 2 }]);
     const steps = await realListSteps('sess-1', 'user-123');
-    expect(EvalResult.find).toHaveBeenCalledWith({ sessionId: 'sess-1', userId: 'user-123' });
+    expect(EvalResult.findMany).toHaveBeenCalledWith(
+      { sessionId: 'sess-1', userId: 'user-123' },
+      { step: 'asc' }
+    );
     expect(steps).toHaveLength(2);
   });
 });

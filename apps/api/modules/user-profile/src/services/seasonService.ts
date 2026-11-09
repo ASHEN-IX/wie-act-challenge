@@ -1,8 +1,9 @@
-import type { Types } from 'mongoose';
 import type { ISeasonResultSnapshot } from '../models/SeasonResultSnapshot';
 import RankSeason, { IRankSeason } from '../models/RankSeason';
 import UserRankProfile, { IUserRankProfile } from '../models/UserRankProfile';
-import SeasonResultSnapshot from '../models/SeasonResultSnapshot';
+import { Prisma } from '../../../../src/generated/prisma/client';
+import { prisma } from '../../../../shared/database';
+import { newId } from '../../../../shared/ids';
 import { DEFAULT_SEASON_FLOOR_INDEX, getRankByIndex, isLowBracket } from '../models/rankingConfig';
 
 export function toSeasonCode(date: Date = new Date()): string {
@@ -34,17 +35,25 @@ export async function getOrCreateActiveSeason(): Promise<IRankSeason> {
   if (season) return season;
 
   const seasonCode = toSeasonCode(now);
-  season = await RankSeason.findOne({ seasonCode, status: { $in: ['upcoming', 'active'] } });
+  season = await RankSeason.findOne({
+    seasonCode,
+    status: { in: ['upcoming', 'active'] }
+  });
 
   if (season) {
-    season.status = 'active';
-    if (!season.startAt) season.startAt = now;
-    if (season.endAt && season.endAt <= now) season.endAt = null;
-    await season.save();
-    return season;
+    await RankSeason.updateOne(
+      { id: season.id },
+      {
+        status: 'active',
+        startAt: season.startAt || now,
+        endAt: season.endAt && season.endAt <= now ? null : season.endAt
+      }
+    );
+    return (await RankSeason.findOne({ id: season.id })) as IRankSeason;
   }
 
   season = await RankSeason.create({
+    id: newId(),
     seasonCode,
     name: `Season ${seasonCode}`,
     theme: null,
@@ -54,7 +63,7 @@ export async function getOrCreateActiveSeason(): Promise<IRankSeason> {
       lowBracketDrop: 3,
       highBracketDrop: 5,
       seasonFloorIndex: DEFAULT_SEASON_FLOOR_INDEX
-    }
+    } as unknown as Prisma.InputJsonValue
   });
 
   return season;
@@ -62,12 +71,16 @@ export async function getOrCreateActiveSeason(): Promise<IRankSeason> {
 
 export async function ensureUserRankProfile(
   userId: string,
-  seasonId: Types.ObjectId
+  seasonId: string
 ): Promise<IUserRankProfile> {
   let profile = await UserRankProfile.findOne({ userId });
 
   if (!profile) {
-    profile = await UserRankProfile.create({ userId, currentSeasonId: seasonId });
+    profile = (await UserRankProfile.findOneAndUpdate(
+      { userId },
+      { currentSeasonId: seasonId },
+      { upsert: true }
+    )) as IUserRankProfile;
     return profile;
   }
 
@@ -78,7 +91,7 @@ export async function ensureUserRankProfile(
     profile.seasonPeakKp = points;
     profile.competitiveEventsCountSeason = 0;
     profile.currentStreak = 0;
-    await profile.save();
+    await UserRankProfile.save(profile);
   }
 
   return profile;
@@ -120,16 +133,18 @@ export function computeResetPreviewForProfile(
   };
 }
 
-export async function previewSeasonReset(seasonId: Types.ObjectId | string | null = null) {
-  const season = seasonId ? await RankSeason.findById(seasonId) : await getOrCreateActiveSeason();
+export async function previewSeasonReset(seasonId: string | null = null) {
+  const season = seasonId
+    ? await RankSeason.findOne({ id: seasonId })
+    : await getOrCreateActiveSeason();
   if (!season) {
     throw new Error('Season not found');
   }
 
-  const profiles = await UserRankProfile.find({ currentSeasonId: season._id })
-    .sort({ knowledgePoints: -1 })
-    .select('userId rankIndex rankName knowledgePoints')
-    .lean();
+  const profiles = await UserRankProfile.findMany(
+    { currentSeasonId: season.id },
+    { orderBy: { knowledgePoints: 'desc' } }
+  );
 
   const preview = profiles.map((profile) =>
     computeResetPreviewForProfile(profile, season.resetPolicy)
@@ -159,16 +174,21 @@ export async function startSeason({
 
   let season = await RankSeason.findOne({ seasonCode: code });
   if (season) {
-    season.status = 'active';
-    season.startAt = now;
-    season.endAt = null;
-    season.theme = theme || season.theme || null;
-    season.startedBy = startedBy || null;
-    await season.save();
-    return season;
+    await RankSeason.updateOne(
+      { id: season.id },
+      {
+        status: 'active',
+        startAt: now,
+        endAt: null,
+        theme: theme || season.theme || null,
+        startedBy: startedBy || null
+      }
+    );
+    return (await RankSeason.findOne({ id: season.id })) as IRankSeason;
   }
 
   season = await RankSeason.create({
+    id: newId(),
     seasonCode: code,
     name: seasonName,
     theme,
@@ -179,7 +199,7 @@ export async function startSeason({
       lowBracketDrop: 3,
       highBracketDrop: 5,
       seasonFloorIndex: DEFAULT_SEASON_FLOOR_INDEX
-    }
+    } as unknown as Prisma.InputJsonValue
   });
 
   return season;
@@ -189,10 +209,12 @@ export async function closeSeasonAndStartNext({
   seasonId = null,
   startedBy = null
 }: {
-  seasonId?: Types.ObjectId | string | null;
+  seasonId?: string | null;
   startedBy?: string | null;
 } = {}) {
-  const season = seasonId ? await RankSeason.findById(seasonId) : await getOrCreateActiveSeason();
+  const season = seasonId
+    ? await RankSeason.findOne({ id: seasonId })
+    : await getOrCreateActiveSeason();
   if (!season) {
     throw new Error('Season not found');
   }
@@ -206,6 +228,7 @@ export async function closeSeasonAndStartNext({
   let nextSeason = await RankSeason.findOne({ seasonCode: nextSeasonCode });
   if (!nextSeason) {
     nextSeason = await RankSeason.create({
+      id: newId(),
       seasonCode: nextSeasonCode,
       name: `Season ${nextSeasonCode}`,
       theme: season.theme || null,
@@ -216,21 +239,26 @@ export async function closeSeasonAndStartNext({
         lowBracketDrop: 3,
         highBracketDrop: 5,
         seasonFloorIndex: DEFAULT_SEASON_FLOOR_INDEX
-      }
+      } as unknown as Prisma.InputJsonValue
     });
   } else {
-    nextSeason.status = 'active';
-    nextSeason.startAt = now;
-    nextSeason.endAt = null;
-    if (!nextSeason.theme && season.theme) nextSeason.theme = season.theme;
-    if (startedBy) nextSeason.startedBy = startedBy;
-    await nextSeason.save();
+    await RankSeason.updateOne(
+      { id: nextSeason.id },
+      {
+        status: 'active',
+        startAt: now,
+        endAt: null,
+        theme: nextSeason.theme || season.theme || null,
+        startedBy: startedBy || nextSeason.startedBy || null
+      }
+    );
+    nextSeason = (await RankSeason.findOne({ id: nextSeason.id })) as IRankSeason;
   }
 
-  const currentProfiles = await UserRankProfile.find({ currentSeasonId: season._id }).sort({
-    knowledgePoints: -1,
-    updatedAt: 1
-  });
+  const currentProfiles = await UserRankProfile.findMany(
+    { currentSeasonId: season.id },
+    { orderBy: { knowledgePoints: 'desc' } }
+  );
 
   const snapshots: Array<
     Pick<
@@ -256,14 +284,14 @@ export async function closeSeasonAndStartNext({
     const seasonPeakKp = Math.max(0, Number(profile.seasonPeakKp || 0));
     const eventsCount = profile.competitiveEventsCountSeason;
 
-    const resetInfo = profile.applySeasonReset(season.resetPolicy || {});
+    const resetInfo = UserRankProfile.applySeasonReset(profile, season.resetPolicy || {});
     const newRank = getRankByIndex(resetInfo.newRankIndex);
 
     profile.currentSeasonId = nextSeason._id;
-    await profile.save();
+    await UserRankProfile.save(profile);
 
     snapshots.push({
-      seasonId: season._id,
+      seasonId: season.id,
       userId: profile.userId,
       position: idx + 1,
       finalRankIndex,
@@ -282,16 +310,29 @@ export async function closeSeasonAndStartNext({
   }
 
   if (snapshots.length > 0) {
-    await SeasonResultSnapshot.insertMany(snapshots, { ordered: false });
+    await prisma.seasonResultSnapshot.createMany({
+      data: snapshots.map((snapshot) => ({
+        id: newId(),
+        seasonId: snapshot.seasonId,
+        userId: snapshot.userId,
+        position: snapshot.position,
+        finalRankIndex: snapshot.finalRankIndex,
+        finalRankName: snapshot.finalRankName,
+        finalKnowledgePoints: snapshot.finalKnowledgePoints,
+        seasonPeakRankIndex: snapshot.seasonPeakRankIndex,
+        seasonPeakKp: snapshot.seasonPeakKp,
+        eventsCount: snapshot.eventsCount,
+        resetApplied: snapshot.resetApplied as unknown as Prisma.InputJsonValue
+      })),
+      skipDuplicates: true
+    });
   }
 
-  season.status = 'closed';
-  season.endAt = now;
-  season.closedAt = now;
-  await season.save();
+  await RankSeason.updateOne({ id: season.id }, { status: 'closed', endAt: now, closedAt: now });
+  const closedSeason = (await RankSeason.findOne({ id: season.id })) as IRankSeason;
 
   return {
-    closedSeason: season,
+    closedSeason,
     startedSeason: nextSeason,
     affectedUsers: currentProfiles.length
   };

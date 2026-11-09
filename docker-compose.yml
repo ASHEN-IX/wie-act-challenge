@@ -14,6 +14,7 @@ services:
     environment:
       MONGODB_URI: mongodb://mongodb:27017/${AI_DB_NAME:-ednova}
       DB_NAME: ${AI_DB_NAME:-ednova}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ednova}:${POSTGRES_PASSWORD:-ednova}@postgres:5432/${POSTGRES_DB:-ednova}
       RABBITMQ_URL: amqp://${RABBITMQ_USER:-ednova}:${RABBITMQ_PASS:?RABBITMQ_PASS
         must be set}@rabbitmq:5672/${RABBITMQ_VHOST:-ednova}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
@@ -40,6 +41,8 @@ services:
     - ${INGEST_UPLOADS_DIR:-./var/dev-uploads}:/app/uploads
     depends_on:
       mongodb:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
@@ -90,6 +93,8 @@ services:
     container_name: ednova-coach-worker
     command: python -m workers.coach_worker
 
+  # The Python AI service keeps its own collections (queues, FAISS chunk
+  # metadata, pacing/review memory). The Node API no longer uses MongoDB.
   mongodb:
     image: mongo:7
     restart: unless-stopped
@@ -98,12 +103,25 @@ services:
     volumes:
     - mongodb_data:/data/db
     healthcheck:
+      test: [CMD, mongosh, --quiet, --eval, "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ednova}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ednova}
+      POSTGRES_DB: ${POSTGRES_DB:-ednova}
+    ports:
+    - 127.0.0.1:5433:5432
+    volumes:
+    - postgres_data:/var/lib/postgresql/data
+    healthcheck:
       test:
-      - CMD
-      - mongosh
-      - --quiet
-      - --eval
-      - db.adminCommand('ping')
+      - CMD-SHELL
+      - pg_isready -U ${POSTGRES_USER:-ednova} -d ${POSTGRES_DB:-ednova}
       interval: 10s
       timeout: 5s
       retries: 6
@@ -160,6 +178,8 @@ volumes:
   mongodb_data:
     name: ednova_mongodb_data
     external: true
+  postgres_data:
+    name: ednova_postgres_data
   rabbitmq_data:
     name: ednova_rabbitmq_data
     external: true

@@ -14,7 +14,7 @@ This log records the 16 core architectural decisions approved by the team. Every
 2. [ADR-02: NestJS Modular Monolith with In-Process Dispatch](#adr-02-nestjs-modular-monolith-with-in-process-dispatch)
 3. [ADR-03: Next.js 16 App Router for Web Application & Gateway Integration](#adr-03-nextjs-16-app-router-for-web-application--gateway-integration)
 4. [ADR-04: Better-Auth for Cookie Identity and Session Management](#adr-04-better-auth-for-cookie-identity-and-session-management)
-5. [ADR-05: MongoDB Primary Persistence with Compound Idempotency](#adr-05-mongodb-primary-persistence-with-compound-idempotency)
+5. [ADR-05: PostgreSQL Primary Persistence with Compound Idempotency](#adr-05-postgresql-primary-persistence-with-compound-idempotency)
 6. [ADR-06: Redis for Ephemeral State, Locks, and Rate Limiting](#adr-06-redis-for-ephemeral-state-locks-and-rate-limiting)
 7. [ADR-07: RabbitMQ Asynchronous Event Broker & Typed AI Envelopes](#adr-07-rabbitmq-asynchronous-event-broker--typed-ai-envelopes)
 8. [ADR-08: Dual-Path AI Inference (Interactive REST vs Asynchronous Workers)](#adr-08-dual-path-ai-inference)
@@ -87,9 +87,9 @@ Retain **Next.js 16 App Router** with **React 19 Server Components (RSC)**, **Ta
 Stateless JWTs stored in browser LocalStorage are vulnerable to XSS and cannot be revoked server-side without complex token blacklists.
 
 ### Decision
-Standardize on **Better-Auth** (`^1.7.7`) using HttpOnly, SameSite, Secure cookies backed by MongoDB.
+Standardize on **Better-Auth** (`^1.7.7`) using HttpOnly, SameSite, Secure cookies backed by PostgreSQL through the Prisma adapter.
 - Better-Auth endpoint is mounted at `/api/auth/[...all]` in Next.js.
-- NestJS uses a unified `SessionGuard` reading the shared MongoDB auth collections (`auth_sessions`, `auth_users`).
+- NestJS uses a unified `SessionGuard` reading the shared PostgreSQL auth tables (`auth_sessions`, `auth_users`).
 - Legacy bcrypt user credentials are automatically upgraded upon first sign-in.
 
 ### Consequences
@@ -98,13 +98,15 @@ Standardize on **Better-Auth** (`^1.7.7`) using HttpOnly, SameSite, Secure cooki
 
 ---
 
-## ADR-05: MongoDB Primary Persistence with Compound Idempotency
+## ADR-05: PostgreSQL Primary Persistence with Compound Idempotency
 
 ### Context
 The application domain requires multi-document entity models (courses, modules, objectives, attempts, rooms) with dynamic pedagogical metadata.
 
 ### Decision
-Retain **MongoDB 7.0** as the primary database managed via Mongoose schemas.
+Use **PostgreSQL 17** as the primary database, accessed through **Prisma 7**. Primary keys remain 24-character hex strings so identifiers that already reached clients are unchanged, and the API keeps serializing them as `_id`. Idempotency that MongoDB delivered with single-document atomic updates is now expressed with unique constraints and transactions. `apps/api/prisma/schema.prisma` is the schema of record.
+
+MongoDB is retained only for the Python AI service's own collections.
 - Use compound unique indexes for critical business idempotency (e.g., `userId + courseId + objectiveId` for competency records; `eventKey` for gamification).
 - Enforce strict read/write ACL filters on every query at the repository layer.
 - Prohibit alternative databases (PostgreSQL, Cassandra) for the core platform.
@@ -164,7 +166,7 @@ Architect two distinct AI execution paths:
    - Used for: Socratic hints, intent-to-activity selection, lightweight feedback, facilitator reasoning.
    - Enforces internal API key authentication, request-level authorization in NestJS, and 5-10s timeout budgets.
 2. **Asynchronous Background Processing Path**:
-   - `NestJS → RabbitMQ → Python Worker → MongoDB/Redis → NestJS Poller/WebSocket`.
+   - `NestJS → RabbitMQ → Python Worker → Mongo/Redis → NestJS Poller/WebSocket`.
    - Used for: Document OCR, PDF chunking, FAISS index construction, complex multi-turn evaluations.
 
 ### Consequences

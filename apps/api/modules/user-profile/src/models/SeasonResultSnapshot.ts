@@ -1,107 +1,75 @@
-import mongoose, { Document, Model, Schema } from 'mongoose';
+import type {
+  Prisma,
+  SeasonResultSnapshot as SnapshotRow
+} from '../../../../src/generated/prisma/client';
+import { prisma, toDocument } from '../../../../shared/database';
+import { newId } from '../../../../shared/ids';
+import { json } from './_helpers';
 
-export interface ISeasonResultSnapshot extends Document {
-  seasonId: mongoose.Types.ObjectId;
-  userId: string;
-  position: number | null;
-  finalRankIndex: number;
-  finalKnowledgePoints: number;
-  finalRankName: string;
-  seasonPeakKp: number | null;
-  seasonPeakRankIndex: number | null;
-  eventsCount: number;
-  rewardsGranted: string[];
+export type ISeasonResultSnapshot = Omit<SnapshotRow, 'resetApplied'> & {
+  _id: string;
   resetApplied: {
     demotedBy: number;
     newRankIndex: number;
     newRankName: string | null;
     seasonFloorIndex: number;
   };
-  snapshotAt: Date;
-  createdAt: Date;
-  updatedAt: Date;
+};
+
+function hydrate(row: SnapshotRow): ISeasonResultSnapshot {
+  return toDocument(row) as unknown as ISeasonResultSnapshot;
 }
 
-const seasonResultSnapshotSchema = new Schema<ISeasonResultSnapshot>(
-  {
-    seasonId: {
-      type: Schema.Types.ObjectId,
-      ref: 'RankSeason',
-      required: true,
-      index: true
-    },
-    userId: {
-      type: String,
-      required: true,
-      index: true
-    },
-    position: {
-      type: Number,
-      min: 1,
-      default: null
-    },
-    finalRankIndex: {
-      type: Number,
-      required: true
-    },
-    finalKnowledgePoints: {
-      type: Number,
-      required: true,
-      default: 0
-    },
-    // Compatibility alias (legacy RP naming).
-    finalRankName: {
-      type: String,
-      required: true
-    },
-    seasonPeakKp: {
-      type: Number,
-      default: null
-    },
-    seasonPeakRankIndex: {
-      type: Number,
-      default: null
-    },
-    eventsCount: {
-      type: Number,
-      default: 0
-    },
-    rewardsGranted: {
-      type: [String],
-      default: []
-    },
-    resetApplied: {
-      demotedBy: { type: Number, default: 0 },
-      newRankIndex: { type: Number, default: 0 },
-      newRankName: { type: String, default: null },
-      seasonFloorIndex: { type: Number, default: 0 }
-    },
-    snapshotAt: {
-      type: Date,
-      default: Date.now,
-      index: true
-    }
+export const SeasonResultSnapshot = {
+  async findOne(
+    where: Prisma.SeasonResultSnapshotWhereInput
+  ): Promise<ISeasonResultSnapshot | null> {
+    const row = await prisma.seasonResultSnapshot.findFirst({ where });
+    return row ? hydrate(row) : null;
   },
-  {
-    timestamps: true
-  }
-);
 
-seasonResultSnapshotSchema.pre('save', function normalizePoints(next) {
-  if (!Number.isFinite(this.finalKnowledgePoints)) {
-    this.finalKnowledgePoints = 0;
-  }
-  if (!Number.isFinite(this.seasonPeakKp)) {
-    this.seasonPeakKp = null;
-  }
-  next();
-});
+  async findMany(
+    where: Prisma.SeasonResultSnapshotWhereInput = {}
+  ): Promise<ISeasonResultSnapshot[]> {
+    const rows = await prisma.seasonResultSnapshot.findMany({ where });
+    return rows.map(hydrate);
+  },
 
-seasonResultSnapshotSchema.index({ seasonId: 1, userId: 1 }, { unique: true });
+  async create(
+    data: Prisma.SeasonResultSnapshotUncheckedCreateInput
+  ): Promise<ISeasonResultSnapshot> {
+    return hydrate(
+      await prisma.seasonResultSnapshot.create({ data: { ...data, id: data.id ?? newId() } })
+    );
+  },
 
-const SeasonResultSnapshot =
-  (mongoose.models.SeasonResultSnapshot as Model<ISeasonResultSnapshot>) ||
-  mongoose.model<ISeasonResultSnapshot>('SeasonResultSnapshot', seasonResultSnapshotSchema);
+  async findOneAndUpdate(
+    where: Prisma.SeasonResultSnapshotWhereInput,
+    data: Prisma.SeasonResultSnapshotUpdateInput
+  ): Promise<ISeasonResultSnapshot | null> {
+    const existing = await prisma.seasonResultSnapshot.findFirst({ where, select: { id: true } });
+    if (!existing) return null;
+    return hydrate(await prisma.seasonResultSnapshot.update({ where: { id: existing.id }, data }));
+  },
+
+  async upsert(
+    seasonId: string,
+    userId: string,
+    data: Omit<Prisma.SeasonResultSnapshotUncheckedCreateInput, 'id' | 'seasonId' | 'userId'>
+  ): Promise<ISeasonResultSnapshot> {
+    const row = await prisma.seasonResultSnapshot.upsert({
+      where: { seasonId_userId: { seasonId, userId } },
+      update: { ...data, resetApplied: json(data.resetApplied) as Prisma.InputJsonValue },
+      create: {
+        ...data,
+        id: newId(),
+        seasonId,
+        userId,
+        resetApplied: json(data.resetApplied) as Prisma.InputJsonValue
+      }
+    });
+    return hydrate(row);
+  }
+};
 
 export default SeasonResultSnapshot;
-module.exports = SeasonResultSnapshot;

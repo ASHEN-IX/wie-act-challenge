@@ -8,14 +8,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import express, { type Response, type NextFunction } from 'express';
 import request from 'supertest';
-import mongoose from 'mongoose';
 import crypto from 'node:crypto';
+import { connectDatabase, disconnectDatabase } from '../../shared/database';
+import { newId } from '../../shared/ids';
 
 import {
   ActivityRecord,
   Course,
   CourseEnrollment,
   CourseRevision,
+  Institution,
   InstitutionMembership,
   LearningEvidence,
   StudentAttempt,
@@ -27,18 +29,18 @@ import { updateCourseDraft } from '../../modules/study/src/services/courseDraft'
 import { publishCourseRevision } from '../../modules/study/src/services/coursePublication';
 import type { DomainRequest } from '../../src/framework/contracts';
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27018/ednova-test';
-
 test('M20 / ED-11: Private Participant Understanding Checks, Debrief and Next Steps Integration', async (t) => {
-  await mongoose.connect(MONGO_URI);
+  await connectDatabase();
 
   const testPrefix = `m20_${Date.now()}`;
   const ownerUserId = `${testPrefix}_owner`;
   const instructorId = `${testPrefix}_instructor`;
   const student1Id = `${testPrefix}_student1`;
   const student2Id = `${testPrefix}_student2`;
+  // Peer study rooms refuse teaching staff, so an enrolled learner hosts.
+  const hostId = `${testPrefix}_host`;
   const nonMemberId = `${testPrefix}_non_member`;
-  const institutionId = new mongoose.Types.ObjectId();
+  const institutionId = newId();
 
   let courseId: string;
   let publishedRevisionTag: string;
@@ -71,49 +73,59 @@ test('M20 / ED-11: Private Participant Understanding Checks, Debrief and Next St
     await cleanupCourseFixtures();
     try {
       if (courseId) {
-        await Course.deleteMany({ courseId });
         await CourseRevision.deleteMany({ courseId });
         await CourseEnrollment.deleteMany({ courseId });
         await ActivityRecord.deleteMany({ courseId });
         await StudentAttempt.deleteMany({ courseId });
-        await LearningEvidence.deleteMany({ 'activity.courseId': courseId });
+        // Evidence has no scalar courseId column; the suite's own users scope it.
+        await LearningEvidence.deleteMany({ userId: { contains: testPrefix } });
       }
+      await Course.deleteMany({ userId: { contains: testPrefix } });
       await InstitutionMembership.deleteMany({ institutionId });
+      await Institution.deleteMany({ _id: institutionId });
       if (roomId) {
         await StudyRoom.deleteMany({ roomId });
       }
     } finally {
-      await mongoose.disconnect();
+      await disconnectDatabase().catch(() => {});
     }
   });
 
   await t.test(
     '1. Setup: Create published course, enrollments, and registered activity',
     async () => {
-      await InstitutionMembership.create([
+      // Institution exists before memberships and enrollments (real foreign keys).
+      await Institution.create({
+        id: institutionId,
+        name: 'M20 Debrief Institution',
+        slug: `m20-${institutionId}`,
+        createdByUserId: ownerUserId,
+        status: 'active'
+      });
+      await InstitutionMembership.createMany([
         { institutionId, userId: instructorId, role: 'instructor', status: 'active' },
         { institutionId, userId: student1Id, role: 'university_student', status: 'active' },
-        { institutionId, userId: student2Id, role: 'university_student', status: 'active' }
+        { institutionId, userId: student2Id, role: 'university_student', status: 'active' },
+        { institutionId, userId: hostId, role: 'university_student', status: 'active' }
       ]);
 
       const rawCourse = await Course.create({
         title: 'Debrief & Assessment Architecture',
-        slug: `debrief-${testPrefix}`,
         description: 'Course verifying private checks and group debrief separation',
         scope: 'institutional',
         institutionId,
         ownerUserId,
         userId: ownerUserId,
         subjectId: 'sub_eval',
-        assignedInstructorIds: [instructorId],
-        settings: { isPublic: false }
+        assignedInstructorIds: [instructorId]
       });
       courseId = rawCourse._id.toString();
       await prepareCourseFixture(courseId, t);
 
-      await CourseEnrollment.create([
-        { courseId, institutionId, userId: student1Id, enrolledRole: 'student', status: 'active' },
-        { courseId, institutionId, userId: student2Id, enrolledRole: 'student', status: 'active' }
+      await CourseEnrollment.createMany([
+        { courseId, institutionId, userId: student1Id, status: 'active' },
+        { courseId, institutionId, userId: student2Id, status: 'active' },
+        { courseId, institutionId, userId: hostId, status: 'active' }
       ]);
 
       const initialDraftTag = `rev_${Date.now()}`;
@@ -230,7 +242,7 @@ test('M20 / ED-11: Private Participant Understanding Checks, Debrief and Next St
   await t.test('2. Room Session & Activity Pinning: Create room and join peers', async () => {
     const createRes = await request(app)
       .post('/api/v1/study/rooms')
-      .set('x-test-actor', instructorId)
+      .set('x-test-actor', hostId)
       .send({
         courseId,
         title: 'Formative Assessment Room',
@@ -257,7 +269,7 @@ test('M20 / ED-11: Private Participant Understanding Checks, Debrief and Next St
     // Presenter selects activity and advances to individual_attempt
     const phaseRes = await request(app)
       .put(`/api/v1/study/rooms/${roomId}/phase`)
-      .set('x-test-actor', instructorId)
+      .set('x-test-actor', hostId)
       .send({
         currentPhase: 'individual_attempt',
         activeActivityId: quizActivityId
@@ -300,7 +312,7 @@ test('M20 / ED-11: Private Participant Understanding Checks, Debrief and Next St
       // Presenter advances room to debrief
       const debriefPhaseRes = await request(app)
         .put(`/api/v1/study/rooms/${roomId}/phase`)
-        .set('x-test-actor', instructorId)
+        .set('x-test-actor', hostId)
         .send({
           currentPhase: 'debrief'
         });
@@ -360,11 +372,11 @@ test('M20 / ED-11: Private Participant Understanding Checks, Debrief and Next St
       // 3. Instructor queries debrief
       const instrDebrief = await request(app)
         .get(`/api/v1/study/rooms/${roomId}/debrief`)
-        .set('x-test-actor', instructorId);
+        .set('x-test-actor', hostId);
 
       assert.equal(instrDebrief.status, 200);
       assert.equal(instrDebrief.body.recap.publicSubmissionsCount, 1);
-      // Instructor's own private outcome is untested
+      // The host's own private outcome is untested
       assert.equal(instrDebrief.body.privateOutcome.status, 'untested');
       // Instructor cannot use debrief to spy on private student attempts
       const instrBodyStr = JSON.stringify(instrDebrief.body);

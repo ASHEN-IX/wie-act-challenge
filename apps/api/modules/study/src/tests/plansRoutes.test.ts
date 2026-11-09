@@ -49,11 +49,17 @@ jest.mock('../services/competencyQueries', () => ({
   getWeakCompetenciesForCourse: jest.fn()
 }));
 
+// The job lookup now reads the orchestrator's AiJob model.
+const mockAiJobFindOne = jest.fn();
+jest.mock('../../../ai-orchestrator/src/models/AiJob', () => ({
+  __esModule: true,
+  default: { findOne: (...args: unknown[]) => mockAiJobFindOne(...args) }
+}));
+
 jest.mock('@ednova/shared/moduleClient', () => ({
   post: jest.fn()
 }));
 
-import mongoose from 'mongoose';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const moduleClient = require('@ednova/shared/moduleClient');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -157,14 +163,7 @@ describe('POST /api/v1/plans/create-status — competency target persistence', (
 
   test('persists objectiveId/targetBloomLevel on each task and in taskGraph', async () => {
     const aiJob = aiJobsResult();
-    const aiJobsColl = {
-      findOne: jest.fn(async () => aiJob)
-    };
-    const original = mongoose.connection;
-    Object.defineProperty(mongoose.connection, 'collection', {
-      value: jest.fn(() => aiJobsColl),
-      configurable: true
-    });
+    mockAiJobFindOne.mockResolvedValue(aiJob);
 
     const res = await request(app)
       .post('/api/v1/plans/create-status')
@@ -191,6 +190,10 @@ describe('POST /api/v1/plans/create-status — competency target persistence', (
       target_bloom_level: 'apply'
     });
     expect(savedPlanDoc.taskGraph.tasks[1]).not.toHaveProperty('objective_id');
-    expect(original).toBe(mongoose.connection);
+    expect(mockAiJobFindOne).toHaveBeenCalledWith({
+      correlationId: 'corr-1',
+      userId: 'user-123',
+      type: 'study.plan.generate'
+    });
   });
 });

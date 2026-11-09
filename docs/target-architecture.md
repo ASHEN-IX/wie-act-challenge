@@ -69,7 +69,7 @@ flowchart LR
 | **Web Frontend** | Next.js 16 (App Router), React 19, Tailwind CSS 4, shadcn/ui | Standalone Node.js (`:5173`) | React Server Components (RSC), native Server Actions, accessible UI primitives, CSP proxy. |
 | **Backend API Gateway** | NestJS 12.1 + Express Platform | Node >= 24 (`:3000`) | Modular monolith, domain contracts, WebSocket servers (`/ws/realtime`), Better-Auth session guard. |
 | **Authentication** | Better-Auth 1.7.7 | Next.js API mount (`/api/auth/*`) | Mongo-backed cookie identity, bcrypt migration, OTP verification, rate limits. |
-| **Primary Persistence** | MongoDB 7.0 + Mongoose 8 | Docker Container (`:27017`) | Multi-document ACID transactions, compound idempotency keys, domain collections. |
+| **Primary Persistence** | PostgreSQL 7.0 + Mongoose 8 | Docker Container (`:27017`) | Multi-document ACID transactions, compound idempotency keys, domain collections. |
 | **Cache & Distributed State**| Redis 7-alpine | Docker Container (`:6379`) | Fast atomic deduplication leases, rate limiting, room heartbeat tracking. |
 | **Background Message Broker**| RabbitMQ 3-management | Docker Container (`:5672`) | Topic exchange (`EXCHANGE_JOBS`), dead letter queues (`ai.dlq.*`), 3-step exponential retry backoff. |
 | **Interactive AI Gateway** | Python FastAPI | Uvicorn (`:8000`) | Low-latency REST endpoints for Socratic hints, intent classification, activity generation. |
@@ -92,7 +92,7 @@ Client Browser ──(HTTPS)──> NestJS Control Plane ──(Internal HTTP)�
                                                                          FAISS Retrieval
 
 Path B: Asynchronous Batch & Long-Running Processing
-NestJS Control Plane ──(AMQP)──> RabbitMQ (mindflow.jobs) ──> Python Background Workers ──> MongoDB / FAISS
+NestJS Control Plane ──(AMQP)──> RabbitMQ (mindflow.jobs) ──> Python Background Workers ──> PostgreSQL / FAISS
                                                                            │
                                                                    Status Poller / WebSocket
 ```

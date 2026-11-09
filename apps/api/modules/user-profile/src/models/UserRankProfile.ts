@@ -1,249 +1,204 @@
-import mongoose, { Document, Model, Schema } from 'mongoose';
+import type {
+  Prisma,
+  UserRankProfile as UserRankProfileRow
+} from '../../../../src/generated/prisma/client';
+import { prisma, toDocument } from '../../../../shared/database';
+import { newId } from '../../../../shared/ids';
 import {
   DEFAULT_KP,
   DEFAULT_SEASON_FLOOR_INDEX,
-  getRankByKp,
   getRankByIndex,
+  getRankByKp,
   isLowBracket,
-  RankLadderItem
+  type RankLadderItem
 } from './rankingConfig';
 
-export interface IUserRankProfile extends Document {
-  userId: string;
-  currentSeasonId: mongoose.Types.ObjectId | null;
-  knowledgePoints: number;
-  rankIndex: number;
-  rankName: string;
-  seasonPeakRankIndex: number;
-  allTimePeakRankIndex: number;
-  seasonPeakKp: number;
-  allTimePeakKp: number;
-  competitiveEventsCountSeason: number;
-  learningSkillRating: number;
-  currentStreak: number;
-  comebackBonusRemaining: number;
-  lastActivityAt: Date | null;
-  lastEventAt: Date | null;
-  lastResetAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-  syncRankFromPoints(): RankLadderItem;
-  applyKnowledgeDelta(deltaKp: number): {
-    deltaKp: number;
-    beforeKp: number;
-    afterKp: number;
-    beforeRankIndex: number;
-    afterRankIndex: number;
-    rankUp: boolean;
-    rankDown: boolean;
-  };
-  applySeasonReset(resetPolicy?: {
-    lowBracketDrop?: number;
-    highBracketDrop?: number;
-    seasonFloorIndex?: number;
-  }): {
-    oldRankIndex: number;
-    newRankIndex: number;
-    demotedBy: number;
-    seasonFloorIndex: number;
-  };
+export type IUserRankProfile = UserRankProfileRow & { _id: string };
+
+function hydrate(row: UserRankProfileRow): IUserRankProfile {
+  return toDocument(row) as unknown as IUserRankProfile;
 }
 
-const userRankProfileSchema = new Schema<IUserRankProfile>(
-  {
-    userId: {
-      type: String,
-      required: true,
-      unique: true,
-      index: true
-    },
-    currentSeasonId: {
-      type: Schema.Types.ObjectId,
-      ref: 'RankSeason',
-      default: null,
-      index: true
-    },
-    knowledgePoints: {
-      type: Number,
-      min: 0,
-      default: DEFAULT_KP,
-      index: true
-    },
-    rankIndex: {
-      type: Number,
-      min: 0,
-      default: DEFAULT_SEASON_FLOOR_INDEX,
-      index: true
-    },
-    rankName: {
-      type: String,
-      default: getRankByIndex(DEFAULT_SEASON_FLOOR_INDEX).name
-    },
-    seasonPeakRankIndex: {
-      type: Number,
-      min: 0,
-      default: DEFAULT_SEASON_FLOOR_INDEX
-    },
-    allTimePeakRankIndex: {
-      type: Number,
-      min: 0,
-      default: DEFAULT_SEASON_FLOOR_INDEX
-    },
-    seasonPeakKp: {
-      type: Number,
-      min: 0,
-      default: DEFAULT_KP
-    },
-    allTimePeakKp: {
-      type: Number,
-      min: 0,
-      default: DEFAULT_KP
-    },
-    competitiveEventsCountSeason: {
-      type: Number,
-      min: 0,
-      default: 0
-    },
-    learningSkillRating: {
-      type: Number,
-      min: 0,
-      default: 1000
-    },
-    currentStreak: {
-      type: Number,
-      min: 0,
-      default: 0
-    },
-    comebackBonusRemaining: {
-      type: Number,
-      min: 0,
-      default: 0
-    },
-    lastActivityAt: {
-      type: Date,
-      default: null,
-      index: true
-    },
-    lastEventAt: {
-      type: Date,
-      default: null
-    },
-    lastResetAt: {
-      type: Date,
-      default: null
-    }
+/** Rank fields derived from a knowledge-point total. */
+function rankStateFor(kp: number) {
+  const safe = Math.max(0, Math.trunc(kp) || 0);
+  const rank = getRankByKp(safe);
+  return { knowledgePoints: safe, rankIndex: rank.index, rankName: rank.name };
+}
+
+export const UserRankProfile = {
+  async findOne(where: Prisma.UserRankProfileWhereInput): Promise<IUserRankProfile | null> {
+    const row = await prisma.userRankProfile.findFirst({ where });
+    return row ? hydrate(row) : null;
   },
-  {
-    timestamps: true
-  }
-);
 
-userRankProfileSchema.methods.syncRankFromPoints = function syncRankFromPoints() {
-  const safeKp = Math.max(0, Number(this.knowledgePoints) || 0);
-  this.knowledgePoints = safeKp;
+  async findMany(
+    where: Prisma.UserRankProfileWhereInput = {},
+    options: {
+      take?: number;
+      skip?: number;
+      orderBy?: Prisma.UserRankProfileOrderByWithRelationInput;
+    } = {}
+  ): Promise<IUserRankProfile[]> {
+    const rows = await prisma.userRankProfile.findMany({ where, ...options });
+    return rows.map(hydrate);
+  },
 
-  const rank = getRankByKp(safeKp);
-  this.rankIndex = rank.index;
-  this.rankName = rank.name;
-  return rank;
-};
+  async countDocuments(where: Prisma.UserRankProfileWhereInput = {}): Promise<number> {
+    return prisma.userRankProfile.count({ where });
+  },
 
-userRankProfileSchema.methods.applyKnowledgeDelta = function applyKnowledgeDelta(deltaKp: number) {
-  const delta = Number.isFinite(deltaKp) ? Math.trunc(deltaKp) : 0;
-  const beforeKp = Math.max(0, Number(this.knowledgePoints) || 0);
-  const beforeRank = getRankByKp(beforeKp);
+  async create(userId: string): Promise<IUserRankProfile> {
+    const row = await prisma.userRankProfile.create({
+      data: {
+        id: newId(),
+        userId,
+        knowledgePoints: DEFAULT_KP,
+        rankIndex: DEFAULT_SEASON_FLOOR_INDEX,
+        rankName: getRankByIndex(DEFAULT_SEASON_FLOOR_INDEX).name
+      }
+    });
+    return hydrate(row);
+  },
 
-  this.knowledgePoints = Math.max(0, beforeKp + delta);
-  const afterRank = this.syncRankFromPoints();
+  async findOneAndUpdate(
+    where: Prisma.UserRankProfileWhereInput,
+    data: Prisma.UserRankProfileUpdateInput,
+    { upsert = false }: { upsert?: boolean } = {}
+  ): Promise<IUserRankProfile | null> {
+    const existing = await prisma.userRankProfile.findFirst({ where, select: { id: true } });
+    if (existing) {
+      const payload = { ...data };
+      // The schema's pre-save hook kept rankName consistent with knowledgePoints.
+      if (
+        typeof data.knowledgePoints === 'number' &&
+        data.rankIndex === undefined &&
+        data.rankName === undefined
+      ) {
+        const rank = getRankByKp(Math.max(0, data.knowledgePoints));
+        payload.rankIndex = rank.index;
+        payload.rankName = rank.name;
+      }
+      return hydrate(
+        await prisma.userRankProfile.update({ where: { id: existing.id }, data: payload })
+      );
+    }
+    if (!upsert) return null;
+    const userId = (where as { userId?: string }).userId;
+    return userId ? UserRankProfile.create(userId) : null;
+  },
 
-  if (this.rankIndex > (this.seasonPeakRankIndex || 0)) {
-    this.seasonPeakRankIndex = this.rankIndex;
-  }
-  if (this.rankIndex > (this.allTimePeakRankIndex || 0)) {
-    this.allTimePeakRankIndex = this.rankIndex;
-  }
-  if (this.knowledgePoints > (this.seasonPeakKp || 0)) {
-    this.seasonPeakKp = this.knowledgePoints;
-  }
-  if (this.knowledgePoints > (this.allTimePeakKp || 0)) {
-    this.allTimePeakKp = this.knowledgePoints;
-  }
+  async updateOne(
+    where: Prisma.UserRankProfileWhereInput,
+    data: Prisma.UserRankProfileUpdateInput
+  ) {
+    const result = await prisma.userRankProfile.updateMany({ where, data });
+    return { matchedCount: result.count };
+  },
 
-  this.competitiveEventsCountSeason = (this.competitiveEventsCountSeason || 0) + 1;
-  this.lastEventAt = new Date();
-  this.lastActivityAt = this.lastEventAt;
+  async save(profile: IUserRankProfile): Promise<IUserRankProfile> {
+    const row = await prisma.userRankProfile.update({
+      where: { id: profile.id },
+      data: {
+        currentSeasonId: profile.currentSeasonId,
+        knowledgePoints: profile.knowledgePoints,
+        rankIndex: profile.rankIndex,
+        rankName: profile.rankName,
+        seasonPeakRankIndex: profile.seasonPeakRankIndex,
+        allTimePeakRankIndex: profile.allTimePeakRankIndex,
+        seasonPeakKp: profile.seasonPeakKp,
+        allTimePeakKp: profile.allTimePeakKp,
+        competitiveEventsCountSeason: profile.competitiveEventsCountSeason,
+        learningSkillRating: profile.learningSkillRating,
+        currentStreak: profile.currentStreak,
+        comebackBonusRemaining: profile.comebackBonusRemaining,
+        lastActivityAt: profile.lastActivityAt,
+        lastEventAt: profile.lastEventAt,
+        lastResetAt: profile.lastResetAt
+      }
+    });
+    return hydrate(row);
+  },
 
-  return {
-    deltaKp: delta,
-    beforeKp,
-    afterKp: this.knowledgePoints,
-    beforeRankIndex: beforeRank.index,
-    afterRankIndex: afterRank.index,
-    rankUp: afterRank.index > beforeRank.index,
-    rankDown: afterRank.index < beforeRank.index
-  };
-};
+  syncRankFromPoints(profile: IUserRankProfile): RankLadderItem {
+    const state = rankStateFor(profile.knowledgePoints);
+    profile.knowledgePoints = state.knowledgePoints;
+    profile.rankIndex = state.rankIndex;
+    profile.rankName = state.rankName;
+    return getRankByIndex(state.rankIndex);
+  },
 
-userRankProfileSchema.methods.applySeasonReset = function applySeasonReset(
-  resetPolicy: NonNullable<Parameters<IUserRankProfile['applySeasonReset']>[0]> = {}
-) {
-  const lowBracketDrop =
-    typeof resetPolicy.lowBracketDrop === 'number' && Number.isFinite(resetPolicy.lowBracketDrop)
-      ? resetPolicy.lowBracketDrop
+  /** Apply a knowledge delta and update the peak/event counters. */
+  applyKnowledgeDelta(profile: IUserRankProfile, deltaKp: number) {
+    const delta = Number.isFinite(deltaKp) ? Math.trunc(deltaKp) : 0;
+    const beforeKp = Math.max(0, Number(profile.knowledgePoints) || 0);
+    const beforeRank = getRankByKp(beforeKp);
+
+    const state = rankStateFor(beforeKp + delta);
+    profile.knowledgePoints = state.knowledgePoints;
+    const afterRank = UserRankProfile.syncRankFromPoints(profile);
+
+    if (profile.rankIndex > (profile.seasonPeakRankIndex || 0))
+      profile.seasonPeakRankIndex = profile.rankIndex;
+    if (profile.rankIndex > (profile.allTimePeakRankIndex || 0))
+      profile.allTimePeakRankIndex = profile.rankIndex;
+    if (profile.knowledgePoints > (profile.seasonPeakKp || 0))
+      profile.seasonPeakKp = profile.knowledgePoints;
+    if (profile.knowledgePoints > (profile.allTimePeakKp || 0))
+      profile.allTimePeakKp = profile.knowledgePoints;
+
+    profile.competitiveEventsCountSeason = (profile.competitiveEventsCountSeason || 0) + 1;
+    profile.lastEventAt = new Date();
+    profile.lastActivityAt = profile.lastEventAt;
+
+    return {
+      deltaKp: delta,
+      beforeKp,
+      afterKp: profile.knowledgePoints,
+      beforeRankIndex: beforeRank.index,
+      afterRankIndex: afterRank.index,
+      rankUp: afterRank.index > beforeRank.index,
+      rankDown: afterRank.index < beforeRank.index
+    };
+  },
+
+  /** Demote the profile at a season boundary and reset the season counters. */
+  applySeasonReset(
+    profile: IUserRankProfile,
+    resetPolicy: {
+      lowBracketDrop?: number;
+      highBracketDrop?: number;
+      seasonFloorIndex?: number;
+    } = {}
+  ) {
+    const lowBracketDrop = Number.isFinite(resetPolicy.lowBracketDrop)
+      ? (resetPolicy.lowBracketDrop as number)
       : 3;
-  const highBracketDrop =
-    typeof resetPolicy.highBracketDrop === 'number' && Number.isFinite(resetPolicy.highBracketDrop)
-      ? resetPolicy.highBracketDrop
+    const highBracketDrop = Number.isFinite(resetPolicy.highBracketDrop)
+      ? (resetPolicy.highBracketDrop as number)
       : 5;
-  const seasonFloorIndex =
-    typeof resetPolicy.seasonFloorIndex === 'number' &&
-    Number.isFinite(resetPolicy.seasonFloorIndex)
-      ? resetPolicy.seasonFloorIndex
+    const seasonFloorIndex = Number.isFinite(resetPolicy.seasonFloorIndex)
+      ? (resetPolicy.seasonFloorIndex as number)
       : DEFAULT_SEASON_FLOOR_INDEX;
 
-  const oldRankIndex = this.rankIndex;
-  const demotedBy = isLowBracket(oldRankIndex) ? lowBracketDrop : highBracketDrop;
-  const newRankIndex = Math.max(seasonFloorIndex, oldRankIndex - demotedBy);
-  const newRank = getRankByIndex(newRankIndex);
+    const oldRankIndex = profile.rankIndex;
+    const demotedBy = isLowBracket(oldRankIndex) ? lowBracketDrop : highBracketDrop;
+    const newRankIndex = Math.max(seasonFloorIndex, oldRankIndex - demotedBy);
+    const newRank = getRankByIndex(newRankIndex);
 
-  this.rankIndex = newRank.index;
-  this.rankName = newRank.name;
-  const rankFloor = Number.isFinite(newRank.minKp) ? newRank.minKp : DEFAULT_KP;
-  this.knowledgePoints = rankFloor;
+    profile.rankIndex = newRank.index;
+    profile.rankName = newRank.name;
+    profile.knowledgePoints = Number.isFinite(newRank.minKp) ? newRank.minKp : DEFAULT_KP;
 
-  this.seasonPeakRankIndex = this.rankIndex;
-  this.seasonPeakKp = this.knowledgePoints;
-  this.competitiveEventsCountSeason = 0;
-  this.currentStreak = 0;
-  this.comebackBonusRemaining = 5;
-  this.lastResetAt = new Date();
+    profile.seasonPeakRankIndex = profile.rankIndex;
+    profile.seasonPeakKp = profile.knowledgePoints;
+    profile.competitiveEventsCountSeason = 0;
+    profile.currentStreak = 0;
+    profile.comebackBonusRemaining = 5;
+    profile.lastResetAt = new Date();
 
-  return {
-    oldRankIndex,
-    newRankIndex,
-    demotedBy,
-    seasonFloorIndex
-  };
+    return { oldRankIndex, newRankIndex, demotedBy, seasonFloorIndex };
+  }
 };
 
-userRankProfileSchema.pre('save', function syncBeforeSave(next) {
-  if (this.isModified('knowledgePoints') && !this.isModified('rankIndex')) {
-    this.syncRankFromPoints();
-  }
-
-  if (!Number.isFinite(this.seasonPeakKp)) {
-    this.seasonPeakKp = Math.max(0, Number(this.knowledgePoints) || DEFAULT_KP);
-  }
-  if (!Number.isFinite(this.allTimePeakKp)) {
-    this.allTimePeakKp = Math.max(0, Number(this.knowledgePoints) || DEFAULT_KP);
-  }
-
-  next();
-});
-
-const UserRankProfile =
-  (mongoose.models.UserRankProfile as Model<IUserRankProfile>) ||
-  mongoose.model<IUserRankProfile>('UserRankProfile', userRankProfileSchema);
-
 export default UserRankProfile;
-module.exports = UserRankProfile;

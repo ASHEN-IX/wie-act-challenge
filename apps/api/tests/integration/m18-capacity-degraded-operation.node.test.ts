@@ -8,14 +8,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import express, { type Response, type NextFunction } from 'express';
 import request from 'supertest';
-import mongoose from 'mongoose';
 import crypto from 'node:crypto';
+import { connectDatabase, disconnectDatabase } from '../../shared/database';
+import { newId } from '../../shared/ids';
 
 import {
   ActivityRecord,
   Course,
   CourseEnrollment,
   CourseRevision,
+  Institution,
   InstitutionMembership,
   LearningEvidence,
   StudentAttempt,
@@ -27,10 +29,8 @@ import { updateCourseDraft } from '../../modules/study/src/services/courseDraft'
 import { publishCourseRevision } from '../../modules/study/src/services/coursePublication';
 import type { DomainRequest } from '../../src/framework/contracts';
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27018/ednova-test';
-
 test('M18 / ED-12: Capacity-Aware Routing and Degraded Operation Integration', async (t) => {
-  await mongoose.connect(MONGO_URI);
+  await connectDatabase();
 
   const testPrefix = `m18_${Date.now()}`;
   const ownerUserId = `${testPrefix}_owner`;
@@ -38,7 +38,8 @@ test('M18 / ED-12: Capacity-Aware Routing and Degraded Operation Integration', a
   const student1Id = `${testPrefix}_student1`;
   const student2Id = `${testPrefix}_student2`;
   const student3Id = `${testPrefix}_student3`;
-  const institutionId = new mongoose.Types.ObjectId();
+  const student4Id = `${testPrefix}_student4`;
+  const institutionId = newId();
 
   let courseId: string;
   let publishedRevisionTag: string;
@@ -59,6 +60,8 @@ test('M18 / ED-12: Capacity-Aware Routing and Degraded Operation Integration', a
         userId: String(actorHeader),
         email: `${actorHeader}@test.edu`,
         name: String(actorHeader).replace(/_/g, ' '),
+        // A synthetic actor is a signed-in student; the institution membership
+        // rows below grant course access, and peer rooms refuse teaching staff.
         role: 'user'
       };
     }
@@ -71,51 +74,61 @@ test('M18 / ED-12: Capacity-Aware Routing and Degraded Operation Integration', a
     await cleanupCourseFixtures();
     try {
       if (courseId) {
-        await Course.deleteMany({ courseId });
         await CourseRevision.deleteMany({ courseId });
         await CourseEnrollment.deleteMany({ courseId });
         await ActivityRecord.deleteMany({ courseId });
         await StudentAttempt.deleteMany({ courseId });
-        await LearningEvidence.deleteMany({ 'activity.courseId': courseId });
+        // Evidence has no scalar courseId column; the suite's own users scope it.
+        await LearningEvidence.deleteMany({ userId: { contains: testPrefix } });
       }
+      await Course.deleteMany({ userId: { contains: testPrefix } });
       await InstitutionMembership.deleteMany({ institutionId });
+      await Institution.deleteMany({ _id: institutionId });
       if (roomId) {
         await StudyRoom.deleteMany({ roomId });
       }
     } finally {
-      await mongoose.disconnect();
+      await disconnectDatabase().catch(() => {});
     }
   });
 
   await t.test(
     '1. Setup: Create published course, enrollments, and registered activity',
     async () => {
-      await InstitutionMembership.create([
+      // Institution exists before memberships and enrollments (real foreign keys).
+      await Institution.create({
+        id: institutionId,
+        name: 'M18 Degraded Operations Institution',
+        slug: `m18-${institutionId}`,
+        createdByUserId: ownerUserId,
+        status: 'active'
+      });
+      await InstitutionMembership.createMany([
         { institutionId, userId: instructorId, role: 'instructor', status: 'active' },
         { institutionId, userId: student1Id, role: 'university_student', status: 'active' },
         { institutionId, userId: student2Id, role: 'university_student', status: 'active' },
-        { institutionId, userId: student3Id, role: 'university_student', status: 'active' }
+        { institutionId, userId: student3Id, role: 'university_student', status: 'active' },
+        { institutionId, userId: student4Id, role: 'university_student', status: 'active' }
       ]);
 
       const rawCourse = await Course.create({
         title: 'Degraded Operations Architecture',
-        slug: `degrade-${testPrefix}`,
         description: 'Testing graceful degradation under load and outage',
         scope: 'institutional',
         institutionId,
         ownerUserId,
         userId: ownerUserId,
         subjectId: 'sub_systems',
-        assignedInstructorIds: [instructorId],
-        settings: { isPublic: false }
+        assignedInstructorIds: [instructorId]
       });
       courseId = rawCourse._id.toString();
       await prepareCourseFixture(courseId, t);
 
-      await CourseEnrollment.create([
-        { courseId, institutionId, userId: student1Id, enrolledRole: 'student', status: 'active' },
-        { courseId, institutionId, userId: student2Id, enrolledRole: 'student', status: 'active' },
-        { courseId, institutionId, userId: student3Id, enrolledRole: 'student', status: 'active' }
+      await CourseEnrollment.createMany([
+        { courseId, institutionId, userId: student1Id, status: 'active' },
+        { courseId, institutionId, userId: student2Id, status: 'active' },
+        { courseId, institutionId, userId: student3Id, status: 'active' },
+        { courseId, institutionId, userId: student4Id, status: 'active' }
       ]);
 
       const initialDraftTag = `rev_${Date.now()}`;
@@ -232,9 +245,10 @@ test('M18 / ED-12: Capacity-Aware Routing and Degraded Operation Integration', a
     '2. Capacity Enforcement: Room rejects joins exceeding maxParticipants (ED-12)',
     async () => {
       // Create room with maxParticipants = 2
+      // Peer study rooms reject teaching staff, so an enrolled student hosts.
       const createRes = await request(app)
         .post('/api/v1/study/rooms')
-        .set('x-test-actor', instructorId)
+        .set('x-test-actor', student1Id)
         .send({
           courseId,
           title: 'High-Concurrency Small Room',
@@ -245,10 +259,10 @@ test('M18 / ED-12: Capacity-Aware Routing and Degraded Operation Integration', a
       roomId = createRes.body.roomId;
       inviteCode = createRes.body.inviteCode;
 
-      // Student 1 joins (participant 2/2)
+      // Student 2 joins (participant 2/2; the host owns the other slot)
       const join1Res = await request(app)
         .post('/api/v1/study/rooms/join')
-        .set('x-test-actor', student1Id)
+        .set('x-test-actor', student2Id)
         .send({ inviteCode });
       assert.equal(join1Res.status, 200);
       assert.equal(join1Res.body.participantsCount, 2);
@@ -256,7 +270,7 @@ test('M18 / ED-12: Capacity-Aware Routing and Degraded Operation Integration', a
       // Student 2 attempts to join (room is full)
       const join2Res = await request(app)
         .post('/api/v1/study/rooms/join')
-        .set('x-test-actor', student2Id)
+        .set('x-test-actor', student3Id)
         .send({ inviteCode });
 
       assert.equal(join2Res.status, 409, 'Overcapacity join must return 409');
@@ -272,7 +286,7 @@ test('M18 / ED-12: Capacity-Aware Routing and Degraded Operation Integration', a
       assert.equal(activeCount, 2, 'Active participant count must not exceed capacity');
       const phase = await request(app)
         .put(`/api/v1/study/rooms/${roomId}/phase`)
-        .set('x-test-actor', instructorId)
+        .set('x-test-actor', student1Id)
         .send({ currentPhase: 'individual_attempt', activeActivityId: quizActivityId });
       assert.equal(phase.status, 200);
     }
@@ -391,18 +405,18 @@ test('M18 / ED-12: Capacity-Aware Routing and Degraded Operation Integration', a
   await t.test(
     '6. Guaranteed Exit: Leaving room succeeds even when participant leaves full room',
     async () => {
-      // Student 1 leaves the room
+      // The joining learner leaves (a host cannot leave its own room).
       const leaveRes = await request(app)
         .post(`/api/v1/study/rooms/${roomId}/leave`)
-        .set('x-test-actor', student1Id);
+        .set('x-test-actor', student2Id);
 
       assert.equal(leaveRes.status, 200);
 
       // Now room capacity has 1 slot available
-      // Student 2 can now join successfully!
+      // A waited learner takes the freed slot.
       const join2AgainRes = await request(app)
         .post('/api/v1/study/rooms/join')
-        .set('x-test-actor', student2Id)
+        .set('x-test-actor', student4Id)
         .send({ inviteCode });
 
       assert.equal(

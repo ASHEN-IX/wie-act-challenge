@@ -11,6 +11,8 @@ import StudyGroup, {
 } from '../models/StudyGroup';
 import Friendship from '../models/Friendship';
 import UserProfile from '../models/UserProfile';
+import { prisma } from '../../../../shared/database';
+import { newId } from '../../../../shared/ids';
 
 interface GroupRequest extends DomainRequest {
   params: Record<string, string>;
@@ -48,7 +50,7 @@ async function notify(
 async function areConnected(a: string, b: string): Promise<boolean> {
   return Boolean(
     await Friendship.findOne({
-      $or: [
+      OR: [
         { requester: a, recipient: b, status: 'accepted' },
         { requester: b, recipient: a, status: 'accepted' }
       ]
@@ -59,7 +61,7 @@ async function areConnected(a: string, b: string): Promise<boolean> {
 async function isBlocked(a: string, b: string): Promise<boolean> {
   return Boolean(
     await Friendship.findOne({
-      $or: [
+      OR: [
         { requester: a, recipient: b, status: 'blocked' },
         { requester: b, recipient: a, status: 'blocked' }
       ]
@@ -68,9 +70,7 @@ async function isBlocked(a: string, b: string): Promise<boolean> {
 }
 
 async function names(ids: string[]): Promise<Record<string, string>> {
-  const profiles = await UserProfile.find({ userId: { $in: ids } })
-    .select('userId nickname')
-    .lean();
+  const profiles = await UserProfile.findMany({ userId: { in: ids } });
   return Object.fromEntries(profiles.map((p) => [p.userId, p.nickname || 'Learner']));
 }
 
@@ -78,12 +78,10 @@ async function names(ids: string[]): Promise<Record<string, string>> {
 router.get('/', async (req: GroupRequest, res: Response) => {
   res.setHeader('Cache-Control', 'private, no-store');
   const userId = req.user!.userId;
-  const groups = await StudyGroup.find({
-    $or: [{ 'members.userId': userId }, { 'invites.userId': userId }]
-  })
-    .sort({ updatedAt: -1 })
-    .limit(50)
-    .lean();
+  const groups = await StudyGroup.findMany(
+    { OR: [{ members: { some: { userId } } }, { invites: { some: { userId } } }] },
+    { orderBy: { updatedAt: 'desc' }, take: 50 }
+  );
   res.json({
     groups: groups.map((g) => {
       const member = g.members.some((m) => m.userId === userId);
@@ -133,9 +131,9 @@ router.get('/:groupId', async (req: GroupRequest, res: Response) => {
   const userId = req.user!.userId;
   if (!ID.test(req.params.groupId)) return res.status(400).json({ error: 'Invalid group' });
   const group = await StudyGroup.findOne({
-    groupId: req.params.groupId,
-    'members.userId': userId
-  }).lean();
+    groupId: String(req.params.groupId),
+    members: { some: { userId } }
+  });
   if (!group) return res.status(404).json({ error: 'Group not found' });
   const labels = await names([
     ...group.members.map((m) => m.userId),
@@ -174,7 +172,10 @@ router.post('/:groupId/invite', async (req: GroupRequest, res: Response) => {
   if (!ID.test(req.params.groupId) || typeof friendId !== 'string' || !ID.test(friendId)) {
     return res.status(400).json({ error: 'groupId and friendId required' });
   }
-  const group = await StudyGroup.findOne({ groupId: req.params.groupId, ownerId: userId });
+  const group = await StudyGroup.findOne({
+    groupId: String(req.params.groupId),
+    ownerId: userId
+  });
   if (!group) return res.status(404).json({ error: 'Group not found' });
   if (friendId === userId) return res.status(400).json({ error: 'You are already in this group' });
   if (!(await areConnected(userId, friendId)) || (await isBlocked(userId, friendId))) {
@@ -190,14 +191,15 @@ router.post('/:groupId/invite', async (req: GroupRequest, res: Response) => {
   if (group.members.length + group.invites.length >= MAX_GROUP_MEMBERS) {
     return res.status(409).json({ error: 'This group is full' });
   }
+  // The guard and the insert are one row operation: a concurrent second invite
+  // for the same person loses on the (groupId, userId) unique key.
   const updated = await StudyGroup.findOneAndUpdate(
     {
       groupId: group.groupId,
-      'invites.userId': { $ne: friendId },
-      'members.userId': { $ne: friendId }
+      invites: { none: { userId: friendId } },
+      members: { none: { userId: friendId } }
     },
-    { $push: { invites: { userId: friendId, invitedBy: userId, createdAt: new Date() } } },
-    { new: true }
+    { invites: { create: { id: newId(), userId: friendId, invitedBy: userId } } }
   );
   if (updated) {
     await notify(
@@ -216,29 +218,32 @@ router.post('/:groupId/accept', async (req: GroupRequest, res: Response) => {
   const userId = req.user!.userId;
   if (!ID.test(req.params.groupId)) return res.status(400).json({ error: 'Invalid group' });
   const already = await StudyGroup.exists({
-    groupId: req.params.groupId,
-    'members.userId': userId
+    groupId: String(req.params.groupId),
+    members: { some: { userId } }
   });
   if (already) return res.json({ message: 'Already a member' });
-  const group = await StudyGroup.findOneAndUpdate(
-    {
-      groupId: req.params.groupId,
-      'invites.userId': userId,
-      $expr: { $lt: [{ $size: '$members' }, MAX_GROUP_MEMBERS] }
-    },
-    { $pull: { invites: { userId } }, $push: { members: { userId, joinedAt: new Date() } } },
-    { new: true }
-  );
+  // Capacity and invitation are checked inside a transaction so two joiners
+  // cannot both take the last seat.
+  const group = await prisma.$transaction(async (tx) => {
+    const current = await tx.studyGroup.findFirst({
+      where: { groupId: String(req.params.groupId), invites: { some: { userId } } },
+      include: { _count: { select: { members: true } } }
+    });
+    if (!current || current._count.members >= MAX_GROUP_MEMBERS) return null;
+    await tx.studyGroupInvite.deleteMany({ where: { groupId: current.id, userId } });
+    await tx.studyGroupMember.create({
+      data: { id: newId(), groupId: current.id, userId, joinedAt: new Date() }
+    });
+    return current;
+  });
   if (!group) return res.status(404).json({ error: 'Invitation not found or the group is full' });
   res.json({ message: 'Joined', groupId: group.groupId });
 });
 
 router.post('/:groupId/decline', async (req: GroupRequest, res: Response) => {
   if (!ID.test(req.params.groupId)) return res.status(400).json({ error: 'Invalid group' });
-  await StudyGroup.updateOne(
-    { groupId: req.params.groupId },
-    { $pull: { invites: { userId: req.user!.userId } } }
-  );
+  const target = await StudyGroup.findOne({ groupId: String(req.params.groupId) });
+  if (target) await StudyGroup.removeInvite(target.id, req.user!.userId);
   res.json({ message: 'Declined' });
 });
 
@@ -248,7 +253,10 @@ router.delete('/:groupId/members/:memberId', async (req: GroupRequest, res: Resp
   const { groupId, memberId } = req.params;
   if (!ID.test(groupId) || !ID.test(memberId))
     return res.status(400).json({ error: 'Invalid request' });
-  const group = await StudyGroup.findOne({ groupId, 'members.userId': userId }).lean();
+  const group = await StudyGroup.findOne({
+    groupId: String(groupId),
+    members: { some: { userId } }
+  });
   if (!group) return res.status(404).json({ error: 'Group not found' });
   if (memberId === group.ownerId) {
     return res.status(409).json({ error: 'The owner cannot leave; delete the group instead' });
@@ -256,17 +264,17 @@ router.delete('/:groupId/members/:memberId', async (req: GroupRequest, res: Resp
   if (memberId !== userId && group.ownerId !== userId) {
     return res.status(403).json({ error: 'Only the owner can remove other members' });
   }
-  await StudyGroup.updateOne(
-    { groupId },
-    { $pull: { members: { userId: memberId }, invites: { userId: memberId } } }
-  );
+  if (group) {
+    await StudyGroup.removeMember(group.id, String(memberId));
+    await StudyGroup.removeInvite(group.id, String(memberId));
+  }
   res.json({ message: memberId === userId ? 'Left group' : 'Member removed' });
 });
 
 router.delete('/:groupId', async (req: GroupRequest, res: Response) => {
   if (!ID.test(req.params.groupId)) return res.status(400).json({ error: 'Invalid group' });
   const result = await StudyGroup.deleteOne({
-    groupId: req.params.groupId,
+    groupId: String(req.params.groupId),
     ownerId: req.user!.userId
   });
   if (!result.deletedCount) return res.status(404).json({ error: 'Group not found' });
@@ -288,9 +296,9 @@ router.post('/:groupId/session', async (req: GroupRequest, res: Response) => {
     return res.status(400).json({ error: 'groupId and roomId required' });
   }
   const group = await StudyGroup.findOne({
-    groupId: req.params.groupId,
-    'members.userId': userId
-  }).lean();
+    groupId: String(req.params.groupId),
+    members: { some: { userId } }
+  });
   if (!group) return res.status(404).json({ error: 'Group not found' });
   let room: { roomId: string; title: string; inviteCode: string; status: string };
   try {
@@ -304,20 +312,13 @@ router.post('/:groupId/session', async (req: GroupRequest, res: Response) => {
   }
   if (!room || room.status !== 'active')
     return res.status(409).json({ error: 'Room is not active' });
-  await StudyGroup.updateOne(
-    { groupId: group.groupId },
-    {
-      $set: {
-        activeSession: {
-          roomId: room.roomId,
-          title: room.title,
-          inviteCode: room.inviteCode,
-          startedBy: userId,
-          startedAt: new Date()
-        }
-      }
-    }
-  );
+  await StudyGroup.setActiveSession(group.id, {
+    roomId: room.roomId,
+    title: room.title,
+    inviteCode: room.inviteCode,
+    startedBy: userId,
+    startedAt: new Date()
+  });
   const labels = await names([userId]);
   await Promise.all(
     group.members
@@ -346,9 +347,9 @@ router.get('/:groupId/session', async (req: GroupRequest, res: Response) => {
   res.setHeader('Cache-Control', 'private, no-store');
   if (!ID.test(req.params.groupId)) return res.status(400).json({ error: 'Invalid group' });
   const group = await StudyGroup.findOne({
-    groupId: req.params.groupId,
-    'members.userId': req.user!.userId
-  }).lean();
+    groupId: String(req.params.groupId),
+    members: { some: { userId: req.user!.userId } }
+  });
   if (!group) return res.status(404).json({ error: 'Group not found' });
   const s = group.activeSession;
   if (!s || Date.now() - new Date(s.startedAt).getTime() >= SESSION_FRESH_MS)

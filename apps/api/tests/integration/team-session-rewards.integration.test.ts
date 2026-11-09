@@ -6,11 +6,20 @@ const axios = require('@ednova/shared/moduleClient');
 jest.mock('@ednova/shared/moduleClient');
 jest.mock('../../modules/study/src/models', () => ({
   StudySession: {
-    findOne: jest.fn()
+    findOne: jest.fn(),
+    // The handler persists the finished session through the model, not the row.
+    save: jest.fn(async (row: unknown) => row)
   }
 }));
 const sessionsRouter = require('../../modules/study/src/routes/sessions');
 const { StudySession } = require('../../modules/study/src/models');
+/** The model returns a cursor; the route chains `.select()` onto it. */
+const asCursor = (value: unknown) => ({
+  select: () => asCursor(value),
+  exec: async () => value,
+  then: (resolve: (v: unknown) => unknown) => Promise.resolve(value).then(resolve)
+});
+
 function buildApp(authUserId = 'host-1') {
   const app = express();
   app.use(express.json());
@@ -93,7 +102,7 @@ describe('Team Session Rewards Integration', () => {
   });
   test('PUT /team/:sessionId/end returns teamRewards with participant-specific awards', async () => {
     const session = makeActiveTeamSession();
-    StudySession.findOne.mockResolvedValue(session);
+    StudySession.findOne.mockReturnValue(asCursor(session));
     const response = await request(buildApp('host-1'))
       .put('/api/v1/study/sessions/team/session-1/end')
       .set('Cookie', 'ednova.test_session=host-auth-token');
@@ -121,7 +130,7 @@ describe('Team Session Rewards Integration', () => {
         awardedXP: 20
       })
     );
-    expect(session.save).toHaveBeenCalledTimes(1);
+    expect(StudySession.save).toHaveBeenCalledTimes(1);
     expect(
       session.participants.every(
         (participant) => participant.leftAt instanceof Date && participant.leftAt.getTime() > 0
@@ -141,7 +150,7 @@ describe('Team Session Rewards Integration', () => {
   });
   test('PUT /team/:sessionId/end blocks non-host users', async () => {
     const session = makeActiveTeamSession();
-    StudySession.findOne.mockResolvedValue(session);
+    StudySession.findOne.mockReturnValue(asCursor(session));
     const response = await request(buildApp('member-2'))
       .put('/api/v1/study/sessions/team/session-1/end')
       .set('Cookie', 'ednova.test_session=member-auth-token');
@@ -165,7 +174,9 @@ describe('Team Session Rewards Integration', () => {
       startTime: new Date(now - 45 * 60 * 1000),
       save: jest.fn().mockResolvedValue(undefined)
     };
-    StudySession.findOne.mockResolvedValueOnce(challengeSession).mockResolvedValueOnce(null);
+    StudySession.findOne
+      .mockReturnValueOnce(asCursor(challengeSession))
+      .mockReturnValueOnce(asCursor(null));
     const response = await request(buildApp('host-1'))
       .put('/api/v1/study/sessions/challenge-session-1')
       .set('Cookie', 'ednova.test_session=host-auth-token')

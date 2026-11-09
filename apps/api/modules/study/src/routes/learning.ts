@@ -29,7 +29,7 @@ import { attachStructuredAsset } from '../services/structuredAssets';
 import {
   planLessonExperience,
   planLessonWithProvider,
-  readStoredPlan,
+  readStoredPlan
 } from '../services/experiencePlanning';
 import { canManageCourse } from '../services/resourceAccess';
 import {
@@ -37,12 +37,15 @@ import {
   dismissRecommendation,
   readPreferences,
   resetPreferences,
-  savePreferences,
+  savePreferences
 } from '../services/lessonAdaptation';
 import { isLearningMode } from '../../../../shared/ednova/learningModes';
 import { summarizeMetrics } from '../services/planningMetrics';
 const { requireRole } = require('@ednova/shared/auth');
-import { resolvePlannerProvider, configuredPlannerModel } from '../services/experiencePlannerProviders';
+import {
+  resolvePlannerProvider,
+  configuredPlannerModel
+} from '../services/experiencePlannerProviders';
 import { grantPlanningConsent } from '../services/planningGovernance';
 import { getCourseNardouch, completeNardouchLesson } from '../services/courseNardouch';
 
@@ -53,7 +56,7 @@ const WORKSPACE_LANGUAGES = ['en', 'fr', 'ar', 'ary'] as const;
 type WorkspaceLanguage = (typeof WORKSPACE_LANGUAGES)[number];
 
 async function getWorkspaceLanguage(userId: string): Promise<WorkspaceLanguage> {
-  const profile = await UserProfile.findOne({ userId }).select('preferences.language').lean();
+  const profile = await UserProfile.findOne({ userId });
   const stored = profile?.preferences?.language;
   return WORKSPACE_LANGUAGES.includes(stored as WorkspaceLanguage)
     ? (stored as WorkspaceLanguage)
@@ -146,7 +149,7 @@ router.get(
         'Aggregate counters for this application process across all courses. ' +
         'No per-course or per-learner breakdown is recorded.',
       processUptimeSeconds: Math.round(process.uptime()),
-      ...summarizeMetrics(),
+      ...summarizeMetrics()
     };
   })
 );
@@ -168,7 +171,7 @@ router.get(
       String(r.params.courseId),
       lessonId,
       mode,
-      revision(r),
+      revision(r)
     );
   })
 );
@@ -200,7 +203,7 @@ router.post(
       courseId: String(r.params.courseId),
       revisionId: String(body.revisionId ?? ''),
       lessonId: body.lessonId,
-      mode: body.mode,
+      mode: body.mode
     });
     return { dismissed: true };
   })
@@ -244,7 +247,7 @@ router.get(
       actor: r.user!.userId,
       courseId: String(r.params.courseId),
       lessonId,
-      mode,
+      mode
     });
     // A non-available outcome is not an error to a learner: the reader falls
     // back. Internal codes never reach the browser.
@@ -262,18 +265,17 @@ router.post(
     // Generating a plan is an author/operator privilege, not a learner one.
     if (!(await canManageCourse(r.user!.userId, String(r.params.courseId))))
       throw Object.assign(new Error('Plan generation requires course author rights'), {
-        status: 403,
+        status: 403
       });
     const provider = resolvePlannerProvider(async () => {
       throw new Error('Mock delegation is not used on this path');
     });
-    if (!provider)
-      return { status: 'refused', code: 'PLANNING_DISABLED' };
+    if (!provider) return { status: 'refused', code: 'PLANNING_DISABLED' };
     return planLessonWithProvider(
       r.user!.userId,
       String(r.params.courseId),
       body.lessonId,
-      provider,
+      provider
     );
   })
 );
@@ -288,7 +290,7 @@ router.post(
       revisionId: body.revisionId,
       provider: 'gemini',
       model: configuredPlannerModel(),
-      termsVersion: body.termsVersion,
+      termsVersion: body.termsVersion
     });
   })
 );
@@ -342,10 +344,16 @@ router.put(
     if (!WORKSPACE_LANGUAGES.includes(language)) {
       throw Object.assign(new Error('Unsupported interface language'), { status: 400 });
     }
+    const existing = await UserProfile.findOne({ userId: r.user!.userId });
+    if (!existing) {
+      await UserProfile.create({ userId: r.user!.userId });
+    }
+    // Preferences are one JSON column; merge and write it whole so the language
+    // survives a reload without clobbering the other preferences.
     await UserProfile.findOneAndUpdate(
       { userId: r.user!.userId },
-      { $set: { 'preferences.language': language } },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
+      { preferences: { ...(existing?.preferences ?? {}), language } },
+      { upsert: true }
     );
     return { language };
   })

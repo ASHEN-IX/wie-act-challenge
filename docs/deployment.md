@@ -4,7 +4,7 @@ This is a configuration guide, not evidence of a successful deployment. Current 
 
 ## Main stack
 
-Backend and frontend run locally from the workspace with `pnpm dev`. The main `docker-compose.yml` runs only the Python AI service and ingestion worker, MongoDB (:27017), Redis, RabbitMQ and Mailpit (:1025/:8025). Persistent volumes hold Mongo, RabbitMQ, FAISS indexes and uploads.
+Backend and frontend run locally from the workspace with `pnpm dev`. The main `docker-compose.yml` runs only the Python AI service and ingestion worker, PostgreSQL (:27017), Redis, RabbitMQ and Mailpit (:1025/:8025). Persistent volumes hold Mongo, RabbitMQ, FAISS indexes and uploads.
 
 Configure `apps/api/.env` from `apps/api/.env.example` and review Compose environment interpolation separately from `env_file`. Set local/deployment secrets, broker credentials/vhost, database URI, common Better Auth secret, trusted public URL/origins, email delivery and independent AI endpoint/key. Node and Next must resolve the same identity database and auth secret. In production use HTTPS and an explicitly configured public auth origin.
 
@@ -24,7 +24,7 @@ There is no current production Compose override in this checkout. `deploy/Caddyf
 
 ## Independent Python AI
 
-`docker-compose.ai.yml` is a separate lifecycle; copy `.env.ai.example` to a local `.env.ai` and set reachable `AI_MONGODB_URI`/`AI_RABBITMQ_URL` plus the service secret/model env in the expected Python environment. The file optionally loads `apps/ai/.env`. Confirm effective Compose config privately; never print credentials into shared logs.
+`docker-compose.ai.yml` is a separate lifecycle; copy `.env.ai.example` to a local `.env.ai` and set reachable `AI_DATABASE_URL`/`AI_RABBITMQ_URL` plus the service secret/model env in the expected Python environment. The file optionally loads `apps/ai/.env`. Confirm effective Compose config privately; never print credentials into shared logs.
 
 ```bash
 docker compose --env-file .env.ai -f docker-compose.ai.yml config --quiet
@@ -54,7 +54,7 @@ Root `.github/workflows/ci.yml` runs Node checks, browser tests, locked Poetry c
 
 The current WebSocket registry is process-local. Run one API process/replica with
 `NODE_ENV=production`, `WEB_CONCURRENCY=1` and `EDNOVA_REALTIME_MODE=single` (default).
-Production startup obtains a renewable Mongo lease scoped to the application DB;
+Production startup obtains a renewable PostgreSQL lease scoped to the application DB;
 a second owner is refused. An expired or lost lease fences request/response and
 WebSocket delivery and stops the instance. Clean shutdown releases its lease;
 a killed instance requires lease expiry before takeover. All instances must use

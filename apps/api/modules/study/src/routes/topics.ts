@@ -96,7 +96,7 @@ router.put(
     }
 
     Object.assign(topic, value);
-    await topic.save();
+    await Topic.save(topic);
 
     res.json({
       message: 'Topic updated',

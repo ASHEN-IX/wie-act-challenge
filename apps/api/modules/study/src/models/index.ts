@@ -1,6 +1,24 @@
-import mongoose, { Document, Model, Schema } from 'mongoose';
+/**
+ * Study-domain models.
+ *
+ * Every collection here is a PostgreSQL table now. Plain CRUD models come from
+ * `_table.ts`; the few models with document-style behaviour (optimistic
+ * concurrency, idempotent upserts) define it explicitly.
+ */
+import type {
+  Course as CourseRow,
+  Prisma,
+  StudyPlan as StudyPlanRow,
+  StudySession as StudySessionRow,
+  Subject as SubjectRow,
+  TaskRecord as TaskRecordRow,
+  Topic as TopicRow
+} from '../../../../src/generated/prisma/client';
+import { prisma, toDocument } from '../../../../shared/database';
+import { newId } from '../../../../shared/ids';
+import { table, type Hydrated } from './_table';
 
-// ── Interfaces ─────────────────────────────────────────────────────────────────
+// ── Embedded projections ──────────────────────────────────────────────────────
 
 export interface ISignalHistoryEntry {
   timestamp?: Date;
@@ -28,83 +46,6 @@ export interface IParticipant {
   hasVoiceConsent?: boolean;
   joinedAt?: Date;
   leftAt?: Date;
-}
-
-export interface IStudySession extends Document {
-  userId: string;
-  taskId?: string;
-  topicId?: string;
-  courseId?: string;
-  studyPlanId?: string;
-  mode: 'focus' | 'pomodoro' | 'exam';
-  challengeDifficulty: 'easy' | 'medium' | 'hard' | 'expert';
-  taskProgress: {
-    currentTaskIndex: number;
-    tasks: ITaskProgressEntry[];
-    totalTasks: number;
-    completedTasks: number;
-  };
-  xpMultiplier: number;
-  duration?: number;
-  status: 'active' | 'completed';
-  startTime: Date;
-  endTime?: Date;
-  focusScore?: number;
-  completedAt: Date;
-  notes?: string;
-  signalHistory: ISignalHistoryEntry[];
-  breakStats: {
-    totalBreaks: number;
-    totalBreakDuration: number;
-    avgBreakDuration: number;
-  };
-  type: 'solo' | 'team';
-  participants: IParticipant[];
-  inviteCode?: string;
-  maxParticipants: number;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface ITask extends Document {
-  userId: string;
-  studyPlanId?: string;
-  title: string;
-  description?: string;
-  topicId?: string;
-  objectiveId?: string;
-  targetBloomLevel?: string;
-  priority: 'low' | 'medium' | 'high';
-  estimatedTime?: number;
-  actualTime: number;
-  status: 'todo' | 'in-progress' | 'completed' | 'cancelled';
-  dueDate?: Date;
-  completedAt?: Date;
-  tags: string[];
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface ITopic extends Document {
-  userId: string;
-  name: string;
-  description?: string;
-  category?: string;
-  color: string;
-  totalStudyTime: number;
-  mastery: number;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface ISubject extends Document {
-  userId: string;
-  name: string;
-  description?: string;
-  image?: string;
-  color: string;
-  createdAt: Date;
-  updatedAt: Date;
 }
 
 export interface ISubtopic {
@@ -161,33 +102,255 @@ export type CourseScope = (typeof COURSE_SCOPES)[number];
 export const COURSE_VISIBILITIES = ['private', 'institution', 'public'] as const;
 export type CourseVisibility = (typeof COURSE_VISIBILITIES)[number];
 
-export interface ICourse extends Document {
-  userId: string;
-  scope?: CourseScope;
-  visibility?: CourseVisibility;
-  institutionId?: mongoose.Types.ObjectId;
-  ownerUserId?: string;
-  assignedInstructorIds?: string[];
-  activeRevisionId?: string;
-  subjectId: string;
-  title: string;
-  description?: string;
-  status: 'processing' | 'completed' | 'failed';
-  jobId?: string;
-  correlationId?: string;
-  ingestStage?: 'parsing' | 'enriching' | 'embedding' | 'indexing' | null;
-  ingestProgress: number;
-  ingestDetail: string;
-  ingestError: string;
+// ── Study session ─────────────────────────────────────────────────────────────
+
+export type IStudySession = Omit<
+  StudySessionRow,
+  'taskProgress' | 'signalHistory' | 'breakStats' | 'participants'
+> & {
+  _id: string;
+  taskProgress: {
+    currentTaskIndex: number;
+    tasks: ITaskProgressEntry[];
+    totalTasks: number;
+    completedTasks: number;
+  };
+  signalHistory: ISignalHistoryEntry[];
+  breakStats: {
+    totalBreaks: number;
+    totalBreakDuration: number;
+    avgBreakDuration: number;
+  };
+  participants: IParticipant[];
+};
+
+const DEFAULT_TASK_PROGRESS = {
+  currentTaskIndex: 0,
+  tasks: [],
+  totalTasks: 0,
+  completedTasks: 0
+};
+
+export const StudySession = table<IStudySession>({
+  delegate: () => prisma.studySession,
+  jsonColumns: ['taskProgress', 'signalHistory', 'breakStats', 'participants'],
+  defaults: () => ({
+    mode: 'focus',
+    challengeDifficulty: 'medium',
+    status: 'completed',
+    type: 'solo',
+    xpMultiplier: 1,
+    maxParticipants: 5,
+    taskProgress: DEFAULT_TASK_PROGRESS,
+    signalHistory: [],
+    breakStats: { totalBreaks: 0, totalBreakDuration: 0, avgBreakDuration: 0 },
+    participants: [],
+    startTime: new Date(),
+    completedAt: new Date()
+  }),
+  columns: (session) => ({
+    userId: session.userId,
+    taskId: session.taskId,
+    topicId: session.topicId,
+    courseId: session.courseId,
+    studyPlanId: session.studyPlanId,
+    mode: session.mode,
+    challengeDifficulty: session.challengeDifficulty,
+    taskProgress: session.taskProgress as unknown as Prisma.InputJsonValue,
+    xpMultiplier: session.xpMultiplier,
+    duration: session.duration,
+    status: session.status,
+    startTime: session.startTime,
+    endTime: session.endTime,
+    focusScore: session.focusScore,
+    completedAt: session.completedAt,
+    notes: session.notes,
+    signalHistory: session.signalHistory as unknown as Prisma.InputJsonValue,
+    breakStats: session.breakStats as unknown as Prisma.InputJsonValue,
+    type: session.type,
+    participants: session.participants as unknown as Prisma.InputJsonValue,
+    inviteCode: session.inviteCode,
+    maxParticipants: session.maxParticipants
+  })
+});
+
+// ── Task ──────────────────────────────────────────────────────────────────────
+
+export type ITask = Omit<TaskRecordRow, never> & { _id: string };
+
+export const Task = table<ITask>({
+  delegate: () => prisma.taskRecord,
+  defaults: () => ({ priority: 'medium', actualTime: 0, status: 'todo', tags: [] }),
+  columns: (task) => ({
+    userId: task.userId,
+    studyPlanId: task.studyPlanId,
+    title: task.title,
+    description: task.description,
+    topicId: task.topicId,
+    objectiveId: task.objectiveId,
+    targetBloomLevel: task.targetBloomLevel,
+    priority: task.priority,
+    estimatedTime: task.estimatedTime,
+    actualTime: task.actualTime,
+    status: task.status,
+    dueDate: task.dueDate,
+    completedAt: task.completedAt,
+    tags: task.tags
+  })
+});
+
+// ── Topic / Subject ───────────────────────────────────────────────────────────
+
+export type ITopic = TopicRow & { _id: string };
+export type ISubject = SubjectRow & { _id: string };
+
+export const Topic = table<ITopic>({
+  delegate: () => prisma.topic,
+  defaults: () => ({ color: '#ff4655', totalStudyTime: 0, mastery: 0 }),
+  columns: (topic) => ({
+    userId: topic.userId,
+    name: topic.name,
+    description: topic.description,
+    category: topic.category,
+    color: topic.color,
+    totalStudyTime: topic.totalStudyTime,
+    mastery: topic.mastery
+  })
+});
+
+export const Subject = table<ISubject>({
+  delegate: () => prisma.subject,
+  defaults: () => ({ color: '#ff4655' }),
+  columns: (subject) => ({
+    userId: subject.userId,
+    name: subject.name,
+    description: subject.description,
+    image: subject.image,
+    color: subject.color
+  })
+});
+
+// ── Course ────────────────────────────────────────────────────────────────────
+
+export type ICourse = Omit<CourseRow, 'topics' | 'files'> & {
+  _id: string;
   topics: ICourseTopic[];
   files: ICourseFile[];
-  processedAt?: Date;
-  aiCourseId?: string;
-  createdAt: Date;
-  updatedAt: Date;
+};
+
+/**
+ * Courses are the hottest study table. The wrapper covers the plain reads and
+ * writes; `Course.save()` persists only the mutable columns below.
+ */
+export const Course = table<ICourse>({
+  delegate: () => prisma.course,
+  jsonColumns: ['topics', 'files'],
+  arrayColumns: ['assignedInstructorIds'],
+  // `ownerUserId` mirrors `userId` so a transfer is authoritative everywhere.
+  // (The Mongoose schema did this in a `pre('validate')` hook.)
+  derives: (data) =>
+    typeof data.userId === 'string' && data.ownerUserId === undefined
+      ? { ownerUserId: data.userId }
+      : {},
+  derivesOnCreate: (data) =>
+    typeof data.userId === 'string' && data.ownerUserId === undefined
+      ? { ownerUserId: data.userId }
+      : {},
+  defaults: () => ({
+    scope: 'personal',
+    status: 'processing',
+    assignedInstructorIds: [],
+    topics: [],
+    files: [],
+    ingestProgress: 0,
+    ingestDetail: '',
+    ingestError: ''
+  }),
+  columns: (course) => ({
+    title: course.title,
+    description: course.description,
+    scope: course.scope,
+    visibility: course.visibility,
+    institutionId: course.institutionId,
+    ownerUserId: course.ownerUserId,
+    assignedInstructorIds: course.assignedInstructorIds,
+    activeRevisionId: course.activeRevisionId,
+    subjectId: course.subjectId,
+    status: course.status,
+    jobId: course.jobId,
+    correlationId: course.correlationId,
+    ingestStage: course.ingestStage,
+    ingestProgress: course.ingestProgress,
+    ingestDetail: course.ingestDetail,
+    ingestError: course.ingestError,
+    topics: course.topics as unknown as Prisma.InputJsonValue,
+    files: course.files as unknown as Prisma.InputJsonValue,
+    processedAt: course.processedAt,
+    aiCourseId: course.aiCourseId
+  })
+});
+
+/** The Mongo `pre('validate')` kept `userId` and `ownerUserId` in sync and made
+ * an institution-scoped course `institutional`. Applied on insert. */
+export function newCourseDocument(
+  input: Partial<ICourse> & { userId?: string; ownerUserId?: string }
+): Record<string, unknown> {
+  const userId = input.userId || input.ownerUserId;
+  const ownerUserId = input.ownerUserId || input.userId;
+  const scope =
+    input.institutionId && (!input.scope || input.scope === 'personal')
+      ? 'institutional'
+      : (input.scope ?? 'personal');
+  return { ...input, userId, ownerUserId, scope };
 }
 
-export interface ILearningObjective extends Document {
+// ── Study plan ────────────────────────────────────────────────────────────────
+
+export interface IStudyPlanTask {
+  id?: string;
+  title?: string;
+  description?: string;
+  estimated_minutes?: number;
+  estimatedTime?: number;
+  difficulty?: number;
+  prerequisites?: string[];
+  is_review?: boolean;
+  objective_id?: string;
+  target_bloom_level?: string;
+}
+
+export type IStudyPlan = Omit<StudyPlanRow, 'taskGraph' | 'resourceScope'> & {
+  _id: string;
+  resourceScope?: { courseId?: string } | null;
+  taskGraph: {
+    goal?: string;
+    tasks?: IStudyPlanTask[];
+  };
+};
+
+export const StudyPlan = table<IStudyPlan>({
+  delegate: () => prisma.studyPlan,
+  jsonColumns: ['taskGraph', 'resourceScope'],
+  defaults: () => ({ taskGraph: { goal: '', tasks: [] }, status: 'created' }),
+  columns: (plan) => ({
+    resourceScope: plan.resourceScope as unknown as Prisma.InputJsonValue,
+    userId: plan.userId,
+    courseId: plan.courseId,
+    goal: plan.goal,
+    availableTimeMinutes: plan.availableTimeMinutes,
+    taskGraph: plan.taskGraph as unknown as Prisma.InputJsonValue,
+    totalEstimatedMinutes: plan.totalEstimatedMinutes,
+    warning: plan.warning,
+    status: plan.status,
+    scheduledAt: plan.scheduledAt
+  })
+});
+
+// ── Learning objectives ───────────────────────────────────────────────────────
+
+export interface ILearningObjective {
+  _id: string;
+  id: string;
   userId: string;
   documentId: string;
   objectiveId: string;
@@ -203,7 +366,31 @@ export interface ILearningObjective extends Document {
   classification?: unknown;
   createdAt: Date;
   updatedAt: Date;
+  __v?: number;
 }
+
+export const LearningObjective = table<ILearningObjective>({
+  delegate: () => prisma.learningObjective,
+  jsonColumns: ['classification'],
+  defaults: () => ({ version: 1, isActive: true }),
+  columns: (objective) => ({
+    userId: objective.userId,
+    documentId: objective.documentId,
+    objectiveId: objective.objectiveId,
+    topicId: objective.topicId,
+    knowledgeType: objective.knowledgeType,
+    bloomLevel: objective.bloomLevel,
+    verb: objective.verb,
+    text: objective.text,
+    textHash: objective.textHash,
+    version: objective.version,
+    isActive: objective.isActive,
+    supersededAt: objective.supersededAt,
+    classification: objective.classification as unknown as Prisma.InputJsonValue
+  })
+});
+
+// ── Competency ────────────────────────────────────────────────────────────────
 
 export interface IEvidenceEntry {
   objectiveId?: string;
@@ -213,7 +400,9 @@ export interface IEvidenceEntry {
   correlationId?: string;
 }
 
-export interface ICompetencyProfile extends Document {
+export interface ICompetencyProfile {
+  _id: string;
+  id: string;
   userId: string;
   topicId: string;
   knowledgeType: string;
@@ -223,12 +412,48 @@ export interface ICompetencyProfile extends Document {
   evidence: IEvidenceEntry[];
   createdAt: Date;
   updatedAt: Date;
+  __v?: number;
 }
 
-export interface IEvalResultRecord extends Document {
+export const CompetencyProfile = table<ICompetencyProfile>({
+  delegate: () => prisma.competencyProfile,
+  jsonColumns: ['evidence'],
+  defaults: () => ({ score: 0, confidence: 0, evidence: [] }),
+  columns: (profile) => ({
+    userId: profile.userId,
+    topicId: profile.topicId,
+    knowledgeType: profile.knowledgeType,
+    bloomLevel: profile.bloomLevel,
+    score: profile.score,
+    confidence: profile.confidence,
+    evidence: profile.evidence as unknown as Prisma.InputJsonValue
+  })
+});
+
+/**
+ * BLOOM-08 idempotency claim store. A unique `correlationId` is the claim: the
+ * first insert wins and a replay observes the existing row and ACK-skips.
+ */
+export const CompetencyProcessing = table<{
+  _id: string;
+  id: string;
+  correlationId: string;
+  processedAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}>({
+  delegate: () => prisma.competencyProcessing,
+  columns: (row) => ({ correlationId: row.correlationId, processedAt: row.processedAt })
+});
+
+// ── Eval results (written by the orchestrator) ───────────────────────────────
+
+export interface IEvalResultRecord {
+  _id: string;
+  id: string;
   competencyProcessedAt?: Date | null;
   competencyLeaseUntil?: Date | null;
-  competencyLeaseToken?: string;
+  competencyLeaseToken?: string | null;
   correlationId: string;
   messageId?: string;
   userId: string;
@@ -244,783 +469,60 @@ export interface IEvalResultRecord extends Document {
   createdAt: Date;
 }
 
-export interface ICompetencyProcessing extends Document {
-  correlationId: string;
-  processedAt: Date;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface IStudyPlanTask {
-  id?: string;
-  title?: string;
-  description?: string;
-  estimated_minutes?: number;
-  estimatedTime?: number;
-  difficulty?: number;
-  prerequisites?: string[];
-  is_review?: boolean;
-  objective_id?: string;
-  target_bloom_level?: string;
-}
-
-export interface IStudyPlan extends Document {
-  resourceScope?: { courseId?: string };
-  userId: string;
-  courseId?: string;
-  goal: string;
-  availableTimeMinutes: number;
-  taskGraph: {
-    goal?: string;
-    tasks?: IStudyPlanTask[];
-  };
-  totalEstimatedMinutes?: number;
-  warning?: string;
-  status: 'created' | 'scheduled' | 'in-progress' | 'completed' | 'cancelled';
-  scheduledAt?: Date;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// ── Schemas ────────────────────────────────────────────────────────────────────
-
-const studySessionSchema = new Schema<IStudySession>(
-  {
-    userId: {
-      type: String,
-      required: true,
-      index: true
-    },
-    taskId: {
-      type: String
-    },
-    topicId: {
-      type: String
-    },
-    // Course-based session fields
-    courseId: {
-      type: String,
-      index: true
-    },
-    studyPlanId: {
-      type: String,
-      index: true
-    },
-    mode: {
-      type: String,
-      enum: ['focus', 'pomodoro', 'exam'],
-      default: 'focus'
-    },
-    challengeDifficulty: {
-      type: String,
-      enum: ['easy', 'medium', 'hard', 'expert'],
-      default: 'medium'
-    },
-    // Task-by-task progression
-    taskProgress: {
-      currentTaskIndex: { type: Number, default: 0 },
-      tasks: [
-        {
-          taskId: String,
-          title: String,
-          description: String,
-          status: {
-            type: String,
-            enum: ['pending', 'in-progress', 'completed', 'skipped'],
-            default: 'pending'
-          },
-          startedAt: Date,
-          completedAt: Date,
-          xpEarned: { type: Number, default: 0 }
-        }
-      ],
-      totalTasks: { type: Number, default: 0 },
-      completedTasks: { type: Number, default: 0 }
-    },
-    // XP multiplier for team sessions
-    xpMultiplier: {
-      type: Number,
-      default: 1.0
-    },
-    duration: {
-      type: Number // in minutes
-    },
-    status: {
-      type: String,
-      enum: ['active', 'completed'],
-      default: 'completed'
-    },
-    startTime: {
-      type: Date,
-      default: Date.now
-    },
-    endTime: {
-      type: Date
-    },
-    focusScore: {
-      type: Number,
-      min: 0,
-      max: 100
-    },
-    completedAt: {
-      type: Date,
-      default: Date.now
-    },
-    notes: {
-      type: String,
-      maxlength: 1000
-    },
-    signalHistory: [
-      {
-        timestamp: Date,
-        focusLevel: Number,
-        fatigueLevel: Number,
-        isDistracted: Boolean
-      }
-    ],
-    breakStats: {
-      totalBreaks: { type: Number, default: 0 },
-      totalBreakDuration: { type: Number, default: 0 }, // seconds
-      avgBreakDuration: { type: Number, default: 0 }
-    },
-    // Team session fields
-    type: {
-      type: String,
-      enum: ['solo', 'team'],
-      default: 'solo'
-    },
-    participants: [
-      {
-        userId: { type: String, required: true },
-        name: { type: String },
-        avatar: { type: String },
-        role: { type: String, enum: ['host', 'member'], default: 'member' },
-        hasVoiceConsent: { type: Boolean, default: false },
-        joinedAt: { type: Date, default: Date.now },
-        leftAt: { type: Date }
-      }
-    ],
-    inviteCode: {
-      type: String,
-      unique: true,
-      sparse: true
-    },
-    maxParticipants: {
-      type: Number,
-      default: 5,
-      max: 10
-    }
-  },
-  {
-    timestamps: true
-  }
-);
-
-const taskSchema = new Schema<ITask>(
-  {
-    userId: {
-      type: String,
-      required: true,
-      index: true
-    },
-    studyPlanId: {
-      type: String,
-      index: true // Link to study plan if task came from planner
-    },
-    title: {
-      type: String,
-      required: true
-    },
-    description: {
-      type: String
-    },
-    topicId: {
-      type: String
-    },
-    // BLOOM-10: competency target for weakest-first planning. `objectiveId`
-    // is the learning objective / subtopic id the task strengthens at
-    // `targetBloomLevel`. Optional — absent for fallback/degraded plans.
-    objectiveId: {
-      type: String
-    },
-    targetBloomLevel: {
-      type: String
-    },
-    priority: {
-      type: String,
-      enum: ['low', 'medium', 'high'],
-      default: 'medium'
-    },
-    estimatedTime: {
-      type: Number // in minutes
-    },
-    actualTime: {
-      type: Number,
-      default: 0
-    },
-    status: {
-      type: String,
-      enum: ['todo', 'in-progress', 'completed', 'cancelled'],
-      default: 'todo'
-    },
-    dueDate: {
-      type: Date
-    },
-    completedAt: {
-      type: Date
-    },
-    tags: [
-      {
-        type: String
-      }
-    ]
-  },
-  {
-    timestamps: true
-  }
-);
-
-const topicSchema = new Schema<ITopic>(
-  {
-    userId: {
-      type: String,
-      required: true,
-      index: true
-    },
-    name: {
-      type: String,
-      required: true
-    },
-    description: {
-      type: String
-    },
-    category: {
-      type: String
-    },
-    color: {
-      type: String,
-      default: '#ff4655'
-    },
-    totalStudyTime: {
-      type: Number,
-      default: 0
-    },
-    mastery: {
-      type: Number,
-      min: 0,
-      max: 100,
-      default: 0
-    }
-  },
-  {
-    timestamps: true
-  }
-);
-
-const subjectSchema = new Schema<ISubject>(
-  {
-    userId: {
-      type: String,
-      required: true,
-      index: true
-    },
-    name: {
-      type: String,
-      required: true
-    },
-    description: {
-      type: String
-    },
-    image: {
-      type: String // URL to subject image
-    },
-    color: {
-      type: String,
-      default: '#ff4655'
-    }
-  },
-  {
-    timestamps: true
-  }
-);
-
-const courseSchema = new Schema<ICourse>(
-  {
-    userId: {
-      type: String,
-      required: true,
-      index: true
-    },
-    scope: {
-      type: String,
-      enum: ['personal', 'institutional'],
-      default: 'personal',
-      required: true
-    },
-    visibility: {
-      type: String,
-      enum: ['private', 'institution', 'public']
-    },
-    institutionId: {
-      type: Schema.Types.ObjectId,
-      ref: 'Institution',
-      index: true
-    },
-    ownerUserId: {
-      type: String
-    },
-    assignedInstructorIds: {
-      type: [String],
-      default: []
-    },
-    activeRevisionId: {
-      type: String
-    },
-    subjectId: {
-      type: String,
-      required: true,
-      index: true
-    },
-    title: {
-      type: String,
-      required: true
-    },
-    description: {
-      type: String
-    },
-    status: {
-      type: String,
-      enum: ['processing', 'completed', 'failed'],
-      default: 'processing'
-    },
-    // INGEST-07: the job that (re)ingests this course — matches the AI
-    // envelope's messageId (jobId) and correlationId used to correlate
-    // progress/result events back to the course document.
-    jobId: {
-      type: String,
-      index: true
-    },
-    correlationId: {
-      type: String,
-      index: true
-    },
-    // INGEST-07: live ingestion progress surfaced via
-    // GET /api/v1/study/courses/:courseId/ingest-status.
-    ingestStage: {
-      type: String,
-      enum: ['parsing', 'enriching', 'embedding', 'indexing'],
-      default: null
-    },
-    ingestProgress: {
-      type: Number,
-      min: 0,
-      max: 1,
-      default: 0
-    },
-    ingestDetail: {
-      type: String,
-      default: ''
-    },
-    ingestError: {
-      type: String,
-      default: ''
-    },
-    topics: [
-      {
-        title: String,
-        subtopics: [
-          {
-            id: String,
-            title: String,
-            summary: String,
-            key_concepts: [String],
-            definitions: [
-              {
-                term: String,
-                definition: String
-              }
-            ],
-            formulas: [String],
-            examples: [String],
-            source_spans: [Schema.Types.Mixed],
-            structured_blocks: [Schema.Types.Mixed],
-            tokenized_chunks: [String],
-            learning_objectives: [Schema.Types.Mixed]
-          }
-        ]
-      }
-    ],
-    files: [
-      {
-        filename: String,
-        originalName: String,
-        size: Number,
-        fileHash: String,
-        uploadedAt: {
-          type: Date,
-          default: Date.now
-        }
-      }
-    ],
-    processedAt: {
-      type: Date
-    },
-    aiCourseId: {
-      type: String,
-      index: true // Link to AI service course record
-    }
-  },
-  {
-    timestamps: true
-  }
-);
-
-courseSchema.index({ institutionId: 1, scope: 1 });
-courseSchema.index({ ownerUserId: 1 });
-courseSchema.index({ visibility: 1, updatedAt: -1 });
-courseSchema.index({ assignedInstructorIds: 1 });
-
-courseSchema.pre('validate', function () {
-  if (!this.ownerUserId && this.userId) {
-    this.ownerUserId = this.userId;
-  }
-  if (!this.userId && this.ownerUserId) {
-    this.userId = this.ownerUserId;
-  }
-  if (this.institutionId && (!this.scope || this.scope === 'personal')) {
-    this.scope = 'institutional';
-  }
+export const EvalResultRecord = table<IEvalResultRecord>({
+  delegate: () => prisma.evalResult,
+  jsonColumns: ['scores'],
+  columns: (row) => ({
+    competencyProcessedAt: row.competencyProcessedAt,
+    competencyLeaseUntil: row.competencyLeaseUntil,
+    competencyLeaseToken: row.competencyLeaseToken,
+    correlationId: row.correlationId,
+    messageId: row.messageId,
+    userId: row.userId,
+    sessionId: row.sessionId,
+    step: row.step,
+    status: row.status,
+    masteryScore: row.masteryScore,
+    scores: row.scores as unknown as Prisma.InputJsonValue,
+    nextQuestion: row.nextQuestion,
+    demonstratedBloomLevel: row.demonstratedBloomLevel,
+    objectiveId: row.objectiveId,
+    targetBloomLevel: row.targetBloomLevel
+  })
 });
 
-const learningObjectiveSchema = new Schema<ILearningObjective>(
-  {
-    userId: {
-      type: String,
-      required: true
-    },
-    documentId: {
-      type: String,
-      required: true
-    },
-    objectiveId: {
-      type: String,
-      required: true
-    },
-    topicId: {
-      type: String,
-      required: true
-    },
-    knowledgeType: {
-      type: String,
-      required: true
-    },
-    bloomLevel: {
-      type: String,
-      required: true
-    },
-    verb: {
-      type: String,
-      required: true
-    },
-    text: {
-      type: String,
-      required: true
-    },
-    textHash: {
-      type: String,
-      required: true
-    },
-    version: {
-      type: Number,
-      default: 1
-    },
-    isActive: {
-      type: Boolean,
-      default: true
-    },
-    supersededAt: {
-      type: Date
-    },
-    classification: {
-      type: Schema.Types.Mixed,
-      default: null
-    }
-  },
-  {
-    timestamps: true
-  }
-);
+export { prisma, newId, toDocument, table, type Hydrated };
 
-const competencyProfileSchema = new Schema<ICompetencyProfile>(
-  {
-    userId: {
-      type: String,
-      required: true
-    },
-    topicId: {
-      type: String,
-      required: true
-    },
-    knowledgeType: {
-      type: String,
-      required: true
-    },
-    bloomLevel: {
-      type: String,
-      required: true
-    },
-    score: {
-      type: Number,
-      required: true,
-      default: 0,
-      min: 0,
-      max: 1
-    },
-    confidence: {
-      type: Number,
-      required: true,
-      default: 0,
-      min: 0,
-      max: 1
-    },
-    evidence: {
-      type: [
-        {
-          objectiveId: String,
-          demonstratedBloomLevel: String,
-          masteryScore: Number,
-          evaluatedAt: Date,
-          correlationId: String
-        }
-      ],
-      default: [],
-      validate: {
-        validator: function (v: IEvidenceEntry[]) {
-          return v.length <= 20;
-        },
-        message: 'Evidence array capped at 20 entries'
-      }
-    }
-  },
-  {
-    timestamps: true
-  }
-);
-
-// ── BLOOM-08: EvalResultRecord (read-only view of eval_results collection) ───
-// The orchestrator writes eval_results; the study service reads them to
-// feed the competency updater. Shared DB, separate process.
-const evalResultRecordSchema = new Schema<IEvalResultRecord>(
-  {
-    competencyProcessedAt: { type: Date, default: null },
-    competencyLeaseUntil: { type: Date, default: null },
-    competencyLeaseToken: { type: String },
-    correlationId: { type: String, required: true },
-    messageId: { type: String },
-    userId: { type: String, required: true, index: true },
-    sessionId: { type: String, required: true },
-    step: { type: Number, required: true },
-    status: { type: String },
-    masteryScore: { type: Number, default: null },
-    scores: { type: Schema.Types.Mixed, default: {} },
-    nextQuestion: { type: String, default: null },
-    demonstratedBloomLevel: { type: String, default: null },
-    objectiveId: { type: String, default: null },
-    targetBloomLevel: { type: String, default: null },
-    createdAt: { type: Date, default: Date.now }
-  },
-  {
-    collection: 'eval_results',
-    timestamps: false
-  }
-);
-
-evalResultRecordSchema.index({ competencyProcessedAt: 1, competencyLeaseUntil: 1, createdAt: 1 });
-evalResultRecordSchema.index({ demonstratedBloomLevel: 1 });
-evalResultRecordSchema.index({ objectiveId: 1 });
-
-// ── BLOOM-08: CompetencyProcessing (idempotency claim store) ─────────────────
-// Each eval result is claimed exactly once via unique correlationId.
-// Replays/retries find the existing claim and skip (ACK-skip semantics).
-const competencyProcessingSchema = new Schema<ICompetencyProcessing>(
-  {
-    correlationId: {
-      type: String,
-      required: true,
-      unique: true
-    },
-    processedAt: {
-      type: Date,
-      default: Date.now
-    }
-  },
-  {
-    timestamps: true
-  }
-);
-
-const studyPlanSchema = new Schema<IStudyPlan>(
-  {
-    resourceScope: { type: Schema.Types.Mixed },
-    userId: {
-      type: String,
-      required: true,
-      index: true
-    },
-    courseId: {
-      type: String,
-      index: true // Optional: link to course if plan was generated from course
-    },
-    goal: {
-      type: String,
-      required: true
-    },
-    availableTimeMinutes: {
-      type: Number,
-      required: true
-    },
-    taskGraph: {
-      goal: String,
-      tasks: [
-        {
-          id: String,
-          title: String,
-          description: String,
-          estimated_minutes: Number,
-          difficulty: Number,
-          prerequisites: [String],
-          is_review: Boolean,
-          // BLOOM-10: competency target echoed from the AI result (snake_case).
-          objective_id: String,
-          target_bloom_level: String
-        }
-      ]
-    },
-    totalEstimatedMinutes: {
-      type: Number
-    },
-    warning: {
-      type: String
-    },
-    status: {
-      type: String,
-      enum: ['created', 'scheduled', 'in-progress', 'completed', 'cancelled'],
-      default: 'created'
-    },
-    scheduledAt: {
-      type: Date
-    }
-  },
-  {
-    timestamps: true,
-    minimize: false
-  }
-);
-
-// --- Compound indexes for hot query patterns ---
-studySessionSchema.index({ userId: 1, completedAt: -1 });
-studySessionSchema.index({ userId: 1, status: 1, createdAt: -1 });
-taskSchema.index({ userId: 1, status: 1, createdAt: -1 });
-
-// BLOOM-06: learning objective indexes
-learningObjectiveSchema.index({ topicId: 1, bloomLevel: 1 });
-learningObjectiveSchema.index({ documentId: 1 });
-learningObjectiveSchema.index({ documentId: 1, topicId: 1, textHash: 1 }, { unique: true });
-
-// BLOOM-07: competency profile indexes
-competencyProfileSchema.index({ userId: 1, topicId: 1 });
-competencyProfileSchema.index(
-  { userId: 1, topicId: 1, knowledgeType: 1, bloomLevel: 1 },
-  { unique: true }
-);
-
-const StudySession =
-  (mongoose.models.StudySession as Model<IStudySession>) ||
-  mongoose.model<IStudySession>('StudySession', studySessionSchema);
-const Task = (mongoose.models.Task as Model<ITask>) || mongoose.model<ITask>('Task', taskSchema);
-const Topic =
-  (mongoose.models.Topic as Model<ITopic>) || mongoose.model<ITopic>('Topic', topicSchema);
-const Subject =
-  (mongoose.models.Subject as Model<ISubject>) ||
-  mongoose.model<ISubject>('Subject', subjectSchema);
-const Course =
-  (mongoose.models.Course as Model<ICourse>) || mongoose.model<ICourse>('Course', courseSchema);
-const StudyPlan =
-  (mongoose.models.StudyPlan as Model<IStudyPlan>) ||
-  mongoose.model<IStudyPlan>('StudyPlan', studyPlanSchema);
-const LearningObjective =
-  (mongoose.models.LearningObjective as Model<ILearningObjective>) ||
-  mongoose.model<ILearningObjective>(
-    'LearningObjective',
-    learningObjectiveSchema,
-    'learning_objectives'
-  );
-const CompetencyProfile =
-  (mongoose.models.CompetencyProfile as Model<ICompetencyProfile>) ||
-  mongoose.model<ICompetencyProfile>(
-    'CompetencyProfile',
-    competencyProfileSchema,
-    'competency_profiles'
-  );
-
-// BLOOM-08: read-only view of eval_results (written by orchestrator)
-const EvalResultRecord =
-  (mongoose.models.EvalResultRecord as Model<IEvalResultRecord>) ||
-  mongoose.model<IEvalResultRecord>('EvalResultRecord', evalResultRecordSchema, 'eval_results');
-
-// BLOOM-08: idempotency claim store for competency updates
-const CompetencyProcessing =
-  (mongoose.models.CompetencyProcessing as Model<ICompetencyProcessing>) ||
-  mongoose.model<ICompetencyProcessing>(
-    'CompetencyProcessing',
-    competencyProcessingSchema,
-    'competency_processing'
-  );
-
-export {
-  StudySession,
-  Task,
-  Topic,
-  Subject,
-  Course,
-  StudyPlan,
-  LearningObjective,
-  CompetencyProfile,
-  EvalResultRecord,
-  CompetencyProcessing
-};
-
-export {
-  StudyRoom,
+// Model modules that live in their own file but are part of this registry.
+export { StudyRoom, mutateRoom, createRoomOnce } from './StudyRoom';
+export type {
   IStudyRoom,
   IStudyRoomParticipant,
+  IRoomCommandReceipt,
   RoomPhase,
   ModeratorMode
 } from './StudyRoom';
 
 export {
+  CourseRevision,
+  COURSE_REVISION_STATUSES,
+  type CourseRevisionStatus,
+  type ICourseRevision
+} from './CourseRevision';
+export {
   CourseEnrollment,
-  ICourseEnrollment,
-  CourseEnrollmentStatus,
-  COURSE_ENROLLMENT_STATUSES
+  COURSE_ENROLLMENT_STATUSES,
+  type CourseEnrollmentStatus,
+  type ICourseEnrollment
 } from './CourseEnrollment';
-
 export {
   CourseInvitation,
-  ICourseInvitation,
-  CourseInvitationRole,
-  CourseInvitationStatus,
   COURSE_INVITATION_ROLES,
-  COURSE_INVITATION_STATUSES
+  COURSE_INVITATION_STATUSES,
+  type CourseInvitationRole,
+  type CourseInvitationStatus,
+  type ICourseInvitation
 } from './CourseInvitation';
-
-export {
-  CourseRevision,
-  ICourseRevision,
-  CourseRevisionStatus,
-  COURSE_REVISION_STATUSES
-} from './CourseRevision';
-
 export {
   Institution,
   InstitutionMembership,
@@ -1028,52 +530,54 @@ export {
   INSTITUTION_MEMBERSHIP_ROLES,
   INSTITUTION_MEMBERSHIP_STATUSES,
   INSTITUTION_INVITATION_ROLES,
-  INSTITUTION_INVITATION_STATUSES
+  INSTITUTION_INVITATION_STATUSES,
+  type IInstitution,
+  type IInstitutionMembership,
+  type IInstitutionInvitation,
+  type InstitutionMembershipRole,
+  type InstitutionMembershipStatus,
+  type InstitutionInvitationRole,
+  type InstitutionInvitationStatus
 } from './Institution';
-export type {
-  IInstitution,
-  IInstitutionMembership,
-  IInstitutionInvitation,
-  InstitutionMembershipRole,
-  InstitutionMembershipStatus,
-  InstitutionInvitationRole,
-  InstitutionInvitationStatus
-} from './Institution';
+export { PublicCourseJoin, type IPublicCourseJoin } from './PublicCourseJoin';
+export { ActivityRecord, type IActivityRecord } from './ActivityRecord';
+export { StudentAttempt, type IStudentAttempt } from './StudentAttempt';
+export { LearningEvidence, type ILearningEvidence } from './LearningEvidence';
+export { VisualLab, type IVisualLab } from './VisualLab';
 export {
   FacilitatorIntervention,
-  IFacilitatorIntervention,
-  FacilitatorStrategy,
-  FacilitatorTrigger,
-  InterventionStatus
+  type IFacilitatorIntervention,
+  type FacilitatorStrategy,
+  type FacilitatorTrigger,
+  type InterventionStatus
 } from './FacilitatorIntervention';
-export { PublicCourseJoin } from './PublicCourseJoin';
-export { StudentAttempt, IStudentAttempt } from './StudentAttempt';
-export { LearningEvidence, ILearningEvidence } from './LearningEvidence';
-export { ActivityRecord, IActivityRecord } from './ActivityRecord';
-export { VisualLab, IVisualLab } from './VisualLab';
+export { RoomWhiteboard, type IRoomWhiteboard } from './RoomWhiteboard';
+export { CourseNardouchProgress, type ICourseNardouchProgress } from './CourseNardouchProgress';
+export { NardouchConversationModel, type ConversationRecord } from './NardouchConversation';
+export {
+  LearnerAdaptationPreference,
+  type ILearnerAdaptationPreference
+} from './LearnerAdaptationPreference';
+export {
+  ExperiencePlanRequest,
+  ACTIVE_STATES,
+  type IExperiencePlanRequest,
+  type ExperiencePlanRequestState
+} from './ExperiencePlanRequest';
+export { ExperiencePlanRecord, type IExperiencePlanRecord } from './ExperiencePlanRecord';
+export {
+  FormulaProposal,
+  type IFormulaProposal,
+  type FormulaProposalDecision
+} from './FormulaProposal';
+export { FormulaRecognitionJob, type IFormulaRecognitionJob } from './FormulaRecognitionJob';
+export { StructuredAsset, type IStructuredAsset } from './StructuredAsset';
+export { StructuredAssetReview, type IStructuredAssetReview } from './StructuredAssetReview';
+export {
+  CourseIngestionOperation,
+  type IngestionOperation,
+  type IngestionOperationState
+} from './CourseIngestionOperation';
 
-module.exports = {
-  StudySession,
-  StudyRoom: require('./StudyRoom').StudyRoom,
-  FacilitatorIntervention: require('./FacilitatorIntervention').FacilitatorIntervention,
-  Institution: require('./Institution').Institution,
-  InstitutionMembership: require('./Institution').InstitutionMembership,
-  InstitutionInvitation: require('./Institution').InstitutionInvitation,
-  CourseEnrollment: require('./CourseEnrollment').CourseEnrollment,
-  PublicCourseJoin: require('./PublicCourseJoin').PublicCourseJoin,
-  CourseInvitation: require('./CourseInvitation').CourseInvitation,
-  CourseRevision: require('./CourseRevision').CourseRevision,
-  StudentAttempt: require('./StudentAttempt').StudentAttempt,
-  LearningEvidence: require('./LearningEvidence').LearningEvidence,
-  ActivityRecord: require('./ActivityRecord').ActivityRecord,
-  VisualLab: require('./VisualLab').VisualLab,
-  Task,
-  Topic,
-  Subject,
-  Course,
-  StudyPlan,
-  LearningObjective,
-  CompetencyProfile,
-  EvalResultRecord,
-  CompetencyProcessing
-};
+// Callers reach these through `import` above; nothing here replaces the module
+// exports object, because doing so would hide every other re-export at runtime.

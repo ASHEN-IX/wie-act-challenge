@@ -23,13 +23,13 @@ import {
   DEFAULT_PREFERENCES,
   parsePreferences,
   type AdaptationEvidence,
-  type AdaptationPreferences,
+  type AdaptationPreferences
 } from '../../../../shared/ednova/learningAdaptation';
 import {
   adaptationFingerprint,
   evaluateAdaptation,
   shouldSurface,
-  type PolicyInput,
+  type PolicyInput
 } from '../../../../shared/ednova/adaptationPolicy';
 import type { LearningAdaptationV1 } from '../../../../shared/ednova/learningAdaptation';
 import type { LearningMode } from '../../../../shared/ednova/learningModes';
@@ -57,8 +57,7 @@ export type StoredPreferences = {
  * learner who has never opened settings behaves as if nothing was chosen. */
 export async function readPreferences(userId: string): Promise<StoredPreferences> {
   const row = await LearnerAdaptationPreference.findOne({ userId }).lean();
-  if (!row)
-    return { preferences: { ...DEFAULT_PREFERENCES }, version: 0, dismissed: [] };
+  if (!row) return { preferences: { ...DEFAULT_PREFERENCES }, version: 0, dismissed: [] };
   return {
     preferences: {
       recommendationsEnabled: row.recommendationsEnabled,
@@ -66,15 +65,15 @@ export async function readPreferences(userId: string): Promise<StoredPreferences
       preferredMode: (row.preferredMode as LearningMode | null) ?? null,
       preferWorkedExamples: row.preferWorkedExamples,
       preferVisualExploration: row.preferVisualExploration,
-      preferDetailedProofs: row.preferDetailedProofs,
+      preferDetailedProofs: row.preferDetailedProofs
     },
     version: row.version,
     dismissed: (row.dismissed ?? []).map((entry) => ({
       courseId: entry.courseId,
       revisionId: entry.revisionId,
       lessonId: entry.lessonId,
-      mode: entry.mode,
-    })),
+      mode: entry.mode
+    }))
   };
 }
 
@@ -88,7 +87,7 @@ export async function readPreferences(userId: string): Promise<StoredPreferences
 export async function savePreferences(
   userId: string,
   input: unknown,
-  expectedVersion: number,
+  expectedVersion: number
 ): Promise<{ preferences: AdaptationPreferences; version: number }> {
   if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 0)
     throw new AdaptationConflictError();
@@ -105,7 +104,7 @@ export async function savePreferences(
         preferredMode: existing.preferredMode,
         preferWorkedExamples: existing.preferWorkedExamples,
         preferVisualExploration: existing.preferVisualExploration,
-        preferDetailedProofs: existing.preferDetailedProofs,
+        preferDetailedProofs: existing.preferDetailedProofs
       }
     : { ...DEFAULT_PREFERENCES };
 
@@ -113,14 +112,14 @@ export async function savePreferences(
     userId,
     version: currentVersion + 1,
     ...base,
-    ...patch,
+    ...patch
   };
 
   // Conditional on the version we read, so a concurrent write loses cleanly.
   const updated = await LearnerAdaptationPreference.findOneAndUpdate(
     { userId, version: currentVersion },
     { $set: next },
-    { upsert: currentVersion === 0, new: true },
+    { upsert: currentVersion === 0, new: true }
   ).lean();
   if (!updated) throw new AdaptationConflictError();
 
@@ -131,9 +130,9 @@ export async function savePreferences(
       preferredMode: (updated.preferredMode as LearningMode | null) ?? null,
       preferWorkedExamples: updated.preferWorkedExamples,
       preferVisualExploration: updated.preferVisualExploration,
-      preferDetailedProofs: updated.preferDetailedProofs,
+      preferDetailedProofs: updated.preferDetailedProofs
     },
-    version: updated.version,
+    version: updated.version
   };
 }
 
@@ -146,22 +145,24 @@ export async function resetPreferences(userId: string): Promise<void> {
 /** Record that a learner dismissed a suggestion for this lesson and mode. */
 export async function dismissRecommendation(
   userId: string,
-  input: { courseId: string; revisionId: string; lessonId: string; mode: string },
+  input: { courseId: string; revisionId: string; lessonId: string; mode: string }
 ): Promise<void> {
-  await LearnerAdaptationPreference.updateOne(
-    { userId },
-    {
-      $push: {
-        dismissed: {
-          $each: [{ ...input, at: new Date() }],
-          // Bounded: dismissals are a UI courtesy, not a history.
-          $slice: -50,
-        },
-      },
-      $setOnInsert: { userId, version: 0 },
-    },
-    { upsert: true },
-  );
+  // Bounded: dismissals are a UI courtesy, not a history. Re-read and rewrite
+  // the capped list under the row's optimistic `version`, retrying on conflict.
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const current = await LearnerAdaptationPreference.findOneAndUpdate(
+      { userId },
+      { $setOnInsert: { userId, version: 0 } },
+      { upsert: true, new: true }
+    );
+    if (!current) break;
+    const dismissed = [...(current.dismissed || []), { ...input, at: new Date() }].slice(-50);
+    const updated = await LearnerAdaptationPreference.updateOne(
+      { userId, version: current.version },
+      { $set: { dismissed, version: current.version + 1 } }
+    );
+    if (updated.matchedCount) break;
+  }
 }
 
 /**
@@ -189,7 +190,7 @@ export async function loadEligibleEvidence(input: {
     userId: input.userId,
     'activity.courseId': input.courseId,
     'activity.revisionId': input.revisionId,
-    status: 'accepted',
+    status: 'accepted'
   };
   if (input.objectiveIds && input.objectiveIds.length > 0)
     filter.objectiveId = { $in: [...input.objectiveIds] };
@@ -200,7 +201,7 @@ export async function loadEligibleEvidence(input: {
       objectiveId: 1,
       masteryAchieved: 1,
       'evaluator.type': 1,
-      'evaluator.validationVersion': 1,
+      'evaluator.validationVersion': 1
     })
     // Still bounded, but now the bound applies *within* the objectives that can
     // matter for this lesson rather than across the learner's whole history.
@@ -216,7 +217,7 @@ export async function loadEligibleEvidence(input: {
       revisionId: input.revisionId,
       objectiveId: row.objectiveId ?? null,
       mastered: row.masteryAchieved === true,
-      evaluatorVersion: row.evaluator?.validationVersion ?? 'unknown',
+      evaluatorVersion: row.evaluator?.validationVersion ?? 'unknown'
     }));
 }
 
@@ -250,7 +251,7 @@ export async function resolveLessonSupport(input: {
       courseId: input.courseId,
       revisionId: input.revisionId,
       lessonId: input.lessonId,
-      mode,
+      mode
     });
     if (found) availableModes.push(mode);
   }
@@ -259,7 +260,7 @@ export async function resolveLessonSupport(input: {
   const rows = await StructuredAsset.find({
     courseId: input.courseId,
     revisionId: input.revisionId,
-    lessonId: input.lessonId,
+    lessonId: input.lessonId
   })
     .limit(50)
     .lean();
@@ -270,7 +271,7 @@ export async function resolveLessonSupport(input: {
       const provenance = await verifyReviewProvenance([asset], {
         courseId: input.courseId,
         revisionId: input.revisionId,
-        lessonId: input.lessonId,
+        lessonId: input.lessonId
       });
       if (provenance.get(asset.assetId)?.verified) {
         hasEligibleAsset = true;
@@ -315,7 +316,7 @@ export async function recommendForLesson(input: {
         courseId: input.courseId,
         revisionId: input.revisionId,
         // Scope the read to what this lesson can actually act on.
-        objectiveIds: input.lessonObjectiveIds,
+        objectiveIds: input.lessonObjectiveIds
       })
     : [];
 
@@ -326,7 +327,7 @@ export async function recommendForLesson(input: {
     contentHash: input.contentHash,
     modes: ['read', 'guided', 'explore', 'practice', 'deep_dive'],
     hasProofMaterial: input.hasProofMaterial,
-    hasWorkedExamples: input.hasWorkedExamples,
+    hasWorkedExamples: input.hasWorkedExamples
   });
 
   const policyInput: PolicyInput = {
@@ -340,7 +341,7 @@ export async function recommendForLesson(input: {
       availableModes: support.availableModes,
       hasEligibleAsset: support.hasEligibleAsset,
       hasProofMaterial: input.hasProofMaterial,
-      hasWorkedExamples: input.hasWorkedExamples,
+      hasWorkedExamples: input.hasWorkedExamples
     },
     evidenceFingerprint: adaptationFingerprint({
       courseId: input.courseId,
@@ -348,9 +349,9 @@ export async function recommendForLesson(input: {
       lessonId: input.lessonId,
       preferences: stored.preferences,
       evidence,
-      availableModes: support.availableModes,
+      availableModes: support.availableModes
     }),
-    ...(input.now ? { now: input.now } : {}),
+    ...(input.now ? { now: input.now } : {})
   };
 
   const adaptation = evaluateAdaptation(policyInput, input.lessonObjectiveIds);
@@ -359,12 +360,12 @@ export async function recommendForLesson(input: {
       entry.courseId === input.courseId &&
       entry.revisionId === input.revisionId &&
       entry.lessonId === input.lessonId &&
-      entry.mode === adaptation.recommendedMode,
+      entry.mode === adaptation.recommendedMode
   );
   return {
     adaptation,
     surface: shouldSurface(adaptation, input.currentMode) && !dismissed,
-    preferenceVersion: stored.version,
+    preferenceVersion: stored.version
   };
 }
 

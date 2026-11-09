@@ -3,7 +3,8 @@ import express from 'express';
 import request from 'supertest';
 
 process.env.JWT_SECRET = 'test-secret-key';
-process.env.MONGODB_URI = 'mongodb://localhost:27017/test_ednova';
+process.env.DATABASE_URL =
+  process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
 process.env.NODE_ENV = 'test';
 
 jest.mock('../models/StudyGroup', () => ({
@@ -12,18 +13,30 @@ jest.mock('../models/StudyGroup', () => ({
   MAX_GROUP_INVITES: 10,
   MAX_OWNED_GROUPS: 10,
   default: {
-    find: jest.fn(),
+    findMany: jest.fn(),
     findOne: jest.fn(),
     findOneAndUpdate: jest.fn(),
     countDocuments: jest.fn(),
     create: jest.fn(),
     exists: jest.fn(),
     updateOne: jest.fn(),
-    deleteOne: jest.fn()
+    deleteOne: jest.fn(),
+    setActiveSession: jest.fn(),
+    removeMember: jest.fn(),
+    removeInvite: jest.fn()
   }
 }));
 jest.mock('../models/Friendship', () => ({ __esModule: true, default: { findOne: jest.fn() } }));
-jest.mock('../models/UserProfile', () => ({ __esModule: true, default: { find: jest.fn() } }));
+jest.mock('../models/UserProfile', () => ({ __esModule: true, default: { findMany: jest.fn() } }));
+jest.mock('../../../../shared/database', () => ({
+  prisma: {
+    $transaction: jest.fn(),
+    studyGroup: { findFirst: jest.fn() },
+    studyGroupInvite: { deleteMany: jest.fn() },
+    studyGroupMember: { create: jest.fn() }
+  },
+  toDocument: (row: unknown) => row
+}));
 jest.mock('@ednova/shared/moduleClient', () => ({
   __esModule: true,
   default: { get: jest.fn(), post: jest.fn().mockResolvedValue({}) }
@@ -48,15 +61,13 @@ app.use(
   },
   groupRoutes
 );
-const lean = (value: unknown) => ({ lean: () => Promise.resolve(value) });
-const sortLimitLean = (value: unknown) => ({ sort: () => ({ limit: () => lean(value) }) });
-const selectLean = (value: unknown) => ({ select: () => lean(value) });
+const prisma = require('../../../../shared/database').prisma;
 
 describe('study groups', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     me = 'alice';
-    UserProfile.find.mockReturnValue(selectLean([]));
+    UserProfile.findMany.mockResolvedValue([]);
   });
 
   it('creates a group owned by the caller', async () => {
@@ -116,43 +127,47 @@ describe('study groups', () => {
 
   it('accept is idempotent for an existing member', async () => {
     me = 'bob';
-    StudyGroup.exists.mockResolvedValue({ _id: 1 });
+    StudyGroup.exists.mockResolvedValue(true);
     const res = await request(app).post('/api/v1/users/groups/g1/accept');
     expect(res.status).toBe(200);
-    expect(StudyGroup.findOneAndUpdate).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
   it('accept fails without an invitation (or when the group is full)', async () => {
     me = 'mallory';
-    StudyGroup.exists.mockResolvedValue(null);
-    StudyGroup.findOneAndUpdate.mockResolvedValue(null);
+    StudyGroup.exists.mockResolvedValue(false);
+    // The capacity and invitation checks run inside one transaction.
+    prisma.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) =>
+      fn({
+        studyGroup: { findFirst: jest.fn().mockResolvedValue(null) },
+        studyGroupInvite: { deleteMany: jest.fn() },
+        studyGroupMember: { create: jest.fn() }
+      })
+    );
     expect((await request(app).post('/api/v1/users/groups/g1/accept')).status).toBe(404);
-    const filter = StudyGroup.findOneAndUpdate.mock.calls[0][0];
-    expect(filter['invites.userId']).toBe('mallory');
-    expect(JSON.stringify(filter.$expr)).toContain('$size');
+    const lookup = prisma.$transaction.mock.calls[0][0];
+    expect(typeof lookup).toBe('function');
   });
 
   it('non-members cannot read a group', async () => {
     me = 'mallory';
-    StudyGroup.findOne.mockReturnValue(lean(null));
+    StudyGroup.findOne.mockResolvedValue(null);
     expect((await request(app).get('/api/v1/users/groups/g1')).status).toBe(404);
     expect(JSON.stringify(StudyGroup.findOne.mock.calls[0][0])).toContain('mallory');
   });
 
   it('a member list shows invitees only that they were invited', async () => {
     me = 'bob';
-    StudyGroup.find.mockReturnValue(
-      sortLimitLean([
-        {
-          groupId: 'g1',
-          name: 'G',
-          subject: '',
-          ownerId: 'alice',
-          members: [{ userId: 'alice' }],
-          invites: [{ userId: 'bob' }]
-        }
-      ])
-    );
+    StudyGroup.findMany.mockResolvedValue([
+      {
+        groupId: 'g1',
+        name: 'G',
+        subject: '',
+        ownerId: 'alice',
+        members: [{ userId: 'alice' }],
+        invites: [{ userId: 'bob' }]
+      }
+    ]);
     const res = await request(app).get('/api/v1/users/groups');
     expect(res.body.groups[0].role).toBe('invited');
     expect(res.body.groups[0].activeSession).toBeNull();
@@ -161,18 +176,26 @@ describe('study groups', () => {
 
   it('members, not the owner, can leave; the owner cannot be removed', async () => {
     me = 'bob';
-    StudyGroup.findOne.mockReturnValue(
-      lean({ groupId: 'g1', ownerId: 'alice', members: [{ userId: 'bob' }] })
-    );
+    StudyGroup.findOne.mockResolvedValue({
+      id: 'row1',
+      groupId: 'g1',
+      ownerId: 'alice',
+      members: [{ userId: 'bob' }],
+      invites: []
+    });
     expect((await request(app).delete('/api/v1/users/groups/g1/members/bob')).status).toBe(200);
     expect((await request(app).delete('/api/v1/users/groups/g1/members/alice')).status).toBe(409);
     expect((await request(app).delete('/api/v1/users/groups/g1/members/carol')).status).toBe(403);
   });
 
   it('attaches a session only when the caller can read the room, and uses the server invite code', async () => {
-    StudyGroup.findOne.mockReturnValue(
-      lean({ groupId: 'g1', name: 'G', members: [{ userId: 'alice' }, { userId: 'bob' }] })
-    );
+    StudyGroup.findOne.mockResolvedValue({
+      id: 'row1',
+      groupId: 'g1',
+      name: 'G',
+      members: [{ userId: 'alice' }, { userId: 'bob' }],
+      invites: []
+    });
     moduleClient.get.mockRejectedValueOnce(new Error('403'));
     expect(
       (await request(app).post('/api/v1/users/groups/g1/session').send({ roomId: 'room_1' })).status
@@ -181,12 +204,12 @@ describe('study groups', () => {
     moduleClient.get.mockResolvedValueOnce({
       data: { room: { roomId: 'room_1', title: 'T', inviteCode: 'ABC123', status: 'active' } }
     });
-    StudyGroup.updateOne.mockResolvedValue({});
+    StudyGroup.setActiveSession.mockResolvedValue(undefined);
     const res = await request(app)
       .post('/api/v1/users/groups/g1/session')
       .send({ roomId: 'room_1', inviteCode: 'HACK' });
     expect(res.status).toBe(200);
-    expect(StudyGroup.updateOne.mock.calls[0][1].$set.activeSession.inviteCode).toBe('ABC123');
+    expect(StudyGroup.setActiveSession.mock.calls[0][1].inviteCode).toBe('ABC123');
     expect(
       moduleClient.post.mock.calls.every(
         (c: unknown[]) => (c[1] as { userId: string }).userId === 'bob'

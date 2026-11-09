@@ -3,8 +3,8 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
-import mongoose from 'mongoose';
 import crypto from 'node:crypto';
+import { connectDatabase, disconnectDatabase, prisma } from '../../shared/database';
 import { Course, CourseRevision, StudyRoom } from '../../modules/study/src/models';
 import {
   materializeRevisionFixture,
@@ -25,22 +25,31 @@ test('Private room help persists only requester history and fails closed at deli
   };
   process.env.INGEST_UPLOADS_DIR = path.join(storage, 'uploads');
   process.env.FAISS_INDEX_DIR = path.join(storage, 'faiss');
-  await mongoose.connect(
-    'mongodb://127.0.0.1:27018/ednova_private_help_' + process.pid + '_' + Date.now()
-  );
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
+  await connectDatabase();
+  // The test database is shared; every row this suite owns is run-unique.
+  const run = `${process.pid}_${Date.now()}`;
+  const roomIds: string[] = [];
+  let courseId = '';
   t.after(async () => {
     await cleanupRevisionFixtures();
-    await mongoose.connection.dropDatabase();
-    await mongoose.disconnect();
-    await rm(storage, { recursive: true, force: true });
-    for (const [key, value] of Object.entries(originalStorage)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
+    try {
+      await prisma.privateRoomHelp.deleteMany({ where: { roomId: { in: roomIds } } });
+      await StudyRoom.deleteMany({ roomId: { in: roomIds } });
+      if (courseId) await Course.deleteMany({ userId: actor });
+    } finally {
+      await disconnectDatabase().catch(() => {});
+      await rm(storage, { recursive: true, force: true });
+      for (const [key, value] of Object.entries(originalStorage)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
     }
   });
-  const actor = 'private_owner',
-    peer = 'private_peer',
-    teacher = 'private_teacher';
+  const actor = `private_owner_${run}`,
+    peer = `private_peer_${run}`,
+    teacher = `private_teacher_${run}`;
   const course = await Course.create({
     userId: actor,
     ownerUserId: actor,
@@ -49,7 +58,7 @@ test('Private room help persists only requester history and fails closed at deli
     subjectId: 'fixture',
     status: 'completed'
   });
-  const courseId = String(course._id);
+  courseId = String(course._id);
   await CourseRevision.create({
     courseId,
     revisionTag: 'rev_private',
@@ -72,10 +81,11 @@ test('Private room help persists only requester history and fails closed at deli
   });
   await materializeRevisionFixture(courseId, 'rev_private');
   await publishCourseRevision(actor, courseId, 'rev_private');
-  const roomId = 'room_private_' + Date.now();
+  const roomId = 'room_private_' + run;
+  roomIds.push(roomId);
   await StudyRoom.create({
     roomId,
-    inviteCode: 'PRIV01',
+    inviteCode: 'P' + run.slice(-5).toUpperCase(),
     title: 'Synthetic private',
     status: 'active',
     hostUserId: actor,
@@ -115,17 +125,20 @@ test('Private room help persists only requester history and fails closed at deli
       );
     }
   );
-  await t.test('older course rooms can use the published source before selecting an activity', async () => {
-    await StudyRoom.updateOne({ roomId }, { $unset: { revisionId: 1 } });
-    try {
-      const previousCalls = calls;
-      await askPrivateRoomHelp(actor, roomId, request);
-      assert.equal(calls, previousCalls + 1);
-      assert.equal((await privateHelpHistory(actor, roomId)).history.length, 1);
-    } finally {
-      await StudyRoom.updateOne({ roomId }, { $set: { revisionId: 'rev_private' } });
+  await t.test(
+    'older course rooms can use the published source before selecting an activity',
+    async () => {
+      await StudyRoom.updateOne({ roomId }, { $unset: { revisionId: 1 } });
+      try {
+        const previousCalls = calls;
+        await askPrivateRoomHelp(actor, roomId, request);
+        assert.equal(calls, previousCalls + 1);
+        assert.equal((await privateHelpHistory(actor, roomId)).history.length, 1);
+      } finally {
+        await StudyRoom.updateOne({ roomId }, { $set: { revisionId: 'rev_private' } });
+      }
     }
-  });
+  );
   await t.test(
     'peer, educator and forged requester cannot read or ask for private course context',
     async () => {
@@ -165,13 +178,12 @@ test('Private room help persists only requester history and fails closed at deli
       );
       release();
       await assert.rejects(() => pending);
-      const records = await mongoose.connection
-        .db!.collection('private_room_help')
-        .find({ question: 'PRIVATE_DELAYED_SENTINEL' })
-        .toArray();
+      const records = await prisma.privateRoomHelp.findMany({
+        where: { question: 'PRIVATE_DELAYED_SENTINEL', roomId }
+      });
       assert.equal(records.length, 1);
       assert.equal(records[0].state, 'unavailable');
-      assert.equal(records[0].result, undefined);
+      assert.equal(records[0].result, null);
       await Course.updateOne({ _id: courseId }, { $set: { ownerUserId: actor, userId: actor } });
       aiClient.post = (async () => {
         calls++;
@@ -180,8 +192,6 @@ test('Private room help persists only requester history and fails closed at deli
     }
   );
   await t.test('history fetch reauthorizes at current revocation', async () => {
-    const uri = mongoose.connection.getClient().options.hosts[0].toString();
-    assert.ok(uri.includes('27018'));
     const recovered = await privateHelpHistory(actor, roomId);
     assert.equal(recovered.history.length, 2);
     assert.ok(recovered.history.some((row) => row.requestId === request.requestId));
@@ -194,10 +204,11 @@ test('Private room help persists only requester history and fails closed at deli
   });
   await t.test('source-free room returns explicit unavailable without invoking AI', async () => {
     const previousCalls = calls;
-    const free = 'room_free_' + Date.now();
+    const free = 'room_free_' + run;
+    roomIds.push(free);
     await StudyRoom.create({
       roomId: free,
-      inviteCode: 'FREE01',
+      inviteCode: 'F' + run.slice(-5).toUpperCase(),
       title: 'Free',
       status: 'active',
       hostUserId: actor,

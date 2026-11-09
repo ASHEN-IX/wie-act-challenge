@@ -53,8 +53,11 @@ jest.mock('../models/index', () => {
       updateOne: jest.fn().mockResolvedValue({ matchedCount: 1, modifiedCount: 1 }),
       findById: jest.fn().mockImplementation((id: string) => {
         const value = mockCourse.findOne({ _id: id, userId: 'user-123' });
-        const result = Promise.resolve(value);
-        return Object.assign(result, { select: () => ({ lean: () => result }) });
+        const result = Promise.resolve(value) as Promise<unknown> & {
+          select: () => Promise<unknown>;
+        };
+        result.select = () => Promise.resolve(value);
+        return result;
       }),
       findOneAndDelete: jest.fn()
     }

@@ -27,39 +27,46 @@ export async function prepareCourseFixture(courseId: string, t?: TestContext) {
   if (!course) throw new Error('Missing synthetic course fixture');
   if (course.scope === 'institutional' && course.institutionId) {
     const existed = await Institution.exists({ _id: course.institutionId });
-    await Institution.updateOne(
-      { _id: course.institutionId },
-      {
-        $setOnInsert: {
-          name: 'Synthetic fixture institution',
-          slug: 'fixture-' + course.institutionId.toString(),
-          createdByUserId: course.userId,
-          status: 'active'
-        }
-      },
-      { upsert: true }
-    );
-    if (!existed) fixtureInstitutions.add(course.institutionId.toString());
+    if (!existed) {
+      await Institution.create({
+        id: course.institutionId,
+        name: 'Synthetic fixture institution',
+        slug: 'fixture-' + course.institutionId,
+        createdByUserId: course.userId,
+        status: 'active'
+      });
+      fixtureInstitutions.add(course.institutionId);
+    }
     void t;
-    for (const userId of course.assignedInstructorIds || [])
-      await InstitutionMembership.updateOne(
-        {
+    for (const userId of course.assignedInstructorIds || []) {
+      const member = await InstitutionMembership.findOne({
+        institutionId: course.institutionId,
+        userId
+      });
+      if (!member)
+        await InstitutionMembership.create({
           institutionId: course.institutionId,
-          userId
-        },
-        { $setOnInsert: { role: 'instructor', status: 'active' } },
-        { upsert: true }
-      );
+          userId,
+          role: 'instructor',
+          status: 'active'
+        });
+    }
     for (const enrollment of await CourseEnrollment.find({ courseId, status: 'active' })) {
       await CourseEnrollment.updateOne(
         { _id: enrollment._id },
-        { $set: { institutionId: course.institutionId } }
+        { institutionId: course.institutionId }
       );
-      await InstitutionMembership.updateOne(
-        { institutionId: course.institutionId, userId: enrollment.userId },
-        { $setOnInsert: { role: 'university_student', status: 'active' } },
-        { upsert: true }
-      );
+      const member = await InstitutionMembership.findOne({
+        institutionId: course.institutionId,
+        userId: enrollment.userId
+      });
+      if (!member)
+        await InstitutionMembership.create({
+          institutionId: course.institutionId,
+          userId: enrollment.userId,
+          role: 'university_student',
+          status: 'active'
+        });
     }
   }
   if (!captureActivitySources(course.files || [])) {
@@ -69,7 +76,7 @@ export async function prepareCourseFixture(courseId: string, t?: TestContext) {
     course.files = [
       { filename: 'reviewed-source.txt', originalName: 'reviewed-source.txt', size: 80, fileHash }
     ];
-    await course.save();
+    await Course.save(course);
   }
 }
 

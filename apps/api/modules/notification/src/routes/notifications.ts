@@ -1,6 +1,5 @@
 import type { DomainRequest } from '../../../../src/framework/contracts';
-import type { FilterQuery } from 'mongoose';
-import type { INotification } from '../models/Notification';
+import type { Prisma } from '../../../../src/generated/prisma/client';
 import { createContracts } from '@ednova/shared/domainContracts';
 import Joi from 'joi';
 import type { Response, NextFunction } from 'express';
@@ -54,22 +53,15 @@ router.get('/', async (req: DomainRequest, res: Response, next: NextFunction) =>
     const dbTimeoutMs = Number(process.env.NOTIFICATION_DB_TIMEOUT_MS || 8000);
     const userId = req.user!.userId;
 
-    const filter: FilterQuery<INotification> = { userId };
-    if (status) filter.status = status;
+    const filter: Prisma.NotificationWhereInput = { userId };
+    if (status) filter.status = String(status);
 
-    const [notifications, total] = await Promise.all([
-      Notification.find(filter)
-        .sort({ createdAt: -1 })
-        .skip(Number(offset))
-        .limit(Number(limit))
-        .maxTimeMS(dbTimeoutMs)
-        .lean(),
-      Notification.countDocuments(filter).maxTimeMS(dbTimeoutMs)
-    ]);
-
-    const unreadCount = await Notification.countDocuments({ userId, status: 'unread' }).maxTimeMS(
-      dbTimeoutMs
-    );
+    const { notifications, total, unreadCount } = await Notification.listPage(filter, {
+      userId,
+      skip: Number(offset),
+      take: Number(limit),
+      timeoutMs: dbTimeoutMs
+    });
 
     return res.json({ notifications, total, unreadCount });
   } catch (err) {
@@ -143,7 +135,7 @@ router.post('/', requireInternal, async (req: DomainRequest, res: Response, next
     if (broadcastToUser) {
       broadcastToUser(normalizedValue.userId, {
         type: 'new_notification',
-        notification: notification.toObject()
+        notification
       });
     }
 
@@ -155,10 +147,10 @@ router.post('/', requireInternal, async (req: DomainRequest, res: Response, next
 
     let emailResult = null;
     if (shouldEmail) {
-      emailResult = await sendNotificationEmail({ req, notification: notification.toObject() });
+      emailResult = await sendNotificationEmail({ req, notification });
     }
 
-    return res.status(201).json({ ...notification.toObject(), email: emailResult });
+    return res.status(201).json({ ...notification, email: emailResult });
   } catch (err) {
     return next(err);
   }
@@ -192,7 +184,7 @@ router.post(
 router.patch('/:id/read', async (req: DomainRequest, res: Response, next: NextFunction) => {
   try {
     const notification = await Notification.findByIdAndUpdate(
-      { _id: req.params.id, userId: req.user!.userId },
+      { id: String(req.params.id), userId: req.user!.userId },
       { status: 'read', readAt: new Date() },
       { new: true }
     );
@@ -227,7 +219,7 @@ router.patch('/read-all', async (req: DomainRequest, res: Response, next: NextFu
 router.delete('/:id', async (req: DomainRequest, res: Response, next: NextFunction) => {
   try {
     const notification = await Notification.findByIdAndUpdate(
-      { _id: req.params.id, userId: req.user!.userId },
+      { id: String(req.params.id), userId: req.user!.userId },
       { status: 'dismissed' },
       { new: true }
     );

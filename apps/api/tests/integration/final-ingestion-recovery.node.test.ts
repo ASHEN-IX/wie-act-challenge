@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import mongoose from 'mongoose';
+import { connectDatabase, disconnectDatabase } from '../../shared/database';
 import { Course, CourseRevision } from '../../modules/study/src/models';
 import { CourseIngestionOperation } from '../../modules/study/src/models/CourseIngestionOperation';
 import {
@@ -13,15 +13,22 @@ import { setCustomPublisher } from '../../modules/study/src/services/ingestionJo
 import { handleIngestResult } from '../../modules/study/src/services/ingestStatus';
 
 test('Durable source dispatch linkage, uncertain acknowledgement, cancellation and outcome replay', async (t) => {
-  await mongoose.connect(
-    'mongodb://127.0.0.1:27018/ednova_ingest_recovery_' + process.pid + '_' + Date.now()
-  );
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
+  await connectDatabase();
+  // The test database is shared, so every row this suite owns carries a
+  // run-unique actor id and teardown deletes exactly those rows.
+  const actor = `recovery_${process.pid}_${Date.now()}`;
   t.after(async () => {
     setCustomPublisher(null);
-    await mongoose.connection.dropDatabase();
-    await mongoose.disconnect();
+    try {
+      await CourseIngestionOperation.deleteMany({ userId: actor });
+      // Revisions cascade from the course row.
+      await Course.deleteMany({ userId: actor });
+    } finally {
+      await disconnectDatabase().catch(() => {});
+    }
   });
-  const actor = 'recovery_owner';
   async function fixture() {
     const course = await Course.create({
       userId: actor,
@@ -152,10 +159,7 @@ test('Durable source dispatch linkage, uncertain acknowledgement, cancellation a
         payload: { course: { topics: [] }, revisionId: 'foreign_revision' }
       });
       assert.equal((await Course.findById(params.courseId).lean())?.status, 'processing');
-      assert.equal(
-        (await CourseIngestionOperation.findById(enqueued.jobId).lean())?.result,
-        undefined
-      );
+      assert.equal((await CourseIngestionOperation.findById(enqueued.jobId).lean())?.result, null);
     }
   );
   await t.test(
@@ -182,7 +186,11 @@ test('Durable source dispatch linkage, uncertain acknowledgement, cancellation a
       );
       await reconcileIngestionOperation(actor, params.courseId, enqueued.jobId);
       assert.equal(
-        (await CourseRevision.findOne({ courseId: params.courseId }).lean())?.topics?.[0]?.title,
+        (
+          (await CourseRevision.findOne({ courseId: params.courseId }))?.topics as Array<{
+            title?: string;
+          }>
+        )?.[0]?.title,
         'Instructor corrected source'
       );
       assert.equal(

@@ -34,7 +34,7 @@ for (const name of ['evaluator', 'planner', 'search', 'schedule', 'coach']) {
 }
 for (const name of ['development', 'test']) {
   const config = resolveCompose(path.join('deploy', `compose.${name}.yml`));
-  if (!config.services.mongodb || !config.services.mailpit)
-    throw new Error(`${name} stack must include MongoDB and Mailpit`);
+  if (!config.services.postgres || !config.services.mailpit)
+    throw new Error(`${name} stack must include PostgreSQL and Mailpit`);
 }
 console.log('Compose files resolve; both Python writers share writable source/index volumes.');

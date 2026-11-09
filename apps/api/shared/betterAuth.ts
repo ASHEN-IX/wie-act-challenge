@@ -1,9 +1,10 @@
 import { betterAuth } from 'better-auth';
-import { mongodbAdapter } from '@better-auth/mongo-adapter';
+import { prismaAdapter } from '@better-auth/prisma-adapter';
 import { hashPassword, verifyPassword } from 'better-auth/crypto';
 import { createAuthMiddleware, APIError } from 'better-auth/api';
 import { emailOTP } from 'better-auth/plugins';
-import { MongoClient, ObjectId, Db } from 'mongodb';
+import { prisma, prismaClient } from './database';
+import { newId } from './ids';
 // @ts-ignore
 import bcrypt from 'bcryptjs';
 import nodemailer, { SendMailOptions } from 'nodemailer';
@@ -12,8 +13,21 @@ import { effectiveTier } from './entitlements';
 
 export type AuthInstance = Awaited<ReturnType<typeof createAuth>>;
 
+/** Defaults written onto every new domain user; mirrors the previous schema defaults. */
+export function defaultNotificationPreferences() {
+  return {
+    emailOnVerification: true,
+    emailOnLevelUp: true,
+    emailOnTaskDue: false,
+    emailOnSessionReminder: false,
+    emailOnWeeklySummary: true,
+    emailOnAchievement: true,
+    emailOnPasswordReset: true,
+    emailOnSubscriptionUpdate: true
+  };
+}
+
 let singleton: Promise<AuthInstance> | undefined;
-let client: MongoClient | undefined;
 
 export function trustedOrigins(): string[] {
   return (process.env.AUTH_TRUSTED_ORIGINS || process.env.APP_URL || 'http://localhost:3000')
@@ -74,13 +88,10 @@ export interface CreateAuthOptions {
   baseURL?: string;
 }
 
-export async function createAuth(
-  db: Db,
-  {
-    sendMail,
-    baseURL = process.env.BETTER_AUTH_URL || process.env.APP_URL || 'http://localhost:3000'
-  }: CreateAuthOptions = {}
-) {
+export async function createAuth({
+  sendMail,
+  baseURL = process.env.BETTER_AUTH_URL || process.env.APP_URL || 'http://localhost:3000'
+}: CreateAuthOptions = {}) {
   const secret = process.env.BETTER_AUTH_SECRET;
   if (!secret || secret.length < 32)
     throw new Error('BETTER_AUTH_SECRET must contain at least 32 characters');
@@ -114,20 +125,26 @@ export async function createAuth(
     baseURL,
     basePath: '/api/auth',
     secret,
-    database: mongodbAdapter(db),
+    database: prismaAdapter(prisma, { provider: 'postgresql' }),
     trustedOrigins: trustedOrigins(),
-    user: { modelName: 'auth_users' },
-    account: { modelName: 'auth_accounts' },
-    verification: { modelName: 'auth_verifications' },
+    // The Prisma adapter addresses models by their Prisma model name; `@@map`
+    // already points each one at the `auth_*` table.
+    user: { modelName: 'AuthUser' },
+    account: { modelName: 'AuthAccount' },
+    verification: { modelName: 'AuthVerification' },
     session: {
-      modelName: 'auth_sessions',
+      modelName: 'AuthSession',
       expiresIn: 7 * 24 * 60 * 60,
       updateAge: 24 * 60 * 60,
       cookieCache: { enabled: false }
     },
     advanced: {
       useSecureCookies: new URL(baseURL).protocol === 'https:',
-      defaultCookieAttributes: { httpOnly: true, sameSite: 'lax', path: '/' }
+      defaultCookieAttributes: { httpOnly: true, sameSite: 'lax', path: '/' },
+      database: {
+        // Ids double as domain row ids (VarChar(24)); keep the ObjectId shape.
+        generateId: () => newId()
+      }
     },
     emailAndPassword: {
       enabled: true,
@@ -159,9 +176,7 @@ export async function createAuth(
           text: `Verify your email: ${url}`
         }),
       afterEmailVerification: async (user): Promise<void> => {
-        await db
-          .collection('users')
-          .updateOne({ _id: new ObjectId(user.id) }, { $set: { isVerified: true } });
+        await prisma.user.updateMany({ where: { id: user.id }, data: { isVerified: true } });
       }
     },
     plugins: [
@@ -191,12 +206,15 @@ export async function createAuth(
             });
         }
         if (ctx.path === '/sign-in/email') {
-          const user = await db.collection('users').findOne({
-            email: String(ctx.body?.email || '')
-              .toLowerCase()
-              .trim()
+          const user = await prisma.user.findUnique({
+            where: {
+              email: String(ctx.body?.email || '')
+                .toLowerCase()
+                .trim()
+            },
+            select: { isActive: true }
           });
-          if (user?.isActive === false)
+          if (user && user.isActive === false)
             throw new APIError('FORBIDDEN', { message: 'Account is deactivated' });
         }
       })
@@ -206,39 +224,40 @@ export async function createAuth(
         create: {
           after: async (user, context) => {
             const now = new Date();
-            await db.collection('users').updateOne(
-              { _id: new ObjectId(user.id) },
-              {
-                $setOnInsert: {
-                  email: user.email,
-                  name: user.name,
-                  role: 'student',
-                  isAdmin: false,
-                  isActive: true,
-                  onboardingDraft: normalizeOnboarding(context?.body?.onboarding),
-                  isVerified: user.emailVerified,
-                  tier: 'trial',
-                  trialStartedAt: now,
-                  trialExpiresAt: new Date(now.getTime() + 15 * 86400000),
-                  createdAt: now,
-                  updatedAt: now
-                }
-              },
-              { upsert: true }
-            );
+            // The auth id becomes the domain user id so every existing
+            // `userId` reference stays valid after the migration.
+            await prisma.user.upsert({
+              where: { id: user.id },
+              update: {},
+              create: {
+                id: user.id,
+                email: user.email,
+                name: user.name,
+                role: 'student',
+                isAdmin: false,
+                isActive: true,
+                onboardingDraft: normalizeOnboarding(context?.body?.onboarding),
+                isVerified: user.emailVerified,
+                tier: 'trial',
+                trialStartedAt: now,
+                trialExpiresAt: new Date(now.getTime() + 15 * 86400000),
+                notificationPreferences: defaultNotificationPreferences(),
+                createdAt: now,
+                updatedAt: now
+              }
+            });
           }
         }
       },
       session: {
         create: {
           before: async (session) => {
-            const user = await db
-              .collection('users')
-              .findOne({ _id: new ObjectId(session.userId) });
+            const user = await prisma.user.findUnique({
+              where: { id: session.userId },
+              select: { id: true, isActive: true }
+            });
             if (!user || user.isActive === false) return false;
-            await db
-              .collection('users')
-              .updateOne({ _id: user._id }, { $set: { lastLogin: new Date() } });
+            await prisma.user.update({ where: { id: user.id }, data: { lastLogin: new Date() } });
             return { data: session };
           }
         }
@@ -247,7 +266,7 @@ export async function createAuth(
     rateLimit: {
       enabled: true,
       storage: 'database',
-      modelName: 'auth_rate_limits',
+      modelName: 'AuthRateLimit',
       window: 60,
       max: 100,
       customRules: {
@@ -264,19 +283,8 @@ export async function createAuth(
 export async function getAuth() {
   if (!singleton)
     singleton = (async () => {
-      let uri =
-        process.env.MONGODB_URI ||
-        process.env.DOCKER_MONGODB_URI ||
-        'mongodb://localhost:27017/ednova';
-      // If running outside Docker and DOCKER_MONGODB_URI points to service name 'mongodb'
-      if (uri.includes('mongodb:') && !uri.includes('localhost') && !uri.includes('127.0.0.1')) {
-        uri = uri
-          .replace('mongodb://mongodb', 'mongodb://127.0.0.1')
-          .replace('mongodb://mongodb:', 'mongodb://127.0.0.1:');
-      }
-      client = new MongoClient(uri);
-      await client.connect();
-      return createAuth(client.db());
+      await prismaClient().$queryRaw`SELECT 1`;
+      return createAuth();
     })().catch((error) => {
       singleton = undefined;
       throw error;
@@ -285,16 +293,10 @@ export async function getAuth() {
 }
 
 export async function closeAuth() {
-  await client?.close();
-  client = undefined;
   singleton = undefined;
 }
 
-export async function resolveIdentity(
-  headers: Headers | IncomingHttpHeaders,
-  auth?: AuthInstance,
-  db?: Db
-) {
+export async function resolveIdentity(headers: Headers | IncomingHttpHeaders, auth?: AuthInstance) {
   auth ||= await getAuth();
   const session = await auth.api.getSession({
     headers:
@@ -306,29 +308,26 @@ export async function resolveIdentity(
     query: { disableCookieCache: true }
   });
   if (!session) return null;
-  const database = db || client!.db();
-  const domain = await database.collection('users').findOne(
-    { _id: new ObjectId(session.user.id) },
-    {
-      projection: {
-        password: 0,
-        refreshTokens: 0,
-        verificationToken: 0,
-        verificationOtp: 0,
-        verificationOtpExpires: 0,
-        verificationOtpAttempts: 0,
-        verificationExpires: 0,
-        resetPasswordToken: 0,
-        resetPasswordExpires: 0
-      }
+  const domain = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      isAdmin: true,
+      isActive: true,
+      tier: true,
+      trialExpiresAt: true,
+      subscriptionEndAt: true
     }
-  );
+  });
   if (!domain || domain.isActive === false) return null;
   return {
     ...session,
     domain,
     identity: {
-      userId: String(domain._id),
+      userId: String(domain.id),
       email: domain.email,
       name: domain.name || session.user.name || 'Learner',
       role: domain.role,

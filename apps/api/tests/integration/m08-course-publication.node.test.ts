@@ -2,11 +2,13 @@ import { materializeRevisionFixture } from '../helpers/revisionArtifactFixture';
 import { cleanupCourseFixtures, prepareCourseFixture } from '../helpers/reviewedActivityFixture';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import mongoose from 'mongoose';
+import { connectDatabase, disconnectDatabase } from '../../shared/database';
+import { newId } from '../../shared/ids';
 import {
   Course,
   CourseEnrollment,
   CourseRevision,
+  Institution,
   InstitutionMembership
 } from '../../modules/study/src/models';
 import {
@@ -20,18 +22,15 @@ import {
 } from '../../modules/study/src/services/coursePublication';
 import { updateCourseDraft } from '../../modules/study/src/services/courseDraft';
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27018/ednova-test';
-
 test('M08 / ED-05: Immutable Reviewed Publication & Revision Resolution Integration', async (t) => {
-  await mongoose.connect(MONGO_URI);
-  const db = mongoose.connection.db!;
+  await connectDatabase();
 
   const testPrefix = `m08_${Date.now()}`;
   const instructorId = `${testPrefix}_instructor`;
   const studentId = `${testPrefix}_student`;
   const nonEnrolledStudentId = `${testPrefix}_non_enrolled`;
   const foreignInstructorId = `${testPrefix}_foreign_inst`;
-  const institutionId = new mongoose.Types.ObjectId();
+  const institutionId = newId();
 
   let courseId: string;
   let draftRevisionTag: string;
@@ -40,21 +39,29 @@ test('M08 / ED-05: Immutable Reviewed Publication & Revision Resolution Integrat
     await cleanupCourseFixtures();
     try {
       if (courseId) {
-        await db
-          .collection('course_revisions')
-          .deleteMany({ courseId: new mongoose.Types.ObjectId(courseId) });
+        await CourseRevision.deleteMany({ courseId });
       }
-      await db.collection('courses').deleteMany({ userId: { $regex: testPrefix } });
-      await db.collection('course_enrollments').deleteMany({ userId: { $regex: testPrefix } });
-      await db.collection('institution_memberships').deleteMany({ userId: { $regex: testPrefix } });
+      await Course.deleteMany({ userId: { contains: testPrefix } });
+      await CourseEnrollment.deleteMany({ userId: { contains: testPrefix } });
+      await InstitutionMembership.deleteMany({ userId: { contains: testPrefix } });
+      await Institution.deleteMany({ _id: institutionId });
     } catch {
       // ignore
     } finally {
-      await mongoose.disconnect().catch(() => {});
+      await disconnectDatabase().catch(() => {});
     }
   });
 
   await t.test('Setup: Create institutional course with unreviewed draft', async () => {
+    // Memberships carry a foreign key to the institution, so it exists first.
+    await Institution.create({
+      id: institutionId,
+      name: 'M08 Publication Institution',
+      slug: `m08-${institutionId}`,
+      createdByUserId: instructorId,
+      status: 'active'
+    });
+
     // Add instructor membership
     await InstitutionMembership.create({
       institutionId,
@@ -124,14 +131,14 @@ test('M08 / ED-05: Immutable Reviewed Publication & Revision Resolution Integrat
 
     // Active enrollment for student
     await CourseEnrollment.create({
-      courseId: courseDoc._id,
+      courseId,
       userId: studentId,
       status: 'active'
     });
 
     draftRevisionTag = `rev_${Date.now()}`;
     await CourseRevision.create({
-      courseId: courseDoc._id,
+      courseId,
       revisionTag: draftRevisionTag,
       contentHash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
       status: 'draft',
@@ -201,7 +208,7 @@ test('M08 / ED-05: Immutable Reviewed Publication & Revision Resolution Integrat
 
     // Verify revision status is published
     const publishedRev = await CourseRevision.findOne({
-      courseId: new mongoose.Types.ObjectId(courseId),
+      courseId,
       revisionTag: reviewedRevisionTag
     });
     assert.equal(publishedRev!.status, 'published');
@@ -262,7 +269,7 @@ test('M08 / ED-05: Immutable Reviewed Publication & Revision Resolution Integrat
     // Create a new unreviewed draft
     const newDraftTag = `rev_draft_${Date.now()}`;
     await CourseRevision.create({
-      courseId: new mongoose.Types.ObjectId(courseId),
+      courseId,
       revisionTag: newDraftTag,
       contentHash: 'new_draft_hash',
       status: 'draft',
