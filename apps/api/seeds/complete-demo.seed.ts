@@ -18,7 +18,7 @@ import {
   issueInstitutionInvitation,
   acceptInstitutionInvitation
 } from '../modules/study/src/services/institutions';
-import { RANK_LADDER } from '../modules/user-profile/src/models/rankingConfig';
+import { createMissingRankBadges } from './rank-badges.seed';
 
 config({ path: path.resolve(__dirname, '../.env') });
 
@@ -28,9 +28,6 @@ const accounts = [
   { email: 'learner@ednova.test', name: 'Tasnim (Learner)', role: 'university_student' },
   { email: 'peer@ednova.test', name: 'Aziz (Peer Student)', role: 'university_student' }
 ] as const;
-
-const SINGLE_BADGE_TIERS = new Set(['grandmaster', 'legend']);
-const DIVISION_TO_BADGE_KEY: Record<string, string> = { III: 'first', II: 'second', I: 'third' };
 
 /** Synthetic source text backing the demo course. Kept in-repo so the seeded
  * revision can carry a real content hash and a verifiable provenance artifact. */
@@ -174,12 +171,6 @@ async function materializeSourceArtifact(
   return document;
 }
 
-function toBadgeKey(rank: any): string {
-  const tier = String(rank?.tier || '').toLowerCase();
-  if (SINGLE_BADGE_TIERS.has(tier)) return 'use';
-  return DIVISION_TO_BADGE_KEY[String(rank?.division || '').toUpperCase()] || 'use';
-}
-
 async function main() {
   if (process.env.ALLOW_DEMO_COURSES !== '1') {
     console.log(
@@ -199,7 +190,7 @@ async function main() {
   await connectDatabase();
   try {
     // 1. Seed Demo Users
-    console.log('\n[1/5] Seeding Demo Users...');
+    console.log('\n[1/6] Seeding Demo Users...');
     const auth = await createAuth({ sendMail: async () => {} });
     const userIds = new Map<string, string>();
 
@@ -252,7 +243,7 @@ async function main() {
     }
 
     // 2. Seed Institution
-    console.log('\n[2/5] Seeding Institution & Memberships...');
+    console.log('\n[2/6] Seeding Institution & Memberships...');
     const adminId = userIds.get('admin@ednova.test')!;
     let institution = await prisma.institution.findUnique({
       where: { slug: 'ednova-learning-demo' }
@@ -291,36 +282,12 @@ async function main() {
     }
 
     // 3. Seed Rank Badges
-    console.log('\n[3/5] Seeding Rank Badges...');
-    let badgeCount = 0;
-    for (const rank of RANK_LADDER) {
-      const tier = String(rank.tier || 'novice').toLowerCase();
-      const badgeKey = toBadgeKey(rank);
-      const existing = await prisma.rankBadge.findUnique({
-        where: { rankIndex: rank.index },
-        select: { id: true }
-      });
-      if (!existing) {
-        await prisma.rankBadge.create({
-          data: {
-            id: newId(),
-            rankIndex: rank.index,
-            rankName: rank.name,
-            tier,
-            division: rank.division || null,
-            badgeKey: badgeKey as Prisma.RankBadgeCreateInput['badgeKey'],
-            // The rebrand removed the per-tier badge PNGs; point at a shipped asset.
-            imagePath: '/brand/noveris-symbol.svg',
-            isActive: true
-          }
-        });
-        badgeCount++;
-      }
-    }
-    console.log(`  ✓ Seeded ${badgeCount} new badges (${RANK_LADDER.length} total)`);
+    console.log('\n[3/6] Seeding Rank Badges...');
+    const badgeCount = await createMissingRankBadges();
+    console.log(`  ✓ Seeded ${badgeCount} new badges`);
 
     // 4. Seed Demo Course, Published Revision & Learning Activities
-    console.log('\n[4/5] Seeding Course & Interactive Learning Activities...');
+    console.log('\n[4/6] Seeding Course & Interactive Learning Activities...');
     const instructorId = userIds.get('instructor@ednova.test')!;
     const learnerId = userIds.get('learner@ednova.test')!;
 
@@ -685,7 +652,7 @@ async function main() {
     });
 
     // 5. Enroll Learner and Seed Tasks & Progress
-    console.log('\n[5/5] Enrolling Learner & Creating Study Tasks...');
+    console.log('\n[5/6] Enrolling Learner & Creating Study Tasks...');
     const enrollment = await prisma.courseEnrollment.findFirst({
       where: { courseId, userId: learnerId },
       select: { id: true }

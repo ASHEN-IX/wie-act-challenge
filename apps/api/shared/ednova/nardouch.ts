@@ -34,7 +34,7 @@ export interface NardouchAnswer {
     traceId: string;
     model: string;
     tier: 'compact' | 'capable';
-    executionMode: 'REAL_APPROVED';
+    executionMode: 'REAL_APPROVED' | 'MOCK_TEST';
     latencyMs: number | null;
     tokens: Record<string, number> | null;
     fallbackUsed: boolean;
@@ -116,7 +116,7 @@ export function parseNardouchInput(value: unknown): NardouchInput {
     language: parseLanguage(v.language)
   } as unknown as NardouchInput;
 }
-export function parseNardouchAnswer(value: unknown): NardouchAnswer {
+export function parseNardouchAnswer(value: unknown, { allowMock = false } = {}): NardouchAnswer {
   try {
     const v = exactObject(value, [
       'displayText',
@@ -160,7 +160,7 @@ export function parseNardouchAnswer(value: unknown): NardouchAnswer {
       typeof u.model !== 'string' ||
       u.model.length > 300 ||
       !['compact', 'capable'].includes(String(u.tier)) ||
-      u.executionMode !== 'REAL_APPROVED' ||
+      (u.executionMode !== 'REAL_APPROVED' && !(allowMock && u.executionMode === 'MOCK_TEST')) ||
       (u.latencyMs !== null &&
         (typeof u.latencyMs !== 'number' || !Number.isFinite(u.latencyMs) || u.latencyMs < 0)) ||
       typeof u.fallbackUsed !== 'boolean'

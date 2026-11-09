@@ -24,13 +24,13 @@ const DIVISION_TO_BADGE_KEY: Record<string, string> = {
   I: 'third'
 };
 
-function toBadgeKey(rank: any): string {
+function toBadgeKey(rank: (typeof RANK_LADDER)[number]): string {
   const tier = String(rank?.tier || '').toLowerCase();
   if (SINGLE_BADGE_TIERS.has(tier)) return 'use';
   return DIVISION_TO_BADGE_KEY[String(rank?.division || '').toUpperCase()] || 'use';
 }
 
-function buildBadgeDoc(rank: any): Prisma.RankBadgeUncheckedCreateInput {
+function buildBadgeDoc(rank: (typeof RANK_LADDER)[number]): Prisma.RankBadgeUncheckedCreateInput {
   const tier = String(rank.tier || 'novice').toLowerCase();
   const badgeKey = toBadgeKey(rank);
 
@@ -45,6 +45,14 @@ function buildBadgeDoc(rank: any): Prisma.RankBadgeUncheckedCreateInput {
     imagePath: '/brand/noveris-symbol.svg',
     isActive: true
   };
+}
+
+export async function createMissingRankBadges(): Promise<number> {
+  const { count } = await prisma.rankBadge.createMany({
+    data: RANK_LADDER.map(buildBadgeDoc),
+    skipDuplicates: true
+  });
+  return count;
 }
 
 /** Badge tiers are keyed by `rankIndex`, so a re-run updates the same rows. */
@@ -76,4 +84,4 @@ async function seedRankBadges(): Promise<void> {
   }
 }
 
-seedRankBadges();
+if (require.main === module) void seedRankBadges();

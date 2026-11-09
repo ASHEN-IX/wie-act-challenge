@@ -78,14 +78,16 @@ async function main() {
   const alias = 'course_multimodal_prototype';
   const env: Record<string, string> = {
     ...Object.fromEntries(['RABBITMQ_URL', 'AI_SERVICE_API_KEY'].map((k) => [k, process.env[k]!])),
-    DB_NAME: name,
     EDNOVA_FINAL_QA: '1',
     NODE_ENV: 'test',
     INGEST_UPLOADS_DIR: '/qa/uploads',
     FAISS_INDEX_DIR: '/qa/indexes',
     GEMINI_API_KEY: 'isolated-qa-never-sent',
-    MONGODB_URI: `mongodb://127.0.0.1:27017/${name}`,
-    LLM_BUDGET_DB_NAME: name,
+    // The AI service keeps its own tables in the `ai` schema of the same database
+    // and reaches API-owned data (budget ledger, ingestion fencing) over HTTP.
+    AI_DATABASE_URL: process.env.DATABASE_URL!,
+    API_SERVICE_URL: `http://host.docker.internal:${process.env.PORT || '3001'}`,
+    INTERNAL_API_SECRET: process.env.INTERNAL_API_SECRET!,
     LLM_APPROVALS_JSON: JSON.stringify({ [alias]: approval }),
     LLM_MODE: 'REAL_APPROVED',
     HF_HOME: '/qa/hf',
@@ -94,24 +96,13 @@ async function main() {
     TOKENIZERS_PARALLELISM: 'false',
     OMP_NUM_THREADS: '2'
   };
-  // MongoDB is published on the host loopback, so it stays reachable through
+  // PostgreSQL is published on the host loopback, so it stays reachable through
   // the host gateway. RabbitMQ is bound to loopback only, which the host
   // gateway cannot reach; when the QA service joins the project network it
   // reaches the broker by service name instead. The two are deliberately
   // independent — forcing one mode for both is what broke earlier attempts.
   const network = process.env.FINAL_QA_DOCKER_NETWORK;
-  // On the project network the mongo container is reachable by service name.
-  // Rewriting to `host.docker.internal` there made `get_db()` fail inside the
-  // AI service, which silently disabled the manifest branch of ingestion and
-  // forced the legacy parser — the root cause of the C1 chapter discrepancy.
-  const mongoHost = network ? 'ednova-qa-mongo' : 'host.docker.internal';
-  // The Python QA service still reads MongoDB, so its URI is rewritten for
-  // the container network. PostgreSQL belongs to the Node runtime only.
-  for (const k of ['MONGODB_URI'])
-    env[k] = env[k]
-      .replace(/@127\.0\.0\.1:/, '@' + mongoHost + ':')
-      .replace(/@localhost:/, '@' + mongoHost + ':')
-      .replace('127.0.0.1', mongoHost);
+  env.AI_DATABASE_URL = env.AI_DATABASE_URL.replace('127.0.0.1', 'host.docker.internal');
   env.RABBITMQ_URL = network
     ? env.RABBITMQ_URL.replace(/@(127\.0\.0\.1|localhost|host\.docker\.internal):/, '@rabbitmq:')
     : env.RABBITMQ_URL.replace(/@127\.0\.0\.1:/, '@host.docker.internal:').replace(
@@ -133,7 +124,7 @@ async function main() {
     '0',
     // The env below rewrites every loopback service to host.docker.internal.
     // Without this mapping that name does not resolve inside the container, so
-    // the QA service cannot reach MongoDB or RabbitMQ on the host.
+    // the QA service cannot reach PostgreSQL, the API or RabbitMQ on the host.
     '--add-host',
     'host.docker.internal:host-gateway',
     '-v',

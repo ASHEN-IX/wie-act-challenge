@@ -693,8 +693,12 @@ export class StudyController {
     return this.service.execute('GET /api/v1/study/plans/calendar', req, res);
   }
   @Get('/api/v1/study/plans/:planId')
-  get_api_v1_study_plans_d85754b8(@Req() req: DomainRequest, @Res() res: Response): Promise<void> {
-    return this.service.execute('GET /api/v1/study/plans/:planId([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})', req, res);
+  get_api_v1_study_plans_235b9490(@Req() req: DomainRequest, @Res() res: Response): Promise<void> {
+    return this.service.execute(
+      'GET /api/v1/study/plans/:planId([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})',
+      req,
+      res
+    );
   }
   @Post('/api/v1/study/plans/:planId/schedule')
   post_api_v1_study_plans_schedule_9e0fa7a9(
@@ -1376,6 +1380,128 @@ export class StudyController {
     @Res() res: Response
   ): Promise<void> {
     return this.service.execute('POST /api/v1/study/nardouch/conversations/:id/speech', req, res);
+  }
+  @Get('/api/v1/study/internal/ingestion/revisions/:courseId/:revisionTag')
+  get_api_v1_study_internal_ingestion_revisions_5c3b3c3b(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute(
+      'GET /api/v1/study/internal/ingestion/revisions/:courseId/:revisionTag',
+      req,
+      res
+    );
+  }
+  @Get('/api/v1/study/internal/ingestion/operations/:messageId')
+  get_api_v1_study_internal_ingestion_operations_2c16e75a(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute(
+      'GET /api/v1/study/internal/ingestion/operations/:messageId',
+      req,
+      res
+    );
+  }
+  @Get('/api/v1/study/internal/coach/catalog')
+  get_api_v1_study_internal_coach_catalog_c18606cd(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('GET /api/v1/study/internal/coach/catalog', req, res);
+  }
+  @Get('/api/v1/study/internal/coach/sessions/:sessionId/current-task')
+  get_api_v1_study_internal_coach_sessions_currenttask_1d75ab5e(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute(
+      'GET /api/v1/study/internal/coach/sessions/:sessionId/current-task',
+      req,
+      res
+    );
+  }
+  @Get('/api/v1/study/internal/planner/plans')
+  get_api_v1_study_internal_planner_plans_61b73a5a(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('GET /api/v1/study/internal/planner/plans', req, res);
+  }
+  @Post('/api/v1/study/internal/budget/reserve')
+  post_api_v1_study_internal_budget_reserve_a49cb25e(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('POST /api/v1/study/internal/budget/reserve', req, res);
+  }
+  @Post('/api/v1/study/internal/budget/reserve-tokens')
+  post_api_v1_study_internal_budget_reservetokens_86c006e4(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('POST /api/v1/study/internal/budget/reserve-tokens', req, res);
+  }
+  @Post('/api/v1/study/internal/budget/active')
+  post_api_v1_study_internal_budget_active_84d3f012(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('POST /api/v1/study/internal/budget/active', req, res);
+  }
+  @Post('/api/v1/study/internal/budget/usage')
+  post_api_v1_study_internal_budget_usage_1c3cd51f(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('POST /api/v1/study/internal/budget/usage', req, res);
+  }
+  @Post('/api/v1/study/internal/budget/revoke')
+  post_api_v1_study_internal_budget_revoke_777f5dc1(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('POST /api/v1/study/internal/budget/revoke', req, res);
+  }
+  @Get('/api/v1/study/internal/budget/:approvalId')
+  get_api_v1_study_internal_budget_c2684c32(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('GET /api/v1/study/internal/budget/:approvalId', req, res);
+  }
+  @Get('/api/v1/study/internal/experience/requests/:requestId/reservation')
+  get_api_v1_study_internal_experience_requests_reservation_a76ebbae(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute(
+      'GET /api/v1/study/internal/experience/requests/:requestId/reservation',
+      req,
+      res
+    );
+  }
+  @Post('/api/v1/study/internal/formula/recognition-context')
+  post_api_v1_study_internal_formula_recognitioncontext_36f3013e(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute(
+      'POST /api/v1/study/internal/formula/recognition-context',
+      req,
+      res
+    );
+  }
+  @Post('/api/v1/study/internal/formula/recognition-recheck')
+  post_api_v1_study_internal_formula_recognitionrecheck_a2508119(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute(
+      'POST /api/v1/study/internal/formula/recognition-recheck',
+      req,
+      res
+    );
   }
 }
 @Module({

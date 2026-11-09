@@ -46,6 +46,7 @@ export const FacilitatorIntervention = table<IFacilitatorIntervention>({
     targetSpeakerName: row.targetSpeakerName,
     reasoning: row.reasoning,
     message: row.message,
+    executionMode: row.executionMode,
     proposedUICommand: row.proposedUICommand as unknown as Prisma.InputJsonValue,
     status: row.status,
     cooldownSeconds: row.cooldownSeconds,

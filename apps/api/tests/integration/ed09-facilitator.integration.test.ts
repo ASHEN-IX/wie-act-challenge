@@ -203,6 +203,7 @@ async function runTests() {
 
     const intervention = res.data.intervention;
     assert.equal(intervention.strategy, 'SOCRATIC_NUDGE');
+    assert.equal(intervention.executionMode, 'DETERMINISTIC_FALLBACK');
     assert.equal(intervention.trigger, 'explicit_ask');
     assert.ok(
       intervention.message.includes('cannot provide the direct answer') ||

@@ -1,8 +1,7 @@
 /** Durable planning budget accounting (Batch 4, Milestone 4.2).
  *
- * Reuses the existing durable-budget store the formula pipeline already writes
- * (`llm_approval_budgets` in the budget database), rather than introducing a
- * second ledger. The rules are the same ones that made that pipeline safe:
+ * Uses the API-owned durable ledger (`llm_approval_budgets`) that the formula
+ * pipeline also draws on, rather than introducing a second ledger. The rules are the same ones that made that pipeline safe:
  *
  *   - reserve atomically *before* dispatch, with a conditional update
  *   - never release a reservation on an uncertain outcome
@@ -13,7 +12,7 @@
  * provider that reports nothing keeps the full reservation as spent.
  */
 
-import { MongoClient, type Collection } from 'mongodb';
+import { prisma } from '../../../../shared/database';
 import type { ProviderUsage } from '../../../../shared/ednova/experiencePlannerProvider';
 
 export class PlanningBudgetError extends Error {
@@ -29,55 +28,16 @@ export class PlanningBudgetError extends Error {
  * total is what gets reserved so a long lesson cannot outspend its approval. */
 export const PLANNING_RESERVED_TOKENS = 32_768;
 
-function budgetUri(): string | null {
-  const uri = process.env.LLM_BUDGET_MONGODB_URI;
-  return uri && uri.length > 0 ? uri : null;
-}
-
-function budgetDb(): string | null {
-  const name = process.env.LLM_BUDGET_DB_NAME;
-  return name && name.length > 0 ? name : null;
-}
-
-/** One client per (uri) pair, reused. Opening and closing a client for every
- * accounting read was both slow and racy under concurrent test processes, and
- * the driver's handshake is not free. */
-let pooled: { uri: string; client: MongoClient } | null = null;
-
-async function budgetClient(uri: string): Promise<MongoClient> {
-  if (pooled && pooled.uri === uri) return pooled.client;
-  if (pooled) await pooled.client.close().catch(() => undefined);
-  const client = new MongoClient(uri, { serverSelectionTimeoutMS: 3000 });
-  await client.connect();
-  pooled = { uri, client };
-  return client;
-}
-
-/** Drop the pooled client. Callers that change the configured URI (tests,
- * shutdown) use this so the next call connects fresh. */
+/** Kept for callers that used to drop the pooled Mongo client. The ledger now
+ * shares the application's Prisma connection, so there is nothing to close. */
 export async function closeBudgetClient(): Promise<void> {
-  if (!pooled) return;
-  const { client } = pooled;
-  pooled = null;
-  await client.close().catch(() => undefined);
+  return undefined;
 }
 
-async function withBudget<T>(run: (collection: Collection) => Promise<T>): Promise<T> {
-  const uri = budgetUri();
-  const dbName = budgetDb();
-  if (!uri || !dbName) throw new PlanningBudgetError();
-  let client: MongoClient;
+/** Any ledger failure refuses rather than permits. */
+async function withBudget<T>(run: () => Promise<T>): Promise<T> {
   try {
-    client = await budgetClient(uri);
-  } catch {
-    // Only a failure to *establish* the connection invalidates the pool. A
-    // query that merely matched nothing must not tear it down, or every second
-    // call in a process pays a reconnect.
-    await closeBudgetClient();
-    throw new PlanningBudgetError();
-  }
-  try {
-    return await run(client.db(dbName).collection('llm_approval_budgets'));
+    return await run();
   } catch (error) {
     throw error instanceof PlanningBudgetError ? error : new PlanningBudgetError();
   }
@@ -112,21 +72,35 @@ export async function reservePlanningBudget(input: {
   if (!Number.isSafeInteger(reservedTokens) || reservedTokens <= 0)
     throw new PlanningBudgetError();
 
-  const updated = await withBudget((collection) =>
-    collection.findOneAndUpdate(
-      {
-        id: input.approvalId as never,
+  const updated = await withBudget(async () => {
+    // The ledger row is created on first use; a concurrent creator is harmless.
+    await prisma.llmApprovalBudget.createMany({
+      data: [
+        {
+          id: input.approvalId,
+          task: input.task,
+          model: input.model,
+          limitRequests: input.maxRequests,
+          maxTokens: input.maxTokens,
+          expiresAt: input.expiresAt
+        }
+      ],
+      skipDuplicates: true
+    });
+    const result = await prisma.llmApprovalBudget.updateMany({
+      where: {
+        id: input.approvalId,
         task: input.task,
         model: input.model,
         maxTokens: input.maxTokens,
-        expiresAt: { $eq: input.expiresAt, $gt: Date.now() / 1000 },
-        revokedAt: { $exists: false },
-        usedTokens: { $lte: input.maxTokens - reservedTokens },
+        expiresAt: { equals: input.expiresAt, gt: Date.now() / 1000 },
+        revokedAt: null,
+        usedTokens: { lte: input.maxTokens - reservedTokens }
       },
-      { $inc: { usedTokens: reservedTokens, usedRequests: 1 } },
-      { returnDocument: 'after' },
-    ),
-  );
+      data: { usedTokens: { increment: reservedTokens }, used: { increment: 1 } }
+    });
+    return result.count === 1;
+  });
 
   if (!updated) throw new PlanningBudgetError();
   return { approvalId: input.approvalId, reservedTokens };
@@ -176,24 +150,19 @@ export async function releaseUndispatchedReservation(input: {
 
   // The release marker lives on the ledger row. Its uniqueness is what makes a
   // second concurrent release a no-op rather than a second refund.
-  const released = await withBudget(async (collection) => {
-    const claimed = await (
-      collection as unknown as {
-        findOneAndUpdate: (filter: unknown, update: unknown, options: unknown) => Promise<unknown>;
-      }
-    ).findOneAndUpdate(
-      {
+  const released = await withBudget(async () => {
+    const claimed = await prisma.llmApprovalBudget.updateMany({
+      where: {
         id: input.approvalId,
-        releaseMarkers: { $ne: input.releaseToken },
-        usedTokens: { $gte: input.reservedTokens },
+        NOT: { releaseMarkers: { has: input.releaseToken } },
+        usedTokens: { gte: input.reservedTokens }
       },
-      {
-        $inc: { usedTokens: -input.reservedTokens },
-        $push: { releaseMarkers: input.releaseToken },
-      },
-      { returnDocument: 'after' },
-    );
-    return Boolean(claimed);
+      data: {
+        usedTokens: { decrement: input.reservedTokens },
+        releaseMarkers: { push: input.releaseToken }
+      }
+    });
+    return claimed.count === 1;
   });
 
   return released
@@ -214,11 +183,11 @@ async function reconcile(input: {
     return { chargedTokens: reported, refunded: 0, usageReported: true };
 
   const refund = input.reservedTokens - reported;
-  await withBudget((collection) =>
-    collection.updateOne(
-      { id: input.approvalId as never },
-      [{ $set: { usedTokens: { $max: [0, { $subtract: ['$usedTokens', refund] }] } } }],
-    ),
+  await withBudget(
+    () => prisma.$executeRaw`
+      UPDATE "llm_approval_budgets"
+         SET "usedTokens" = GREATEST(0, "usedTokens" - ${refund}), "updatedAt" = now()
+       WHERE "id" = ${input.approvalId}`
   );
   return { chargedTokens: reported, refunded: refund, usageReported: true };
 }
@@ -227,11 +196,11 @@ async function reconcile(input: {
 export async function planningBudgetStatus(
   approvalId: string,
 ): Promise<{ usedTokens: number; maxTokens: number } | null> {
-  const row = await withBudget((collection) =>
-    collection.findOne({ id: approvalId as never }),
+  const row = await withBudget(() =>
+    prisma.llmApprovalBudget.findUnique({ where: { id: approvalId } })
   );
   if (!row) return null;
-  const used = Number((row as Record<string, unknown>).usedTokens ?? 0);
-  const max = Number((row as Record<string, unknown>).maxTokens ?? 0);
+  const used = row.usedTokens;
+  const max = row.maxTokens ?? 0;
   return { usedTokens: used, maxTokens: max };
 }

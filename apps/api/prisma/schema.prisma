@@ -1153,6 +1153,7 @@ model FacilitatorIntervention {
   targetSpeakerName String?
   reasoning        String
   message          String
+  executionMode    String    @default("UNKNOWN")
   proposedUICommand Json?
   status           String    @default("delivered")
   cooldownSeconds  Int       @default(15)
@@ -1559,12 +1560,25 @@ model CalendarEntry {
   @@map("calendar")
 }
 
+// Durable LLM spend ledger, one row per operator approval. The API owns it: the
+// Python AI service reserves and reads through /internal/budget/*, so every
+// reservation is one conditional UPDATE here and is never debited twice.
 model LlmApprovalBudget {
-  id        String   @id @db.Uuid
-  key       String   @unique
-  payload   Json
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String   @id // the approval id
+  task             String
+  model            String
+  limitRequests    Int
+  maxTokens        Int?
+  maxCostUsd       Float?
+  expiresAt        Float // epoch seconds, as carried by the approval
+  used             Int      @default(0)
+  usedTokens       Int      @default(0)
+  usedCostUsd      Float    @default(0)
+  revokedAt        Float?
+  revocationReason String?
+  releaseMarkers   String[] @default([])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@map("llm_approval_budgets")
 }

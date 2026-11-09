@@ -15,9 +15,8 @@
  *   --report=<path>  Where to write migration-report.json.
  *
  * Rules:
- *   * Identifiers are preserved: an ObjectId `id` becomes its 24-character hex
- *     string, a string `id` is copied verbatim. The same rule applies to every
- *     reference field and to ObjectIds nested in JSON columns.
+ *   * MongoDB primary IDs and references are converted to stable UUIDs.
+ *     Existing UUIDs, revision tags and other non-identifier text are retained.
  *   * The run is idempotent: rows are inserted with `createMany({skipDuplicates})`
  *     in dependency order, so re-running never duplicates a row.
  *   * Target tables are never dropped or truncated unless `--truncate --yes` is
@@ -31,7 +30,7 @@ import path from 'node:path';
 import { config as loadEnv } from 'dotenv';
 import { MongoClient, ObjectId } from 'mongodb';
 import { disconnectDatabase, prismaClient } from '../shared/database';
-import { deterministicId } from '../shared/ids';
+import { deterministicId, isId } from '../shared/ids';
 import { defaultNotificationPreferences } from '../shared/betterAuth';
 
 // Operators usually run this from apps/api, where the connection strings live in .env.
@@ -89,6 +88,7 @@ interface FieldInfo {
   optional: boolean;
   hasDefault: boolean;
   isUpdatedAt: boolean;
+  isUuid: boolean;
   enumValues?: Set<string>;
 }
 
@@ -186,6 +186,7 @@ function loadSchema(): Map<string, ModelInfo> {
         optional,
         hasDefault: /@default\(/.test(rest),
         isUpdatedAt: /@updatedAt/.test(rest),
+        isUuid: /@db\.Uuid\b/.test(rest),
         enumValues: enums.get(base)
       });
     }
@@ -206,7 +207,16 @@ function idOf(value: unknown): string | null {
   return String(value);
 }
 
-/** Recursively turn BSON values into JSON-safe ones, preserving id strings. */
+function sourceId(doc: Record<string, unknown>): string | null {
+  return idOf(doc._id ?? doc.id);
+}
+
+function migratedId(value: string): string {
+  if (isId(value as unknown)) return value.toLowerCase();
+  const key = /^[0-9a-f]{24}$/i.test(value) ? value.toLowerCase() : value;
+  return deterministicId(`mongo:${key}`);
+}
+
 /**
  * Extractors that leave a U+0000 in a document (common in OCR text) produce a
  * JSON string PostgreSQL cannot store: `jsonb` rejects `\u0000` with SQLSTATE
@@ -304,7 +314,10 @@ function coerceScalar(value: unknown, field: FieldInfo): CoerceResult {
     }
     case 'string':
     default:
-      return { ok: true, value: sanitizeText(idOf(value) ?? '') };
+      const text = sanitizeText(idOf(value) ?? '');
+      const isLegacyReference =
+        /(?:^id$|Ids?$)/.test(field.name) && /^[0-9a-f]{24}$/i.test(text);
+      return { ok: true, value: field.isUuid || isLegacyReference ? migratedId(text) : text };
   }
 }
 
@@ -332,7 +345,7 @@ function normalizeRow(model: ModelInfo, raw: Record<string, unknown>): Normalize
   const issues: string[] = [];
   const unknownFields: string[] = [];
   for (const [key, value] of Object.entries(raw)) {
-    if (key === '__v' || key === 'id') continue;
+    if (key === '__v' || key === '_id') continue;
     const field = model.fields.get(key);
     if (!field) {
       unknownFields.push(key);
@@ -389,7 +402,7 @@ function defaultOnboardingDraft(): Record<string, unknown> {
 }
 
 function userRefreshTokens(doc: Record<string, unknown>): Array<Record<string, unknown>> {
-  const userId = idOf(doc.id);
+  const userId = sourceId(doc);
   const tokens = Array.isArray(doc.refreshTokens) ? doc.refreshTokens : [];
   const rows: Array<Record<string, unknown>> = [];
   for (const token of tokens) {
@@ -410,7 +423,7 @@ function userRefreshTokens(doc: Record<string, unknown>): Array<Record<string, u
 }
 
 function couponUsages(doc: Record<string, unknown>): Array<Record<string, unknown>> {
-  const couponId = idOf(doc.id);
+  const couponId = sourceId(doc);
   const byUser = new Map<string, Record<string, unknown>>();
   const fallback = doc.updatedAt ?? doc.createdAt;
   for (const entry of Array.isArray(doc.usageHistory) ? doc.usageHistory : []) {
@@ -433,7 +446,7 @@ function couponUsages(doc: Record<string, unknown>): Array<Record<string, unknow
 }
 
 function studyGroupMembers(doc: Record<string, unknown>): Array<Record<string, unknown>> {
-  const groupId = idOf(doc.id);
+  const groupId = sourceId(doc);
   return (Array.isArray(doc.members) ? doc.members : []).flatMap((entry) => {
     if (!entry || typeof entry !== 'object') return [];
     const member = entry as Record<string, unknown>;
@@ -451,7 +464,7 @@ function studyGroupMembers(doc: Record<string, unknown>): Array<Record<string, u
 }
 
 function studyGroupInvites(doc: Record<string, unknown>): Array<Record<string, unknown>> {
-  const groupId = idOf(doc.id);
+  const groupId = sourceId(doc);
   return (Array.isArray(doc.invites) ? doc.invites : []).flatMap((entry) => {
     if (!entry || typeof entry !== 'object') return [];
     const invite = entry as Record<string, unknown>;
@@ -813,8 +826,8 @@ async function main(): Promise<void> {
           ? derived
           : [
               {
-                id: idOf(doc.id),
                 ...doc,
+                id: sourceId(doc),
                 ...(mapping.overrides ? mapping.overrides(doc) : {})
               }
             ];
@@ -827,7 +840,7 @@ async function main(): Promise<void> {
             report.complications.unknownFields[key] = [...known].sort();
           }
           if (!normalized.row) {
-            const id = String(candidate.id ?? idOf(doc.id) ?? '<no id>');
+            const id = String(candidate.id ?? sourceId(doc) ?? '<no id>');
             const reason = normalized.issues.join('; ');
             failureIds.push({ collection: mapping.collection, model: mapping.model, id, reason });
             stats.failed += 1;
@@ -931,7 +944,7 @@ async function main(): Promise<void> {
           const sourceDocs = docsByCollection.get(check.mustExistInSource);
           if (!sourceDocs) continue;
           allowed = new Set(
-            sourceDocs.map((doc) => idOf(doc.id)).filter((id): id is string => !!id)
+            sourceDocs.map((doc) => sourceId(doc)).filter((id): id is string => !!id)
           );
         }
         const values = new Set<string>();
@@ -939,7 +952,7 @@ async function main(): Promise<void> {
           const id = idOf(doc[check.field]);
           if (!id) continue;
           if (allowed && !allowed.has(id)) continue; // legacy slug, not a reference
-          values.add(id);
+          values.add(migratedId(id));
         }
         const model = models.get(check.targetModel);
         const delegate = model ? client[model.delegate] : undefined;
@@ -1016,7 +1029,11 @@ async function main(): Promise<void> {
         );
     }
     if (opts.dryRun) console.log('    Dry run: no rows were written.');
-    if (failed && opts.strict) process.exitCode = 1;
+    if (
+      failed ||
+      report.verification.counts.some((entry) => entry.mismatch) ||
+      report.verification.relations.some((entry) => entry.violations)
+    ) process.exitCode = 1;
   } finally {
     await mongo.close();
     await disconnectDatabase();

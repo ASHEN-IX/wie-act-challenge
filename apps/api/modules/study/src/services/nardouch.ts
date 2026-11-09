@@ -134,7 +134,9 @@ export async function submitTurn(userId: string, raw: unknown) {
       },
       { timeout: 26000 }
     );
-    const answer = parseNardouchAnswer(response.data);
+    const answer = parseNardouchAnswer(response.data, {
+      allowMock: process.env.NODE_ENV !== 'production' && process.env.LLM_MOCK === '1'
+    });
     if (
       answer.usage.traceId !== traceId ||
       answer.mode !== input.mode ||

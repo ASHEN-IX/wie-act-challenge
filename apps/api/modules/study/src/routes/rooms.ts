@@ -32,6 +32,7 @@ interface FacilitatorProposal {
   reasoning?: string;
   message?: string;
   messageText?: string;
+  executionMode?: string;
   cooldownSeconds?: number;
   proposedUICommand?: IFacilitatorIntervention['proposedUICommand'];
 }
@@ -155,6 +156,7 @@ async function broadcastFacilitatorIntervention(
         targetSpeakerName: intervention.targetSpeakerName,
         reasoning: intervention.reasoning,
         message: intervention.message,
+        executionMode: intervention.executionMode,
         proposedUICommand: intervention.proposedUICommand,
         status: intervention.status,
         cooldownSeconds: intervention.cooldownSeconds,
@@ -1471,7 +1473,7 @@ router.post(
           '/api/ai/facilitator/observe',
           obsInput,
           {
-            timeout: 4000
+            timeout: 60000
           }
         );
         if (aiRes?.data) proposal = aiRes.data;
@@ -1480,6 +1482,7 @@ router.post(
           `AI service unavailable for facilitator observe (${errorDetails(aiErr).message}), using peer-first policy engine.`
         );
         proposal = evaluateLocalPeerFirstPolicy(obsInput);
+        proposal.executionMode = 'DETERMINISTIC_FALLBACK';
       }
 
       const currentRoom = await activeLearningRoom(userId, room.roomId);
@@ -1507,12 +1510,13 @@ router.post(
         ),
         message: Joi.string().max(8000),
         messageText: Joi.string().max(8000),
+        executionMode: Joi.string().valid('REAL_APPROVED', 'MOCK_TEST', 'DETERMINISTIC_FALLBACK', 'UNAVAILABLE'),
         reasoning: Joi.string().max(2000),
         interventionId: Joi.string().max(128),
         roomId: Joi.string().max(128),
-        targetSpeakerId: Joi.string().max(128),
+        targetSpeakerId: Joi.string().max(128).allow(null),
         targetUserId: Joi.string().max(128),
-        targetSpeakerName: Joi.string().max(200),
+        targetSpeakerName: Joi.string().max(200).allow(null),
         cooldownSeconds: Joi.number().integer().min(0).max(300),
         proposedUICommand: Joi.object({
           action: Joi.string().max(64).required(),
@@ -1559,6 +1563,7 @@ router.post(
         targetSpeakerName: proposal.targetSpeakerName,
         reasoning: proposal.reasoning || 'Fostering collaborative reasoning.',
         message: messageContent,
+        executionMode: proposal.executionMode || 'UNKNOWN',
         proposedUICommand: proposal.proposedUICommand || null,
         status: 'delivered',
         cooldownSeconds: proposal.cooldownSeconds || 15
@@ -1649,7 +1654,7 @@ router.post(
           '/api/ai/facilitator/action',
           actionPayload,
           {
-            timeout: 4000
+            timeout: 60000
           }
         );
         if (aiRes?.data) proposal = aiRes.data;
@@ -1663,6 +1668,7 @@ router.post(
           speakerName: participant.name,
           transcriptText: promptText
         });
+        proposal.executionMode = 'DETERMINISTIC_FALLBACK';
       }
 
       const currentRoom = await activeLearningRoom(userId, room.roomId);
@@ -1690,12 +1696,13 @@ router.post(
         ),
         message: Joi.string().max(8000),
         messageText: Joi.string().max(8000),
+        executionMode: Joi.string().valid('REAL_APPROVED', 'MOCK_TEST', 'DETERMINISTIC_FALLBACK', 'UNAVAILABLE'),
         reasoning: Joi.string().max(2000),
         interventionId: Joi.string().max(128),
         roomId: Joi.string().max(128),
-        targetSpeakerId: Joi.string().max(128),
+        targetSpeakerId: Joi.string().max(128).allow(null),
         targetUserId: Joi.string().max(128),
-        targetSpeakerName: Joi.string().max(200),
+        targetSpeakerName: Joi.string().max(200).allow(null),
         cooldownSeconds: Joi.number().integer().min(0).max(300),
         proposedUICommand: Joi.object({
           action: Joi.string().max(64).required(),
@@ -1741,6 +1748,7 @@ router.post(
         targetSpeakerName: proposal.targetSpeakerName,
         reasoning: proposal.reasoning || 'Action processed.',
         message: messageContent,
+        executionMode: proposal.executionMode || 'UNKNOWN',
         proposedUICommand: proposal.proposedUICommand || null,
         status: 'delivered',
         cooldownSeconds: proposal.cooldownSeconds || 15

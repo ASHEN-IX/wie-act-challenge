@@ -4,43 +4,36 @@
  * cost the full reservation; a refund must never exceed the reservation; and an
  * unavailable ledger must refuse rather than permit.
  */
-jest.mock('mongodb', () => {
-  const findOneAndUpdate = jest.fn();
-  const updateOne = jest.fn();
-  const findOne = jest.fn();
-  const close = jest.fn(async () => undefined);
-  const collection = jest.fn(() => ({ findOneAndUpdate, updateOne, findOne }));
-  const db = jest.fn(() => ({ collection }));
+jest.mock('../../../../shared/database', () => {
+  const createMany = jest.fn(async () => ({ count: 1 }));
+  const updateMany = jest.fn();
+  const findUnique = jest.fn();
+  const executeRaw = jest.fn();
   return {
-    __mocks: { findOneAndUpdate, updateOne, findOne, close, collection, db },
-    MongoClient: jest.fn(() => ({ db, close, connect: jest.fn(async () => undefined) })),
+    __mocks: { createMany, updateMany, findUnique, executeRaw },
+    prisma: {
+      llmApprovalBudget: { createMany, updateMany, findUnique },
+      $executeRaw: executeRaw,
+    },
   };
 });
 
 import {
   reconcilePlanningBudget,
+  releaseUndispatchedReservation,
   reservePlanningBudget,
   planningBudgetStatus,
   PLANNING_RESERVED_TOKENS,
   PlanningBudgetError,
 } from '../services/planningBudget';
 
-const mocks = (jest.requireMock('mongodb') as { __mocks: Record<string, jest.Mock> }).__mocks;
-
-const originalUri = process.env.LLM_BUDGET_MONGODB_URI;
-const originalDb = process.env.LLM_BUDGET_DB_NAME;
+const mocks = (
+  jest.requireMock('../../../../shared/database') as { __mocks: Record<string, jest.Mock> }
+).__mocks;
 
 beforeEach(() => {
   jest.clearAllMocks();
-  process.env.LLM_BUDGET_MONGODB_URI = 'mongodb://budget.test/';
-  process.env.LLM_BUDGET_DB_NAME = 'budget';
-});
-
-afterAll(() => {
-  if (originalUri === undefined) delete process.env.LLM_BUDGET_MONGODB_URI;
-  else process.env.LLM_BUDGET_MONGODB_URI = originalUri;
-  if (originalDb === undefined) delete process.env.LLM_BUDGET_DB_NAME;
-  else process.env.LLM_BUDGET_DB_NAME = originalDb;
+  mocks.createMany.mockResolvedValue({ count: 1 });
 });
 
 const reservation = {
@@ -58,28 +51,24 @@ describe('budget reservation', () => {
   });
 
   it('reserves atomically and returns the reservation', async () => {
-    mocks.findOneAndUpdate.mockResolvedValue({ id: 'approval-1' });
+    mocks.updateMany.mockResolvedValue({ count: 1 });
     const result = await reservePlanningBudget(reservation);
     expect(result).toEqual({ approvalId: 'approval-1', reservedTokens: 32768 });
     // The update is conditional on remaining budget, which is the whole safety
     // property: two concurrent callers cannot both win.
-    const [filter] = mocks.findOneAndUpdate.mock.calls[0];
-    expect(filter.usedTokens).toEqual({ $lte: 100_000 - 32768 });
-    expect(filter.revokedAt).toEqual({ $exists: false });
+    const [{ where, data }] = mocks.updateMany.mock.calls[0];
+    expect(where.usedTokens).toEqual({ lte: 100_000 - 32768 });
+    expect(where.revokedAt).toBeNull();
+    expect(data.usedTokens).toEqual({ increment: 32768 });
   });
 
   it('refuses when the conditional update does not match', async () => {
-    mocks.findOneAndUpdate.mockResolvedValue(null);
-    await expect(reservePlanningBudget(reservation)).rejects.toBeInstanceOf(PlanningBudgetError);
-  });
-
-  it('refuses when the budget ledger is not configured', async () => {
-    delete process.env.LLM_BUDGET_MONGODB_URI;
+    mocks.updateMany.mockResolvedValue({ count: 0 });
     await expect(reservePlanningBudget(reservation)).rejects.toBeInstanceOf(PlanningBudgetError);
   });
 
   it('refuses when the ledger is unreachable', async () => {
-    mocks.findOneAndUpdate.mockRejectedValue(new Error('unreachable'));
+    mocks.updateMany.mockRejectedValue(new Error('unreachable'));
     await expect(reservePlanningBudget(reservation)).rejects.toBeInstanceOf(PlanningBudgetError);
   });
 
@@ -109,7 +98,7 @@ describe('usage reconciliation', () => {
     });
     expect(result).toEqual({ chargedTokens: 32768, refunded: 0, usageReported: false });
     // No refund was written: the reservation stays spent.
-    expect(mocks.updateOne).not.toHaveBeenCalled();
+    expect(mocks.executeRaw).not.toHaveBeenCalled();
   });
 
   it('charges the full reservation when usage is null', async () => {
@@ -123,14 +112,14 @@ describe('usage reconciliation', () => {
   });
 
   it('refunds the unused part when usage is reported below the reservation', async () => {
-    mocks.updateOne.mockResolvedValue({});
+    mocks.executeRaw.mockResolvedValue(1);
     const result = await reconcilePlanningBudget({
       approvalId: 'approval-1',
       reservedTokens: 32768,
       usage: usage(150),
     });
     expect(result).toEqual({ chargedTokens: 150, refunded: 32618, usageReported: true });
-    expect(mocks.updateOne).toHaveBeenCalled();
+    expect(mocks.executeRaw).toHaveBeenCalled();
   });
 
   it('never refunds when reported usage meets or exceeds the reservation', async () => {
@@ -146,19 +135,19 @@ describe('usage reconciliation', () => {
       usage: usage(40000),
     });
     expect(over.chargedTokens).toBe(40000);
-    expect(mocks.updateOne).not.toHaveBeenCalled();
+    expect(mocks.executeRaw).not.toHaveBeenCalled();
   });
 
   it('bounds the refund so the ledger cannot go negative', async () => {
-    mocks.updateOne.mockResolvedValue({});
+    mocks.executeRaw.mockResolvedValue(1);
     await reconcilePlanningBudget({
       approvalId: 'approval-1',
       reservedTokens: 32768,
       usage: usage(0),
     });
-    const [, pipeline] = mocks.updateOne.mock.calls[0];
-    // The $max with 0 is what prevents a negative balance.
-    expect(JSON.stringify(pipeline)).toContain('"$max":[0');
+    const [strings] = mocks.executeRaw.mock.calls[0];
+    // GREATEST(0, ...) is what prevents a negative balance.
+    expect(strings.join('?')).toContain('GREATEST(0,');
   });
 
   it('treats a negative or non-integer report as unreported', async () => {
@@ -174,14 +163,34 @@ describe('usage reconciliation', () => {
 
 describe('budget status', () => {
   it('reports usage without exposing credentials', async () => {
-    mocks.findOne.mockResolvedValue({ usedTokens: 500, maxTokens: 1000 });
+    mocks.findUnique.mockResolvedValue({ usedTokens: 500, maxTokens: 1000 });
     const status = await planningBudgetStatus('approval-1');
     expect(status).toEqual({ usedTokens: 500, maxTokens: 1000 });
     expect(JSON.stringify(status)).not.toMatch(/key|secret|password/i);
   });
 
   it('returns null for an unknown approval', async () => {
-    mocks.findOne.mockResolvedValue(null);
+    mocks.findUnique.mockResolvedValue(null);
     expect(await planningBudgetStatus('missing')).toBeNull();
+  });
+});
+
+describe('release of an undispatched reservation', () => {
+  const release = { approvalId: 'approval-1', reservedTokens: 32768, releaseToken: 'attempt-0001' };
+
+  it('claims the release marker and refunds in one conditional update', async () => {
+    mocks.updateMany.mockResolvedValue({ count: 1 });
+    expect(await releaseUndispatchedReservation(release)).toEqual({
+      released: true,
+      refunded: 32768,
+    });
+    const [{ where, data }] = mocks.updateMany.mock.calls[0];
+    expect(where.NOT).toEqual({ releaseMarkers: { has: 'attempt-0001' } });
+    expect(data.releaseMarkers).toEqual({ push: 'attempt-0001' });
+  });
+
+  it('is a no-op the second time the same attempt is released', async () => {
+    mocks.updateMany.mockResolvedValue({ count: 0 });
+    expect(await releaseUndispatchedReservation(release)).toEqual({ released: false, refunded: 0 });
   });
 });
