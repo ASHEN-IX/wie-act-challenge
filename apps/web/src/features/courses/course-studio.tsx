@@ -313,6 +313,23 @@ export function CourseStudio({
   }>({ phase: "idle" });
   const autoRan = useRef<string | null>(null);
   const autoBusy = useRef(false);
+  /** Read at the moment of deciding. If storage is unavailable the opt-out cannot be
+   * honoured, so the automatic path stays off; the manual button still works. */
+  const autoAllowed = () => {
+    try {
+      return localStorage.getItem(AUTO_KEY) !== "off";
+    } catch {
+      return false;
+    }
+  };
+  const latest = useRef({ dirty, published, isInstructorReviewed });
+  useEffect(() => {
+    latest.current = { dirty, published, isInstructorReviewed };
+  });
+  const untouched = () =>
+    !latest.current.dirty &&
+    !latest.current.published &&
+    !latest.current.isInstructorReviewed;
   useEffect(() => {
     try {
       if (localStorage.getItem(AUTO_KEY) === "off") setAutoEnabled(false);
@@ -322,16 +339,16 @@ export function CourseStudio({
   }, []);
 
   /** Check, fix what is clearly fixable, then publish, with no manual steps. */
-  const runAuto = async () => {
+  const runAuto = async (automatic = false) => {
     if (autoBusy.current) return;
     autoBusy.current = true;
     try {
-      await runAutoOnce();
+      await runAutoOnce(automatic);
     } finally {
       autoBusy.current = false;
     }
   };
-  const runAutoOnce = async () => {
+  const runAutoOnce = async (automatic: boolean) => {
     setErrorMsg(null);
     setSuccessMsg(null);
     let tag = draft.revisionTag;
@@ -341,6 +358,7 @@ export function CourseStudio({
       needsSave:
         dirty || topics.some((t) => t.subtopics?.some((sub) => !sub.id)),
       onPhase: (phase) => setAuto({ phase }),
+      canContinue: automatic ? () => autoAllowed() && untouched() : undefined,
       save: async (next, reviewed) => {
         const form = new FormData();
         form.set("courseId", courseId);
@@ -418,6 +436,7 @@ export function CourseStudio({
   useEffect(() => {
     if (
       !autoEnabled ||
+      !autoAllowed() ||
       hasPublishedRevision ||
       published ||
       dirty ||
@@ -430,7 +449,8 @@ export function CourseStudio({
     autoRan.current = courseId;
     studioIngestStatus(courseId)
       .then((status) => {
-        if (status.status === "completed") return runAuto();
+        if (status.status === "completed" && autoAllowed() && untouched())
+          return runAuto(true);
       })
       .catch(() => undefined);
     // runAuto reads the latest render's state.
@@ -585,31 +605,34 @@ export function CourseStudio({
         <div>
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <h1 className="min-w-0 text-xl font-bold tracking-tight sm:text-2xl">
-              Course Studio: {courseTitle}
+              {courseTitle}
             </h1>
             <Badge
               variant={draft.status === "published" ? "default" : "outline"}
             >
-              {draft.status}
+              {draft.status === "published" || hasPublishedRevision || published
+                ? "Published"
+                : "Not published yet"}
             </Badge>
             {isInstructorReviewed ? (
               <Badge
                 variant="secondary"
                 className="bg-emerald-500/10 text-emerald-600"
               >
-                Reviewed
+                Checked
               </Badge>
             ) : (
               <Badge
                 variant="secondary"
                 className="bg-amber-500/10 text-amber-600"
               >
-                Needs Review
+                Not checked yet
               </Badge>
             )}
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Upload a course, check the lessons the parser found, then publish.
+            EdNova reads your material and turns it into chapters and lessons.
+            Check them, then publish so learners can start.
           </p>
         </div>
 
@@ -619,7 +642,7 @@ export function CourseStudio({
             onClick={handleSaveDraft}
             disabled={isPending}
           >
-            {isPending ? "Saving..." : "Save Draft"}
+            {isPending ? "Saving..." : "Save changes"}
           </Button>
           <Button
             onClick={handlePrepareAndPublish}
@@ -639,14 +662,80 @@ export function CourseStudio({
         </div>
       </div>
 
+      {topics.length > 0 && (
+        <section
+          aria-label="Automatic review and publishing"
+          className="flex flex-wrap items-start justify-between gap-3 rounded-xl border bg-card p-4"
+        >
+          <div
+            role="status"
+            aria-live="polite"
+            className="min-w-0 flex-1 text-sm"
+          >
+            <p className="font-medium">
+              {auto.phase === "checking"
+                ? "Checking the draft…"
+                : auto.phase === "fixing"
+                  ? "Improving unclear titles and objectives…"
+                  : auto.phase === "publishing"
+                    ? "Publishing…"
+                    : auto.phase === "published"
+                      ? "Published"
+                      : auto.phase === "held"
+                        ? "Waiting for you"
+                        : autoEnabled
+                          ? "Automatic review is on"
+                          : "Automatic review is off"}
+            </p>
+            <p className="mt-1 text-muted-foreground">
+              {auto.message ??
+                "EdNova checks this draft, fixes unclear lesson titles and objectives, and publishes when nothing blocks it. Source regions with low confidence always wait for your confirmation."}
+            </p>
+          </div>
+          <div className="flex flex-col items-end gap-2">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={autoEnabled}
+                onChange={(event) => {
+                  setAutoEnabled(event.target.checked);
+                  try {
+                    if (event.target.checked) localStorage.removeItem(AUTO_KEY);
+                    else localStorage.setItem(AUTO_KEY, "off");
+                  } catch {
+                    /* ignore */
+                  }
+                }}
+              />
+              Review and publish automatically
+            </label>
+            {!published &&
+              auto.phase !== "checking" &&
+              auto.phase !== "fixing" &&
+              auto.phase !== "publishing" && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={isPending || dirty}
+                  onClick={() => {
+                    autoRan.current = draft.revisionTag;
+                    void runAuto();
+                  }}
+                >
+                  Review and publish now
+                </Button>
+              )}
+          </div>
+        </section>
+      )}
       <ol
         aria-label="Course review progress"
         className="grid gap-3 sm:grid-cols-3"
       >
         {[
-          [1, "Upload", "Add the original PDF or text"],
-          [2, "Review", "Check chapters and lesson objectives"],
-          [3, "Publish", "Release the reviewed revision"],
+          [1, "Add material", "Your PDF or notes"],
+          [2, "Check", "Chapters and what each lesson teaches"],
+          [3, "Publish", "Make it available to learners"],
         ].map(([number, title, description]) => (
           <li
             key={number}
@@ -680,7 +769,7 @@ export function CourseStudio({
 
       {dirty && (
         <p role="status">
-          Unsaved changes. Publishing also saves your changes.
+          You have changes that are not saved yet. Publishing saves them too.
         </p>
       )}
       {originalFiles.length > 0 && (
@@ -702,11 +791,11 @@ export function CourseStudio({
       {!!sourceState?.extractionReview?.required && (
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-4">
           <p className="text-sm font-medium">
-            {sourceState.extractionReview.reviewRegionCount} source region
+            {sourceState.extractionReview.reviewRegionCount} place
             {sourceState.extractionReview.reviewRegionCount === 1
               ? ""
               : "s"}{" "}
-            need checking against the original
+            where the text may not match your original
           </p>
           <a
             className="mt-2 inline-block text-sm underline"
@@ -718,12 +807,12 @@ export function CourseStudio({
               if (inspector) inspector.open = true;
             }}
           >
-            Review source issues
+            Show me where
           </a>
           <p className="mt-1 text-xs text-muted-foreground">
-            Unreviewed formulas retain source text and equation images. Check
-            equations, figures and tables against the original before
-            acknowledging review.
+            The reader was not sure about these, usually formulas, tables or
+            scanned pages. Open your original file and compare them before you
+            confirm.
           </p>
           <label className="mt-3 flex items-start gap-2 text-sm">
             <input
@@ -734,16 +823,14 @@ export function CourseStudio({
               }}
               className="mt-0.5 size-4 rounded border-gray-300"
             />
-            <span>
-              I reviewed the flagged source regions against the original.
-            </span>
+            <span>I compared these places with my original file.</span>
           </label>
         </div>
       )}
       {/* Global Alerts */}
       {errorMsg && (
         <Alert variant="destructive">
-          <AlertTitle>Action Failed</AlertTitle>
+          <AlertTitle>That did not work</AlertTitle>
           <AlertDescription>{errorMsg}</AlertDescription>
           {/stale|changed|conflict|reload/i.test(errorMsg) && (
             <Button
@@ -783,7 +870,7 @@ export function CourseStudio({
             className="underline"
             href={`/courses/${courseId}/learn?revisionId=${encodeURIComponent(published)}`}
           >
-            View published course
+            Open the published course as a learner
           </a>
           <a className="underline" href={`/courses/${courseId}/students`}>
             Next: invite students
@@ -804,7 +891,7 @@ export function CourseStudio({
       </details>
       <details id="source-review" className="rounded-xl border bg-card">
         <summary className="cursor-pointer px-6 py-4 text-sm font-semibold">
-          Source review and advanced tools
+          Advanced tools: source check and extra activities
         </summary>
         <div className="border-t px-6 pb-6">
           <Card className="border-0 shadow-none">
@@ -1031,72 +1118,6 @@ export function CourseStudio({
           </Card>
         </div>
       </details>
-      {topics.length > 0 && (
-        <section
-          aria-label="Automatic review and publishing"
-          className="flex flex-wrap items-start justify-between gap-3 rounded-xl border bg-card p-4"
-        >
-          <div
-            role="status"
-            aria-live="polite"
-            className="min-w-0 flex-1 text-sm"
-          >
-            <p className="font-medium">
-              {auto.phase === "checking"
-                ? "Checking the draft…"
-                : auto.phase === "fixing"
-                  ? "Improving unclear titles and objectives…"
-                  : auto.phase === "publishing"
-                    ? "Publishing…"
-                    : auto.phase === "published"
-                      ? "Published"
-                      : auto.phase === "held"
-                        ? "Waiting for you"
-                        : autoEnabled
-                          ? "Automatic review is on"
-                          : "Automatic review is off"}
-            </p>
-            <p className="mt-1 text-muted-foreground">
-              {auto.message ??
-                "EdNova checks this draft, fixes unclear lesson titles and objectives, and publishes when nothing blocks it. Source regions with low confidence always wait for your confirmation."}
-            </p>
-          </div>
-          <div className="flex flex-col items-end gap-2">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={autoEnabled}
-                onChange={(event) => {
-                  setAutoEnabled(event.target.checked);
-                  try {
-                    if (event.target.checked) localStorage.removeItem(AUTO_KEY);
-                    else localStorage.setItem(AUTO_KEY, "off");
-                  } catch {
-                    /* ignore */
-                  }
-                }}
-              />
-              Review and publish automatically
-            </label>
-            {!published &&
-              auto.phase !== "checking" &&
-              auto.phase !== "fixing" &&
-              auto.phase !== "publishing" && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={isPending || dirty}
-                  onClick={() => {
-                    autoRan.current = draft.revisionTag;
-                    void runAuto();
-                  }}
-                >
-                  Review and publish now
-                </Button>
-              )}
-          </div>
-        </section>
-      )}
       {topics.length > 0 && (
         <CourseReviewPanel
           courseId={courseId}

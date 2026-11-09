@@ -299,6 +299,34 @@ export class StudyController {
   ): Promise<void> {
     return this.service.execute('GET /api/v1/study/courses/invitations/inbox', req, res);
   }
+  @Get('/api/v1/study/courses/public')
+  get_api_v1_study_courses_public_db48d53c(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('GET /api/v1/study/courses/public', req, res);
+  }
+  @Put('/api/v1/study/courses/:courseId/visibility')
+  put_api_v1_study_courses_visibility_b39751d8(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('PUT /api/v1/study/courses/:courseId/visibility', req, res);
+  }
+  @Post('/api/v1/study/courses/:courseId/join')
+  post_api_v1_study_courses_join_d18db08b(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('POST /api/v1/study/courses/:courseId/join', req, res);
+  }
+  @Delete('/api/v1/study/courses/:courseId/join')
+  delete_api_v1_study_courses_join_95a0412a(
+    @Req() req: DomainRequest,
+    @Res() res: Response
+  ): Promise<void> {
+    return this.service.execute('DELETE /api/v1/study/courses/:courseId/join', req, res);
+  }
   @Get('/api/v1/study/courses/:courseId')
   get_api_v1_study_courses_7b6e05af(
     @Req() req: DomainRequest,

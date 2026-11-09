@@ -1,6 +1,6 @@
 import "server-only";
 import { load, segment } from "@/lib/api";
-import type { Course, Subject, CourseDraft } from "./types";
+import type { Course, Subject, CourseDraft, PublicCourse } from "./types";
 export const getCourses = (institutionId?: string) =>
   load<{ courses: Course[] }>(
     institutionId
@@ -24,3 +24,7 @@ export const getCourseEnrollments = (courseId: string) =>
       enrolledAt: string;
     }>;
   }>(`/api/v1/study/courses/${segment(courseId)}/enrollments`);
+export const getPublicCourses = (q?: string) =>
+  load<{ courses: PublicCourse[] }>(
+    `/api/v1/study/courses/public${q ? `?q=${encodeURIComponent(q)}` : ""}`,
+  );

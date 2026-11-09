@@ -14,6 +14,7 @@ import {
   GraduationCap,
   Building2,
   FlaskConical,
+  Compass,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -52,6 +53,7 @@ export function Navigation({
           label: teaching ? "My courses" : "My Learning",
           icon: BookOpen,
         },
+        { href: "/explore", label: "Explore courses", icon: Compass },
         ...(!teaching ? [{ href: "/study-together", label: "Study Together", icon: Users }] : []),
         ...(!teaching
           ? [

@@ -172,6 +172,18 @@ describe("autoReviewAndPublish", () => {
     });
   });
 
+  it("stops before approving when the learner opts out or edits mid-run", async () => {
+    const d = deps({ canContinue: () => false });
+    const result = await autoReviewAndPublish(d);
+    expect(result.status).toBe("held");
+    expect(d.approve).not.toHaveBeenCalled();
+    expect(d.publish).not.toHaveBeenCalled();
+    const reviewedSaves = (d.save as ReturnType<typeof vi.fn>).mock.calls.filter(
+      (call) => call[1] === true,
+    );
+    expect(reviewedSaves).toHaveLength(0);
+  });
+
   it("saves first when there are unsaved edits or lessons without ids", async () => {
     const d = deps({ needsSave: true });
     await autoReviewAndPublish(d);

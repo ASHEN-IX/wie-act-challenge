@@ -73,6 +73,9 @@ export interface AutoPublishDeps {
     revisionTag: string,
   ): Promise<{ error?: string; revisionTag?: string }>;
   onPhase?(phase: AutoPublishPhase): void;
+  /** Asked before the save that attests the review, so an opt-out or an edit made while the
+   * run was in progress stops it before anything is approved or published. */
+  canContinue?(): boolean;
 }
 
 const SOURCE = "SOURCE_REVIEW_PENDING";
@@ -129,6 +132,12 @@ export async function autoReviewAndPublish(
     const blocker = review.findings.find((f) => f.severity === "blocker");
     if (blocker) return { status: "held", fixed, reason: blocker.message };
 
+    if (deps.canContinue && !deps.canContinue())
+      return {
+        status: "held",
+        fixed,
+        reason: "Automatic publishing was stopped before anything was approved.",
+      };
     deps.onPhase?.("publishing");
     await deps.save(state.topics, true);
     state = await deps.refresh();
