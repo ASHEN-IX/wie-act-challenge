@@ -49,6 +49,9 @@ jest.mock('../models/index', () => ({
   CourseEnrollment: {
     find: jest.fn().mockReturnValue({ distinct: jest.fn().mockResolvedValue([]) })
   },
+  PublicCourseJoin: {
+    find: jest.fn().mockReturnValue({ select: () => ({ lean: async () => [] }) })
+  },
   Course: {
     exists: jest.fn().mockResolvedValue({ _id: '64a000000000000000000001' }),
     find: jest.fn(),

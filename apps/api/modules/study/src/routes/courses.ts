@@ -39,6 +39,15 @@ import {
 } from '../models';
 import { canReadCourse, canManageCourse, canAuthorCourse } from '../services/resourceAccess';
 import {
+  VisibilityError,
+  effectiveVisibility,
+  setCourseVisibility,
+  listPublicCourses,
+  joinPublicCourse,
+  leavePublicCourse,
+  joinedPublicCourseIds
+} from '../services/courseVisibility';
+import {
   getCourseDraft,
   withExtractionReview,
   findEditableDraft,
@@ -385,9 +394,10 @@ router.get('/', async (req: DomainRequest, res: Response) => {
     if (institution_id && typeof institution_id === 'string') {
       courses = (await listAccessibleCourses(userId, institution_id)) as unknown as ICourse[];
     } else {
-      const enrolledIds = await CourseEnrollment.find({ userId, status: 'active' }).distinct(
-        'courseId'
-      );
+      const enrolledIds = [
+        ...(await CourseEnrollment.find({ userId, status: 'active' }).distinct('courseId')),
+        ...(await joinedPublicCourseIds(userId))
+      ];
       const query: FilterQuery<ICourse> = {
         $or: [
           { userId },
@@ -412,6 +422,7 @@ router.get('/', async (req: DomainRequest, res: Response) => {
       title: course.title,
       description: course.description,
       scope: course.scope || 'personal',
+      visibility: effectiveVisibility(course),
       institutionId: course.institutionId ? course.institutionId.toString() : undefined,
       assignedInstructorIds: course.assignedInstructorIds || [],
       subjectId: course.subjectId,
@@ -588,6 +599,52 @@ router.get('/invitations/inbox', async (req: DomainRequest, res: Response) => {
   }
 });
 
+// Public catalog: published courses anyone signed in may open. Registered before /:courseId.
+router.get('/public', async (req: DomainRequest, res: Response) => {
+  try {
+    const q = typeof req.query.q === 'string' ? req.query.q : undefined;
+    const limit = Number(req.query.limit) || undefined;
+    const skip = Number(req.query.skip) || undefined;
+    res.json({ courses: await listPublicCourses(req.user!.userId, { q, limit, skip }) });
+  } catch (error) {
+    console.error('Error listing public courses:', error);
+    res.status(500).json({ error: 'Failed to list public courses' });
+  }
+});
+
+function visibilityFailure(res: Response, error: unknown) {
+  if (error instanceof VisibilityError) {
+    return res.status(error.status).json({ error: error.message });
+  }
+  console.error('Course visibility error:', error);
+  return res.status(500).json({ error: 'Failed to update course' });
+}
+
+router.put('/:courseId/visibility', async (req: DomainRequest, res: Response) => {
+  try {
+    const { userId } = req.user!;
+    res.json(await setCourseVisibility(userId, param(req, 'courseId'), req.body?.visibility));
+  } catch (error) {
+    visibilityFailure(res, error);
+  }
+});
+
+router.post('/:courseId/join', async (req: DomainRequest, res: Response) => {
+  try {
+    res.json(await joinPublicCourse(req.user!.userId, param(req, 'courseId')));
+  } catch (error) {
+    visibilityFailure(res, error);
+  }
+});
+
+router.delete('/:courseId/join', async (req: DomainRequest, res: Response) => {
+  try {
+    res.json(await leavePublicCourse(req.user!.userId, param(req, 'courseId')));
+  } catch (error) {
+    visibilityFailure(res, error);
+  }
+});
+
 router.get('/:courseId', async (req: DomainRequest, res: Response) => {
   try {
     const { courseId } = req.params;
@@ -609,6 +666,7 @@ router.get('/:courseId', async (req: DomainRequest, res: Response) => {
         title: course.title,
         description: course.description,
         scope: course.scope || 'personal',
+        visibility: effectiveVisibility(course),
         institutionId: course.institutionId ? course.institutionId.toString() : undefined,
         assignedInstructorIds: course.assignedInstructorIds || [],
         subjectId: course.subjectId,

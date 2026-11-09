@@ -70,7 +70,7 @@ describe("CourseStudio Component (ED-31 / M15)", () => {
       />,
     );
 
-    expect(html).toContain("Source review and advanced tools");
+    expect(html).toContain("Advanced tools: source check and extra activities");
     expect(html).toContain("Source passage");
     expect(html).not.toContain("Normalized text");
     expect(html).not.toContain("extracted regions</summary>");
@@ -90,8 +90,8 @@ describe("CourseStudio Component (ED-31 / M15)", () => {
     expect(html).not.toContain("rev_20261023_01");
     expect(html).toContain("Upload");
     expect(html).toContain("Review");
-    expect(html).toContain("Needs Review");
-    expect(html).toContain("Save Draft");
+    expect(html).toContain("Not checked yet");
+    expect(html).toContain("Save changes");
     expect(html).toContain("Publish course");
     expect(html).toContain("Draft ready for review.");
     expect(html).not.toContain("Choose a source to begin.");

@@ -371,3 +371,81 @@ export async function getPendingInvitationCount() {
   const { data } = await getInvitationInbox();
   return data?.pendingCount ?? null;
 }
+
+export async function setVisibilityAction(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  await requireIdentity();
+  try {
+    const courseId = text(form, "courseId", 50);
+    const visibility = text(form, "visibility", 20);
+    await api(`/api/v1/study/courses/${segment(courseId)}/visibility`, {
+      method: "PUT",
+      body: JSON.stringify({ visibility }),
+    });
+    revalidatePath(`/courses/${segment(courseId)}/studio`);
+    revalidatePath(`/courses/${segment(courseId)}`);
+    revalidatePath("/explore");
+    return {
+      success:
+        visibility === "public"
+          ? "Saved. Anyone signed in to EdNova can now find and open this course."
+          : visibility === "institution"
+            ? "Saved. Only your institution's enrolled students can open this course."
+            : "Saved. Only you can open this course.",
+    };
+  } catch (error) {
+    unstable_rethrow(error);
+    return {
+      error:
+        error instanceof Error ? error.message : "Unable to change visibility.",
+    };
+  }
+}
+
+export async function joinPublicCourseAction(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  await requireIdentity();
+  try {
+    const courseId = text(form, "courseId", 50);
+    await api(`/api/v1/study/courses/${segment(courseId)}/join`, {
+      method: "POST",
+    });
+    revalidatePath("/courses");
+    revalidatePath("/explore");
+    return {
+      success: "Added to My Learning.",
+      destination: `/courses/${segment(courseId)}`,
+      destinationLabel: "Open course",
+    };
+  } catch (error) {
+    unstable_rethrow(error);
+    return {
+      error: error instanceof Error ? error.message : "Unable to join course.",
+    };
+  }
+}
+
+export async function leavePublicCourseAction(
+  _previous: ActionState,
+  form: FormData,
+): Promise<ActionState> {
+  await requireIdentity();
+  try {
+    const courseId = text(form, "courseId", 50);
+    await api(`/api/v1/study/courses/${segment(courseId)}/join`, {
+      method: "DELETE",
+    });
+    revalidatePath("/courses");
+    revalidatePath("/explore");
+    return { success: "Removed from My Learning." };
+  } catch (error) {
+    unstable_rethrow(error);
+    return {
+      error: error instanceof Error ? error.message : "Unable to leave course.",
+    };
+  }
+}

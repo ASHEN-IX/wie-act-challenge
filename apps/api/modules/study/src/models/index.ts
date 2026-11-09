@@ -157,9 +157,14 @@ export interface ICourseFile {
 export const COURSE_SCOPES = ['personal', 'institutional'] as const;
 export type CourseScope = (typeof COURSE_SCOPES)[number];
 
+/** Who may open the published course. Legacy courses derive it from `scope`. */
+export const COURSE_VISIBILITIES = ['private', 'institution', 'public'] as const;
+export type CourseVisibility = (typeof COURSE_VISIBILITIES)[number];
+
 export interface ICourse extends Document {
   userId: string;
   scope?: CourseScope;
+  visibility?: CourseVisibility;
   institutionId?: mongoose.Types.ObjectId;
   ownerUserId?: string;
   assignedInstructorIds?: string[];
@@ -552,6 +557,10 @@ const courseSchema = new Schema<ICourse>(
       default: 'personal',
       required: true
     },
+    visibility: {
+      type: String,
+      enum: ['private', 'institution', 'public']
+    },
     institutionId: {
       type: Schema.Types.ObjectId,
       ref: 'Institution',
@@ -668,6 +677,7 @@ const courseSchema = new Schema<ICourse>(
 
 courseSchema.index({ institutionId: 1, scope: 1 });
 courseSchema.index({ ownerUserId: 1 });
+courseSchema.index({ visibility: 1, updatedAt: -1 });
 courseSchema.index({ assignedInstructorIds: 1 });
 
 courseSchema.pre('validate', function () {
@@ -1036,6 +1046,7 @@ export {
   FacilitatorTrigger,
   InterventionStatus
 } from './FacilitatorIntervention';
+export { PublicCourseJoin } from './PublicCourseJoin';
 export { StudentAttempt, IStudentAttempt } from './StudentAttempt';
 export { LearningEvidence, ILearningEvidence } from './LearningEvidence';
 export { ActivityRecord, IActivityRecord } from './ActivityRecord';
@@ -1049,6 +1060,7 @@ module.exports = {
   InstitutionMembership: require('./Institution').InstitutionMembership,
   InstitutionInvitation: require('./Institution').InstitutionInvitation,
   CourseEnrollment: require('./CourseEnrollment').CourseEnrollment,
+  PublicCourseJoin: require('./PublicCourseJoin').PublicCourseJoin,
   CourseInvitation: require('./CourseInvitation').CourseInvitation,
   CourseRevision: require('./CourseRevision').CourseRevision,
   StudentAttempt: require('./StudentAttempt').StudentAttempt,

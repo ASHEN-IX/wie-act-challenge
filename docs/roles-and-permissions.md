@@ -81,3 +81,11 @@ See the [M04-A verification](../reports/EDNOVA-M04A-INSTITUTION-FOUNDATION-VERIF
 
 ## Learning engagement (whiteboard, connections, groups) — implemented
 Whiteboard access follows the study room (active participants edit, host locks). Connections and study groups are personal and never grant course, institution or progress access. Details: `learning-engagement-plan.md`.
+
+## Course visibility (public courses) — implemented
+`Course.visibility` is `private` (personal courses: owner only), `institution` (institutional courses: enrolled members, the default) or `public` (any signed-in user, read only). Courses created before the field existed keep their meaning: personal → private, institutional → institution.
+- A public course is read through a `student` grant only when it has a published revision and, for an institutional course, the institution is active. It never grants authoring, enrollment, roster or analytics access. Making it private again removes access at the next request; the learner's progress is kept.
+- Who may change it: the course owner, an institution admin, or the instructor who created the course. Another assigned instructor may not. Going public additionally needs a published revision.
+- Learners add a public course to "My learning" with `POST /api/v1/study/courses/:courseId/join` (`DELETE` to remove). That writes `public_course_joins`, not a `CourseEnrollment`, so public learners do not appear in institution rosters or instructor analytics.
+- Routes: `GET /courses/public` (search `?q=`, paged), `PUT /courses/:courseId/visibility`, `POST|DELETE /courses/:courseId/join`. Web: the "Who can open this course" card in the Studio and `/explore`.
+- Not covered yet: reporting or removing abusive public courses by a platform admin, per-learner analytics for the author of a public course, and rate limiting of the catalog.

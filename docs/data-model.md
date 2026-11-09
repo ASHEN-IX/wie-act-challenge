@@ -259,3 +259,5 @@ EdNova enforces strict storage boundaries to prevent duplication and ensure that
 - `user_profiles.learningProfile` (Mixed, normalised in `shared/ednova/learningProfile.ts`): stated learning preferences.
 - `room_whiteboards`: one board per room, `version` CAS token, TTL 7 days on `updatedAt`.
 - `studygroups` (`StudyGroup`): owner, members, invites, optional active session.
+- `courses.visibility` (`private | institution | public`, optional; legacy courses derive it from `scope`). Index `{visibility, updatedAt}`.
+- `public_course_joins` (`PublicCourseJoin`): `userId`, `courseId`, unique pair. Grants nothing by itself; "My learning" membership for public courses.

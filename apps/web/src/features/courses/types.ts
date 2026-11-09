@@ -15,6 +15,16 @@ export interface CourseTopic {
   summary?: string;
   subtopics?: { id?: string; title: string; summary?: string }[];
 }
+export type CourseVisibility = "private" | "institution" | "public";
+export interface PublicCourse {
+  id: string;
+  title: string;
+  description?: string;
+  institutionName?: string;
+  topicsCount: number;
+  joined: boolean;
+  own: boolean;
+}
 export interface Course {
   id: string;
   title: string;
@@ -23,6 +33,7 @@ export interface Course {
   activeRevisionId?: string;
   subjectId: string;
   scope?: "personal" | "institutional";
+  visibility?: CourseVisibility;
   institutionId?: string;
   assignedInstructorIds?: string[];
   createdAt: string;

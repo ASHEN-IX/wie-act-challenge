@@ -6,6 +6,7 @@ import { ActionForm } from "@/components/shared/action-form";
 import { TextField } from "@/components/shared/form-field";
 import { deleteCourse } from "@/features/courses/actions";
 import { CourseStudio } from "@/features/courses/course-studio";
+import { VisibilityCard } from "@/features/courses/visibility-card";
 import { DataError } from "@/components/shared/states";
 
 export default async function CourseStudioPage({
@@ -45,6 +46,12 @@ export default async function CourseStudioPage({
       <p className="text-sm">{course.activeRevisionId ? "Published. Invite students to start learning." : "Review and publish your course, then invite students."}</p>
       <Button asChild variant="outline"><Link href={`/courses/${course.id}/students`}>Invite students</Link></Button>
     </div>
+    <VisibilityCard
+      courseId={course.id}
+      scope={course.scope || "personal"}
+      visibility={course.visibility || (course.scope === "institutional" ? "institution" : "private")}
+      published={Boolean(course.activeRevisionId)}
+    />
     <CourseStudio
       courseId={course.id}
       courseTitle={course.title}

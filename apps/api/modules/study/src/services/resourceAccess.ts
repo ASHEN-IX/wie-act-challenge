@@ -9,9 +9,41 @@ export type CourseAccessRole = 'owner' | 'instructor' | 'admin' | 'student';
 async function courseGrant(userId: string, courseId: unknown) {
   if (!userId || typeof courseId !== 'string' || !/^[a-f\d]{24}$/i.test(courseId)) return null;
   const course = await Course.findById(courseId)
-    .select('scope userId ownerUserId institutionId assignedInstructorIds')
+    .select(
+      'scope visibility userId ownerUserId institutionId assignedInstructorIds activeRevisionId'
+    )
     .lean();
   if (!course) return null;
+  return (await memberGrant(userId, courseId, course)) || (await publicGrant(course));
+}
+
+interface GrantCourse {
+  scope?: string;
+  visibility?: string;
+  userId?: string;
+  ownerUserId?: string;
+  institutionId?: unknown;
+  assignedInstructorIds?: string[];
+  activeRevisionId?: string;
+}
+
+/** Anyone signed in may read a course its publisher made public, but only once it is
+ * published, and for an institutional course only while the institution is active.
+ * It is read access only: it never grants authoring, enrollment or admin rights. */
+async function publicGrant(course: GrantCourse) {
+  if (course.visibility !== 'public' || !course.activeRevisionId) return null;
+  if (
+    course.scope === 'institutional' &&
+    !(
+      course.institutionId &&
+      (await Institution.exists({ _id: course.institutionId, status: 'active' }))
+    )
+  )
+    return null;
+  return { course, role: 'student' as const };
+}
+
+async function memberGrant(userId: string, courseId: string, course: GrantCourse) {
   if (!course.scope || course.scope === 'personal') {
     return course.userId === userId || course.ownerUserId === userId
       ? { course, role: 'owner' as const }
