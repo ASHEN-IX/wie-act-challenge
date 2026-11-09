@@ -11,6 +11,7 @@ pnpm install --frozen-lockfile
 pnpm dev:setup
 pnpm dev:infra:up
 pnpm dev:doctor
+pnpm --filter api db:setup
 pnpm dev
 ```
 

@@ -199,9 +199,9 @@
       "additionalProperties": false,
       "properties": {
         "courseId": {
-          "maxLength": 24,
+          "maxLength": 36,
           "minLength": 1,
-          "pattern": "^[a-f0-9]{24}$",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
           "title": "Courseid",
           "type": "string"
         },
@@ -390,9 +390,9 @@
           "additionalProperties": false,
           "properties": {
             "courseId": {
-              "maxLength": 24,
+              "maxLength": 36,
               "minLength": 1,
-              "pattern": "^[a-f0-9]{24}$",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "title": "Courseid",
               "type": "string"
             },
@@ -525,9 +525,9 @@
           "additionalProperties": false,
           "properties": {
             "courseId": {
-              "maxLength": 24,
+              "maxLength": 36,
               "minLength": 1,
-              "pattern": "^[a-f0-9]{24}$",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "title": "Courseid",
               "type": "string"
             },
@@ -645,9 +645,9 @@
           "type": "array"
         },
         "vectorIndexRef": {
-          "maxLength": 256,
+          "maxLength": 280,
           "minLength": 1,
-          "pattern": "^faiss/[a-f0-9]{24}/[a-zA-Z0-9][a-zA-Z0-9_-]*\\.faiss$",
+          "pattern": "^faiss/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/[a-zA-Z0-9][a-zA-Z0-9_-]*\\.faiss$",
           "title": "Vectorindexref",
           "type": "string"
         }
@@ -693,9 +693,9 @@
           "additionalProperties": false,
           "properties": {
             "courseId": {
-              "maxLength": 24,
+              "maxLength": 36,
               "minLength": 1,
-              "pattern": "^[a-f0-9]{24}$",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "title": "Courseid",
               "type": "string"
             },
@@ -881,9 +881,9 @@
       "additionalProperties": false,
       "properties": {
         "courseId": {
-          "maxLength": 24,
+          "maxLength": 36,
           "minLength": 1,
-          "pattern": "^[a-f0-9]{24}$",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
           "title": "Courseid",
           "type": "string"
         },
@@ -1002,9 +1002,9 @@
           "additionalProperties": false,
           "properties": {
             "courseId": {
-              "maxLength": 24,
+              "maxLength": 36,
               "minLength": 1,
-              "pattern": "^[a-f0-9]{24}$",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "title": "Courseid",
               "type": "string"
             },
@@ -1163,9 +1163,9 @@
           "additionalProperties": false,
           "properties": {
             "courseId": {
-              "maxLength": 24,
+              "maxLength": 36,
               "minLength": 1,
-              "pattern": "^[a-f0-9]{24}$",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "title": "Courseid",
               "type": "string"
             },
@@ -1419,9 +1419,9 @@
           "additionalProperties": false,
           "properties": {
             "courseId": {
-              "maxLength": 24,
+              "maxLength": 36,
               "minLength": 1,
-              "pattern": "^[a-f0-9]{24}$",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "title": "Courseid",
               "type": "string"
             },
@@ -1548,9 +1548,9 @@
           "additionalProperties": false,
           "properties": {
             "courseId": {
-              "maxLength": 24,
+              "maxLength": 36,
               "minLength": 1,
-              "pattern": "^[a-f0-9]{24}$",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "title": "Courseid",
               "type": "string"
             },
@@ -1734,9 +1734,9 @@
           "additionalProperties": false,
           "properties": {
             "courseId": {
-              "maxLength": 24,
+              "maxLength": 36,
               "minLength": 1,
-              "pattern": "^[a-f0-9]{24}$",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "title": "Courseid",
               "type": "string"
             },
@@ -1979,9 +1979,9 @@
           "additionalProperties": false,
           "properties": {
             "courseId": {
-              "maxLength": 24,
+              "maxLength": 36,
               "minLength": 1,
-              "pattern": "^[a-f0-9]{24}$",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "title": "Courseid",
               "type": "string"
             },
@@ -2278,9 +2278,9 @@
           "additionalProperties": false,
           "properties": {
             "courseId": {
-              "maxLength": 24,
+              "maxLength": 36,
               "minLength": 1,
-              "pattern": "^[a-f0-9]{24}$",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "title": "Courseid",
               "type": "string"
             },
@@ -2601,9 +2601,9 @@
           "additionalProperties": false,
           "properties": {
             "courseId": {
-              "maxLength": 24,
+              "maxLength": 36,
               "minLength": 1,
-              "pattern": "^[a-f0-9]{24}$",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "title": "Courseid",
               "type": "string"
             },
@@ -2796,9 +2796,9 @@
           "additionalProperties": false,
           "properties": {
             "courseId": {
-              "maxLength": 24,
+              "maxLength": 36,
               "minLength": 1,
-              "pattern": "^[a-f0-9]{24}$",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "title": "Courseid",
               "type": "string"
             },
@@ -2994,9 +2994,9 @@
           "additionalProperties": false,
           "properties": {
             "courseId": {
-              "maxLength": 24,
+              "maxLength": 36,
               "minLength": 1,
-              "pattern": "^[a-f0-9]{24}$",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "title": "Courseid",
               "type": "string"
             },
@@ -3100,9 +3100,9 @@
           "additionalProperties": false,
           "properties": {
             "courseId": {
-              "maxLength": 24,
+              "maxLength": 36,
               "minLength": 1,
-              "pattern": "^[a-f0-9]{24}$",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "title": "Courseid",
               "type": "string"
             },
@@ -3229,9 +3229,9 @@
           "additionalProperties": false,
           "properties": {
             "courseId": {
-              "maxLength": 24,
+              "maxLength": 36,
               "minLength": 1,
-              "pattern": "^[a-f0-9]{24}$",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "title": "Courseid",
               "type": "string"
             },
@@ -3337,9 +3337,9 @@
           "additionalProperties": false,
           "properties": {
             "courseId": {
-              "maxLength": 24,
+              "maxLength": 36,
               "minLength": 1,
-              "pattern": "^[a-f0-9]{24}$",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "title": "Courseid",
               "type": "string"
             },
@@ -3418,9 +3418,9 @@
           "additionalProperties": false,
           "properties": {
             "courseId": {
-              "maxLength": 24,
+              "maxLength": 36,
               "minLength": 1,
-              "pattern": "^[a-f0-9]{24}$",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "title": "Courseid",
               "type": "string"
             },
@@ -3538,9 +3538,9 @@
           "additionalProperties": false,
           "properties": {
             "courseId": {
-              "maxLength": 24,
+              "maxLength": 36,
               "minLength": 1,
-              "pattern": "^[a-f0-9]{24}$",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "title": "Courseid",
               "type": "string"
             },
@@ -3596,9 +3596,9 @@
           "additionalProperties": false,
           "properties": {
             "courseId": {
-              "maxLength": 24,
+              "maxLength": 36,
               "minLength": 1,
-              "pattern": "^[a-f0-9]{24}$",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "title": "Courseid",
               "type": "string"
             },
@@ -4015,9 +4015,9 @@
           "additionalProperties": false,
           "properties": {
             "courseId": {
-              "maxLength": 24,
+              "maxLength": 36,
               "minLength": 1,
-              "pattern": "^[a-f0-9]{24}$",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "title": "Courseid",
               "type": "string"
             },
@@ -4124,9 +4124,9 @@
           "additionalProperties": false,
           "properties": {
             "courseId": {
-              "maxLength": 24,
+              "maxLength": 36,
               "minLength": 1,
-              "pattern": "^[a-f0-9]{24}$",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
               "title": "Courseid",
               "type": "string"
             },

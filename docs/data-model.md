@@ -17,7 +17,7 @@ EdNova enforces strict storage boundaries to prevent duplication and ensure that
 | Storage Engine | Owned Data / Artifacts | Access Control / Scope |
 | :--- | :--- | :--- |
 | **PostgreSQL 17** | Domain entities (Users, Courses, Revisions, Activities, Attempts, Evidence, Competencies, Rooms, Gamification Ledger). | Authenticated Control Plane (NestJS) through Prisma. |
-| **MongoDB 7.0** | Reserved for the Python AI service's own collections (queue state, FAISS chunk metadata, pacing/review memory, coach history). | Python workers only; the Node API does not connect to it. |
+| **PostgreSQL `ai` schema** | The Python AI service's own tables (`task_scheduling`, `schedule_history`, `schedule_snapshots`, `coach_actions`, `signals`, `pacing_data`, `review_schedule`, `chunk_embeddings`, `search_history`, `formula_dispatches`), created idempotently by `apps/ai/services/pg.py` from `AI_DATABASE_URL`. | Python only; the API never touches them. The LLM budget ledger (`llm_approval_budgets`) is API-owned. |
 | **Private Object Storage / Volume** | Original uploaded PDFs, syllabus files, extracted images, sanitized document assets. | Private storage ACLs; streamed only via authenticated NestJS endpoints. |
 | **FAISS Vector Store** | Dense text embeddings and vector indexes for course retrieval. | Disk-mounted Docker volume, namespaced by `courseId` and `revisionId`. |
 | **Redis 7-alpine** | Deduplication leases (`SET NX EX 3600`), room heartbeats, rate-limit sliding windows. | Ephemeral state only; zero persistent business records. |

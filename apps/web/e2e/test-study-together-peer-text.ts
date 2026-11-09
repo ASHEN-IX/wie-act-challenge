@@ -295,15 +295,15 @@ async function main() {
       "PASS participant send, refresh recovery and inert HTML/script/unsafe-link rendering",
     );
 
-    // Commit at the real server, then inject a missing Mongo write acknowledgement.
+    // Commit at the real server, then inject a missing write acknowledgement.
     // The caller gets uncertainty (503) with no live event and retries the exact ID.
-    const original = SessionChat.collection.findOneAndUpdate;
+    const original = SessionChat.appendPeerMessage;
     let injected = false;
-    SessionChat.collection.findOneAndUpdate = (async (
+    SessionChat.appendPeerMessage = (async (
       ...args: Parameters<typeof original>
     ) => {
-      const updated = await original.apply(SessionChat.collection, args);
-      if (!injected) {
+      const updated = await original.apply(SessionChat, args);
+      if (updated && !injected) {
         injected = true;
         throw new Error("Synthetic lost write acknowledgement");
       }
@@ -335,7 +335,7 @@ async function main() {
       );
       assert.equal(await pageA2.getByTestId("peer-outbox").count(), 0);
     } finally {
-      SessionChat.collection.findOneAndUpdate = original;
+      SessionChat.appendPeerMessage = original;
     }
     // B missed a best-effort event after the injected commit; explicit existing
     // history recovery proves persistence, rather than pretending it was broadcast.

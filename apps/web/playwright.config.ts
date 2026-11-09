@@ -69,7 +69,7 @@ export default defineConfig({
             NEXT_PUBLIC_WS_URL: `ws://localhost:${apiPort}`,
             EDNOVA_NEXT_DIST_DIR: process.env.AUTH_E2E_WEB_DIR ? ".next" : ".next-e2e",
             SMTP_HOST: "127.0.0.1",
-            SMTP_PORT: "1026",
+            SMTP_PORT: process.env.SMTP_PORT || "1026",
             SMTP_SECURE: "false",
           },
         },

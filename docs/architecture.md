@@ -12,7 +12,7 @@ Browser -> Next (:5173) -> /api/auth -> Better Auth -> Postgres auth_* tables
         -> /ws/realtime, /ws/notifications -> notification module
 Browser <-> peer browser: WebRTC audio; WS carries signaling, not audio packets
 Nest -> independent FastAPI (:8000): authenticated HTTP
-Nest -> RabbitMQ -> separately launched Python worker -> result/progress -> Mongo (Python) / Postgres (API)
+Nest -> RabbitMQ -> separately launched Python worker -> result/progress -> Postgres (API schema via Prisma; AI-owned `ai` schema via psycopg)
 Redis: cache/rate state; optional Python idempotency and evaluation session state
 ```
 
@@ -46,7 +46,7 @@ Better Auth uses `auth_users`, `auth_accounts`, `auth_sessions`, `auth_verificat
 
 Owner filters exist on personal course reads/downloads. Team creation's course lookup, session-chat/voice HTTP resource checks and generic static `/uploads` mounts require review: presence of authentication is not proof of content isolation. WebSocket connect and inbound messages check identity and team membership; session broadcast/heartbeat behavior must also be tested under revocation. See ED-02 and [roles](roles-and-permissions.md).
 
-PostgreSQL stores business and auth state through Prisma; Python repositories keep their own MongoDB collections and derived course IDs. FAISS indexes and embeddings are also stored on disk; uploads use local/Compose volumes. Multiple schema views of learning objectives/eval results are intentional read/write boundaries, not automatically duplicate dead models. [Data model](data-model.md) records relationships and unresolved ownership boundaries.
+PostgreSQL stores business and auth state through Prisma; the Python service keeps what it alone produces (coach history, pacing, schedules, signals, review schedule, embeddings, search history, formula dispatch markers) in the `ai` schema of PostgreSQL, and reads API-owned data over HTTP with `x-internal-secret`. FAISS indexes and embeddings are also stored on disk; uploads use local/Compose volumes. Multiple schema views of learning objectives/eval results are intentional read/write boundaries, not automatically duplicate dead models. [Data model](data-model.md) records relationships and unresolved ownership boundaries.
 
 ## AI and background flow
 
@@ -58,7 +58,7 @@ Shared LiteLLM aliases are per agent; **no challenge compact/capable policy is i
 
 Team sessions support invite codes, participant lists and task progress. Realtime handles `chat_query`, voice signaling, mute and speaking updates. SessionChat stores query/result/coach messages, not a full peer-discussion/facilitation model. Browser WebRTC uses STUN; no managed SFU/TURN service is supplied. No tested synchronized PDF/page/exercise protocol, group misconception state machine or private tutor channel exists.
 
-Main Compose defines API, Next web, nginx edge (:8080), PostgreSQL (:5433 published), Mongo (:27017, Python only), Redis, RabbitMQ and Mailpit (:1025/:8025). Test Compose provides PostgreSQL (:5433) and Mailpit (:1026/:8026). AI Compose is separate and mounts an external upload volume; path/DB/broker/secret alignment requires explicit configuration. Production override plus `deploy/Caddyfile` and nginx config require validation; there is no evidence for zero-downtime or deployed-state claims.
+Main Compose defines API, Next web, nginx edge (:8080), PostgreSQL (:5433 published), Redis, RabbitMQ and Mailpit (:1025/:8025). Test Compose provides PostgreSQL (:5433) and Mailpit (:1026/:8026). AI Compose is separate and mounts an external upload volume; path/DB/broker/secret alignment requires explicit configuration. Production override plus `deploy/Caddyfile` and nginx config require validation; there is no evidence for zero-downtime or deployed-state claims.
 
 Root CI declares Node checks, E2E and AI checks, but its AI install references absent `requirements.txt`. The nested Python workflow reflects former repository layout and is not automatically a root GitHub Actions workflow. Python Docker dependencies differ from Poetry, and the HTTP image does not constitute worker deployment. These remain ED-01 work, without changes to infrastructure in this audit.
 

@@ -13,9 +13,16 @@ All four demo passwords: `EdNovaDemo!2026`. These are local demonstration accoun
 
 On 27 October the local configuration was aligned, Docker infrastructure and the host web/API/Python/ingestion services were started, the learner browser login and API session were verified, and the cached embedding model loaded in offline mode. The local tutor still uses mock/deterministic execution; this is not approved provider inference.
 
-The demo accounts live in the `ednova_dev` database on MongoDB port 27018 (`pnpm dev:infra:up`). Seed them with `pnpm --filter api seed:learning-demo`. Run `pnpm dev` and `pnpm dev:ai` in separate terminals, and `pnpm dev:worker ingestion` for course uploads. `apps/ai/.env` selects the Python environment through `EDNOVA_AI_PYTHON`.
+For the challenge demo, start PostgreSQL and apply migrations with `pnpm --filter api db:setup`.
+Start `pnpm dev:ai` with the same source and index paths as the API, then run
+`ALLOW_DEMO_COURSES=1 pnpm seed` against a disposable local database. This loads the
+demo accounts, institution, badges, two courses, practice activities and the learner task.
+Use `pnpm --filter api prisma:seed baseline` for the separate legacy tier-test accounts
+and rank badges, or choose `learning`, `demo-course`, `phase2` or `analytics`
+for the corresponding existing fixtures. The course and phase 2 presets require the
+learning accounts first.
 
-Their active memberships belong to **EdNova Learning Demo**, institution ID `6ae1f28715e0d23d377dda36`. Instructor is an institution membership, not a platform administrator role. Course assignment/enrollment remains a separate explicit operation after creating a course. No course, activity, answer or mastery result was fabricated by this seed.
+Their active memberships belong to **EdNova Learning Demo**, with a database-generated ID. Instructor is an institution membership, not a platform administrator role. Course assignment/enrollment remains a separate explicit operation after creating a course. No course, activity, answer or mastery result was fabricated by this seed.
 
 ## Demo course for the learning workspace
 

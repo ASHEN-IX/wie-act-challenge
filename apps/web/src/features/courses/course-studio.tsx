@@ -306,7 +306,7 @@ export function CourseStudio({
   };
 
   const AUTO_KEY = "ednova:auto-publish";
-  const [autoEnabled, setAutoEnabled] = useState(true);
+  const [autoEnabled, setAutoEnabled] = useState(false);
   const [auto, setAuto] = useState<{
     phase: "idle" | AutoPublishPhase | "published" | "held";
     message?: string;
@@ -317,7 +317,7 @@ export function CourseStudio({
    * honoured, so the automatic path stays off; the manual button still works. */
   const autoAllowed = () => {
     try {
-      return localStorage.getItem(AUTO_KEY) !== "off";
+      return localStorage.getItem(AUTO_KEY) === "on";
     } catch {
       return false;
     }
@@ -332,9 +332,9 @@ export function CourseStudio({
     !latest.current.isInstructorReviewed;
   useEffect(() => {
     try {
-      if (localStorage.getItem(AUTO_KEY) === "off") setAutoEnabled(false);
+      setAutoEnabled(localStorage.getItem(AUTO_KEY) === "on");
     } catch {
-      /* storage can be blocked; automatic review stays on */
+      /* Storage can be blocked; automatic review stays off. */
     }
   }, []);
 
@@ -700,8 +700,8 @@ export function CourseStudio({
                 onChange={(event) => {
                   setAutoEnabled(event.target.checked);
                   try {
-                    if (event.target.checked) localStorage.removeItem(AUTO_KEY);
-                    else localStorage.setItem(AUTO_KEY, "off");
+                    if (event.target.checked) localStorage.setItem(AUTO_KEY, "on");
+                    else localStorage.removeItem(AUTO_KEY);
                   } catch {
                     /* ignore */
                   }

@@ -12,9 +12,10 @@ services:
     - path: ./apps/ai/.env
       required: false
     environment:
-      MONGODB_URI: mongodb://mongodb:27017/${AI_DB_NAME:-ednova}
-      DB_NAME: ${AI_DB_NAME:-ednova}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-ednova}:${POSTGRES_PASSWORD:-ednova}@postgres:5432/${POSTGRES_DB:-ednova}
+      # AI owns its schema and reaches application data over the internal API.
+      AI_DATABASE_URL: ${AI_DATABASE_URL:-postgresql://${POSTGRES_USER:-ednova}:${POSTGRES_PASSWORD:-ednova}@postgres:5432/${POSTGRES_DB:-ednova}}
+      API_SERVICE_URL: ${API_SERVICE_URL:-http://host.docker.internal:3001}
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:?Set the shared internal API secret}
       RABBITMQ_URL: amqp://${RABBITMQ_USER:-ednova}:${RABBITMQ_PASS:?RABBITMQ_PASS
         must be set}@rabbitmq:5672/${RABBITMQ_VHOST:-ednova}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
@@ -28,8 +29,6 @@ services:
       INGEST_UPLOADS_DIR: /app/uploads
       FAISS_INDEX_DIR: /app/faiss
       LLM_APPROVALS_JSON: ${LLM_APPROVALS_JSON:-}
-      LLM_BUDGET_MONGODB_URI: ${LLM_BUDGET_MONGODB_URI:-}
-      LLM_BUDGET_DB_NAME: ${LLM_BUDGET_DB_NAME:-}
     extra_hosts:
     - host.docker.internal:host-gateway
     volumes:
@@ -40,8 +39,6 @@ services:
     - ${FAISS_INDEX_DIR:-./var/dev-faiss}:/app/faiss
     - ${INGEST_UPLOADS_DIR:-./var/dev-uploads}:/app/uploads
     depends_on:
-      mongodb:
-        condition: service_healthy
       postgres:
         condition: service_healthy
       rabbitmq:
@@ -93,20 +90,6 @@ services:
     container_name: ednova-coach-worker
     command: python -m workers.coach_worker
 
-  # The Python AI service keeps its own collections (queues, FAISS chunk
-  # metadata, pacing/review memory). The Node API no longer uses MongoDB.
-  mongodb:
-    image: mongo:7
-    restart: unless-stopped
-    ports:
-    - 127.0.0.1:27017:27017
-    volumes:
-    - mongodb_data:/data/db
-    healthcheck:
-      test: [CMD, mongosh, --quiet, --eval, "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 6
   postgres:
     image: postgres:17-alpine
     restart: unless-stopped
@@ -174,9 +157,6 @@ services:
 volumes:
   redis_data:
     name: ednova_redis_data
-    external: true
-  mongodb_data:
-    name: ednova_mongodb_data
     external: true
   postgres_data:
     name: ednova_postgres_data

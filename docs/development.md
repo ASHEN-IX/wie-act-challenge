@@ -20,7 +20,7 @@ Schema changes are Prisma migrations. Run `pnpm --filter api exec prisma migrate
 
 For newly generated host configurations, `pnpm dev:setup` gives Node and Python the same absolute `INGEST_UPLOADS_DIR` and `FAISS_INDEX_DIR` paths under `var/`. The default `var/dev-uploads` and `var/dev-faiss` directories are excluded from Git because they contain private originals and indexes. Existing environment files are never overwritten: `pnpm dev:doctor` flags missing or mismatched paths, service keys and broker settings for manual correction. These host paths are distinct from Docker named volumes; sharing storage with containerized Python requires an explicit matching bind mount or a compatible shared volume.
 
-`pnpm dev` builds/starts API :3000 and Next :5173 only. `pnpm dev:api` and `pnpm dev:web` run them independently. API health: `/api/v1/health`; OpenAPI: `/api/v1/docs/openapi.json`. Next proxies HTTP `/api/v1` and `/uploads`; local setup sets `NEXT_PUBLIC_WS_URL=ws://localhost:3000` for direct WebSocket access.
+`pnpm dev` builds/starts API :3001 and Next :3000 only. `pnpm dev:api` and `pnpm dev:web` run them independently. API health: `/api/v1/health`; OpenAPI: `/api/v1/docs/openapi.json`. Next proxies HTTP `/api/v1` and `/uploads`; local setup sets `NEXT_PUBLIC_WS_URL=ws://localhost:3000` for direct WebSocket access.
 
 ## Workspace and collaboration
 
@@ -83,6 +83,9 @@ M01 continuation results and reproducible broker fixture instructions are record
 
 ### Student background actions
 
-After starting the local infrastructure, run `pnpm dev:workers` to start the ingestion, feedback, planning, search, scheduling and coaching workers. This command derives the database and broker virtual host from `apps/api/.env`, so workers use the same local queues as Node rather than settings from a different root environment. It recreates only the AI HTTP/worker containers; it does not remove data volumes. Model-backed operations still require their configured provider authorization.
+After starting the local infrastructure, run `pnpm dev:ai` for the AI HTTP service and
+`pnpm dev:workers` for ingestion, feedback, planning, search, scheduling and coaching.
+Both commands read `apps/ai/.env` and use the selected local Python environment.
+Model-backed operations still require their configured provider authorization.
 
 Feedback, search and plan pages keep the current job in the page URL. Refreshing or returning to that URL resumes status checks; the API still checks job ownership. Use **Check status** after a temporary connection failure.

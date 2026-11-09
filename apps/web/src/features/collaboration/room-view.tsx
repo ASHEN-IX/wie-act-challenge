@@ -36,6 +36,7 @@ export interface FacilitatorInterventionInfo {
   targetSpeakerName?: string;
   reasoning: string;
   message: string;
+  executionMode?: string;
   proposedUICommand?: {
     action: string;
     activityId?: string;
@@ -295,8 +296,9 @@ export function RoomView({
       const formData = new FormData();
       formData.set("id", roomId);
       formData.set("prompt", customQuestion);
-      await askFacilitator({ error: undefined }, formData);
-      setCustomQuestion("");
+      const result = await askFacilitator({ error: undefined }, formData);
+      setActionError(result.error);
+      if (!result.error) setCustomQuestion("");
     });
   };
 
@@ -305,8 +307,9 @@ export function RoomView({
       const formData = new FormData();
       formData.set("id", roomId);
       formData.set("hintLevel", String(hintLevel));
-      await requestFacilitatorHint({ error: undefined }, formData);
-      setHintLevel((prev) => (prev === 1 ? 2 : 1));
+      const result = await requestFacilitatorHint({ error: undefined }, formData);
+      setActionError(result.error);
+      if (!result.error) setHintLevel((prev) => (prev === 1 ? 2 : 1));
     });
   };
 
@@ -633,6 +636,15 @@ export function RoomView({
 
               {activeIntervention && (
                 <div className="rounded-md border bg-muted/40 p-3 text-sm">
+                  <p className="mb-2 text-xs text-muted-foreground">
+                    {activeIntervention.executionMode === "REAL_APPROVED"
+                      ? "AI-generated guidance"
+                      : activeIntervention.executionMode === "MOCK_TEST"
+                        ? "Test guidance"
+                        : activeIntervention.executionMode === "DETERMINISTIC_FALLBACK"
+                          ? "Built-in guidance"
+                          : "Guidance source unavailable"}
+                  </p>
                   <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                     <span className="flex flex-wrap items-center gap-2">
                       <Badge

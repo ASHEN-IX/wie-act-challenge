@@ -105,28 +105,25 @@ contained U+0000, which MongoDB stores but PostgreSQL `jsonb` rejects (SQLSTATE
 
 ## 3. What did **not** move
 
-The Python AI service (`apps/ai`) owns its own collections — `coach_actions`,
-`pacing_data`, `review_schedule`, `search_history`, `task_scheduling`,
-`evaluation_sessions`, `chunk_embeddings`, `schedule_history`,
-`schedule_snapshots`, `signals`, `reflections`, `daily_metrics`, and the LLM
-budget ledger. They stay in MongoDB; nothing in this migration touches them.
+The Python AI service (`apps/ai`) was moved in a follow-up. Nothing in the
+runtime uses MongoDB any more (`mongodb`/`mongoose` remain only for
+`scripts/migrate-mongo-to-postgres.ts`).
 
-Two consequences worth knowing:
-
-- `agents/coach/services/course_repository.py` and `planner_repository.py` used to
-  read the API's `courses` / `subjects` / `studysessions` / `studyplans`
-  collections. Those now live in PostgreSQL, so those readers find nothing and
-  the coach falls back to task-title-only context — the degradation path the code
-  was already written to tolerate. The files carry a note saying so.
-- The QA harness passes the Python container a `MONGODB_URI`; the Node runtime
-  no longer reads one.
-
-One Node path stays on MongoDB on purpose: `modules/study/src/services/planningBudget.ts`
-reads the `llm_approval_budgets` ledger from `LLM_BUDGET_MONGODB_URI` when it is
-configured. That ledger is shared with the Python LLM client, which debits the
-same collection, so moving only the Node half would split one accounting record
-across two stores. It fails closed when unconfigured, and its tests cover that.
-It should move together with the Python budget client, not before.
+- **AI-owned data** (`task_scheduling`, `schedule_history`, `schedule_snapshots`,
+  `coach_actions`, `signals`, `pacing_data`, `review_schedule`, `chunk_embeddings`,
+  `search_history`, `formula_dispatches`) lives in the `ai` schema, created by
+  `apps/ai/services/pg.py` (psycopg 3 + pool, JSONB documents; chosen over an ORM
+  because the footprint is a few small tables and a handful of atomic statements).
+  `formula_dispatches` is the crash-safety marker and survives restarts.
+- **API-owned data** is read over HTTP (`x-internal-secret`) under
+  `/api/v1/study/internal/`: ingestion revision + operation fencing (outage or 409
+  rejects, 404 = legacy allowed), coach catalog/current task, planner plans, LLM
+  budget, experience reservation, formula recognition controls.
+- **`llm_approval_budgets`** moved to PostgreSQL with typed columns, owned by Node
+  (`llmBudget.ts`, one conditional `UPDATE` per reservation). Python calls it.
+- **Removed as dead:** `evaluation_sessions`, `daily_metrics`/`reflections`,
+  `agents/orchestrator.py`, `DatabaseService.save_course` (the sync ingest
+  endpoint no longer persists; the worker/API path owns that).
 
 ---
 

@@ -106,7 +106,7 @@ The application domain requires multi-document entity models (courses, modules, 
 ### Decision
 Use **PostgreSQL 17** as the primary database, accessed through **Prisma 7**. Primary keys remain 24-character hex strings so identifiers that already reached clients are unchanged, and the API keeps serializing them as `_id`. Idempotency that MongoDB delivered with single-document atomic updates is now expressed with unique constraints and transactions. `apps/api/prisma/schema.prisma` is the schema of record.
 
-MongoDB is retained only for the Python AI service's own collections.
+The Python AI service's own data lives in the `ai` schema of the same PostgreSQL (psycopg, no ORM); it reads API-owned data over the internal HTTP endpoints. MongoDB is no longer used by the runtime.
 - Use compound unique indexes for critical business idempotency (e.g., `userId + courseId + objectiveId` for competency records; `eventKey` for gamification).
 - Enforce strict read/write ACL filters on every query at the repository layer.
 - Prohibit alternative databases (PostgreSQL, Cassandra) for the core platform.

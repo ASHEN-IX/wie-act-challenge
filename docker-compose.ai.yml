@@ -11,8 +11,9 @@ services:
       - path: ./apps/ai/.env
         required: false
     environment:
-      MONGODB_URI: ${AI_MONGODB_URI:?Set the independent AI database URI}
-      DB_NAME: ${AI_DB_NAME:-ednova}
+      AI_DATABASE_URL: ${AI_DATABASE_URL:?Set the AI service PostgreSQL URI (schema ai)}
+      API_SERVICE_URL: ${API_SERVICE_URL:?Set the reachable API base URL}
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:?Set the shared internal service secret}
       RABBITMQ_URL: ${AI_RABBITMQ_URL:?Set the reachable AI broker URI}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
