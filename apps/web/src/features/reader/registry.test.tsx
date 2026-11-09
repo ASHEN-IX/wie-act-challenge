@@ -107,7 +107,7 @@ it("uses original equation imagery for unreviewed plain extraction, preserving t
     id: "unreviewed", type: "math", expression: "∫ f x a b", notation: "plain",
     sourceMeta: { page: 2, regionId: "region_aaaaaaaaaaaaaaaaaaaa", reviewRequired: true },
   };
-  const html = renderToStaticMarkup(<LearningBlockView block={block} context={{ title: "Math", revisionId: "rev_1", mathCropHref: () => "/api/v1/study/courses/aaaaaaaaaaaaaaaaaaaaaaaa/revisions/rev_1/sources/doc_aaaaaaaaaaaaaaaa/regions/region_aaaaaaaaaaaaaaaaaaaa" }} />);
+  const html = renderToStaticMarkup(<LearningBlockView block={block} context={{ title: "Math", revisionId: "rev_1", mathCropHref: () => "/api/v1/study/courses/04b3da2d-ec14-5643-bf49-e43f550168bf/revisions/rev_1/sources/doc_aaaaaaaaaaaaaaaa/regions/region_aaaaaaaaaaaaaaaaaaaa" }} />);
   expect(html).toContain("<img");
   expect(html).toContain("Automatic transcription is unverified");
   expect(html).toContain("∫ f x a b");

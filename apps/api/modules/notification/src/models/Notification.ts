@@ -31,7 +31,7 @@ export type NotificationPriority = 'low' | 'normal' | 'high' | 'urgent';
 /**
  * Domain notification. The Mongo collection `notifications` is now the
  * `notifications` table; the column names and defaults are unchanged, and
- * `toDocument` keeps `_id` on the wire.
+ * `toDocument` keeps `id` on the wire.
  *
  * The old schema also carried a TTL index (`updatedAt` + 30 days where
  * `status = 'dismissed'`). PostgreSQL has no TTL indexes, so the field
@@ -39,7 +39,7 @@ export type NotificationPriority = 'low' | 'normal' | 'high' | 'urgent';
  * concern rather than a database guarantee.
  */
 export type INotification = Omit<NotificationRow, 'type' | 'status' | 'priority' | 'metadata'> & {
-  _id: string;
+  id: string;
   type: NotificationType;
   status: NotificationStatus;
   priority: NotificationPriority;

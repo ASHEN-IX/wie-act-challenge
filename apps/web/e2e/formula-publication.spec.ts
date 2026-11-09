@@ -11,7 +11,7 @@ test("reviewed formulas publish into an immutable reader snapshot and original s
   await page.getByLabel("Password", { exact: true }).fill("FormulaPass!123");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page).toHaveURL(/dashboard/);
-  await page.goto("/courses/bbbbbbbbbbbbbbbbbbbbbbbb/studio");
+  await page.goto("/courses/ebf069b5-6c44-5857-8834-17d3bc9778d0/studio");
   await page
     .getByText("Check individual equations (optional)", { exact: true })
     .click();
@@ -146,7 +146,7 @@ test("reviewed formulas publish into an immutable reader snapshot and original s
       JSON.stringify(
         (await db
           .collection("course_revisions")
-          .findOne({ _id: revision!._id }))!.contentDocument,
+          .findOne({ id: revision!.id }))!.contentDocument,
       ),
     ).toBe(before);
     expect(

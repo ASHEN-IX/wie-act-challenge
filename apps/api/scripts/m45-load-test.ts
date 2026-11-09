@@ -21,7 +21,7 @@ import { COMPONENT_REGISTRY_VERSION } from '../shared/ednova/componentRegistry';
 
 const URI = process.env.M45_MONGO || 'mongodb://127.0.0.1:27017';
 const DB = `test_m45_load_${process.pid}`;
-const COURSE = '0123456789abcdef01234567';
+const COURSE = 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d';
 const MODES = ['guided', 'explore', 'practice', 'deep_dive'] as const;
 
 process.env.LLM_BUDGET_MONGODB_URI = URI;

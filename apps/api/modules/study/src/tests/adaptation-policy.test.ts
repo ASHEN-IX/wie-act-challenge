@@ -23,7 +23,7 @@ import {
 } from '../../../../shared/ednova/adaptationPolicy';
 import type { LearningMode } from '../../../../shared/ednova/learningModes';
 
-const courseId = '0123456789abcdef01234567';
+const courseId = 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d';
 const revisionId = 'rev_m44';
 const lessonId = 'lesson-1';
 const now = new Date('2026-11-07T10:00:00.000Z');
@@ -287,7 +287,7 @@ describe('the record validates strictly', () => {
 
   it('rejects a record for another course or revision', () => {
     const record = evaluate();
-    expect(() => parseLearningAdaptation(record, { ...binding, courseId: 'f'.repeat(24) })).toThrow();
+    expect(() => parseLearningAdaptation(record, { ...binding, courseId: '1b083a5b-c476-5351-93ed-34d5f0615103' })).toThrow();
     expect(() => parseLearningAdaptation(record, { ...binding, revisionId: 'rev_other' })).toThrow();
     expect(() => parseLearningAdaptation(record, { ...binding, lessonId: 'lesson-2' })).toThrow();
   });

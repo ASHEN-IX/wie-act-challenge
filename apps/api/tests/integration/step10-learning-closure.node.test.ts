@@ -61,10 +61,10 @@ test('Step 10 Learning Closure: ED-06 Source Isolation, ED-21 Unofficial Flow, a
         await CourseRevision.deleteMany({ courseId: institutionalCourseId });
       }
       await ActivityRecord.deleteMany({ courseId: institutionalCourseId });
-      await Institution.deleteMany({ _id: { $in: [inst1Id, inst2Id] } });
+      await Institution.deleteMany({ id: { $in: [inst1Id, inst2Id] } });
       await InstitutionMembership.deleteMany({ userId: { $in: [userA, userB, instructor] } });
       await CourseEnrollment.deleteMany({ userId: { $in: [userA, userB] } });
-      await Subject.deleteMany({ _id: subjectId });
+      await Subject.deleteMany({ id: subjectId });
     } catch {
     } finally {
       await disconnectDatabase();
@@ -84,14 +84,14 @@ test('Step 10 Learning Closure: ED-06 Source Isolation, ED-21 Unofficial Flow, a
   await t.test('1. Setup Institutions, Memberships, and Courses', async () => {
     try {
       await Subject.create({
-        _id: subjectId,
+        id: subjectId,
         userId: instructor,
         name: 'Computer Science'
       });
 
       // 1. Active Institution 1
       await Institution.create({
-        _id: inst1Id,
+        id: inst1Id,
         name: 'Step 10 University 1',
         slug: `s10-u1-${Date.now()}`,
         status: 'active',
@@ -100,7 +100,7 @@ test('Step 10 Learning Closure: ED-06 Source Isolation, ED-21 Unofficial Flow, a
 
       // 2. Active Institution 2
       await Institution.create({
-        _id: inst2Id,
+        id: inst2Id,
         name: 'Step 10 University 2',
         slug: `s10-u2-${Date.now()}`,
         status: 'active',
@@ -141,7 +141,7 @@ test('Step 10 Learning Closure: ED-06 Source Isolation, ED-21 Unofficial Flow, a
         status: 'completed'
         // `modules` was a legacy field with no column; courses carry `topics`.
       });
-      personalCourseId = pc._id.toString();
+      personalCourseId = pc.id.toString();
 
       // Institutional course in Institution 1
       const ic = await Course.create({
@@ -185,14 +185,14 @@ test('Step 10 Learning Closure: ED-06 Source Isolation, ED-21 Unofficial Flow, a
           }
         ]
       });
-      institutionalCourseId = ic._id.toString();
+      institutionalCourseId = ic.id.toString();
 
       // Prepare course fixture (sets up files and mock artifacts)
       await prepareCourseFixture(institutionalCourseId, t);
 
       // Enroll User A in Institutional Course
       await CourseEnrollment.create({
-        courseId: ic._id,
+        courseId: ic.id,
         institutionId: inst1Id,
         userId: userA,
         status: 'active',

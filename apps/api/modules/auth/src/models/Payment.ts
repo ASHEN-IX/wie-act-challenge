@@ -2,7 +2,7 @@ import type { Payment as PaymentRow, Prisma } from '../../../../src/generated/pr
 import { prisma, toDocument } from '../../../../shared/database';
 import { newId } from '../../../../shared/ids';
 
-export type IPayment = PaymentRow & { _id: string };
+export type IPayment = PaymentRow & { id: string };
 
 function hydrate(row: PaymentRow): IPayment {
   return toDocument(row) as IPayment;

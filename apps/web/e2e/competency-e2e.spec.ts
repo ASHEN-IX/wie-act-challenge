@@ -15,7 +15,7 @@ const { test, expect } = require("@playwright/test");
  * API responses to isolate the frontend rendering.
  */
 
-const authUser = { _id: "e2e-user", email: "e2e@test.com", role: "student", isVerified: true };
+const authUser = { id: "e2e-user", email: "e2e@test.com", role: "student", isVerified: true };
 
 /**
  * Authenticate by driving the real login UI with a mocked login API. This sets

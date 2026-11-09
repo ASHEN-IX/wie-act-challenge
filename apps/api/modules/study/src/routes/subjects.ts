@@ -44,11 +44,11 @@ router.get('/', async (req: DomainRequest, res: Response) => {
     const subjectsWithCount = await Promise.all(
       subjects.map(async (subject) => {
         const courseCount = await Course.countDocuments({
-          subjectId: subject._id.toString(),
+          subjectId: subject.id.toString(),
           userId
         });
         return {
-          id: subject._id.toString(),
+          id: subject.id.toString(),
           name: subject.name,
           description: subject.description,
           image: subject.image,
@@ -100,7 +100,7 @@ router.post('/', upload.single('image'), async (req: DomainRequest, res: Respons
       const USER_PROFILE_URL = 'module://users';
       const payload = {
         action: 'subject_create',
-        metadata: { subjectId: subject._id.toString(), name: subject.name }
+        metadata: { subjectId: subject.id.toString(), name: subject.name }
       };
       await moduleClient.post(`${USER_PROFILE_URL}/api/v1/users/gamification/award-xp`, payload, {
         headers: buildInternalHeaders(req.headers.cookie)
@@ -117,7 +117,7 @@ router.post('/', upload.single('image'), async (req: DomainRequest, res: Respons
 
     res.status(201).json({
       subject: {
-        id: subject._id.toString(),
+        id: subject.id.toString(),
         name: subject.name,
         description: subject.description,
         image: subject.image,
@@ -138,7 +138,7 @@ router.get('/:subjectId', async (req: DomainRequest, res: Response) => {
     const { subjectId } = req.params;
     const userId = req.user!.userId;
 
-    const subject = await Subject.findOne({ _id: subjectId, userId });
+    const subject = await Subject.findOne({ id: subjectId, userId });
 
     if (!subject) {
       return res.status(404).json({ error: 'Subject not found' });
@@ -151,7 +151,7 @@ router.get('/:subjectId', async (req: DomainRequest, res: Response) => {
 
     res.json({
       subject: {
-        id: subject._id.toString(),
+        id: subject.id.toString(),
         name: subject.name,
         description: subject.description,
         image: subject.image,
@@ -174,7 +174,7 @@ router.put('/:subjectId', upload.single('image'), async (req: DomainRequest, res
     const { name, description } = req.body;
     const userId = req.user!.userId;
 
-    const subject = await Subject.findOne({ _id: subjectId, userId });
+    const subject = await Subject.findOne({ id: subjectId, userId });
 
     if (!subject) {
       return res.status(404).json({ error: 'Subject not found' });
@@ -193,7 +193,7 @@ router.put('/:subjectId', upload.single('image'), async (req: DomainRequest, res
 
     res.json({
       subject: {
-        id: subject._id.toString(),
+        id: subject.id.toString(),
         name: subject.name,
         description: subject.description,
         image: subject.image,
@@ -214,7 +214,7 @@ router.delete('/:subjectId', async (req: DomainRequest, res: Response) => {
     const { subjectId } = req.params;
     const userId = req.user!.userId;
 
-    const subject = await Subject.findOneAndDelete({ _id: subjectId, userId });
+    const subject = await Subject.findOneAndDelete({ id: subjectId, userId });
 
     if (!subject) {
       return res.status(404).json({ error: 'Subject not found' });

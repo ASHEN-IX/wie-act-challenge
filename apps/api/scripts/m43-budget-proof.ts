@@ -37,7 +37,7 @@ let client: MongoClient;
 async function reset(usedTokens = 0) {
   await client.db(DB).collection('llm_approval_budgets').deleteMany({});
   await client.db(DB).collection('llm_approval_budgets').insertOne({
-    _id: APPROVAL as never,
+    id: APPROVAL as never,
     task: 'experience_planning',
     model: MODEL,
     limit: 10,
@@ -52,7 +52,7 @@ async function used(): Promise<number> {
   const row = await client
     .db(DB)
     .collection('llm_approval_budgets')
-    .findOne({ _id: APPROVAL as never });
+    .findOne({ id: APPROVAL as never });
   return Number(row?.usedTokens ?? 0);
 }
 

@@ -444,7 +444,7 @@ async function main() {
     // objective topics through these records. Seed them from the same hierarchy.
     // Course.subjectId historically held a free-form slug, which no Subject could
     // ever match, so subject names resolved to null. Point it at a real Subject.
-    let subject = /^[a-f\d]{24}$/i.test(course.subjectId)
+    let subject = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(course.subjectId)
       ? await prisma.subject.findUnique({ where: { id: course.subjectId } })
       : null;
     if (!subject) {

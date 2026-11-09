@@ -11,7 +11,7 @@ jest.mock('../models', () => ({
 
 import { getCourseAccessRole, canReadCourse, canManageCourse } from '../services/resourceAccess';
 
-const id = '0123456789abcdef01234567';
+const id = 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d';
 const stranger = 'someone-else';
 
 function stored(doc: Record<string, unknown>) {
@@ -56,7 +56,7 @@ describe('public course read grant', () => {
     });
     institutionExists.mockResolvedValue(null);
     expect(await canReadCourse(stranger, id)).toBe(false);
-    institutionExists.mockResolvedValue({ _id: 'i1' });
+    institutionExists.mockResolvedValue({ id: 'i1' });
     expect(await canReadCourse(stranger, id)).toBe(true);
   });
 });

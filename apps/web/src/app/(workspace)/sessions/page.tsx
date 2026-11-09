@@ -15,7 +15,7 @@ export default async function Sessions() {
   const [result, courses] = await Promise.all([
     load<{
       sessions: {
-        _id: string;
+        id: string;
         status: string;
         type?: string;
         startTime?: string;
@@ -53,11 +53,11 @@ export default async function Sessions() {
         <div className="divide-y rounded-lg border">
           {result.data.sessions.map((session) => (
             <Link
-              key={session._id}
+              key={session.id}
               href={
                 session.type === "team"
-                  ? `/study-together/${session._id}`
-                  : `/sessions/${session._id}`
+                  ? `/study-together/${session.id}`
+                  : `/sessions/${session.id}`
               }
               className="flex justify-between gap-4 p-5 hover:bg-muted"
             >

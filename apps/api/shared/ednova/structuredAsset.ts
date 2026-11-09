@@ -512,8 +512,8 @@ export function parseStructuredAsset(value: unknown): StructuredAssetV1 {
     return fail('STRUCTURED_ASSET_VERSION_UNSUPPORTED');
   if (v.registryVersion !== COMPONENT_REGISTRY_VERSION)
     return fail('STRUCTURED_ASSET_VERSION_UNSUPPORTED');
-  const courseId = str(v.courseId, 24);
-  if (!/^[a-f0-9]{24}$/.test(courseId)) return fail('INVALID_STRUCTURED_ASSET');
+  const courseId = str(v.courseId, 36);
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(courseId)) return fail('INVALID_STRUCTURED_ASSET');
   const component = String(v.component);
   if (!ASSET_COMPONENTS.includes(component as ComponentType))
     return fail('STRUCTURED_ASSET_COMPONENT_UNSUPPORTED');

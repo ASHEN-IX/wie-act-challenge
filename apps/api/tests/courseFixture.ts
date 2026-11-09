@@ -23,7 +23,7 @@ export interface CourseFixture extends Partial<
     | 'updatedAt'
   >
 > {
-  _id: string;
+  id: string;
   save: jest.Mock;
   topics?: ReturnType<typeof sanitizeCourseFromResult>;
   topLevelJunk?: string;

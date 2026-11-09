@@ -189,7 +189,7 @@ test('M09 / ED-10: Source-Grounded Tutor with Verifiable Citations Integration',
       await Course.deleteMany({ userId: { contains: testPrefix } });
       await CourseEnrollment.deleteMany({ userId: { contains: testPrefix } });
       await InstitutionMembership.deleteMany({ userId: { contains: testPrefix } });
-      await Institution.deleteMany({ _id: institutionId });
+      await Institution.deleteMany({ id: institutionId });
     } catch {
       // ignore
     } finally {
@@ -259,13 +259,13 @@ test('M09 / ED-10: Source-Grounded Tutor with Verifiable Citations Integration',
           }
         ]
       });
-      courseId = courseDoc._id.toString();
+      courseId = courseDoc.id.toString();
       await prepareCourseFixture(courseId, t);
 
       // 3. Create initial draft revision
       const initialDraftTag = `rev_${Date.now()}`;
       await CourseRevision.create({
-        courseId: courseDoc._id,
+        courseId: courseDoc.id,
         revisionTag: initialDraftTag,
         contentHash: 'sha256:1111111111111111111111111111111111111111111111111111111111111111',
         status: 'draft',
@@ -293,7 +293,7 @@ test('M09 / ED-10: Source-Grounded Tutor with Verifiable Citations Integration',
 
       // 6. Enroll student
       await CourseEnrollment.create({
-        courseId: courseDoc._id,
+        courseId: courseDoc.id,
         institutionId,
         userId: studentId,
         status: 'active'
@@ -307,7 +307,7 @@ test('M09 / ED-10: Source-Grounded Tutor with Verifiable Citations Integration',
         userId: ownerUserId,
         subjectId: 'sub_math'
       });
-      unpublishedCourseId = unpubDoc._id.toString();
+      unpublishedCourseId = unpubDoc.id.toString();
 
       await prepareCourseFixture(courseId, t);
     }

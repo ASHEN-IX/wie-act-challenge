@@ -61,7 +61,7 @@ export async function attachStructuredAsset(
     revisionTag: revisionId,
     revokedAt: { $exists: false },
   })
-    .select({ _id: 1, status: 1 })
+    .select({ id: 1, status: 1 })
     .lean();
   if (!revision) throw new PresentationUnavailableError('Published revision unavailable');
 
@@ -86,7 +86,7 @@ export async function attachStructuredAsset(
     revisionId,
     assetId: asset.assetId,
   })
-    .select({ _id: 1 })
+    .select({ id: 1 })
     .lean();
   // Identity is stable: re-writing the same id would silently replace a
   // supplement a learner may already be reading. Reject and require a new id.

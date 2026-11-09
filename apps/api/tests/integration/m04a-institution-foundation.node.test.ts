@@ -14,7 +14,7 @@ interface ContextBody {
   }>;
   invitation?: { id: string; role: string; expiresAt: string; status?: string };
   token?: string;
-  user?: { _id?: string };
+  user?: { id?: string };
   error?: string;
 }
 
@@ -231,7 +231,7 @@ test(
         );
         const me = await request(instructorA, 'GET', '/api/v1/auth/me');
         assert.equal(me.status, 200);
-        assert.equal(me.body.user?._id, String(instructorA.id));
+        assert.equal(me.body.user?.id, String(instructorA.id));
       }
     );
 
@@ -557,7 +557,7 @@ test(
       const foreignCourseId = newId();
       courseIds.push(foreignCourseId);
       await Course.create({
-        _id: foreignCourseId,
+        id: foreignCourseId,
         userId: String(platform.id),
         ownerUserId: String(platform.id),
         subjectId: newId(),

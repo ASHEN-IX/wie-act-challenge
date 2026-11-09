@@ -57,13 +57,13 @@ test(
           await models.CourseEnrollment.deleteMany({ courseId: { $in: courseIds } });
           await models.ActivityRecord.deleteMany({ courseId: { $in: courseIds } });
           await models.StudentAttempt.deleteMany({ courseId: { $in: courseIds } });
-          await models.Course.deleteMany({ _id: { $in: courseIds } });
+          await models.Course.deleteMany({ id: { $in: courseIds } });
         }
         if (models && institutions.length) {
           await models.InstitutionMembership.deleteMany({
             institutionId: { $in: institutions }
           });
-          await models.Institution.deleteMany({ _id: { $in: institutions } });
+          await models.Institution.deleteMany({ id: { $in: institutions } });
         }
         await prisma.authSession.deleteMany({ where: { userId: { in: actorIds } } });
         await prisma.authAccount.deleteMany({ where: { userId: { in: actorIds } } });
@@ -177,16 +177,16 @@ test(
       slug: 'p0r2-' + Date.now(),
       createdByUserId: instructor.id.toString()
     });
-    institutions.push(institution._id.toString());
+    institutions.push(institution.id.toString());
     await m.InstitutionMembership.createMany([
       {
-        institutionId: institution._id,
+        institutionId: institution.id,
         userId: instructor.id.toString(),
         role: 'instructor',
         status: 'active'
       },
       {
-        institutionId: institution._id,
+        institutionId: institution.id,
         userId: learner.id.toString(),
         role: 'university_student',
         status: 'active'
@@ -195,7 +195,7 @@ test(
     const course = await m.Course.create({
       title: 'Source arithmetic',
       scope: 'institutional',
-      institutionId: institution._id,
+      institutionId: institution.id,
       userId: instructor.id.toString(),
       ownerUserId: instructor.id.toString(),
       assignedInstructorIds: [instructor.id.toString()],
@@ -203,11 +203,11 @@ test(
       status: 'completed',
       files: []
     });
-    const id = course._id.toString();
+    const id = course.id.toString();
     courseIds.push(id);
     await m.CourseEnrollment.create({
       courseId: id,
-      institutionId: institution._id,
+      institutionId: institution.id,
       userId: learner.id.toString(),
       status: 'active'
     });
@@ -238,7 +238,7 @@ test(
     await fs.mkdir(path.join(temp, 'uploads/courses', id), { recursive: true });
     await fs.writeFile(path.join(temp, 'uploads/courses', id, 'source.txt'), text);
     await m.Course.updateOne(
-      { _id: id },
+      { id: id },
       {
         $set: {
           files: [
@@ -685,7 +685,7 @@ test(
           )
         );
         assert.ok(races.some((x) => x.status === 'fulfilled'));
-        await m.Course.updateOne({ _id: id }, { $set: { files: [] } });
+        await m.Course.updateOne({ id: id }, { $set: { files: [] } });
         await fs.unlink(path.join(temp, 'uploads/courses', id, 'source.txt'));
         const old = await pub.getPublishedCourseContext(learner.id.toString(), id, 'rev_alpha');
         assert.equal(old.revisionId, 'rev_alpha');
@@ -766,9 +766,9 @@ test(
             '# Arithmetic source\n\n## Addition\n\nArithmetic addition combines quantities into a total. This original passage supports an exact quotation check and keeps its source identity.';
           const form = new FormData();
           form.set('title', 'Uploaded source course');
-          form.set('subject_id', subject._id.toString());
+          form.set('subject_id', subject.id.toString());
           form.set('scope', 'institutional');
-          form.set('institutionId', institution._id.toString());
+          form.set('institutionId', institution.id.toString());
           form.append('files', new Blob([passage], { type: 'text/plain' }), 'arithmetic.txt');
           const uploaded = await fetch(origin + '/api/v1/study/courses', {
             method: 'POST',
@@ -816,7 +816,7 @@ test(
           );
           await m.CourseEnrollment.create({
             courseId: uploadedId,
-            institutionId: institution._id,
+            institutionId: institution.id,
             userId: learner.id.toString(),
             status: 'active'
           });
@@ -964,9 +964,9 @@ test(
                 const pdfBytes = await fs.readFile(pdfPath);
                 const pdfForm = new FormData();
                 pdfForm.set('title', 'Uploaded synthetic PDF course');
-                pdfForm.set('subject_id', subject._id.toString());
+                pdfForm.set('subject_id', subject.id.toString());
                 pdfForm.set('scope', 'institutional');
-                pdfForm.set('institutionId', institution._id.toString());
+                pdfForm.set('institutionId', institution.id.toString());
                 pdfForm.append(
                   'files',
                   new Blob([pdfBytes], { type: 'application/pdf' }),
@@ -1016,7 +1016,7 @@ test(
                 );
                 await m.CourseEnrollment.create({
                   courseId: pdfCourseId,
-                  institutionId: institution._id,
+                  institutionId: institution.id,
                   userId: learner.id.toString(),
                   status: 'active'
                 });

@@ -14,7 +14,7 @@ export type ConversationRecord = Omit<
   NardouchConversationRow,
   'language' | 'messages' | 'feedback'
 > & {
-  _id: string;
+  id: string;
   mode: LearningMode;
   language: LanguagePreference;
   messages: NardouchMessage[];

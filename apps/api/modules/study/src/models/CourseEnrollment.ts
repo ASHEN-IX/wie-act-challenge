@@ -8,7 +8,7 @@ import { table } from './_table';
 export const COURSE_ENROLLMENT_STATUSES = ['active', 'dropped', 'revoked'] as const;
 export type CourseEnrollmentStatus = (typeof COURSE_ENROLLMENT_STATUSES)[number];
 
-export type ICourseEnrollment = CourseEnrollmentRow & { _id: string };
+export type ICourseEnrollment = CourseEnrollmentRow & { id: string };
 
 export const CourseEnrollment = table<ICourseEnrollment>({
   delegate: () => prisma.courseEnrollment,

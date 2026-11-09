@@ -56,9 +56,9 @@ test("real reference upload, Python ingestion/index, SDK replay, instructor publ
     const upload = await page.request.post("/api/v1/study/courses", {
       multipart: {
         title: "Reference QA mathematics",
-        subject_id: "bbbbbbbbbbbbbbbbbbbbbbbb",
+        subject_id: "ebf069b5-6c44-5857-8834-17d3bc9778d0",
         scope: "institutional",
-        institutionId: "eeeeeeeeeeeeeeeeeeeeeeee",
+        institutionId: "265fd273-cda8-5cc6-a0c8-309008d054a0",
         files: {
           name: "reference-course.pdf",
           mimeType: "application/pdf",
@@ -74,7 +74,7 @@ test("real reference upload, Python ingestion/index, SDK replay, instructor publ
           return (
             await db
               .collection("courses")
-              .findOne({ _id: new ObjectId(courseId) })
+              .findOne({ id: new ObjectId(courseId) })
           )?.status;
         },
         { timeout: 180000, intervals: [1000, 3000] },
@@ -96,8 +96,8 @@ test("real reference upload, Python ingestion/index, SDK replay, instructor publ
     ).toBe(draft.sourceManifest[0].contentHash);
     await db.collection("course_enrollments").insertOne({
       courseId: new ObjectId(courseId),
-      institutionId: new ObjectId("eeeeeeeeeeeeeeeeeeeeeeee"),
-      userId: "cccccccccccccccccccccccc",
+      institutionId: new ObjectId("265fd273-cda8-5cc6-a0c8-309008d054a0"),
+      userId: "dfbaedb6-25c0-5dbd-a7b1-57ac70b60f57",
       status: "active",
       enrolledAt: new Date(),
     });
@@ -195,7 +195,7 @@ test("real reference upload, Python ingestion/index, SDK replay, instructor publ
       (
         await db
           .collection("llm_approval_budgets")
-          .findOne({ _id: process.env.FINAL_QA_DB as any })
+          .findOne({ id: process.env.FINAL_QA_DB as any })
       )?.used,
     ).toBe(3);
     // Acknowledge source extraction quality through the existing Studio policy.
@@ -433,7 +433,7 @@ test("real reference upload, Python ingestion/index, SDK replay, instructor publ
     // Canonical content before any supplemental write.
     const canonicalBefore = await db
       .collection("course_revisions")
-      .findOne({ _id: revision._id ?? revision.id });
+      .findOne({ id: revision.id ?? revision.id });
     const canonicalHashBefore = canonicalBefore?.contentDocumentHash;
 
     // Positive: the instructor attaches a valid authored asset.
@@ -449,7 +449,7 @@ test("real reference upload, Python ingestion/index, SDK replay, instructor publ
       revisionId: revision.revisionTag,
     });
     expect(storedAsset).not.toBeNull();
-    expect(storedAsset!.createdByUserId).toBe("aaaaaaaaaaaaaaaaaaaaaaaa");
+    expect(storedAsset!.createdByUserId).toBe("04b3da2d-ec14-5643-bf49-e43f550168bf");
     expect(storedAsset!.provenance).toBe("instructor_authored");
 
     // The same revision returns it on the presentation surface.
@@ -465,7 +465,7 @@ test("real reference upload, Python ingestion/index, SDK replay, instructor publ
     // Canonical content is untouched by the supplemental write.
     const canonicalAfter = await db
       .collection("course_revisions")
-      .findOne({ _id: revision._id ?? revision.id });
+      .findOne({ id: revision.id ?? revision.id });
     expect(canonicalAfter?.contentDocumentHash).toBe(canonicalHashBefore);
 
     // ---------------------------------------------------------------------
@@ -473,11 +473,11 @@ test("real reference upload, Python ingestion/index, SDK replay, instructor publ
     // the API is asked for the projection, and it must refuse rather than
     // serve degraded or silently switched content.
     // ---------------------------------------------------------------------
-    const integrityRevisionId = revision._id ?? revision.id;
+    const integrityRevisionId = revision.id ?? revision.id;
     await db
       .collection("course_revisions")
       .updateOne(
-        { _id: revision._id ?? revision.id },
+        { id: revision.id ?? revision.id },
         { $set: { contentDocumentHash: "sha256:" + "0".repeat(64) } },
       );
     try {
@@ -499,7 +499,7 @@ test("real reference upload, Python ingestion/index, SDK replay, instructor publ
       await db
         .collection("course_revisions")
         .updateOne(
-          { _id: integrityRevisionId },
+          { id: integrityRevisionId },
           { $set: { contentDocumentHash: canonicalHashBefore } },
         );
     }
@@ -805,9 +805,9 @@ test("representative networking PDF preserves code, table, caption and diagram t
     const response = await page.request.post("/api/v1/study/courses", {
       multipart: {
         title: "Representative networking QA fixture",
-        subject_id: "bbbbbbbbbbbbbbbbbbbbbbbb",
+        subject_id: "ebf069b5-6c44-5857-8834-17d3bc9778d0",
         scope: "institutional",
-        institutionId: "eeeeeeeeeeeeeeeeeeeeeeee",
+        institutionId: "265fd273-cda8-5cc6-a0c8-309008d054a0",
         files: {
           name: "networking-qa.pdf",
           mimeType: "application/pdf",
@@ -823,7 +823,7 @@ test("representative networking PDF preserves code, table, caption and diagram t
           (
             await db
               .collection("courses")
-              .findOne({ _id: new ObjectId(courseId) })
+              .findOne({ id: new ObjectId(courseId) })
           )?.status,
         { timeout: 180000, intervals: [1000, 3000] },
       )

@@ -108,42 +108,42 @@ export async function listPublicCourses(
     ...new Set(courses.filter((c) => c.institutionId).map((c) => String(c.institutionId)))
   ];
   const institutions = institutionIds.length
-    ? await Institution.find({ _id: { $in: institutionIds }, status: 'active' }).select('name')
+    ? await Institution.find({ id: { $in: institutionIds }, status: 'active' }).select('name')
     : [];
-  const names = new Map(institutions.map((i) => [String(i._id), i.name as string]));
+  const names = new Map(institutions.map((i) => [String(i.id), i.name as string]));
   const joins = await PublicCourseJoin.find({
     userId,
-    courseId: { $in: courses.map((c) => c._id) }
+    courseId: { $in: courses.map((c) => c.id) }
   }).select('courseId');
   const joined = new Set(joins.map((j) => String(j.courseId)));
 
   return courses
     .filter((c) => c.scope !== 'institutional' || names.has(String(c.institutionId)))
     .map((c): PublicCourseSummary => ({
-      id: String(c._id),
+      id: String(c.id),
       title: c.title,
       description: c.description ?? undefined,
       subjectId: c.subjectId ?? undefined,
       institutionName: c.institutionId ? names.get(String(c.institutionId)) : undefined,
       topicsCount: c.topics?.length || 0,
-      joined: joined.has(String(c._id)),
+      joined: joined.has(String(c.id)),
       own: c.userId === userId || c.ownerUserId === userId
     }));
 }
 
 async function requirePublicCourse(courseId: string) {
-  if (!/^[a-f\d]{24}$/i.test(courseId)) throw new VisibilityError(404, 'Course not found');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(courseId)) throw new VisibilityError(404, 'Course not found');
   const course = await Course.findOne({
-    _id: courseId,
+    id: courseId,
     visibility: 'public',
     activeRevisionId: { $exists: true, $nin: [null, ''] }
-  }).select('_id scope institutionId');
+  }).select('id scope institutionId');
   if (!course) throw new VisibilityError(404, 'Course not found');
   if (
     course.scope === 'institutional' &&
     !(
       course.institutionId &&
-      (await Institution.exists({ _id: course.institutionId, status: 'active' }))
+      (await Institution.exists({ id: course.institutionId, status: 'active' }))
     )
   ) {
     throw new VisibilityError(404, 'Course not found');
@@ -163,7 +163,7 @@ export async function joinPublicCourse(userId: string, courseId: string) {
 }
 
 export async function leavePublicCourse(userId: string, courseId: string) {
-  if (!/^[a-f\d]{24}$/i.test(courseId)) throw new VisibilityError(404, 'Course not found');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(courseId)) throw new VisibilityError(404, 'Course not found');
   await PublicCourseJoin.deleteOne({ userId, courseId });
   return { joined: false };
 }

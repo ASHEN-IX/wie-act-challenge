@@ -67,7 +67,7 @@ router.get(
     const userId = req.user!.userId;
     const { taskId } = req.params;
 
-    const task = await Task.findOne({ _id: taskId, userId });
+    const task = await Task.findOne({ id: taskId, userId });
 
     if (!task || (task.studyPlanId && !(await canReadPlanContext(userId, task.studyPlanId)))) {
       return res.status(404).json({ error: 'Task not found' });
@@ -112,7 +112,7 @@ router.put(
     const userId = req.user!.userId;
     const { taskId } = req.params;
 
-    const task = await Task.findOne({ _id: taskId, userId });
+    const task = await Task.findOne({ id: taskId, userId });
 
     if (!task || (task.studyPlanId && !(await canReadPlanContext(userId, task.studyPlanId)))) {
       return res.status(404).json({ error: 'Task not found' });
@@ -141,7 +141,7 @@ router.put(
           `${USER_PROFILE_URL}/api/v1/users/gamification/award-xp`,
           {
             action,
-            metadata: { taskId: task._id.toString(), title: task.title }
+            metadata: { taskId: task.id.toString(), title: task.title }
           },
           {
             headers: buildInternalHeaders(req.headers.cookie)
@@ -179,7 +179,7 @@ router.delete(
     const userId = req.user!.userId;
     const { taskId } = req.params;
 
-    const result = await Task.deleteOne({ _id: taskId, userId });
+    const result = await Task.deleteOne({ id: taskId, userId });
 
     if (result.deletedCount === 0) {
       return res.status(404).json({ error: 'Task not found' });

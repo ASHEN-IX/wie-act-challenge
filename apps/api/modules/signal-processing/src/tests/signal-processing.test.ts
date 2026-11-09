@@ -83,7 +83,7 @@ describe('Signal Processing Service', () => {
       };
 
       FocusSession.create.mockResolvedValue({
-        _id: 'signal-123',
+        id: 'signal-123',
         ...focusData
       });
 
@@ -136,7 +136,7 @@ describe('Signal Processing Service', () => {
       };
 
       FocusSession.create.mockResolvedValue({
-        _id: 'fatigue-123',
+        id: 'fatigue-123',
         ...fatigueData
       });
 

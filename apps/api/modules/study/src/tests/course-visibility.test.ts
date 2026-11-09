@@ -24,7 +24,7 @@ import {
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { Course } = jest.requireMock('../models');
 
-const id = '0123456789abcdef01234567';
+const id = 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d';
 
 function course(over: Record<string, unknown>) {
   const doc: Record<string, unknown> & { save: jest.Mock } = {

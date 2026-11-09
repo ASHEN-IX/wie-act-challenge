@@ -8,7 +8,7 @@ import {
 import { EmptyState } from "@/components/shared/states";
 import { updateTask } from "./actions";
 export interface Task {
-  _id: string;
+  id: string;
   title: string;
   description?: string;
   priority: string;
@@ -27,7 +27,7 @@ export function TaskList({ tasks }: { tasks: Task[] }) {
     <div className="divide-y rounded-lg border">
       {tasks.map((task) => (
         <article
-          key={task._id}
+          key={task.id}
           className="flex flex-wrap items-start justify-between gap-6 p-5"
         >
           <div className="flex min-w-0 flex-col gap-2">
@@ -50,13 +50,13 @@ export function TaskList({ tasks }: { tasks: Task[] }) {
             variant="outline"
             className="flex flex-wrap items-end gap-3"
           >
-            <input type="hidden" name="id" value={task._id} />
+            <input type="hidden" name="id" value={task.id} />
             <Field>
-              <FieldLabel htmlFor={`status-${task._id}`} className="sr-only">
+              <FieldLabel htmlFor={`status-${task.id}`} className="sr-only">
                 Status of {task.title}
               </FieldLabel>
               <NativeSelect
-                id={`status-${task._id}`}
+                id={`status-${task.id}`}
                 name="status"
                 defaultValue={task.status}
               >

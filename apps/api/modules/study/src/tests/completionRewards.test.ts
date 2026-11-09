@@ -14,7 +14,7 @@ describe('Completion rewards', () => {
 
   it('awards study XP directly and preserves rank progress', async () => {
     const reward = await awardSessionCompletion({
-      session: { _id: 'session-1', id: 'session-1', userId: 'u1', mode: 'focus', duration: 25 },
+      session: { id: 'session-1', userId: 'u1', mode: 'focus', duration: 25 },
       authorization: 'ednova.test_session=test'
     });
     expect(moduleClient.post).toHaveBeenCalledTimes(1);
@@ -35,7 +35,6 @@ describe('Completion rewards', () => {
     expect(calculateChallengeXP({ difficulty: 'expert', baseXP: 30 })).toBe(75);
     const reward = await awardSessionCompletion({
       session: {
-        _id: 'session-2',
         id: 'session-2',
         userId: 'u1',
         mode: 'exam',

@@ -152,7 +152,7 @@ class PlanRequest(StrictModel):
     schemaVersion: Literal["1.0.0"] = "1.0.0"
     mode: Literal["course", "topic"]
     concept: Annotated[str, Field(min_length=1, max_length=500)]
-    courseId: Annotated[str, Field(pattern=r"^[a-f0-9]{24}$")] | None = None
+    courseId: Annotated[str, Field(pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")] | None = None
     revisionId: Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")] | None = None
     topicId: Annotated[str, Field(max_length=128)] | None = None
     objectiveId: Annotated[str, Field(max_length=128)] | None = None

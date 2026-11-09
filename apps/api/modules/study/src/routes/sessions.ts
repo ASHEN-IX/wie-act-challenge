@@ -30,7 +30,7 @@ router.use(async (req: DomainRequest, res: Response, next: NextFunction) => {
     const code = req.body?.inviteCode;
     if (!sessionId && !(joining && typeof code === 'string')) return next();
     const filter = sessionId
-      ? { _id: sessionId }
+      ? { id: sessionId }
       : { inviteCode: code.toUpperCase(), type: 'team', status: 'active' };
     const session = await StudySession.findOne(filter).select(
       'userId participants courseId type status'

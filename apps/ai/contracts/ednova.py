@@ -21,7 +21,7 @@ def txt(maximum=128, pattern=None):
 
 
 Id = txt(128, r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$")
-CourseId = txt(24, r"^[a-f0-9]{24}$")
+CourseId = txt(36, r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
 UUID = txt(36, r"^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$")
 Hash = txt(71, r"^sha256:[a-f0-9]{64}$")
 Version = Literal["1.0.0"]
@@ -144,7 +144,7 @@ class SourceResolution(Strict):
     pin: Pin
     access: AccessDecision
     sources: Sources
-    vectorIndexRef: txt(256, r"^faiss/[a-f0-9]{24}/[a-zA-Z0-9][a-zA-Z0-9_-]*\.faiss$")
+    vectorIndexRef: txt(280, r"^faiss/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/[a-zA-Z0-9][a-zA-Z0-9_-]*\.faiss$")
 
     @model_validator(mode="after")
     def binding(self):

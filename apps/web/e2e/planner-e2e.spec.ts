@@ -18,7 +18,7 @@ const login = async (page) => {
     route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ user: { _id: "e2e-user", email: "e2e@test.com", role: "student" } }),
+      body: JSON.stringify({ user: { id: "e2e-user", email: "e2e@test.com", role: "student" } }),
     })
   );
   await page.goto("/login");
@@ -28,7 +28,7 @@ const login = async (page) => {
       "auth-storage",
       JSON.stringify({
         state: {
-          user: { _id: "e2e-user", email: "e2e@test.com", role: "student" },
+          user: { id: "e2e-user", email: "e2e@test.com", role: "student" },
           token: "mock-jwt-token",
         },
         version: 0,
@@ -49,7 +49,7 @@ test.describe("PLAN-10: Plan Generation E2E", () => {
         body: JSON.stringify({
           subjects: [
             {
-              _id: "subj-1",
+              id: "subj-1",
               name: "Computer Science",
               courses: [
                 {
@@ -205,7 +205,7 @@ test.describe("PLAN-10: Plan Generation E2E", () => {
         body: JSON.stringify({
           subjects: [
             {
-              _id: "subj-1",
+              id: "subj-1",
               name: "Computer Science",
               courses: [
                 {

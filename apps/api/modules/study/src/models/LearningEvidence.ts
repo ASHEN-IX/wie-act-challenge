@@ -9,7 +9,7 @@ export type ILearningEvidence = Omit<
   LearningEvidenceRow,
   'activity' | 'evaluator' | 'rewardReference'
 > & {
-  _id: string;
+  id: string;
   activity: {
     courseId: string;
     revisionId: string;

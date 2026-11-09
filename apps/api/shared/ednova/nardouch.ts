@@ -95,7 +95,7 @@ export function parseNardouchInput(value: unknown): NardouchInput {
   ]);
   if (
     typeof v.courseId !== 'string' ||
-    !/^[a-f0-9]{24}$/.test(v.courseId) ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v.courseId) ||
     typeof v.revisionId !== 'string' ||
     !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(v.revisionId) ||
     typeof v.message !== 'string' ||
@@ -105,7 +105,7 @@ export function parseNardouchInput(value: unknown): NardouchInput {
     !Number.isInteger(v.expectedVersion) ||
     Number(v.expectedVersion) < 0 ||
     (v.conversationId !== undefined &&
-      (typeof v.conversationId !== 'string' || !/^[a-f0-9]{24}$/.test(v.conversationId))) ||
+      (typeof v.conversationId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v.conversationId))) ||
     (v.objectiveId !== undefined &&
       (typeof v.objectiveId !== 'string' || v.objectiveId.length > 150))
   )

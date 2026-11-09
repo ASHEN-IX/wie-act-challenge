@@ -164,9 +164,9 @@ beforeEach(async () => {
     title: 'Math',
     files: [{ filename: 'math.pdf', fileHash: doc.contentHash.slice(7), size: 16 }]
   });
-  const c = canonical(String(course._id));
+  const c = canonical(String(course.id));
   draft = await CourseRevision.create({
-    courseId: course._id,
+    courseId: course.id,
     revisionTag: 'rev_source',
     status: 'draft',
     contentHash: 'a'.repeat(64),
@@ -179,8 +179,8 @@ beforeEach(async () => {
   for (let i = 0; i < 4; i++) {
     const state = ['accepted', 'corrected', 'rejected', 'pending'][i];
     await FormulaProposal.create({
-      courseId: course._id,
-      revisionId: draft._id,
+      courseId: course.id,
+      revisionId: draft.id,
       revisionTag: draft.revisionTag,
       draftVersion: 0,
       documentId: doc.documentId,
@@ -196,7 +196,7 @@ beforeEach(async () => {
       reviewedLatex: i === 1 ? 's_2^{2}' : i === 0 ? 's_1' : undefined,
       state,
       reviewVersion: state === 'pending' ? 0 : 1,
-      identity: String(course._id) + '-' + i,
+      identity: String(course.id) + '-' + i,
       history:
         state === 'pending'
           ? []
@@ -209,7 +209,7 @@ beforeEach(async () => {
                 expression: i === 1 ? 's_2^{2}' : undefined,
                 draftVersion: 0,
                 revisionTag: draft.revisionTag,
-                revisionId: String(draft._id),
+                revisionId: String(draft.id),
                 reviewVersion: 1,
                 at: new Date()
               }
@@ -218,10 +218,10 @@ beforeEach(async () => {
   }
 });
 it('freezes accepted/corrected expressions, leaves rejected/pending source, and indexes the same snapshot', async () => {
-  const result = await publishCourseRevision('owner', String(course._id), 'rev_source');
+  const result = await publishCourseRevision('owner', String(course.id), 'rev_source');
   expect(result.publishedRevisionTag).toMatch(/^rev_formula_/);
   const published: any = await CourseRevision.findOne({
-    courseId: course._id,
+    courseId: course.id,
     revisionTag: result.publishedRevisionTag
   }).lean();
   const blocks = published.contentDocument.chapters[0].lessons[0].blocks;
@@ -237,17 +237,17 @@ it('freezes accepted/corrected expressions, leaves rejected/pending source, and 
   expect(
     artifact.metadata.metas.filter((m: any) => m.representation === 'instructor_reviewed')
   ).toHaveLength(2);
-  const reader = await getLearningDocument('owner', String(course._id), published.revisionTag);
+  const reader = await getLearningDocument('owner', String(course.id), published.revisionTag);
   const math: any[] = reader.sections.flatMap((s) => s.blocks).filter((b) => b.type === 'math');
   expect(math.map((b) => b.expression)).toEqual(['s_1', 's_2^{2}', 'x3', 'x4']);
   expect(math[0].review.state).toBe('accepted');
 
   const presentation = await getPublishedPresentation(
     'owner',
-    String(course._id),
+    String(course.id),
     published.revisionTag
   );
-  expect(presentation.courseId).toBe(String(course._id));
+  expect(presentation.courseId).toBe(String(course.id));
   expect(presentation.revisionId).toBe(published.revisionTag);
   // The context formats the stored source hash; the canonical hash is the
   // checksum actually re-verified before projection.
@@ -279,45 +279,45 @@ it('freezes accepted/corrected expressions, leaves rejected/pending source, and 
   expect(JSON.stringify(presentation)).not.toMatch(/reviewedFormula|sourceDraftId|\/tmp\//);
   const original = JSON.stringify(published);
   await FormulaProposal.updateMany(
-    { courseId: course._id },
+    { courseId: course.id },
     { $set: { reviewedLatex: 'tamper', state: 'rejected' } }
   );
-  expect(JSON.stringify(await CourseRevision.findById(published._id).lean())).toBe(original);
-  const again = await publishCourseRevision('owner', String(course._id), 'rev_source');
+  expect(JSON.stringify(await CourseRevision.findById(published.id).lean())).toBe(original);
+  const again = await publishCourseRevision('owner', String(course.id), 'rev_source');
   expect(again.publishedRevisionTag).toBe(published.revisionTag);
-  expect((await CourseRevision.findById(draft._id).lean())!.contentDocument).toEqual(
+  expect((await CourseRevision.findById(draft.id).lean())!.contentDocument).toEqual(
     draft.contentDocument
   );
 });
 it('rejects unauthorized publication and changed crop identity', async () => {
   await expect(
-    publishCourseRevision('other', String(course._id), 'rev_source')
+    publishCourseRevision('other', String(course.id), 'rev_source')
   ).rejects.toMatchObject({ status: 403 });
   await FormulaProposal.updateOne(
-    { courseId: course._id, state: 'accepted' },
+    { courseId: course.id, state: 'accepted' },
     { $set: { cropHash: 'sha256:' + 'd'.repeat(64) } }
   );
   await expect(
-    publishCourseRevision('owner', String(course._id), 'rev_source')
+    publishCourseRevision('owner', String(course.id), 'rev_source')
   ).rejects.toMatchObject({ status: 409 });
 });
 it('excludes old snapshots and refuses unsafe reviewed expressions', async () => {
-  await FormulaProposal.updateMany({ courseId: course._id }, { $set: { draftVersion: 99 } });
+  await FormulaProposal.updateMany({ courseId: course.id }, { $set: { draftVersion: 99 } });
   expect(
     (
       await FormulaProposal.find({
-        courseId: course._id,
+        courseId: course.id,
         draftVersion: 0,
         state: { $in: ['accepted', 'corrected'] }
       })
     ).length
   ).toBe(0);
   await FormulaProposal.updateOne(
-    { courseId: course._id, state: 'accepted' },
+    { courseId: course.id, state: 'accepted' },
     { $set: { draftVersion: 0, reviewedLatex: '\\input{bad}', latex: '\\input{bad}' } }
   );
   await expect(
-    publishCourseRevision('owner', String(course._id), 'rev_source')
+    publishCourseRevision('owner', String(course.id), 'rev_source')
   ).rejects.toMatchObject({ status: 422 });
 });
 it('a concurrent draft edit cannot enter the frozen publication snapshot', async () => {
@@ -329,7 +329,7 @@ it('a concurrent draft edit cannot enter the frozen publication snapshot', async
     if (!changed && args[0].endsWith('region-inspect')) {
       changed = true;
       await CourseRevision.updateOne(
-        { _id: draft._id },
+        { id: draft.id },
         { $inc: { __v: 1 }, $set: { revisionTag: 'rev_changed' } }
       );
     }
@@ -337,9 +337,9 @@ it('a concurrent draft edit cannot enter the frozen publication snapshot', async
   });
   try {
     await expect(
-      publishCourseRevision('owner', String(course._id), 'rev_source')
+      publishCourseRevision('owner', String(course.id), 'rev_source')
     ).rejects.toMatchObject({ status: 409 });
-    expect(await CourseRevision.countDocuments({ courseId: course._id, status: 'published' })).toBe(
+    expect(await CourseRevision.countDocuments({ courseId: course.id, status: 'published' })).toBe(
       0
     );
   } finally {
@@ -348,38 +348,38 @@ it('a concurrent draft edit cannot enter the frozen publication snapshot', async
 });
 
 it('fresh drafts do not inherit old formula approvals and old published content/indexes remain unchanged', async () => {
-  const first = await publishCourseRevision('owner', String(course._id), 'rev_source');
+  const first = await publishCourseRevision('owner', String(course.id), 'rev_source');
   const old: any = await CourseRevision.findOne({
-    courseId: course._id,
+    courseId: course.id,
     revisionTag: first.publishedRevisionTag
   }).lean();
   const oldCanonical = JSON.stringify(old.contentDocument);
   const indexPath = path.join(
     process.env.FAISS_INDEX_DIR!,
-    String(course._id),
+    String(course.id),
     first.publishedRevisionTag
   );
   const oldIndex = await fs.readFile(indexPath + '.faiss'),
     oldMeta = await fs.readFile(indexPath + '.meta.json');
-  const fresh = await getCourseDraft('owner', String(course._id));
+  const fresh = await getCourseDraft('owner', String(course.id));
   const row: any = await CourseRevision.findOne({
-    courseId: course._id,
+    courseId: course.id,
     revisionTag: fresh.revisionTag
   }).lean();
   expect(
     row.contentDocument.chapters[0].lessons[0].blocks.every((b: any) => !b.reviewedFormula)
   ).toBe(true);
-  await CourseRevision.updateOne({ _id: row._id }, { $set: { isInstructorReviewed: true } });
-  await prepareRevisionSources('owner', String(course._id), fresh.revisionTag);
-  const second = await publishCourseRevision('owner', String(course._id), fresh.revisionTag);
+  await CourseRevision.updateOne({ id: row.id }, { $set: { isInstructorReviewed: true } });
+  await prepareRevisionSources('owner', String(course.id), fresh.revisionTag);
+  const second = await publishCourseRevision('owner', String(course.id), fresh.revisionTag);
   expect(second.publishedRevisionTag).toBe(fresh.revisionTag);
-  const older: any = await CourseRevision.findById(old._id).lean();
+  const older: any = await CourseRevision.findById(old.id).lean();
   expect(JSON.stringify(older.contentDocument)).toBe(oldCanonical);
   expect((await fs.readFile(indexPath + '.faiss')).equals(oldIndex)).toBe(true);
   expect((await fs.readFile(indexPath + '.meta.json')).equals(oldMeta)).toBe(true);
   const reader = await getLearningDocument(
     'owner',
-    String(course._id),
+    String(course.id),
     second.publishedRevisionTag
   );
   expect(
@@ -391,11 +391,11 @@ it('fresh drafts do not inherit old formula approvals and old published content/
 });
 it('concurrent publish commands cannot create two publication snapshots for the same frozen source', async () => {
   const results = await Promise.allSettled([
-    publishCourseRevision('owner', String(course._id), 'rev_source'),
-    publishCourseRevision('owner', String(course._id), 'rev_source')
+    publishCourseRevision('owner', String(course.id), 'rev_source'),
+    publishCourseRevision('owner', String(course.id), 'rev_source')
   ]);
   expect(results.some((r) => r.status === 'fulfilled')).toBe(true);
-  expect(await CourseRevision.countDocuments({ courseId: course._id, status: 'published' })).toBe(
+  expect(await CourseRevision.countDocuments({ courseId: course.id, status: 'published' })).toBe(
     1
   );
 });
@@ -408,16 +408,16 @@ it('recovers exact publication receipt after indexing fails without changing sou
     if (failIndex && url.endsWith('/index')) { failIndex = false; throw new Error('isolated index outage'); }
     return original(url, body, ...rest);
   });
-  await expect(publishCourseRevision('owner', String(course._id), 'rev_source')).rejects.toBeDefined();
-  const frozen: any = await CourseRevision.findById(draft._id).lean();
+  await expect(publishCourseRevision('owner', String(course.id), 'rev_source')).rejects.toBeDefined();
+  const frozen: any = await CourseRevision.findById(draft.id).lean();
   expect(frozen.activationState).toBe('prepared');
   expect(frozen.contentDocument).toEqual(draft.contentDocument);
   const targetTag = frozen.formulaPublication.targetTag;
   // Later mutable records cannot replace the already captured review set.
-  await FormulaProposal.updateMany({ courseId: course._id }, { $set: { reviewedLatex: 'late mutation' } });
-  const result = await publishCourseRevision('owner', String(course._id), 'rev_source');
+  await FormulaProposal.updateMany({ courseId: course.id }, { $set: { reviewedLatex: 'late mutation' } });
+  const result = await publishCourseRevision('owner', String(course.id), 'rev_source');
   expect(result.publishedRevisionTag).toBe(targetTag);
-  const published: any = await CourseRevision.findOne({ courseId: course._id, revisionTag: targetTag }).lean();
+  const published: any = await CourseRevision.findOne({ courseId: course.id, revisionTag: targetTag }).lean();
   expect(published.contentDocument.chapters[0].lessons[0].blocks[1].reviewedFormula.expression).toBe('s_1');
   expect((await verifyRevisionArtifact(published)).metadata.revisionId).toBe(targetTag);
 });

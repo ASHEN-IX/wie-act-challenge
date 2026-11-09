@@ -21,7 +21,7 @@ import { CourseStudio } from "./course-studio";
 import type { CourseDraft } from "./types";
 
 const mockUnreviewedDraft: CourseDraft = {
-  courseId: "64f1a2b3c4d5e6f7a8b9c0d1",
+  courseId: "6b6c876a-068c-5071-982b-9591d6e077ab",
   revisionTag: "rev_20261023_01",
   contentHash:
     "sha256:1111111111111111111111111111111111111111111111111111111111111111",

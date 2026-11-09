@@ -9,7 +9,6 @@ import { table } from '../models/_table';
 import { learningStyleCue } from './learningStyle';
 export interface SupportState {
   id: string;
-  _id: string;
   userId: string;
   courseId: string;
   revisionId: string;

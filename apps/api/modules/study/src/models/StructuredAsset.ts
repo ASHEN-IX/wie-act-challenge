@@ -13,7 +13,7 @@ import { table } from './_table';
  * is written, so the stored shape is always within the contract's limits.
  */
 export type IStructuredAsset = Omit<StructuredAssetRow, 'payload' | 'sourceReferences'> & {
-  _id: string;
+  id: string;
   payload: unknown;
   sourceReferences?: unknown[] | null;
 };

@@ -54,7 +54,7 @@ test(
       learner = 'rewards_learner_' + runTag,
       legacyAdmin = 'legacy_admin_' + runTag;
     const institution = await Institution.create({
-      _id: newId(),
+      id: newId(),
       name: 'Synthetic rewards',
       slug: 'rewards-' + runTag,
       createdByUserId: instructor,
@@ -70,18 +70,18 @@ test(
         await ActivityRecord.deleteMany({ courseId: courseId ?? '__none__' });
         await CourseEnrollment.deleteMany({ courseId: courseId ?? '__none__' });
         await CourseRevision.deleteMany({ courseId: courseId ?? '__none__' });
-        await Course.deleteMany({ _id: courseId ?? '__none__' });
-        await InstitutionMembership.deleteMany({ institutionId: institution._id });
-        await Institution.deleteMany({ _id: institution._id });
+        await Course.deleteMany({ id: courseId ?? '__none__' });
+        await InstitutionMembership.deleteMany({ institutionId: institution.id });
+        await Institution.deleteMany({ id: institution.id });
       } finally {
         await disconnectDatabase().catch(() => {});
         await rm(temp, { recursive: true, force: true });
       }
     });
     await InstitutionMembership.createMany([
-      { institutionId: institution._id, userId: instructor, role: 'instructor', status: 'active' },
+      { institutionId: institution.id, userId: instructor, role: 'instructor', status: 'active' },
       {
-        institutionId: institution._id,
+        institutionId: institution.id,
         userId: learner,
         role: 'university_student',
         status: 'active'
@@ -93,14 +93,14 @@ test(
       assignedInstructorIds: [instructor],
       title: 'Reward fixture',
       scope: 'institutional',
-      institutionId: institution._id,
+      institutionId: institution.id,
       subjectId: 'fixture',
       status: 'completed'
     });
-    courseId = String(course._id);
+    courseId = String(course.id);
     await CourseEnrollment.create({
       courseId,
-      institutionId: institution._id,
+      institutionId: institution.id,
       userId: learner,
       status: 'active'
     });

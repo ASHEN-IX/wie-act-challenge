@@ -38,7 +38,7 @@ import {
   type StructuredAssetV1,
 } from '../../../../shared/ednova/structuredAsset';
 
-const courseId = '0123456789abcdef01234567';
+const courseId = 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d';
 const revisionId = 'rev_m41_service';
 const contentHash = 'sha256:' + 'c'.repeat(64);
 
@@ -57,7 +57,7 @@ function approvedReview(asset: StructuredAssetV1) {
     contentHash: assetContentHash(asset),
     lessonId: asset.lessonId,
     decision: 'approved' as const,
-    reviewerUserId: 'aaaaaaaaaaaaaaaaaaaaaaaa',
+    reviewerUserId: '04b3da2d-ec14-5643-bf49-e43f550168bf',
     reviewerRole: 'instructor' as const,
     decidedAt: new Date('2026-11-01T10:00:00Z'),
   };

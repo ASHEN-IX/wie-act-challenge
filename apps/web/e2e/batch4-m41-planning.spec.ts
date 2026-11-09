@@ -25,7 +25,7 @@ const evidence = path.resolve("../../reports/evidence/batch4-m41");
 /** Identities of the published revision seeded by `tests/m41-fixture.ts`, which
  * the QA harness runs before it starts the API. */
 const fixtureIdentities = {
-  courseId: "0123456789abcdef01234567",
+  courseId: "a57d9f30-21c4-58ff-b48c-1e9e140f4c6d",
   revisionTag: "rev_m41_fixture",
 };
 
@@ -194,7 +194,7 @@ test("mock planning is refused when the environment flag is absent", async ({ re
   // This suite runs with the flag enabled by the harness, so the assertion is
   // that the flag is what gates it: the route exists and is authenticated.
   const anonymous = await request.post(
-    "/api/v1/study/learning/courses/0123456789abcdef01234567/presentation/plan",
+    "/api/v1/study/learning/courses/a57d9f30-21c4-58ff-b48c-1e9e140f4c6d/presentation/plan",
     { data: { lessonId: "lesson-1", scenario: "valid_mathematics" } },
   );
   expect(anonymous.status()).toBe(401);
@@ -208,7 +208,7 @@ test("mock planning is refused when the environment flag is absent", async ({ re
  * learner must be protected from seeing as an error.
  */
 test("AI planning is optional and never blocks the deterministic reader", async ({ page }) => {
-  const courseId = "0123456789abcdef01234567";
+  const courseId = "a57d9f30-21c4-58ff-b48c-1e9e140f4c6d";
   const revisionTag = "rev_m41_fixture";
   await login(page, "final-student@example.test");
 
@@ -249,7 +249,7 @@ test("learning modes render from a persisted plan and never widen learner access
   page,
   browser,
 }) => {
-  const courseId = "0123456789abcdef01234567";
+  const courseId = "a57d9f30-21c4-58ff-b48c-1e9e140f4c6d";
   const revisionTag = "rev_m41_fixture";
   const readerUrl = `/courses/${courseId}/present?revisionId=${encodeURIComponent(revisionTag)}`;
 
@@ -341,7 +341,7 @@ test("adaptation suggests with a reason, stays dismissible and never leaks evide
   page,
   browser,
 }) => {
-  const courseId = "0123456789abcdef01234567";
+  const courseId = "a57d9f30-21c4-58ff-b48c-1e9e140f4c6d";
   const revisionTag = "rev_m41_fixture";
   const readerUrl = `/courses/${courseId}/present?revisionId=${encodeURIComponent(revisionTag)}`;
 
@@ -451,7 +451,7 @@ test("adaptation suggests with a reason, stays dismissible and never leaks evide
 test("reader is keyboard-operable, reflows and keeps source evidence inspectable", async ({
   page,
 }) => {
-  const courseId = "0123456789abcdef01234567";
+  const courseId = "a57d9f30-21c4-58ff-b48c-1e9e140f4c6d";
   const revisionTag = "rev_m41_fixture";
   await login(page, "final-student@example.test");
   await page.goto(

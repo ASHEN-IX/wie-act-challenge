@@ -5,12 +5,13 @@
  * `disconnectDatabase` keep their previous signatures because the Nest entry
  * point, the health checks and the test harnesses all call them.
  *
- * ── The `_id` contract ───────────────────────────────────────────────────────
- * Every document used to be a MongoDB document and its identifier leaked into
- * HTTP responses as `_id`. The React app and the e2e suites still read `_id`.
- * Rather than touch every call site, `query()` exposes the primary key under
- * both names: `id` (the column, as Prisma returns it) and `_id` (the wire name).
- * The value is the same 24-character hex string in both cases.
+ * ── Identifier shape ────────────────────────────────────────────────────────
+ * Primary keys are PostgreSQL `uuid` values and reach clients as `id`. The
+ * short-lived MongoDB compatibility layer that also exposed them as `id` is
+ * gone; nothing in the API, the web app or the tests reads `id` any more.
+ *
+ * `toDocument` therefore just normalises a row for the wire: it is a plain
+ * identity function kept so the call sites that already use it stay readable.
  */
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma/client';
@@ -93,37 +94,24 @@ export function hasDatabaseClient(): boolean {
 }
 
 /**
- * Translate one Prisma row (or relation payload) into the shape the API used to
- * return: `id` is mirrored onto `_id`, and a 24-hex `id` becomes the string the
- * client already knows.
+ * Normalise a Prisma row for the API response.
  *
- * Rows may carry JSONB columns that already contain `_id` keys; those are
- * returned untouched because they were stored that way.
+ * Rows already carry their UUID as `id`, which is the wire field, so this is an
+ * identity function. It exists so the model layer and routes share one obvious
+ * seam if a projection is ever needed again.
  */
-export function toDocument<T>(row: T): T & { _id: unknown } {
-  if (row === null || typeof row !== 'object') return row as T & { _id: unknown };
-  const record = row as Record<string, unknown>;
-  if (!('id' in record)) return record as T & { _id: unknown };
-  if (record._id !== undefined) return record as T & { _id: unknown };
-  return { ...record, _id: record.id } as T & { _id: unknown };
+export function toDocument<T>(row: T): T {
+  return row;
 }
 
-/**
- * `toDocument` over a list. `null`/`undefined` pass through so optional
- * relations keep their meaning.
- */
-export function toDocuments<T>(rows: T[] | null | undefined): Array<T & { _id: unknown }> | null {
-  if (rows === null || rows === undefined) return rows as null;
-  return rows.map((row) => toDocument(row));
+/** `toDocument` over a list; `null`/`undefined` pass through. */
+export function toDocuments<T>(rows: T[] | null | undefined): T[] | null {
+  return rows as T[] | null;
 }
 
-/**
- * `toDocument` that maps a single optional row (`findFirst`) and leaves `null`
- * as `null`.
- */
-export function toDocumentOrNull<T>(row: T | null | undefined): (T & { _id: unknown }) | null {
-  if (row === null || row === undefined) return null;
-  return toDocument(row);
+/** `toDocument` for a single optional row. */
+export function toDocumentOrNull<T>(row: T | null | undefined): T | null {
+  return row ?? null;
 }
 
 module.exports = {

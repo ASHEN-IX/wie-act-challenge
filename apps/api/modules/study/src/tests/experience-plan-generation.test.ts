@@ -57,10 +57,10 @@ import {
   type ExperiencePlanValidationContext,
 } from '../../../../shared/ednova/experiencePlan';
 
-const courseId = '0123456789abcdef01234567';
+const courseId = 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d';
 const revisionId = 'rev_1';
 const contentHash = 'sha256:' + 'b'.repeat(64);
-const actor = 'aaaaaaaaaaaaaaaaaaaaaaaa';
+const actor = '04b3da2d-ec14-5643-bf49-e43f550168bf';
 
 const peek = peekStoredPlan as jest.Mock;
 const find = ExperiencePlanRequest.find as jest.Mock;
@@ -215,7 +215,7 @@ beforeEach(() => {
   authorize.mockResolvedValue({ approvalId: 'approval-1', maxTokens: 100_000 });
   canAuthor.mockResolvedValue(true);
   const row = {
-    _id: 'row-1',
+    id: 'row-1',
     requestId: 'req-1',
     state: 'requested',
     usageReported: false,
@@ -338,7 +338,7 @@ describe('generation lifecycle', () => {
   });
 
   it('returns duplicate for an attempt already in flight', async () => {
-    upsert.mockReturnValue({ lean: async () => ({ _id: 'row-1', requestId: 'req-1', state: 'dispatched' }) });
+    upsert.mockReturnValue({ lean: async () => ({ id: 'row-1', requestId: 'req-1', state: 'dispatched' }) });
     const p = provider();
     const outcome = await run(p);
     expect(outcome).toEqual({ status: 'duplicate', requestId: 'req-1' });
@@ -346,7 +346,7 @@ describe('generation lifecycle', () => {
   });
 
   it('refuses to replay a previously uncertain request', async () => {
-    upsert.mockReturnValue({ lean: async () => ({ _id: 'row-1', requestId: 'req-1', state: 'uncertain' }) });
+    upsert.mockReturnValue({ lean: async () => ({ id: 'row-1', requestId: 'req-1', state: 'uncertain' }) });
     const p = provider();
     const outcome = await run(p);
     expect(outcome).toMatchObject({ status: 'failed', code: 'PROVIDER_UNCERTAIN_PREVIOUS', uncertain: true });
@@ -357,7 +357,7 @@ describe('generation lifecycle', () => {
     // M4.5: a validated request whose plan record is still live must not be
     // regenerated. The caller reads the store; no second dispatch occurs.
     upsert.mockReturnValue({
-      lean: async () => ({ _id: 'row-1', requestId: 'req-1', state: 'validated', planDigest: 'd' }),
+      lean: async () => ({ id: 'row-1', requestId: 'req-1', state: 'validated', planDigest: 'd' }),
     });
     peek.mockResolvedValue(true);
     const p = provider();
@@ -370,7 +370,7 @@ describe('generation lifecycle', () => {
     // Invalidation releases the identity: regeneration is legitimate, and is
     // separately reserved and reconciled like any other attempt.
     upsert.mockReturnValue({
-      lean: async () => ({ _id: 'row-1', requestId: 'req-1', state: 'validated', planDigest: 'd' }),
+      lean: async () => ({ id: 'row-1', requestId: 'req-1', state: 'validated', planDigest: 'd' }),
     });
     peek.mockResolvedValue(false);
     const p = provider();
@@ -408,12 +408,12 @@ describe('generation lifecycle', () => {
       select: () => ({
         limit: () => ({
           lean: async () => [
-            { _id: 'row-a', requestId: 'req-a', approvalId: 'approval-1', reservedTokens: 32768 },
+            { id: 'row-a', requestId: 'req-a', approvalId: 'approval-1', reservedTokens: 32768 },
           ],
         }),
       }),
     });
-    upsert.mockReturnValue({ lean: async () => ({ _id: 'row-a', state: 'failed' }) });
+    upsert.mockReturnValue({ lean: async () => ({ id: 'row-a', state: 'failed' }) });
     const released = jest.fn(async () => ({ released: true, refunded: 32768 }));
     expect(await recoverStalePlanningRequests(0, released as never)).toBe(1);
     expect(released).toHaveBeenCalledWith(

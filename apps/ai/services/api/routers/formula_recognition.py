@@ -45,7 +45,7 @@ def preflight(req: Preflight):
     return {'available': True}
 
 class Recognize(RegionCropRequest):
-    jobId: str = Field(pattern=r'^[a-f0-9]{24}$')
+    jobId: str = Field(pattern=r'^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')
 
 @router.post('/recognize-formula')
 def recognize(req: Recognize):

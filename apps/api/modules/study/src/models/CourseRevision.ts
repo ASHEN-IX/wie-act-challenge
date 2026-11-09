@@ -38,7 +38,7 @@ export type ICourseRevision = Omit<
   CourseRevisionRow,
   'topics' | 'contentDocument' | 'formulaPublication' | 'sourceManifest' | 'approvedActivities'
 > & {
-  _id: string;
+  id: string;
   topics: unknown[];
   contentDocument?: unknown;
   formulaPublication?: CourseRevisionFormulaPublication | null;

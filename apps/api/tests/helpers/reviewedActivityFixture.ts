@@ -18,7 +18,7 @@ const fixtureInstitutions = new Set<string>();
 export async function cleanupCourseFixtures() {
   await cleanupRevisionFixtures();
   if (fixtureInstitutions.size)
-    await Institution.deleteMany({ _id: { $in: [...fixtureInstitutions] } });
+    await Institution.deleteMany({ id: { $in: [...fixtureInstitutions] } });
   fixtureInstitutions.clear();
 }
 
@@ -26,7 +26,7 @@ export async function prepareCourseFixture(courseId: string, t?: TestContext) {
   const course = await Course.findById(courseId);
   if (!course) throw new Error('Missing synthetic course fixture');
   if (course.scope === 'institutional' && course.institutionId) {
-    const existed = await Institution.exists({ _id: course.institutionId });
+    const existed = await Institution.exists({ id: course.institutionId });
     if (!existed) {
       await Institution.create({
         id: course.institutionId,
@@ -53,7 +53,7 @@ export async function prepareCourseFixture(courseId: string, t?: TestContext) {
     }
     for (const enrollment of await CourseEnrollment.find({ courseId, status: 'active' })) {
       await CourseEnrollment.updateOne(
-        { _id: enrollment._id },
+        { id: enrollment.id },
         { institutionId: course.institutionId }
       );
       const member = await InstitutionMembership.findOne({

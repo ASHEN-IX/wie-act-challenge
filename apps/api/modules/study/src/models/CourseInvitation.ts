@@ -8,7 +8,7 @@ export type CourseInvitationRole = (typeof COURSE_INVITATION_ROLES)[number];
 export const COURSE_INVITATION_STATUSES = ['pending', 'accepted', 'revoked', 'expired'] as const;
 export type CourseInvitationStatus = (typeof COURSE_INVITATION_STATUSES)[number];
 
-export type ICourseInvitation = CourseInvitationRow & { _id: string };
+export type ICourseInvitation = CourseInvitationRow & { id: string };
 
 export const CourseInvitation = table<ICourseInvitation>({
   delegate: () => prisma.courseInvitation,

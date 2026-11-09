@@ -58,7 +58,7 @@ router.post('/challenge/start', async (req: DomainRequest, res: Response) => {
     res.status(201).json({
       message: 'Challenge session started',
       session: {
-        _id: session._id,
+        id: session.id,
         challengeId: session.taskId,
         courseId: session.courseId,
         topicId: session.topicId,
@@ -79,7 +79,7 @@ router.get('/challenge/:sessionId', async (req: DomainRequest, res: Response) =>
   try {
     const userId = req.user!.userId;
     const session = await StudySession.findOne({
-      _id: req.params.sessionId,
+      id: req.params.sessionId,
       userId,
       mode: 'exam'
     });
@@ -90,7 +90,7 @@ router.get('/challenge/:sessionId', async (req: DomainRequest, res: Response) =>
 
     res.json({
       session: {
-        _id: session._id,
+        id: session.id,
         challengeId: session.taskId,
         courseId: session.courseId,
         topicId: session.topicId,
@@ -120,7 +120,7 @@ router.put('/challenge/:sessionId/complete', async (req: DomainRequest, res: Res
   try {
     const userId = req.user!.userId;
     const session = await StudySession.findOne({
-      _id: req.params.sessionId,
+      id: req.params.sessionId,
       userId,
       mode: 'exam'
     });
@@ -158,7 +158,7 @@ router.put('/challenge/:sessionId/complete', async (req: DomainRequest, res: Res
         authorization: req.headers.cookie,
         eventType: 'study_session_completed',
         metadata: {
-          sessionId: session._id.toString(),
+          sessionId: session.id.toString(),
           duration: session.duration || 0,
           focusScore: session.focusScore || 0,
           sessionType: 'challenge',

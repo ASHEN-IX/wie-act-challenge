@@ -8,14 +8,14 @@ const mockFindOne = jest.fn();
 const mockCreate = jest.fn();
 jest.mock('../../modules/study/src/models', () => ({
   Course: {
-    exists: jest.fn().mockResolvedValue({ _id: '64a000000000000000000001' }),
+    exists: jest.fn().mockResolvedValue({ id: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514' }),
     // `canReadCourse` awaits the cursors returned by these; the mock must too.
     countDocuments: jest.fn().mockResolvedValue(0),
     // `canReadCourse` awaits `.select()` directly; other callers use `.lean()`.
     findById: jest.fn((id: unknown) => {
       void id;
       const course = {
-        _id: '64a000000000000000000001',
+        id: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
         userId: 'user-1',
         ownerUserId: 'user-1',
         scope: 'personal',
@@ -97,9 +97,9 @@ describe('Challenge Session Routes Integration', () => {
   });
   test('POST /challenge/start creates an active exam-mode session', async () => {
     const createdSession = {
-      _id: 'challenge-session-1',
+      id: 'challenge-session-1',
       taskId: 'challenge-123',
-      courseId: '64a000000000000000000001',
+      courseId: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
       topicId: 'topic-1',
       mode: 'exam',
       type: 'solo',
@@ -110,7 +110,7 @@ describe('Challenge Session Routes Integration', () => {
     mockCreate.mockResolvedValue(createdSession);
     const response = await request(buildApp()).post('/api/v1/study/sessions/challenge/start').send({
       challengeId: 'challenge-123',
-      courseId: '64a000000000000000000001',
+      courseId: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
       topicId: 'topic-1',
       difficulty: 'expert'
     });
@@ -118,7 +118,7 @@ describe('Challenge Session Routes Integration', () => {
     expect(response.body.message).toBe('Challenge session started');
     expect(response.body.session).toEqual(
       expect.objectContaining({
-        _id: 'challenge-session-1',
+        id: 'challenge-session-1',
         challengeId: 'challenge-123',
         mode: 'exam',
         status: 'active',
@@ -138,7 +138,7 @@ describe('Challenge Session Routes Integration', () => {
   });
   test('PUT /challenge/:sessionId/complete applies challenge XP pipeline and returns completionRewards', async () => {
     const activeChallengeSession = {
-      _id: 'challenge-session-1',
+      id: 'challenge-session-1',
       userId: 'user-1',
       taskId: 'challenge-123',
       mode: 'exam',

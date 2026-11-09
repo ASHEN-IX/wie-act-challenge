@@ -7,7 +7,7 @@ import { validateExperiencePlan } from '../shared/ednova/experiencePlanValidator
 import { projectExperiencePlan } from '../modules/study/src/services/experiencePlanning';
 import { COMPONENT_REGISTRY_VERSION } from '../shared/ednova/componentRegistry';
 
-const courseId = '0123456789abcdef01234567';
+const courseId = 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d';
 const ctx = {
   courseId, revisionId: 'rev_x', contentHash: 'sha256:' + 'b'.repeat(64), lessonId: 'lesson-1', mode: 'guided',
   contextFingerprint: experienceContextFingerprint({ courseId, revisionId: 'rev_x', contentHash: 'sha256:'+'b'.repeat(64), lessonId: 'lesson-1', mode: 'guided', blockIds: ['h1'] }),

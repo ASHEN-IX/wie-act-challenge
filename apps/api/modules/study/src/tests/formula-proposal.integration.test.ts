@@ -49,7 +49,7 @@ beforeAll(async () => {
     subjectId: 's',
     title: 'Test'
   });
-  courses_created.push(String(course._id));
+  courses_created.push(String(course.id));
   const manifest = [
     {
       documentId,
@@ -61,7 +61,7 @@ beforeAll(async () => {
     }
   ];
   draft = await CourseRevision.create({
-    courseId: course._id,
+    courseId: course.id,
     revisionTag: 'rev_test',
     contentHash: documentHash.slice(7),
     status: 'draft',
@@ -70,13 +70,13 @@ beforeAll(async () => {
     sourceManifest: manifest
   });
   published = await CourseRevision.create({
-    courseId: course._id,
+    courseId: course.id,
     revisionTag: 'rev_published',
     contentHash: documentHash.slice(7),
     status: 'published',
     isInstructorReviewed: true
   });
-  publishedSnapshot = JSON.stringify(await CourseRevision.findById(published._id));
+  publishedSnapshot = JSON.stringify(await CourseRevision.findById(published.id));
   jest.spyOn(aiClient, 'post').mockImplementation(async (_url, body: any) => {
     if (body.regionId !== regionId) throw { response: { status: 404 } };
     return {
@@ -111,7 +111,7 @@ afterAll(async () => {
 });
 
 it('persists and retrieves authenticated source-bound proposals with idempotency and rejects invalid access', async () => {
-  const base = `/courses/${course._id}/drafts/rev_test/formula-proposals`;
+  const base = `/courses/${course.id}/drafts/rev_test/formula-proposals`;
   const body = { documentId, regionId, draftVersion: 0 };
   const create = await request(app)
     .post(base + '/test')
@@ -119,25 +119,25 @@ it('persists and retrieves authenticated source-bound proposals with idempotency
     .send(body);
   expect(create.status).toBe(200);
   expect(create.body.proposal.state).toBe('pending');
-  const id = create.body.proposal._id;
+  const id = create.body.proposal.id;
   const workspace = await request(app)
-    .get(`/courses/${course._id}/drafts/rev_test/formula-workspace`)
+    .get(`/courses/${course.id}/drafts/rev_test/formula-workspace`)
     .set('x-test-user', 'owner');
   expect(workspace.status).toBe(200);
   expect(workspace.body.draftVersion).toBe(0);
   expect(workspace.body.canConsent).toBe(true);
-  expect(workspace.body.proposals[0]._id).toBe(id);
+  expect(workspace.body.proposals[0].id).toBe(id);
   expect(
     (
       await request(app)
-        .get(`/courses/${course._id}/drafts/rev_test/formula-workspace`)
+        .get(`/courses/${course.id}/drafts/rev_test/formula-workspace`)
         .set('x-test-user', 'intruder')
     ).status
   ).toBe(403);
   expect(
     (
       await request(app)
-        .get(`/courses/${course._id}/drafts/rev_wrong/formula-workspace`)
+        .get(`/courses/${course.id}/drafts/rev_wrong/formula-workspace`)
         .set('x-test-user', 'owner')
     ).status
   ).toBe(409);
@@ -146,7 +146,7 @@ it('persists and retrieves authenticated source-bound proposals with idempotency
     .set('x-test-user', 'owner')
     .send(body);
   expect(duplicate.status).toBe(200);
-  expect(duplicate.body.proposal._id).toBe(id);
+  expect(duplicate.body.proposal.id).toBe(id);
   const other = await Course.create({
     userId: 'owner',
     ownerUserId: 'owner',
@@ -154,9 +154,9 @@ it('persists and retrieves authenticated source-bound proposals with idempotency
     subjectId: 's',
     title: 'Other'
   });
-  courses_created.push(String(other._id));
+  courses_created.push(String(other.id));
   await CourseRevision.create({
-    courseId: other._id,
+    courseId: other.id,
     revisionTag: 'rev_other',
     contentHash: documentHash.slice(7),
     status: 'draft',
@@ -167,7 +167,7 @@ it('persists and retrieves authenticated source-bound proposals with idempotency
   expect(
     (
       await request(app)
-        .post(`/courses/${other._id}/drafts/rev_other/formula-proposals/test`)
+        .post(`/courses/${other.id}/drafts/rev_other/formula-proposals/test`)
         .set('x-test-user', 'owner')
         .send(body)
     ).status
@@ -175,7 +175,7 @@ it('persists and retrieves authenticated source-bound proposals with idempotency
   expect(
     (
       await request(app)
-        .get(`/courses/${other._id}/drafts/rev_other/formula-proposals/${id}`)
+        .get(`/courses/${other.id}/drafts/rev_other/formula-proposals/${id}`)
         .set('x-test-user', 'owner')
     ).status
   ).toBe(404);
@@ -184,7 +184,7 @@ it('persists and retrieves authenticated source-bound proposals with idempotency
     .set('x-test-user', 'owner');
   expect(read.status).toBe(200);
   expect(read.body.proposal.documentHash).toBe(documentHash);
-  expect(await prisma.formulaProposal.count({ where: { courseId: String(course._id) } })).toBe(1);
+  expect(await prisma.formulaProposal.count({ where: { courseId: String(course.id) } })).toBe(1);
   expect((await request(app).get(base + '/' + id)).status).toBe(401);
   expect(
     (
@@ -235,7 +235,7 @@ it('persists and retrieves authenticated source-bound proposals with idempotency
     ).status
   ).toBe(404);
   process.env.FORMULA_MOCK_PROVIDER = '1';
-  await CourseRevision.updateOne({ _id: draft._id }, { $inc: { __v: 1 } });
+  await CourseRevision.updateOne({ id: draft.id }, { $inc: { __v: 1 } });
   expect(
     (
       await request(app)
@@ -243,19 +243,19 @@ it('persists and retrieves authenticated source-bound proposals with idempotency
         .set('x-test-user', 'owner')
     ).status
   ).toBe(409);
-  expect((await CourseRevision.findById(published._id))?.__v).toBe(0);
+  expect((await CourseRevision.findById(published.id))?.__v).toBe(0);
 });
 
 it.each(['accept', 'correct', 'reject'])(
   'reviews pending proposal: %s and persists immutable audit history',
   async (action) => {
     const current = await CourseRevision.findOneAndUpdate(
-      { _id: draft._id },
+      { id: draft.id },
       { $inc: { __v: 1 } },
       { new: true }
     );
     const version = current!.__v;
-    const base = `/courses/${course._id}/drafts/rev_test/formula-proposals`;
+    const base = `/courses/${course.id}/drafts/rev_test/formula-proposals`;
     const body = { documentId, regionId, draftVersion: version };
     const [a, b] = await Promise.all([
       request(app)
@@ -269,8 +269,8 @@ it.each(['accept', 'correct', 'reject'])(
     ]);
     expect(a.status).toBe(200);
     expect(b.status).toBe(200);
-    expect(a.body.proposal._id).toBe(b.body.proposal._id);
-    const id = a.body.proposal._id;
+    expect(a.body.proposal.id).toBe(b.body.proposal.id);
+    const id = a.body.proposal.id;
     const review = {
       action,
       reviewVersion: 0,
@@ -364,7 +364,7 @@ it.each(['accept', 'correct', 'reject'])(
     expect(
       (
         await request(app)
-          .post(`/courses/${other!._id}/drafts/rev_other/formula-proposals/${id}/review`)
+          .post(`/courses/${other!.id}/drafts/rev_other/formula-proposals/${id}/review`)
           .set('x-test-user', 'owner')
           .send(review)
       ).status
@@ -379,7 +379,7 @@ it.each(['accept', 'correct', 'reject'])(
     });
     expect((saved!.history as unknown[]).length).toBe(1);
     expect(saved!.state).toBe(accepted.state);
-    const before = await CourseRevision.findById(published._id);
+    const before = await CourseRevision.findById(published.id);
     expect(JSON.stringify(before)).toBe(publishedSnapshot);
     expect(before!.__v).toBe(0);
     expect(before!.status).toBe('published');
@@ -388,11 +388,11 @@ it.each(['accept', 'correct', 'reject'])(
 
 it('returns conflict if draft changes after the atomic decision; stale record stays inaccessible', async () => {
   const current = await CourseRevision.findOneAndUpdate(
-    { _id: draft._id },
+    { id: draft.id },
     { $inc: { __v: 1 } },
     { new: true }
   );
-  const base = `/courses/${course._id}/drafts/rev_test/formula-proposals`;
+  const base = `/courses/${course.id}/drafts/rev_test/formula-proposals`;
   const created = await request(app)
     .post(base + '/test')
     .set('x-test-user', 'owner')
@@ -403,19 +403,19 @@ it('returns conflict if draft changes after the atomic decision; stale record st
   const spy = jest
     .spyOn(reviewModule, 'ensureSnapshot')
     .mockImplementation(async (actor, snapshot) => {
-      if (++checks === 2) await CourseRevision.updateOne({ _id: draft._id }, { $inc: { __v: 1 } });
+      if (++checks === 2) await CourseRevision.updateOne({ id: draft.id }, { $inc: { __v: 1 } });
       await original(actor, snapshot);
     });
   try {
     const response = await request(app)
-      .post(base + '/' + created.body.proposal._id + '/review')
+      .post(base + '/' + created.body.proposal.id + '/review')
       .set('x-test-user', 'owner')
       .send({ action: 'accept', reviewVersion: 0, draftVersion: current!.__v });
     expect(response.status).toBe(409);
     expect(
       (
         await request(app)
-          .get(base + '/' + created.body.proposal._id)
+          .get(base + '/' + created.body.proposal.id)
           .set('x-test-user', 'owner')
       ).status
     ).toBe(409);

@@ -2,7 +2,7 @@ import type { Prisma, RankBadge as RankBadgeRow } from '../../../../src/generate
 import { prisma, toDocument } from '../../../../shared/database';
 import { newId } from '../../../../shared/ids';
 
-export type IRankBadge = RankBadgeRow & { _id: string };
+export type IRankBadge = RankBadgeRow & { id: string };
 
 function hydrate(row: RankBadgeRow): IRankBadge {
   return toDocument(row) as unknown as IRankBadge;

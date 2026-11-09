@@ -229,7 +229,7 @@ test(
     // ---- owner publishes a course with a verified source artifact ----
     const institutionId = newId();
     await Institution.create({
-      _id: institutionId,
+      id: institutionId,
       name: 'Synthetic visual lab institution',
       slug: `visual-lab-${institutionId.toString()}`,
       createdByUserId: owner.id.toString(),
@@ -257,11 +257,11 @@ test(
       title: 'Routing and networks',
       status: 'completed'
     });
-    courseId = course._id.toString();
+    courseId = course.id.toString();
     await prepareCourseFixture(courseId);
 
     await CourseEnrollment.create({
-      courseId: course._id,
+      courseId: course.id,
       userId: student.id.toString(),
       institutionId,
       status: 'active'
@@ -287,7 +287,7 @@ test(
       }
     ];
     await CourseRevision.create({
-      courseId: course._id,
+      courseId: course.id,
       revisionTag,
       contentHash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
       status: 'draft',

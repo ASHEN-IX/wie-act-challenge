@@ -85,7 +85,7 @@ test('M22 / ED-14: Master End-to-End Educational System Evaluation Scenario', as
     await cleanupCourseFixtures();
     try {
       if (courseId) {
-        await Course.deleteMany({ _id: courseId });
+        await Course.deleteMany({ id: courseId });
         await CourseRevision.deleteMany({ courseId });
         await CourseEnrollment.deleteMany({ courseId });
         await ActivityRecord.deleteMany({ courseId });
@@ -93,7 +93,7 @@ test('M22 / ED-14: Master End-to-End Educational System Evaluation Scenario', as
         await LearningEvidence.deleteMany({ userId: { startsWith: testPrefix } });
       }
       await InstitutionMembership.deleteMany({ institutionId });
-      await Institution.deleteMany({ _id: institutionId });
+      await Institution.deleteMany({ id: institutionId });
       await Course.deleteMany({ userId: { startsWith: testPrefix } });
       if (roomId) {
         await StudyRoom.deleteMany({ roomId });
@@ -109,7 +109,7 @@ test('M22 / ED-14: Master End-to-End Educational System Evaluation Scenario', as
     'Step 1: Institutional scoping, assigned instructors, and student enrollment',
     async () => {
       await Institution.create({
-        _id: institutionId,
+        id: institutionId,
         name: 'EdNova University of Science',
         slug: `ednova-sci-${testPrefix}`,
         createdByUserId: adminUserId,
@@ -137,7 +137,7 @@ test('M22 / ED-14: Master End-to-End Educational System Evaluation Scenario', as
         status: 'completed',
         topics: []
       });
-      courseId = courseDoc._id.toString();
+      courseId = courseDoc.id.toString();
       await prepareCourseFixture(courseId, t);
 
       // Enroll students in course

@@ -20,7 +20,7 @@ export interface IFocusSummary {
 }
 
 export type IFocusSession = FocusSessionRow & {
-  _id: string;
+  id: string;
   dataPoints: IFocusDataPoint[];
   summary: IFocusSummary | null;
 };

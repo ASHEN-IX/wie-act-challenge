@@ -73,7 +73,7 @@ test('M10 / ED-29: Durable Activity Attempts, Assessment & Accepted Evidence Int
       await InstitutionMembership.deleteMany({ userId: { contains: testPrefix } });
       await StudentAttempt.deleteMany({ userId: { contains: testPrefix } });
       await LearningEvidence.deleteMany({ userId: { contains: testPrefix } });
-      await Institution.deleteMany({ _id: institutionId });
+      await Institution.deleteMany({ id: institutionId });
     } catch {
       // ignore
     } finally {
@@ -119,7 +119,7 @@ test('M10 / ED-29: Durable Activity Attempts, Assessment & Accepted Evidence Int
           }
         ]
       });
-      courseId = courseDoc._id.toString();
+      courseId = courseDoc.id.toString();
       await prepareCourseFixture(courseId, t);
 
       // 3. Draft revision
@@ -145,7 +145,7 @@ test('M10 / ED-29: Durable Activity Attempts, Assessment & Accepted Evidence Int
       ];
 
       await CourseRevision.create({
-        courseId: courseDoc._id,
+        courseId: courseDoc.id,
         revisionTag: initialDraftTag,
         contentHash,
         status: 'draft',
@@ -168,13 +168,13 @@ test('M10 / ED-29: Durable Activity Attempts, Assessment & Accepted Evidence Int
 
       // 5. Enroll students
       await CourseEnrollment.create({
-        courseId: courseDoc._id,
+        courseId: courseDoc.id,
         institutionId,
         userId: studentId,
         status: 'active'
       });
       await CourseEnrollment.create({
-        courseId: courseDoc._id,
+        courseId: courseDoc.id,
         institutionId,
         userId: otherStudentId,
         status: 'active'

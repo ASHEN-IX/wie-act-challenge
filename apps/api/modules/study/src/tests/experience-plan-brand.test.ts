@@ -25,7 +25,7 @@ import { projectExperiencePlan } from '../services/experiencePlanning';
 import { verifyAssetBindings } from '../services/experiencePlanning';
 import type { StructuredAssetV1 } from '../../../../shared/ednova/structuredAsset';
 
-const courseId = '0123456789abcdef01234567';
+const courseId = 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d';
 const revisionId = 'rev_brand';
 const contentHash = 'sha256:' + 'b'.repeat(64);
 

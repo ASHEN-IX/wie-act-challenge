@@ -44,7 +44,7 @@ test('M08 / ED-05: Immutable Reviewed Publication & Revision Resolution Integrat
       await Course.deleteMany({ userId: { contains: testPrefix } });
       await CourseEnrollment.deleteMany({ userId: { contains: testPrefix } });
       await InstitutionMembership.deleteMany({ userId: { contains: testPrefix } });
-      await Institution.deleteMany({ _id: institutionId });
+      await Institution.deleteMany({ id: institutionId });
     } catch {
       // ignore
     } finally {
@@ -126,7 +126,7 @@ test('M08 / ED-05: Immutable Reviewed Publication & Revision Resolution Integrat
         }
       ]
     });
-    courseId = courseDoc._id.toString();
+    courseId = courseDoc.id.toString();
     await prepareCourseFixture(courseId, t);
 
     // Active enrollment for student
@@ -361,7 +361,7 @@ test('M08 / ED-05: Immutable Reviewed Publication & Revision Resolution Integrat
 
     await assert.rejects(
       async () => {
-        await getPublishedCourseContext(instructorId, unpublishedCourse._id.toString());
+        await getPublishedCourseContext(instructorId, unpublishedCourse.id.toString());
       },
       (err: unknown) => {
         assert.ok(err instanceof UnpublishedCourseError);

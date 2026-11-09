@@ -71,7 +71,7 @@ test('P0-R3 canonical learning selection, durable pinned rooms, private checks a
     subjectId: 'synthetic',
     status: 'completed'
   });
-  courseId = course._id.toString();
+  courseId = course.id.toString();
   const topics = [
     {
       id: 'topic_source',

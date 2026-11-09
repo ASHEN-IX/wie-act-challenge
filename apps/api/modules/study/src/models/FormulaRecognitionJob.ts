@@ -6,7 +6,7 @@ import { prisma } from '../../../../shared/database';
 import { table } from './_table';
 
 export type IFormulaRecognitionJob = Omit<FormulaRecognitionJobRow, 'usage' | 'result' | 'bbox'> & {
-  _id: string;
+  id: string;
   usage?: unknown;
   result?: unknown;
   bbox: number[];

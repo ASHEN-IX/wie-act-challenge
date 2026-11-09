@@ -7,7 +7,7 @@
       "payload": {
         "schemaVersion": "1.0.0",
         "visibility": "authorized_learner",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "title": "Synthetic course",
@@ -115,7 +115,7 @@
         "decision": "allowed",
         "userId": "learner_synthetic",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -131,7 +131,7 @@
         "schemaVersion": "1.0.0",
         "visibility": "server_only",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -140,7 +140,7 @@
           "decision": "allowed",
           "userId": "learner_synthetic",
           "pin": {
-            "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+            "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
             "revisionId": "rev_synthetic_1",
             "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           },
@@ -156,7 +156,7 @@
             "locationKnown": true
           }
         ],
-        "vectorIndexRef": "faiss/66f1e2b3c4d5e6f7a8b9c0aa/rev_synthetic_1.faiss"
+        "vectorIndexRef": "faiss/746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4/rev_synthetic_1.faiss"
       },
       "valid": true
     },
@@ -167,7 +167,7 @@
         "schemaVersion": "1.0.0",
         "visibility": "service_only",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -195,7 +195,7 @@
       "payload": {
         "schemaVersion": "1.0.0",
         "visibility": "editor_only",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "status": "draft",
@@ -218,7 +218,7 @@
       "payload": {
         "schemaVersion": "1.0.0",
         "visibility": "editor_only",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "status": "draft",
@@ -241,7 +241,7 @@
       "payload": {
         "schemaVersion": "1.0.0",
         "visibility": "editor_only",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "status": "published",
@@ -264,7 +264,7 @@
       "payload": {
         "schemaVersion": "1.0.0",
         "visibility": "editor_only",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "status": "deprecated",
@@ -289,7 +289,7 @@
         "activityId": "act_quiz",
         "activityRevision": "ar_1",
         "componentVersion": "1.0.0",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "objectiveId": "obj_synthetic",
@@ -337,7 +337,7 @@
         "activityId": "act_problem",
         "activityRevision": "ar_1",
         "componentVersion": "1.0.0",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "objectiveId": "obj_synthetic",
@@ -382,7 +382,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -406,7 +406,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -430,7 +430,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -451,7 +451,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -475,7 +475,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -496,7 +496,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -524,7 +524,7 @@
             "activityId": "act_quiz",
             "activityRevision": "ar_1",
             "activityType": "InteractiveQuiz",
-            "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+            "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
             "revisionId": "rev_synthetic_1",
             "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           },
@@ -554,7 +554,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -582,7 +582,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -604,7 +604,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -626,7 +626,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -648,7 +648,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -670,7 +670,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -694,7 +694,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -730,7 +730,7 @@
             "activityId": "act_quiz",
             "activityRevision": "ar_1",
             "activityType": "InteractiveQuiz",
-            "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+            "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
             "revisionId": "rev_synthetic_1",
             "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           },
@@ -786,7 +786,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -821,7 +821,7 @@
         "presenterUserId": "learner_synthetic",
         "currentPhase": "peer_discussion",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -829,7 +829,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -860,7 +860,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         }
@@ -876,7 +876,7 @@
         "roomId": "room_synthetic",
         "seq": 3,
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -884,7 +884,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -904,7 +904,7 @@
         "roomId": "room_synthetic",
         "expectedSeq": 3,
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -916,7 +916,7 @@
             "activityId": "act_quiz",
             "activityRevision": "ar_1",
             "activityType": "InteractiveQuiz",
-            "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+            "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
             "revisionId": "rev_synthetic_1",
             "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           }
@@ -996,7 +996,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -1017,7 +1017,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -1034,7 +1034,7 @@
         "activityId": "act_quiz",
         "activityRevision": "ar_1",
         "componentVersion": "1.0.0",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "objectiveId": "obj_synthetic",
@@ -1082,7 +1082,7 @@
         "activityId": "act_quiz",
         "activityRevision": "ar_1",
         "componentVersion": "1.0.0",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "objectiveId": "obj_synthetic",
@@ -1130,7 +1130,7 @@
         "activityId": "act_quiz",
         "activityRevision": "ar_1",
         "componentVersion": "2.0.0",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "objectiveId": "obj_synthetic",
@@ -1178,7 +1178,7 @@
         "activityId": "act_quiz",
         "activityRevision": "ar_1",
         "componentVersion": "1.0.0",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "objectiveId": "obj_synthetic",
@@ -1229,7 +1229,7 @@
         "activityId": "act_quiz",
         "activityRevision": "ar_1",
         "componentVersion": "1.0.0",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "objectiveId": "obj_synthetic",
@@ -1278,7 +1278,7 @@
         "activityId": "act_quiz",
         "activityRevision": "ar_1",
         "componentVersion": "1.0.0",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "objectiveId": "obj_synthetic",
@@ -1327,7 +1327,7 @@
         "activityId": "act_quiz",
         "activityRevision": "ar_1",
         "componentVersion": "1.0.0",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "objectiveId": "obj_synthetic",
@@ -1451,7 +1451,7 @@
         "activityId": "act_quiz",
         "activityRevision": "ar_1",
         "componentVersion": "1.0.0",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "objectiveId": "obj_synthetic",
@@ -1499,7 +1499,7 @@
         "activityId": "act_quiz",
         "activityRevision": "ar_1",
         "componentVersion": "1.0.0",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "objectiveId": "obj_synthetic",
@@ -1547,7 +1547,7 @@
         "activityId": "act_quiz",
         "activityRevision": "ar_1",
         "componentVersion": "1.0.0",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "objectiveId": "obj_synthetic",
@@ -1595,7 +1595,7 @@
         "activityId": "act_quiz",
         "activityRevision": "ar_1",
         "componentVersion": "1.0.0",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "objectiveId": "obj_synthetic",
@@ -1643,7 +1643,7 @@
         "activityId": "act_quiz",
         "activityRevision": "ar_1",
         "componentVersion": "1.0.0",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "objectiveId": "obj_synthetic",
@@ -1691,7 +1691,7 @@
         "activityId": "act_quiz",
         "activityRevision": "ar_1",
         "componentVersion": "1.0.0",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "objectiveId": "obj_synthetic",
@@ -1739,7 +1739,7 @@
         "activityId": "act_quiz",
         "activityRevision": "ar_1",
         "componentVersion": "1.0.0",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "objectiveId": "obj_synthetic",
@@ -1789,7 +1789,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -1814,7 +1814,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -1839,7 +1839,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -1863,7 +1863,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -1891,7 +1891,7 @@
         "presenterUserId": "learner_synthetic",
         "currentPhase": "peer_discussion",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -1899,7 +1899,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -1925,7 +1925,7 @@
             "activityId": "act_quiz",
             "activityRevision": "ar_1",
             "activityType": "InteractiveQuiz",
-            "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+            "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
             "revisionId": "rev_synthetic_1",
             "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           },
@@ -1956,7 +1956,7 @@
         "presenterUserId": "learner_synthetic",
         "currentPhase": "peer_discussion",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -1964,7 +1964,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -1993,7 +1993,7 @@
         "presenterUserId": "learner_synthetic",
         "currentPhase": "peer_discussion",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -2001,7 +2001,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -2030,7 +2030,7 @@
         "presenterUserId": "other",
         "currentPhase": "peer_discussion",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -2038,7 +2038,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -2067,7 +2067,7 @@
         "presenterUserId": "learner_synthetic",
         "currentPhase": "peer_discussion",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -2075,7 +2075,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_other",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -2104,7 +2104,7 @@
         "presenterUserId": "learner_synthetic",
         "currentPhase": "peer_discussion",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -2112,7 +2112,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -2142,7 +2142,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -2168,7 +2168,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -2196,7 +2196,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -2229,7 +2229,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -2260,7 +2260,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -2283,7 +2283,7 @@
         "roomId": "room_synthetic",
         "expectedSeq": 3,
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -2295,7 +2295,7 @@
             "activityId": "act_quiz",
             "activityRevision": "ar_1",
             "activityType": "InteractiveQuiz",
-            "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+            "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
             "revisionId": "rev_synthetic_1",
             "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           }
@@ -2314,7 +2314,7 @@
         "roomId": "room_synthetic",
         "expectedSeq": 3,
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -2326,7 +2326,7 @@
             "activityId": "act_quiz",
             "activityRevision": "ar_1",
             "activityType": "InteractiveQuiz",
-            "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+            "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
             "revisionId": "foreign",
             "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           }
@@ -2341,7 +2341,7 @@
       "payload": {
         "schemaVersion": "1.0.0",
         "visibility": "authorized_learner",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "title": "Synthetic course",
@@ -2381,7 +2381,7 @@
       "payload": {
         "schemaVersion": "1.0.0",
         "visibility": "authorized_learner",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "title": "Synthetic course",
@@ -2422,7 +2422,7 @@
       "payload": {
         "schemaVersion": "1.0.0",
         "visibility": "authorized_learner",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "title": "Synthetic course",
@@ -2462,7 +2462,7 @@
       "payload": {
         "schemaVersion": "1.0.0",
         "visibility": "authorized_learner",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "title": "Synthetic course",
@@ -2504,7 +2504,7 @@
         "activityId": "act_quiz",
         "activityRevision": "ar_1",
         "componentVersion": "1.0.0",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "objectiveId": "obj_synthetic",
@@ -2547,7 +2547,7 @@
       "context": {
         "schemaVersion": "1.0.0",
         "visibility": "authorized_learner",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "title": "Synthetic course",
@@ -2588,7 +2588,7 @@
         "activityId": "act_quiz",
         "activityRevision": "ar_1",
         "componentVersion": "1.0.0",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_stale",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "objectiveId": "obj_synthetic",
@@ -2631,7 +2631,7 @@
       "context": {
         "schemaVersion": "1.0.0",
         "visibility": "authorized_learner",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "title": "Synthetic course",
@@ -2672,7 +2672,7 @@
         "activityId": "act_quiz",
         "activityRevision": "ar_1",
         "componentVersion": "1.0.0",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "objectiveId": "obj_synthetic",
@@ -2715,7 +2715,7 @@
       "context": {
         "schemaVersion": "1.0.0",
         "visibility": "authorized_learner",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "title": "Synthetic course",
@@ -2756,7 +2756,7 @@
         "activityId": "act_quiz",
         "activityRevision": "ar_1",
         "componentVersion": "1.0.0",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "objectiveId": "obj_foreign",
@@ -2799,7 +2799,7 @@
       "context": {
         "schemaVersion": "1.0.0",
         "visibility": "authorized_learner",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "title": "Synthetic course",
@@ -2840,7 +2840,7 @@
         "activityId": "act_quiz",
         "activityRevision": "ar_1",
         "componentVersion": "1.0.0",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "objectiveId": "obj_synthetic",
@@ -2883,7 +2883,7 @@
       "context": {
         "schemaVersion": "1.0.0",
         "visibility": "authorized_learner",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "title": "Synthetic course",
@@ -2926,7 +2926,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -2945,7 +2945,7 @@
         "activityId": "act_quiz",
         "activityRevision": "ar_1",
         "componentVersion": "1.0.0",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "objectiveId": "obj_synthetic",
@@ -2994,7 +2994,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -3013,7 +3013,7 @@
         "activityId": "act_quiz",
         "activityRevision": "ar_1",
         "componentVersion": "1.0.0",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "objectiveId": "obj_synthetic",
@@ -3064,7 +3064,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -3094,7 +3094,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -3120,7 +3120,7 @@
         "roomId": "room_synthetic",
         "expectedSeq": 3,
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -3132,7 +3132,7 @@
             "activityId": "act_quiz",
             "activityRevision": "ar_1",
             "activityType": "InteractiveQuiz",
-            "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+            "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
             "revisionId": "rev_synthetic_1",
             "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           }
@@ -3147,7 +3147,7 @@
         "roomId": "room_synthetic",
         "seq": 3,
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -3155,7 +3155,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -3174,7 +3174,7 @@
         "roomId": "room_synthetic",
         "expectedSeq": 2,
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -3186,7 +3186,7 @@
             "activityId": "act_quiz",
             "activityRevision": "ar_1",
             "activityType": "InteractiveQuiz",
-            "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+            "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
             "revisionId": "rev_synthetic_1",
             "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           }
@@ -3201,7 +3201,7 @@
         "roomId": "room_synthetic",
         "seq": 3,
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -3209,7 +3209,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -3224,7 +3224,7 @@
       "payload": {
         "schemaVersion": "1.0.0",
         "visibility": "authorized_learner",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "title": "Synthetic course",
@@ -3265,7 +3265,7 @@
       "payload": {
         "schemaVersion": "9.0.0",
         "visibility": "authorized_learner",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "title": "Synthetic course",
@@ -3304,7 +3304,7 @@
       "contract": "PublishedContext",
       "payload": {
         "visibility": "authorized_learner",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "title": "Synthetic course",
@@ -3346,7 +3346,7 @@
         "decision": "allowed",
         "userId": "learner_synthetic",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -3364,7 +3364,7 @@
         "decision": "allowed",
         "userId": "learner_synthetic",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -3380,7 +3380,7 @@
         "decision": "allowed",
         "userId": "learner_synthetic",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -3396,7 +3396,7 @@
         "schemaVersion": "1.0.0",
         "visibility": "server_only",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -3405,7 +3405,7 @@
           "decision": "allowed",
           "userId": "learner_synthetic",
           "pin": {
-            "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+            "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
             "revisionId": "rev_synthetic_1",
             "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           },
@@ -3421,7 +3421,7 @@
             "locationKnown": true
           }
         ],
-        "vectorIndexRef": "faiss/66f1e2b3c4d5e6f7a8b9c0aa/rev_synthetic_1/index",
+        "vectorIndexRef": "faiss/746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4/rev_synthetic_1/index",
         "credentials": "synthetic-forbidden-field"
       },
       "valid": false
@@ -3433,7 +3433,7 @@
         "schemaVersion": "9.0.0",
         "visibility": "server_only",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -3442,7 +3442,7 @@
           "decision": "allowed",
           "userId": "learner_synthetic",
           "pin": {
-            "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+            "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
             "revisionId": "rev_synthetic_1",
             "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           },
@@ -3458,7 +3458,7 @@
             "locationKnown": true
           }
         ],
-        "vectorIndexRef": "faiss/66f1e2b3c4d5e6f7a8b9c0aa/rev_synthetic_1/index"
+        "vectorIndexRef": "faiss/746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4/rev_synthetic_1/index"
       },
       "valid": false
     },
@@ -3468,7 +3468,7 @@
       "payload": {
         "visibility": "server_only",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -3477,7 +3477,7 @@
           "decision": "allowed",
           "userId": "learner_synthetic",
           "pin": {
-            "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+            "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
             "revisionId": "rev_synthetic_1",
             "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           },
@@ -3493,7 +3493,7 @@
             "locationKnown": true
           }
         ],
-        "vectorIndexRef": "faiss/66f1e2b3c4d5e6f7a8b9c0aa/rev_synthetic_1/index"
+        "vectorIndexRef": "faiss/746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4/rev_synthetic_1/index"
       },
       "valid": false
     },
@@ -3504,7 +3504,7 @@
         "schemaVersion": "1.0.0",
         "visibility": "service_only",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -3534,7 +3534,7 @@
         "schemaVersion": "9.0.0",
         "visibility": "service_only",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -3562,7 +3562,7 @@
       "payload": {
         "visibility": "service_only",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -3590,7 +3590,7 @@
       "payload": {
         "schemaVersion": "1.0.0",
         "visibility": "editor_only",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "status": "deprecated",
@@ -3614,7 +3614,7 @@
       "payload": {
         "schemaVersion": "9.0.0",
         "visibility": "editor_only",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "status": "deprecated",
@@ -3636,7 +3636,7 @@
       "contract": "EditorContext",
       "payload": {
         "visibility": "editor_only",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "status": "deprecated",
@@ -3661,7 +3661,7 @@
         "activityId": "act_quiz",
         "activityRevision": "ar_1",
         "componentVersion": "1.0.0",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "objectiveId": "obj_synthetic",
@@ -3710,7 +3710,7 @@
         "activityId": "act_quiz",
         "activityRevision": "ar_1",
         "componentVersion": "1.0.0",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "objectiveId": "obj_synthetic",
@@ -3757,7 +3757,7 @@
         "activityId": "act_quiz",
         "activityRevision": "ar_1",
         "componentVersion": "1.0.0",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "objectiveId": "obj_synthetic",
@@ -3807,7 +3807,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -3832,7 +3832,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -3855,7 +3855,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -3879,7 +3879,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -3904,7 +3904,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -3927,7 +3927,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -3955,7 +3955,7 @@
             "activityId": "act_quiz",
             "activityRevision": "ar_1",
             "activityType": "InteractiveQuiz",
-            "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+            "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
             "revisionId": "rev_synthetic_1",
             "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           },
@@ -3988,7 +3988,7 @@
             "activityId": "act_quiz",
             "activityRevision": "ar_1",
             "activityType": "InteractiveQuiz",
-            "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+            "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
             "revisionId": "rev_synthetic_1",
             "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           },
@@ -4019,7 +4019,7 @@
             "activityId": "act_quiz",
             "activityRevision": "ar_1",
             "activityType": "InteractiveQuiz",
-            "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+            "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
             "revisionId": "rev_synthetic_1",
             "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           },
@@ -4049,7 +4049,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4076,7 +4076,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4101,7 +4101,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4129,7 +4129,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4163,7 +4163,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4195,7 +4195,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4262,7 +4262,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4283,7 +4283,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4302,7 +4302,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4369,7 +4369,7 @@
         "presenterUserId": "learner_synthetic",
         "currentPhase": "peer_discussion",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4377,7 +4377,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4407,7 +4407,7 @@
         "presenterUserId": "learner_synthetic",
         "currentPhase": "peer_discussion",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4415,7 +4415,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4443,7 +4443,7 @@
         "presenterUserId": "learner_synthetic",
         "currentPhase": "peer_discussion",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4451,7 +4451,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4482,7 +4482,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4503,7 +4503,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         }
@@ -4522,7 +4522,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         }
@@ -4538,7 +4538,7 @@
         "roomId": "room_synthetic",
         "seq": 3,
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4546,7 +4546,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4566,7 +4566,7 @@
         "roomId": "room_synthetic",
         "seq": 3,
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4574,7 +4574,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4592,7 +4592,7 @@
         "roomId": "room_synthetic",
         "seq": 3,
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4600,7 +4600,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4620,7 +4620,7 @@
         "roomId": "room_synthetic",
         "expectedSeq": 3,
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4632,7 +4632,7 @@
             "activityId": "act_quiz",
             "activityRevision": "ar_1",
             "activityType": "InteractiveQuiz",
-            "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+            "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
             "revisionId": "rev_synthetic_1",
             "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           }
@@ -4652,7 +4652,7 @@
         "roomId": "room_synthetic",
         "expectedSeq": 3,
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4664,7 +4664,7 @@
             "activityId": "act_quiz",
             "activityRevision": "ar_1",
             "activityType": "InteractiveQuiz",
-            "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+            "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
             "revisionId": "rev_synthetic_1",
             "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           }
@@ -4682,7 +4682,7 @@
         "roomId": "room_synthetic",
         "expectedSeq": 3,
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4694,7 +4694,7 @@
             "activityId": "act_quiz",
             "activityRevision": "ar_1",
             "activityType": "InteractiveQuiz",
-            "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+            "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
             "revisionId": "rev_synthetic_1",
             "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           }
@@ -4749,7 +4749,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4769,7 +4769,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4787,7 +4787,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4808,7 +4808,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4830,7 +4830,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4850,7 +4850,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4869,7 +4869,7 @@
           "activityId": "act_problem",
           "activityRevision": "ar_1",
           "activityType": "GuidedProblem",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -4891,7 +4891,7 @@
         "activityId": "act_problem",
         "activityRevision": "ar_1",
         "componentVersion": "1.0.0",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "objectiveId": "obj_synthetic",
@@ -4933,7 +4933,7 @@
         "activityId": "act_quiz",
         "activityRevision": "ar_1",
         "componentVersion": "1.0.0",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "objectiveId": "obj_synthetic",
@@ -4983,7 +4983,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -5007,7 +5007,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "GuidedProblem",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -5107,7 +5107,7 @@
         "schemaVersion": "1.0.0",
         "visibility": "server_only",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -5126,7 +5126,7 @@
             "locationKnown": true
           }
         ],
-        "vectorIndexRef": "faiss/66f1e2b3c4d5e6f7a8b9c0aa/rev_synthetic_1/index"
+        "vectorIndexRef": "faiss/746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4/rev_synthetic_1/index"
       },
       "valid": false
     },
@@ -5137,7 +5137,7 @@
         "schemaVersion": "1.0.0",
         "visibility": "server_only",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -5146,7 +5146,7 @@
           "decision": "allowed",
           "userId": "learner_synthetic",
           "pin": {
-            "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+            "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
             "revisionId": "rev_synthetic_1",
             "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           },
@@ -5162,7 +5162,7 @@
             "locationKnown": true
           }
         ],
-        "vectorIndexRef": "faiss/66f1e2b3c4d5e6f7a8b9c0aa/rev_synthetic_1/../private"
+        "vectorIndexRef": "faiss/746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4/rev_synthetic_1/../private"
       },
       "valid": false
     },
@@ -5178,7 +5178,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -5203,7 +5203,7 @@
         "roomId": "room_synthetic",
         "expectedSeq": 3,
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -5215,7 +5215,7 @@
             "activityId": "act_quiz",
             "activityRevision": "ar_1",
             "activityType": "InteractiveQuiz",
-            "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+            "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
             "revisionId": "rev_synthetic_1",
             "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           }
@@ -5232,7 +5232,7 @@
         "schemaVersion": "1.0.0",
         "visibility": "server_only",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -5241,7 +5241,7 @@
           "decision": "allowed",
           "userId": "learner_synthetic",
           "pin": {
-            "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+            "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
             "revisionId": "rev_synthetic_1",
             "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           },
@@ -5257,7 +5257,7 @@
             "locationKnown": true
           }
         ],
-        "vectorIndexRef": "faiss/66f1e2b3c4d5e6f7a8b9c0aa/rev_synthetic_1"
+        "vectorIndexRef": "faiss/746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4/rev_synthetic_1"
       },
       "valid": false
     },
@@ -5268,7 +5268,7 @@
         "schemaVersion": "1.0.0",
         "visibility": "server_only",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -5277,7 +5277,7 @@
           "decision": "allowed",
           "userId": "learner_synthetic",
           "pin": {
-            "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+            "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
             "revisionId": "rev_synthetic_1",
             "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           },
@@ -5293,7 +5293,7 @@
             "locationKnown": true
           }
         ],
-        "vectorIndexRef": "faiss/66f1e2b3c4d5e6f7a8b9c0aa/index.faiss"
+        "vectorIndexRef": "faiss/746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4/index.faiss"
       },
       "valid": false
     },
@@ -5304,7 +5304,7 @@
         "schemaVersion": "1.0.0",
         "visibility": "server_only",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -5313,7 +5313,7 @@
           "decision": "allowed",
           "userId": "learner_synthetic",
           "pin": {
-            "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+            "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
             "revisionId": "rev_synthetic_1",
             "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           },
@@ -5329,7 +5329,7 @@
             "locationKnown": true
           }
         ],
-        "vectorIndexRef": "/faiss/66f1e2b3c4d5e6f7a8b9c0aa/rev_synthetic_1.faiss"
+        "vectorIndexRef": "/faiss/746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4/rev_synthetic_1.faiss"
       },
       "valid": false
     },
@@ -5340,7 +5340,7 @@
         "schemaVersion": "1.0.0",
         "visibility": "server_only",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -5349,7 +5349,7 @@
           "decision": "allowed",
           "userId": "learner_synthetic",
           "pin": {
-            "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+            "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
             "revisionId": "rev_synthetic_1",
             "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           },
@@ -5365,7 +5365,7 @@
             "locationKnown": true
           }
         ],
-        "vectorIndexRef": "faiss/66f1e2b3c4d5e6f7a8b9c0bb/rev_synthetic_1.faiss"
+        "vectorIndexRef": "faiss/d66761bf-e8f7-5b84-9e93-fb476fd87c83/rev_synthetic_1.faiss"
       },
       "valid": false
     },
@@ -5376,7 +5376,7 @@
         "schemaVersion": "1.0.0",
         "visibility": "server_only",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -5385,7 +5385,7 @@
           "decision": "allowed",
           "userId": "learner_synthetic",
           "pin": {
-            "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+            "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
             "revisionId": "rev_synthetic_1",
             "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           },
@@ -5401,7 +5401,7 @@
             "locationKnown": true
           }
         ],
-        "vectorIndexRef": "faiss/66f1e2b3c4d5e6f7a8b9c0aa/rev_other.faiss"
+        "vectorIndexRef": "faiss/746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4/rev_other.faiss"
       },
       "valid": false
     },
@@ -5412,7 +5412,7 @@
         "schemaVersion": "1.0.0",
         "visibility": "server_only",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -5421,7 +5421,7 @@
           "decision": "allowed",
           "userId": "learner_synthetic",
           "pin": {
-            "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+            "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
             "revisionId": "rev_synthetic_1",
             "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           },
@@ -5437,7 +5437,7 @@
             "locationKnown": true
           }
         ],
-        "vectorIndexRef": "faiss/66f1e2b3c4d5e6f7a8b9c0aa/rev_synthetic_1.index"
+        "vectorIndexRef": "faiss/746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4/rev_synthetic_1.index"
       },
       "valid": false
     },
@@ -5448,7 +5448,7 @@
         "schemaVersion": "1.0.0",
         "visibility": "server_only",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -5457,7 +5457,7 @@
           "decision": "allowed",
           "userId": "learner_synthetic",
           "pin": {
-            "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+            "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
             "revisionId": "rev_synthetic_1",
             "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           },
@@ -5473,7 +5473,7 @@
             "locationKnown": true
           }
         ],
-        "vectorIndexRef": "faiss/66f1e2b3c4d5e6f7a8b9c0aa/rev_synthetic_1.meta.json"
+        "vectorIndexRef": "faiss/746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4/rev_synthetic_1.meta.json"
       },
       "valid": false
     },
@@ -5484,7 +5484,7 @@
         "schemaVersion": "1.0.0",
         "visibility": "server_only",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -5493,7 +5493,7 @@
           "decision": "allowed",
           "userId": "learner_synthetic",
           "pin": {
-            "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+            "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
             "revisionId": "rev_synthetic_1",
             "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           },
@@ -5509,7 +5509,7 @@
             "locationKnown": true
           }
         ],
-        "vectorIndexRef": "faiss/66f1e2b3c4d5e6f7a8b9c0aa/rev_synthetic_1/extra.faiss"
+        "vectorIndexRef": "faiss/746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4/rev_synthetic_1/extra.faiss"
       },
       "valid": false
     },
@@ -5520,7 +5520,7 @@
         "schemaVersion": "1.0.0",
         "visibility": "server_only",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -5529,7 +5529,7 @@
           "decision": "allowed",
           "userId": "learner_synthetic",
           "pin": {
-            "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+            "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
             "revisionId": "rev_synthetic_1",
             "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           },
@@ -5545,7 +5545,7 @@
             "locationKnown": true
           }
         ],
-        "vectorIndexRef": "faiss\\66f1e2b3c4d5e6f7a8b9c0aa\\rev_synthetic_1.faiss"
+        "vectorIndexRef": "faiss\\746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4\\rev_synthetic_1.faiss"
       },
       "valid": false
     },
@@ -5556,17 +5556,17 @@
         "schemaVersion": "1.0.0",
         "visibility": "server_only",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "_id": "66f1e2b3c4d5e6f7a8b9c0cc"
+          "_id": "0dc8228d-b264-577a-a9ad-83be1415b747"
         },
         "access": {
           "schemaVersion": "1.0.0",
           "decision": "allowed",
           "userId": "learner_synthetic",
           "pin": {
-            "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+            "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
             "revisionId": "rev_synthetic_1",
             "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           },
@@ -5582,7 +5582,7 @@
             "locationKnown": true
           }
         ],
-        "vectorIndexRef": "faiss/66f1e2b3c4d5e6f7a8b9c0aa/rev_synthetic_1.faiss"
+        "vectorIndexRef": "faiss/746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4/rev_synthetic_1.faiss"
       },
       "valid": false
     },
@@ -5594,7 +5594,7 @@
         "activityId": "act_quiz",
         "activityRevision": "ar_1",
         "componentVersion": "1.0.0",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "objectiveId": "obj_synthetic",
@@ -5642,7 +5642,7 @@
         "activityId": "act_quiz",
         "activityRevision": "ar_1",
         "componentVersion": "1.0.0",
-        "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+        "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
         "revisionId": "rev_synthetic_1",
         "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "objectiveId": "obj_synthetic",
@@ -5694,7 +5694,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -5726,7 +5726,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -5753,7 +5753,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -5780,7 +5780,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -5808,7 +5808,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -5840,7 +5840,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -5871,7 +5871,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -5903,7 +5903,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -5924,7 +5924,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -5949,7 +5949,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -5997,7 +5997,7 @@
         "presenterUserId": "learner_synthetic",
         "currentPhase": "peer_discussion",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -6031,7 +6031,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -6060,14 +6060,14 @@
         "presenterUserId": "learner_synthetic",
         "currentPhase": "peer_discussion",
         "pin": {
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1"
         },
         "activity": {
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -6114,7 +6114,7 @@
           "activityId": "act_quiz",
           "activityRevision": "ar_1",
           "activityType": "InteractiveQuiz",
-          "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+          "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
           "revisionId": "rev_synthetic_1",
           "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         },
@@ -6171,7 +6171,7 @@
             "activityId": "act_quiz",
             "activityRevision": "ar_1",
             "activityType": "InteractiveQuiz",
-            "courseId": "66f1e2b3c4d5e6f7a8b9c0aa",
+            "courseId": "746ab2b5-9d09-5cc3-a5a8-8f766be0b9e4",
             "revisionId": "rev_synthetic_1",
             "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           }

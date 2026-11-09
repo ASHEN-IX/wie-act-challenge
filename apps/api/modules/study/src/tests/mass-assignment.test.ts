@@ -33,7 +33,7 @@ jest.mock('@ednova/shared/moduleClient', () => ({
 jest.mock('../models', () => {
   const createFn = jest
     .fn()
-    .mockImplementation((doc: object) => Promise.resolve({ _id: 'new-1', ...doc }));
+    .mockImplementation((doc: object) => Promise.resolve({ id: 'new-1', ...doc }));
   const findFn = jest.fn();
   const findOneFn = jest.fn();
   const updateOneFn = jest.fn();
@@ -43,7 +43,7 @@ jest.mock('../models', () => {
   // `save()` a document now call `Model.save(row)`.
   const saveFn = jest
     .fn()
-    .mockImplementation((doc: object) => Promise.resolve({ _id: 'new-1', ...doc }));
+    .mockImplementation((doc: object) => Promise.resolve({ id: 'new-1', ...doc }));
   return {
     Task: {
       create: createFn,
@@ -108,7 +108,7 @@ app.use('/', challengeRouter);
 // ── Helpers ─────────────────────────────────────────────────────────
 function mockTask(overrides = {}) {
   return {
-    _id: 'task-1',
+    id: 'task-1',
     userId: 'user-123',
     status: 'todo',
     priority: 'medium',
@@ -122,7 +122,7 @@ function mockTask(overrides = {}) {
 
 function mockSession(overrides = {}) {
   return {
-    _id: 'session-1',
+    id: 'session-1',
     userId: 'user-123',
     mode: 'standard',
     status: 'active',
@@ -189,7 +189,7 @@ describe('SEC-10 topic routes reject privileged fields', () => {
 
   it('PUT /topics/:id updates with stripped body', async () => {
     const topic = {
-      _id: 'topic-1',
+      id: 'topic-1',
       userId: 'user-123',
       name: 'Math',
       save: jest.fn().mockResolvedValue(true)

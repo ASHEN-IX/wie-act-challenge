@@ -138,10 +138,10 @@ test(
       status: 'active',
       createdByUserId: foreign.id
     });
-    institutionIds = [String(alpha._id), String(beta._id)];
+    institutionIds = [String(alpha.id), String(beta.id)];
     await models.InstitutionMembership.createMany(
       actors.map((actor) => ({
-        institutionId: actor === foreign ? beta._id : alpha._id,
+        institutionId: actor === foreign ? beta.id : alpha.id,
         userId: actor.id,
         status: 'active',
         role:
@@ -154,7 +154,7 @@ test(
     );
     await models.InstitutionMembership.createMany(
       cohort.slice(1).map((id) => ({
-        institutionId: alpha._id,
+        institutionId: alpha.id,
         userId: id,
         role: 'university_student',
         status: 'active'
@@ -166,17 +166,17 @@ test(
       title: 'Owned reviewed course',
       subjectId: 'synthetic',
       scope: 'institutional',
-      institutionId: alpha._id,
+      institutionId: alpha.id,
       assignedInstructorIds: [owner.id],
       status: 'completed',
       activeRevisionId: 'rev_analytics'
     });
-    courseId = String(course._id);
+    courseId = String(course.id);
     const hash = 'sha256:' + 'a'.repeat(64);
     await models.CourseEnrollment.createMany(
       cohort.map((id) => ({
         courseId,
-        institutionId: alpha._id,
+        institutionId: alpha.id,
         userId: id,
         status: 'active'
       }))
@@ -371,7 +371,7 @@ test(
           cursor.then = async function (onFulfilled?: never, onRejected?: never) {
             const rows = await then();
             await models.InstitutionMembership.updateOne(
-              { institutionId: alpha._id, userId: owner.id },
+              { institutionId: alpha.id, userId: owner.id },
               { status: 'suspended' }
             );
             return then(onFulfilled, onRejected).then(() => rows);
@@ -383,7 +383,7 @@ test(
         } finally {
           models.LearningEvidence.find = original;
           await models.InstitutionMembership.updateOne(
-            { institutionId: alpha._id, userId: owner.id },
+            { institutionId: alpha.id, userId: owner.id },
             { status: 'active' }
           );
         }

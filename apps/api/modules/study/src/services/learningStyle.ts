@@ -12,7 +12,6 @@ import {
 
 export interface LearningStyleState {
   id: string;
-  _id: string;
   userId: string;
   primary: LearningStyle;
   ranking: Array<{ style: LearningStyle; count: number }>;

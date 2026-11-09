@@ -10,7 +10,7 @@ describe('universal learning source adapter', () => {
     }));
     const document = (sectionBlocks: LessonBlockV2[]) => ({
       schemaVersion: '2.0.0',
-      courseId: 'a'.repeat(24),
+      courseId: '01020ca1-fc51-5c10-92c0-16c54abb997f',
       revisionId: 'rev_test',
       contentHash: 'sha256:' + 'a'.repeat(64),
       title: 'Long chapter',
@@ -65,7 +65,7 @@ describe('universal learning source adapter', () => {
     expect(() =>
       parseLearningDocument({
         schemaVersion: '2.0.0',
-        courseId: 'a'.repeat(24),
+        courseId: '01020ca1-fc51-5c10-92c0-16c54abb997f',
         revisionId: 'rev-1',
         contentHash: 'sha256:' + 'a'.repeat(64),
         title: 'Course',
@@ -138,7 +138,7 @@ describe('universal learning source adapter', () => {
     expect(() =>
       parseReadingDocumentV2({
         schemaVersion: '2.0.0',
-        courseId: 'a'.repeat(24),
+        courseId: '01020ca1-fc51-5c10-92c0-16c54abb997f',
         revisionId: 'rev_test',
         contentHash: 'sha256:' + 'a'.repeat(64),
         title: 'Canonical course',
@@ -200,7 +200,7 @@ describe('universal learning source adapter', () => {
         ...meta,
       },
     ],
-    { courseId: 'a'.repeat(24), revisionId: 'rev_test' });
+    { courseId: '01020ca1-fc51-5c10-92c0-16c54abb997f', revisionId: 'rev_test' });
     expect(blocks.map((block) => block.type)).toEqual(['paragraph', 'callout', 'media']);
     expect(blocks[0]).toMatchObject({ sourceMeta: meta });
     expect(blocks[0].provenance).toEqual([
@@ -208,14 +208,14 @@ describe('universal learning source adapter', () => {
     ]);
     expect(blocks[2]).toMatchObject({
       type: 'media',
-      src: `/api/v1/study/courses/${'a'.repeat(24)}/revisions/rev_test/sources/doc_1/regions/${meta.regionId}`,
+      src: `/api/v1/study/courses/${'01020ca1-fc51-5c10-92c0-16c54abb997f'}/revisions/rev_test/sources/doc_1/regions/${meta.regionId}`,
     });
   });
 
   it('rejects executable fields rather than stripping them', () => {
     const valid = {
       schemaVersion: '1.0.0',
-      courseId: 'a'.repeat(24),
+      courseId: '01020ca1-fc51-5c10-92c0-16c54abb997f',
       revisionId: 'rev-1',
       contentHash: 'sha256:' + 'a'.repeat(64),
       title: 'Course',

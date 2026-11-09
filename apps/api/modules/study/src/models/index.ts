@@ -108,7 +108,7 @@ export type IStudySession = Omit<
   StudySessionRow,
   'taskProgress' | 'signalHistory' | 'breakStats' | 'participants'
 > & {
-  _id: string;
+  id: string;
   taskProgress: {
     currentTaskIndex: number;
     tasks: ITaskProgressEntry[];
@@ -176,7 +176,7 @@ export const StudySession = table<IStudySession>({
 
 // ── Task ──────────────────────────────────────────────────────────────────────
 
-export type ITask = Omit<TaskRecordRow, never> & { _id: string };
+export type ITask = Omit<TaskRecordRow, never> & { id: string };
 
 export const Task = table<ITask>({
   delegate: () => prisma.taskRecord,
@@ -201,8 +201,8 @@ export const Task = table<ITask>({
 
 // ── Topic / Subject ───────────────────────────────────────────────────────────
 
-export type ITopic = TopicRow & { _id: string };
-export type ISubject = SubjectRow & { _id: string };
+export type ITopic = TopicRow & { id: string };
+export type ISubject = SubjectRow & { id: string };
 
 export const Topic = table<ITopic>({
   delegate: () => prisma.topic,
@@ -233,7 +233,7 @@ export const Subject = table<ISubject>({
 // ── Course ────────────────────────────────────────────────────────────────────
 
 export type ICourse = Omit<CourseRow, 'topics' | 'files'> & {
-  _id: string;
+  id: string;
   topics: ICourseTopic[];
   files: ICourseFile[];
 };
@@ -320,7 +320,7 @@ export interface IStudyPlanTask {
 }
 
 export type IStudyPlan = Omit<StudyPlanRow, 'taskGraph' | 'resourceScope'> & {
-  _id: string;
+  id: string;
   resourceScope?: { courseId?: string } | null;
   taskGraph: {
     goal?: string;
@@ -349,7 +349,6 @@ export const StudyPlan = table<IStudyPlan>({
 // ── Learning objectives ───────────────────────────────────────────────────────
 
 export interface ILearningObjective {
-  _id: string;
   id: string;
   userId: string;
   documentId: string;
@@ -401,7 +400,6 @@ export interface IEvidenceEntry {
 }
 
 export interface ICompetencyProfile {
-  _id: string;
   id: string;
   userId: string;
   topicId: string;
@@ -435,7 +433,6 @@ export const CompetencyProfile = table<ICompetencyProfile>({
  * first insert wins and a replay observes the existing row and ACK-skips.
  */
 export const CompetencyProcessing = table<{
-  _id: string;
   id: string;
   correlationId: string;
   processedAt: Date;
@@ -449,7 +446,6 @@ export const CompetencyProcessing = table<{
 // ── Eval results (written by the orchestrator) ───────────────────────────────
 
 export interface IEvalResultRecord {
-  _id: string;
   id: string;
   competencyProcessedAt?: Date | null;
   competencyLeaseUntil?: Date | null;

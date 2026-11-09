@@ -9,7 +9,7 @@ export type IStudentAttempt = Omit<
   StudentAttemptRow,
   'answers' | 'assessmentResult' | 'submission' | 'preparedEvidence'
 > & {
-  _id: string;
+  id: string;
   answers: Record<string, unknown>;
   assessmentResult?: Record<string, unknown> | null;
   submission?: Record<string, unknown> | null;

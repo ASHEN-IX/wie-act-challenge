@@ -38,7 +38,7 @@ async function main() {
 
     for (const u of [userA, userB]) {
       await db.collection("users").insertOne({
-        _id: u.id,
+        id: u.id,
         email: u.email,
         name: u.name,
         password: hashedPw,

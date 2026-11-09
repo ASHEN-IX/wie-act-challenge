@@ -64,7 +64,7 @@ test('Adaptive reviewed evidence and requester-only graduated source support', a
     subjectId: 'fixture',
     status: 'completed'
   });
-  courseId = String(course._id);
+  courseId = String(course.id);
   await CourseRevision.create({
     courseId,
     revisionTag: 'rev_policy',
@@ -216,7 +216,7 @@ test('Adaptive reviewed evidence and requester-only graduated source support', a
     }
   );
   await t.test('revocation blocks both selection and persisted support', async () => {
-    await Course.updateOne({ _id: courseId }, { $set: { userId: 'other', ownerUserId: 'other' } });
+    await Course.updateOne({ id: courseId }, { $set: { userId: 'other', ownerUserId: 'other' } });
     await assert.rejects(choose);
     await assert.rejects(() =>
       sourceLearningSupport(actor, courseId, { ...support, mode: 'explain' })

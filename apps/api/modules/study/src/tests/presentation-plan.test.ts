@@ -35,7 +35,7 @@ const lesson = (blocks: LessonBlockV2[]): PlanLessonInput => ({
 
 const plan = (blocks: LessonBlockV2[], mode: 'read' | 'explore' | 'practice' = 'read') =>
   buildPresentationPlan({
-    courseId: 'a'.repeat(24),
+    courseId: '01020ca1-fc51-5c10-92c0-16c54abb997f',
     revisionId: 'rev_1',
     contentHash: 'sha256:' + 'b'.repeat(64),
     mode,

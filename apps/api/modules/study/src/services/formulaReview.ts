@@ -22,11 +22,11 @@ export function validateCorrection(value: unknown): string {
 
 export async function reviewContext(actor: string | undefined, courseId: string, tag: string, proposalId: string) {
   if (!actor) fail(401, 'UNAUTHENTICATED');
-  if (!/^[a-f0-9]{24}$/.test(courseId) || !/^[a-f0-9]{24}$/.test(proposalId) || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(tag)) fail(422, 'INVALID_REQUEST');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(courseId) || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(proposalId) || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(tag)) fail(422, 'INVALID_REQUEST');
   if (!(await canManageCourse(actor, courseId))) fail(403, 'FORBIDDEN');
   const draft = await findEditableDraft(courseId);
   if (!draft || draft.revisionTag !== tag || draft.revokedAt) fail(409, 'DRAFT_CHANGED');
-  const proposal = await FormulaProposal.findOne({ _id: proposalId, courseId, revisionId: draft._id, revisionTag: tag }).lean();
+  const proposal = await FormulaProposal.findOne({ id: proposalId, courseId, revisionId: draft.id, revisionTag: tag }).lean();
   if (!proposal || Array.isArray(proposal)) fail(404, 'NOT_FOUND');
   if (proposal.draftVersion !== draft.__v) fail(409, 'DRAFT_CHANGED');
   const doc = draft.sourceManifest?.find(d => d.documentId === proposal.documentId);
@@ -37,6 +37,6 @@ export async function reviewContext(actor: string | undefined, courseId: string,
 
 export async function ensureSnapshot(actor: string, draft: any) {
   if (!(await canManageCourse(actor, String(draft.courseId))) ||
-      String((await findEditableDraft(String(draft.courseId)))?._id) !== String(draft._id) ||
-      !(await CourseRevision.exists({ _id: draft._id, revisionTag: draft.revisionTag, __v: draft.__v, status: 'draft', revokedAt: { $exists: false } }))) fail(409, 'DRAFT_CHANGED');
+      String((await findEditableDraft(String(draft.courseId)))?.id) !== String(draft.id) ||
+      !(await CourseRevision.exists({ id: draft.id, revisionTag: draft.revisionTag, __v: draft.__v, status: 'draft', revokedAt: { $exists: false } }))) fail(409, 'DRAFT_CHANGED');
 }

@@ -39,7 +39,7 @@ export type IStudyRoom = Omit<
   StudyRoomRow,
   'participants' | 'commandReceipts' | 'activePin' | 'visualizationState'
 > & {
-  _id: string;
+  id: string;
   participants: IStudyRoomParticipant[];
   commandReceipts: IRoomCommandReceipt[];
   activePin: {
@@ -136,7 +136,7 @@ function roomMatches(room: IStudyRoom, where: Record<string, unknown>): boolean 
     }
     if (key === 'commandReceipts') continue;
     if (key === '$expr') continue;
-    const field = key === '_id' ? 'id' : key;
+    const field = key === 'id' ? 'id' : key;
     const actual = (room as unknown as Record<string, unknown>)[field];
     if (value && typeof value === 'object' && !(value instanceof Date)) {
       const ops = value as Record<string, unknown>;

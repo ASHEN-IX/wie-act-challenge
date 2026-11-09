@@ -16,7 +16,7 @@ const { Course, CourseEnrollment, CourseRevision, CompetencyProfile } = require(
 import { getWeakCompetenciesForCourse } from '../services/competencyQueries';
 
 const courseDoc = {
-  _id: 'course-1',
+  id: 'course-1',
   userId: 'user-123',
   subjectId: 'subj-1',
   topics: [

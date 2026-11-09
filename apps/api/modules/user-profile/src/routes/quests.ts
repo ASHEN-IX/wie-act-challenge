@@ -183,7 +183,7 @@ router.post('/progress', requireInternal, async (req: DomainRequest, res: Respon
         // Quest bookkeeping is not verified personal learning evidence. Preserve
         // completion without minting XP through this legacy action pathway.
         results.push({
-          questId: quest._id,
+          questId: quest.id,
           title: quest.title,
           currentCount: quest.currentCount,
           targetCount: quest.targetCount,

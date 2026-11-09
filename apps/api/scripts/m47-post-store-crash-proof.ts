@@ -39,7 +39,7 @@ import { buildPlanningContext } from '../shared/ednova/planningContext';
 
 const URI = process.env.M47_MONGO || 'mongodb://127.0.0.1:27017';
 const DB = `test_m47_poststore_${process.pid}`;
-const courseId = '0123456789abcdef01234567';
+const courseId = 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d';
 const revisionId = 'rev_poststore';
 const lessonId = 'lesson-1';
 const mode = 'guided';
@@ -143,7 +143,7 @@ const PLANNER = { implementation: 'mock_experience_planner', version: 'mock/1.0.
 async function seedGovernance() {
   const db = mongoose.connection.db!;
   await db.collection('courses').insertOne({
-    _id: new mongoose.Types.ObjectId(courseId),
+    id: new mongoose.Types.ObjectId(courseId),
     ownerUserId: 'author-a',
     userId: 'author-a',
   } as never);

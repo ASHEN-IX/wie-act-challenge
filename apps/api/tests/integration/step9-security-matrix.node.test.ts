@@ -37,9 +37,9 @@ test('Step 9: Extended Adversarial Security and Privacy Matrix', async (t) => {
       await CourseRevision.deleteMany({ courseId });
       await CourseEnrollment.deleteMany({ courseId });
       await StudentAttempt.deleteMany({ courseId });
-      await Course.deleteMany({ _id: courseId });
+      await Course.deleteMany({ id: courseId });
       await InstitutionMembership.deleteMany({ institutionId: instId });
-      await Institution.deleteMany({ _id: instId });
+      await Institution.deleteMany({ id: instId });
       await StudyRoom.deleteMany({ roomId: { startsWith: 'sec_lk_room_' } });
     } finally {
       await disconnectDatabase().catch(() => {});
@@ -71,7 +71,7 @@ test('Step 9: Extended Adversarial Security and Privacy Matrix', async (t) => {
 
   const instId = newId();
   await Institution.create({
-    _id: instId,
+    id: instId,
     name: 'Security Test Academy',
     slug: 'sec-academy-' + Date.now(),
     status: 'active',
@@ -94,7 +94,7 @@ test('Step 9: Extended Adversarial Security and Privacy Matrix', async (t) => {
 
   // Seed course & published revision
   await Course.create({
-    _id: courseId,
+    id: courseId,
     title: 'Adversarial Security & Resilience Course',
     scope: 'institutional',
     institutionId: instId,

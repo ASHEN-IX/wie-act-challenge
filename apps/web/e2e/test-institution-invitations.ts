@@ -48,7 +48,7 @@ async function main() {
     for (const name of ["Admin", "Alice", "Bob"]) {
       const id = new ObjectId();
       await db.collection("users").insertOne({
-        _id: id,
+        id: id,
         name: `M04A1 ${name}`,
         email: `${name.toLowerCase()}-${Date.now()}@m04a1.browser.test`,
         password: passwordHash,
@@ -61,14 +61,14 @@ async function main() {
       actors.push({ id, name, email: "", page: undefined as unknown as Page });
     }
     for (const actor of actors) {
-      const row = await db.collection("users").findOne({ _id: actor.id });
+      const row = await db.collection("users").findOne({ id: actor.id });
       actor.email = String(row!.email);
     }
     const [adminData, aliceData, bobData] = actors;
 
     const courseId = new ObjectId();
     await db.collection("courses").insertOne({
-      _id: courseId,
+      id: courseId,
       userId: String(aliceData.id),
       subjectId: new ObjectId().toString(),
       title: "Alice personal reliability course",
@@ -224,7 +224,7 @@ async function main() {
     const expiredInvite = await issue(institutionA, "university_student");
     const revokedInvite = await issue(institutionA, "university_student");
     await db.collection("institution_invitations").updateOne(
-      { _id: new ObjectId(expiredInvite.id) },
+      { id: new ObjectId(expiredInvite.id) },
       { $set: { expiresAt: new Date(Date.now() - 60_000) } }
     );
     const revoked = await request(

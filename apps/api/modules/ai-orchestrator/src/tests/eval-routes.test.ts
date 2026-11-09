@@ -75,12 +75,12 @@ describe('POST /api/v1/eval/step', () => {
     scoped.use(express.json());
     scoped.use((req, res, next) => {
       Object.assign(req, { user: { userId: 'user-1' } });
-      res.locals.sourceCourseId = '0123456789abcdef01234567';
+      res.locals.sourceCourseId = 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d';
       next();
     });
     scoped.use(evalRoutes);
     resolveObjectiveContext.mockResolvedValue({
-      courseId: 'abcdef0123456789abcdef01',
+      courseId: 'c1e7302d-8173-564f-8817-a3562f3b7a54',
       targetBloomLevel: 'understand',
       knowledgeType: 'factual'
     });

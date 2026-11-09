@@ -77,7 +77,7 @@ const object =
 
 const id = text(128, 1);
 const courseId = (value: unknown) =>
-  /^[a-f0-9]{24}$/.test(text(24, 24)(value)) ? (value as string) : fail();
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(text(36, 36)(value)) ? (value as string) : fail();
 const hash = (value: unknown) =>
   /^sha256:[a-f0-9]{64}$/.test(text(71, 71)(value)) ? (value as string) : fail();
 const evidenceIds = array(id, 0, 128);

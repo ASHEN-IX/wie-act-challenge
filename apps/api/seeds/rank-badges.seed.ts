@@ -58,7 +58,7 @@ async function seedRankBadges(): Promise<void> {
     await connectDatabase();
     const badgeDocs = RANK_LADDER.map(buildBadgeDoc);
     for (const badge of badgeDocs) {
-      const { id: _id, rankIndex, ...rest } = badge;
+      const { id: id, rankIndex, ...rest } = badge;
       await prisma.rankBadge.upsert({
         where: { rankIndex },
         update: rest,

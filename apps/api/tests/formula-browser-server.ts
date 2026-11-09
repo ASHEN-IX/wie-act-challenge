@@ -154,7 +154,7 @@ async function main() {
     .provision(name)
     .catch(() => process.exit(1));
   await connectDatabase();
-  const userId = 'aaaaaaaaaaaaaaaaaaaaaaaa';
+  const userId = '04b3da2d-ec14-5643-bf49-e43f550168bf';
   await prisma.user.create({
     data: {
       id: userId,
@@ -190,7 +190,7 @@ async function main() {
   const runtime = await start({ port: 5351, workers: false });
   const { Course, CourseRevision } = require('../modules/study/src/models');
   const { activityDigest } = require('../modules/study/src/services/activityIdentity');
-  const courseId = 'bbbbbbbbbbbbbbbbbbbbbbbb';
+  const courseId = 'ebf069b5-6c44-5857-8834-17d3bc9778d0';
   const topics = [
     {
       id: 'chapter',
@@ -206,7 +206,7 @@ async function main() {
     }
   ];
   await Course.create({
-    _id: courseId,
+    id: courseId,
     userId: String(userId),
     ownerUserId: String(userId),
     scope: 'personal',

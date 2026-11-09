@@ -140,7 +140,7 @@ export function buildRankProgress(
 
 export async function getRankProfile(userId: string) {
   const season = await seasonService.getOrCreateActiveSeason();
-  const profile = await seasonService.ensureUserRankProfile(userId, season._id);
+  const profile = await seasonService.ensureUserRankProfile(userId, season.id);
   const progress = buildRankProgress(profile);
   const rankBadge = await getRankBadge(profile.rankIndex);
   return { season, profile, progress, rankBadge };

@@ -205,7 +205,7 @@ export function parseLearningAdaptation(
 
   // Identity is bound at the boundary: a record for another revision cannot be
   // presented as this one's.
-  const courseId = text(value.courseId, 24);
+  const courseId = text(value.courseId, 36);
   const revisionId = text(value.revisionId, 128);
   const lessonId = text(value.lessonId, 128);
   if (courseId !== binding.courseId) return fail('ADAPTATION_COURSE_MISMATCH');

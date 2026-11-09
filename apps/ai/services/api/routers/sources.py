@@ -45,7 +45,7 @@ class CanonicalIndexUnit(BaseModel):
 class IndexRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     schemaVersion: str = Field(pattern=r"^1\.0\.0$")
-    courseId: str = Field(pattern=r"^[a-f0-9]{24}$")
+    courseId: str = Field(pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
     revisionId: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
     contentHash: str = Field(pattern=r"^sha256:[a-f0-9]{64}$")
     documents: list[dict] = Field(min_length=1, max_length=32)
@@ -56,7 +56,7 @@ class IndexRequest(BaseModel):
 class RegionCropRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     schemaVersion: str = Field(pattern=r"^1\.0\.0$")
-    courseId: str = Field(pattern=r"^[a-f0-9]{24}$")
+    courseId: str = Field(pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
     revisionId: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
     contentHash: str = Field(pattern=r"^sha256:[a-f0-9]{64}$")
     documents: list[dict] = Field(min_length=1, max_length=32)

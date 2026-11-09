@@ -23,17 +23,17 @@ export async function migrateAuth(
     const email = String(user.email || '')
       .trim()
       .toLowerCase();
-    if (!email || emails.has(email) || !(user._id instanceof ObjectId))
+    if (!email || emails.has(email) || !(user.id instanceof ObjectId))
       throw new Error('Invalid or duplicate legacy identity; no migration performed');
     emails.add(email);
     const existing = await db
       .collection('auth_users')
-      .findOne({ $or: [{ _id: user._id }, { email }] });
-    if (existing && String(existing._id) !== String(user._id))
+      .findOne({ $or: [{ id: user.id }, { email }] });
+    if (existing && String(existing.id) !== String(user.id))
       throw new Error('Conflicting Better Auth identity; no migration performed');
     const credential = await db
       .collection('auth_accounts')
-      .findOne({ userId: user._id, providerId: 'credential' });
+      .findOne({ userId: user.id, providerId: 'credential' });
     if (!credential && !/^\$2[aby]\$12\$[./A-Za-z0-9]{53}$/.test(user.password || ''))
       throw new Error('Unsupported legacy password format; no migration performed');
   }
@@ -47,7 +47,7 @@ export async function migrateAuth(
     for (const user of users) {
       const now = new Date();
       await db.collection('auth_users').updateOne(
-        { _id: user._id },
+        { id: user.id },
         {
           $setOnInsert: {
             email: user.email.trim().toLowerCase(),
@@ -60,12 +60,12 @@ export async function migrateAuth(
         { upsert: true }
       );
       await db.collection('auth_accounts').updateOne(
-        { userId: user._id, providerId: 'credential' },
+        { userId: user.id, providerId: 'credential' },
         {
           $setOnInsert: {
-            _id: new ObjectId(),
-            userId: user._id,
-            accountId: String(user._id),
+            id: new ObjectId(),
+            userId: user.id,
+            accountId: String(user.id),
             providerId: 'credential',
             password: user.password,
             createdAt: user.createdAt || now,

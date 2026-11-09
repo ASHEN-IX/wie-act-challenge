@@ -44,7 +44,7 @@ router.get(
     const userId = req.user!.userId;
     const { topicId } = req.params;
 
-    const topic = await Topic.findOne({ _id: topicId, userId });
+    const topic = await Topic.findOne({ id: topicId, userId });
 
     if (!topic) {
       return res.status(404).json({ error: 'Topic not found' });
@@ -89,7 +89,7 @@ router.put(
     const userId = req.user!.userId;
     const { topicId } = req.params;
 
-    const topic = await Topic.findOne({ _id: topicId, userId });
+    const topic = await Topic.findOne({ id: topicId, userId });
 
     if (!topic) {
       return res.status(404).json({ error: 'Topic not found' });
@@ -112,7 +112,7 @@ router.delete(
     const userId = req.user!.userId;
     const { topicId } = req.params;
 
-    const result = await Topic.deleteOne({ _id: topicId, userId });
+    const result = await Topic.deleteOne({ id: topicId, userId });
 
     if (result.deletedCount === 0) {
       return res.status(404).json({ error: 'Topic not found' });

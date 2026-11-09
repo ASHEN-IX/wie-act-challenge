@@ -37,13 +37,13 @@ async function authorizedCourse(actor: string, courseId: string) {
 /** No global role or institution administrator grants educator insight access. */
 export async function instructorAnalyticsCourses(actor: string) {
   const candidates = await Course.find({ scope: 'institutional', assignedInstructorIds: actor })
-    .select('_id title')
-    .sort({ title: 1, _id: 1 })
+    .select('id title')
+    .sort({ title: 1, id: 1 })
     .limit(200);
   const courses = [];
   for (const course of candidates) {
-    if (await canAuthorCourse(actor, String(course._id)))
-      courses.push({ courseId: String(course._id), title: course.title });
+    if (await canAuthorCourse(actor, String(course.id)))
+      courses.push({ courseId: String(course.id), title: course.title });
   }
   // Listing can also be delayed by the database: re-check at delivery.
   const visible = [];

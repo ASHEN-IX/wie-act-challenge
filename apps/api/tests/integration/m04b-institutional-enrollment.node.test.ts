@@ -251,7 +251,7 @@ test(
       name: 'Personal Mathematics',
       color: '#10b981'
     });
-    subjectIds.push(String(subjectAlpha._id), String(subjectBeta._id), String(subjectPersonal._id));
+    subjectIds.push(String(subjectAlpha.id), String(subjectBeta.id), String(subjectPersonal.id));
 
     let coursePersonalId = '';
     let courseAlphaId = '';
@@ -264,7 +264,7 @@ test(
         '/api/v1/study/courses/manual',
         {
           title: 'Calculus I (Personal)',
-          subject_id: subjectPersonal._id.toString()
+          subject_id: subjectPersonal.id.toString()
         }
       );
       assert.equal(resPersonal.status, 201);
@@ -278,7 +278,7 @@ test(
         '/api/v1/study/courses/manual',
         {
           title: 'Algorithms & Data Structures',
-          subject_id: subjectAlpha._id.toString(),
+          subject_id: subjectAlpha.id.toString(),
           scope: 'institutional',
           institutionId: instAlphaId
         }
@@ -298,7 +298,7 @@ test(
         '/api/v1/study/courses/manual',
         {
           title: 'Thermodynamics',
-          subject_id: subjectBeta._id.toString(),
+          subject_id: subjectBeta.id.toString(),
           scope: 'institutional',
           institutionId: instBetaId
         }
@@ -313,7 +313,7 @@ test(
         '/api/v1/study/courses/manual',
         {
           title: 'Illegal Student Course',
-          subject_id: subjectAlpha._id.toString(),
+          subject_id: subjectAlpha.id.toString(),
           scope: 'institutional',
           institutionId: instAlphaId
         }

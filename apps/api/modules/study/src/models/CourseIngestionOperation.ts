@@ -9,7 +9,6 @@ export type IngestionOperationState =
 
 export interface IngestionOperation extends Record<string, unknown> {
   id: string;
-  _id: string;
   correlationId: string;
   courseId: string;
   revisionId: string;

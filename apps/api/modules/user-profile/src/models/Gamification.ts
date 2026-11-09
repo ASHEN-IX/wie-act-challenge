@@ -31,7 +31,7 @@ export type IGamification = Omit<
   GamificationRow,
   'stats' | 'xpHistory' | 'achievements' | 'evidenceAwards'
 > & {
-  _id: string;
+  id: string;
   stats: IGamificationStats;
   xpHistory: Array<{ action: string; xp: number; timestamp: Date; metadata?: unknown }>;
   achievements: IGamificationAchievement[];

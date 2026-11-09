@@ -306,7 +306,7 @@ export function parseLessonBlock(value: unknown): LessonBlockV2 {
 export function parseReadingDocumentV2(value: unknown): ReadingDocumentV2 {
   const v = exact(value, ['schemaVersion', 'courseId', 'revisionId', 'contentHash', 'title', 'canonical', 'generated', 'sections', 'sources', 'warnings']);
   if (v.schemaVersion !== '2.0.0') fail();
-  if (typeof v.courseId !== 'string' || !/^[a-f0-9]{24}$/.test(v.courseId)) fail();
+  if (typeof v.courseId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v.courseId)) fail();
   if (typeof v.contentHash !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(v.contentHash)) fail();
   const canonical = exact(v.canonical, ['extraction', 'projectionVersion', 'passages', 'mappings']);
   if (canonical.extraction !== 'deterministic' || canonical.projectionVersion !== '2.0.0') fail();

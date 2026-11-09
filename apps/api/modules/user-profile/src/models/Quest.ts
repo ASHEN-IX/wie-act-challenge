@@ -2,7 +2,7 @@ import type { Prisma, Quest as QuestRow } from '../../../../src/generated/prisma
 import { prisma, toDocument } from '../../../../shared/database';
 import { newId } from '../../../../shared/ids';
 
-export type IQuest = QuestRow & { _id: string };
+export type IQuest = QuestRow & { id: string };
 
 function hydrate(row: QuestRow): IQuest {
   return toDocument(row) as unknown as IQuest;

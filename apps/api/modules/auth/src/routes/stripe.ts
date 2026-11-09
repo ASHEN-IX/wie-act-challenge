@@ -176,7 +176,7 @@ async function upsertCustomer(user: IUser): Promise<string> {
   const customer = await stripe!.customers.create({
     email: user.email,
     name: user.name,
-    metadata: { userId: String(user._id) }
+    metadata: { userId: String(user.id) }
   });
 
   user.stripeCustomerId = customer.id;
@@ -233,7 +233,7 @@ router.post('/subscribe', authenticate, async (req: DomainRequest, res: Response
       success_url: `${frontendBase}${successPath}?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${frontendBase}${cancelPath}`,
       metadata: {
-        userId: String(user._id),
+        userId: String(user.id),
         tier: value.tier,
         durationMonths: String(pricing.durationMonths),
         monthlyPriceCents: String(pricing.monthlyPriceCents),
@@ -243,7 +243,7 @@ router.post('/subscribe', authenticate, async (req: DomainRequest, res: Response
 
     await Payment.create({
       id: newId(),
-      userId: String(user._id),
+      userId: String(user.id),
       stripeCheckoutSessionId: checkoutSession.id,
       stripeCustomerId: customerId,
       tier: value.tier as 'vip' | 'vip_plus',

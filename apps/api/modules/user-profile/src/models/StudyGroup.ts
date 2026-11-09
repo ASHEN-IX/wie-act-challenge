@@ -8,7 +8,6 @@ export const MAX_GROUP_INVITES = 10;
 export const MAX_OWNED_GROUPS = 10;
 
 export interface IStudyGroup {
-  _id: string;
   id: string;
   groupId: string;
   name: string;

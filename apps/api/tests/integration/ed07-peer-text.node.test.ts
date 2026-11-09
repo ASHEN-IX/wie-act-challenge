@@ -60,7 +60,7 @@ test('ED-07 public peer text real Nest/PostgreSQL', { timeout: 90000 }, async (t
     await StudyRoom.deleteMany({ hostUserId: { $in: actors.map((actor) => actor.id) } });
     if (roomIds.length)
       await prisma.sessionChat.deleteMany({ where: { sessionId: { in: roomIds } } });
-    if (courseIds.length) await Course.deleteMany({ _id: { $in: courseIds } });
+    if (courseIds.length) await Course.deleteMany({ id: { $in: courseIds } });
     const ids = actors.map((actor) => actor.id);
     await prisma.authSession.deleteMany({ where: { userId: { in: ids } } });
     await prisma.authAccount.deleteMany({ where: { userId: { in: ids } } });
@@ -185,7 +185,7 @@ test('ED-07 public peer text real Nest/PostgreSQL', { timeout: 90000 }, async (t
     if (!row) return null;
     return {
       ...row,
-      _id: row.id,
+      id: row.id,
       peerMessages: row.peerMessages as unknown as IPeerMessage[]
     };
   };
@@ -396,7 +396,7 @@ test('ED-07 public peer text real Nest/PostgreSQL', { timeout: 90000 }, async (t
     assert.equal(legacy.status, 200);
     assert.equal(legacy.body.items.length, 0);
     const raw = await journal();
-    assert.equal((await request(host, chatPath() + '/' + raw!._id, 'DELETE')).status, 403);
+    assert.equal((await request(host, chatPath() + '/' + raw!.id, 'DELETE')).status, 403);
   });
   await t.test(
     'concurrent conflicting reuse accepts one message and rejects the other',
@@ -479,7 +479,7 @@ test('ED-07 public peer text real Nest/PostgreSQL', { timeout: 90000 }, async (t
       assert.equal((await send(host, body, roomId)).status, 201);
       const connection = await connect(roomId, host);
       await waitFor(() => connection.received.some((e) => e.type === 'ROOM_STATE_SYNC'));
-      await Course.updateOne({ _id: courseId }, { userId: outsider.id });
+      await Course.updateOne({ id: courseId }, { userId: outsider.id });
       assert.equal((await send(host, body, roomId)).status, 403);
       assert.equal((await history(host, '', roomId)).status, 403);
       const { broadcastToSession } = await import('../../modules/notification/src/realtime.js');

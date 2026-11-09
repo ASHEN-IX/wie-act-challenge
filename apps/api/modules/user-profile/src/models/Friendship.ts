@@ -3,7 +3,7 @@ import { prisma, toDocument } from '../../../../shared/database';
 import { newId } from '../../../../shared/ids';
 
 export type FriendshipStatus = 'pending' | 'accepted' | 'rejected' | 'blocked';
-export type IFriendship = FriendshipRow & { _id: string };
+export type IFriendship = FriendshipRow & { id: string };
 
 function hydrate(row: FriendshipRow): IFriendship {
   return toDocument(row) as IFriendship;

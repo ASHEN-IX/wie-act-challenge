@@ -503,7 +503,7 @@ test(
         const foreignCourseId = newId();
         courseIds.push(foreignCourseId);
         await Course.create({
-          _id: foreignCourseId,
+          id: foreignCourseId,
           userId: String(platform.id),
           ownerUserId: String(platform.id),
           subjectId: newId(),

@@ -1,42 +1,12 @@
-/*
-  Warnings:
+-- CreateEnum
+CREATE TYPE "Role" AS ENUM ('student', 'admin');
 
-  - You are about to drop the column `access_token` on the `auth_accounts` table. All the data in the column will be lost.
-  - You are about to drop the column `access_token_expires_at` on the `auth_accounts` table. All the data in the column will be lost.
-  - You are about to drop the column `account_id` on the `auth_accounts` table. All the data in the column will be lost.
-  - You are about to drop the column `created_at` on the `auth_accounts` table. All the data in the column will be lost.
-  - You are about to drop the column `id_token` on the `auth_accounts` table. All the data in the column will be lost.
-  - You are about to drop the column `provider_id` on the `auth_accounts` table. All the data in the column will be lost.
-  - You are about to drop the column `refresh_token` on the `auth_accounts` table. All the data in the column will be lost.
-  - You are about to drop the column `refresh_token_expires_at` on the `auth_accounts` table. All the data in the column will be lost.
-  - You are about to drop the column `updated_at` on the `auth_accounts` table. All the data in the column will be lost.
-  - You are about to drop the column `user_id` on the `auth_accounts` table. All the data in the column will be lost.
-  - You are about to drop the column `last_request` on the `auth_rate_limits` table. All the data in the column will be lost.
-  - You are about to drop the column `created_at` on the `auth_sessions` table. All the data in the column will be lost.
-  - You are about to drop the column `expires_at` on the `auth_sessions` table. All the data in the column will be lost.
-  - You are about to drop the column `ip_address` on the `auth_sessions` table. All the data in the column will be lost.
-  - You are about to drop the column `updated_at` on the `auth_sessions` table. All the data in the column will be lost.
-  - You are about to drop the column `user_agent` on the `auth_sessions` table. All the data in the column will be lost.
-  - You are about to drop the column `user_id` on the `auth_sessions` table. All the data in the column will be lost.
-  - You are about to drop the column `created_at` on the `auth_users` table. All the data in the column will be lost.
-  - You are about to drop the column `email_verified` on the `auth_users` table. All the data in the column will be lost.
-  - You are about to drop the column `updated_at` on the `auth_users` table. All the data in the column will be lost.
-  - You are about to drop the column `created_at` on the `auth_verifications` table. All the data in the column will be lost.
-  - You are about to drop the column `expires_at` on the `auth_verifications` table. All the data in the column will be lost.
-  - You are about to drop the column `updated_at` on the `auth_verifications` table. All the data in the column will be lost.
-  - Added the required column `accountId` to the `auth_accounts` table without a default value. This is not possible if the table is not empty.
-  - Added the required column `providerId` to the `auth_accounts` table without a default value. This is not possible if the table is not empty.
-  - Added the required column `updatedAt` to the `auth_accounts` table without a default value. This is not possible if the table is not empty.
-  - Added the required column `userId` to the `auth_accounts` table without a default value. This is not possible if the table is not empty.
-  - Added the required column `lastRequest` to the `auth_rate_limits` table without a default value. This is not possible if the table is not empty.
-  - Added the required column `expiresAt` to the `auth_sessions` table without a default value. This is not possible if the table is not empty.
-  - Added the required column `updatedAt` to the `auth_sessions` table without a default value. This is not possible if the table is not empty.
-  - Added the required column `userId` to the `auth_sessions` table without a default value. This is not possible if the table is not empty.
-  - Added the required column `updatedAt` to the `auth_users` table without a default value. This is not possible if the table is not empty.
-  - Added the required column `expiresAt` to the `auth_verifications` table without a default value. This is not possible if the table is not empty.
-  - Added the required column `updatedAt` to the `auth_verifications` table without a default value. This is not possible if the table is not empty.
+-- CreateEnum
+CREATE TYPE "Tier" AS ENUM ('trial', 'normal', 'vip', 'vip_plus');
 
-*/
+-- CreateEnum
+CREATE TYPE "PaymentStatus" AS ENUM ('pending', 'succeeded', 'failed', 'canceled');
+
 -- CreateEnum
 CREATE TYPE "OnlineStatus" AS ENUM ('online', 'studying', 'offline');
 
@@ -109,77 +79,181 @@ CREATE TYPE "RoomPhase" AS ENUM ('idle', 'peer_discussion', 'individual_attempt'
 -- CreateEnum
 CREATE TYPE "RoomStatus" AS ENUM ('active', 'closed');
 
--- DropForeignKey
-ALTER TABLE "auth_accounts" DROP CONSTRAINT "auth_accounts_user_id_fkey";
+-- CreateTable
+CREATE TABLE "auth_users" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "emailVerified" BOOLEAN NOT NULL DEFAULT false,
+    "image" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
--- DropForeignKey
-ALTER TABLE "auth_sessions" DROP CONSTRAINT "auth_sessions_user_id_fkey";
+    CONSTRAINT "auth_users_pkey" PRIMARY KEY ("id")
+);
 
--- DropIndex
-DROP INDEX "auth_accounts_user_id_idx";
+-- CreateTable
+CREATE TABLE "auth_sessions" (
+    "id" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "token" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "ipAddress" TEXT,
+    "userAgent" TEXT,
+    "userId" TEXT NOT NULL,
 
--- DropIndex
-DROP INDEX "auth_sessions_user_id_idx";
+    CONSTRAINT "auth_sessions_pkey" PRIMARY KEY ("id")
+);
 
--- AlterTable
-ALTER TABLE "auth_accounts" DROP COLUMN "access_token",
-DROP COLUMN "access_token_expires_at",
-DROP COLUMN "account_id",
-DROP COLUMN "created_at",
-DROP COLUMN "id_token",
-DROP COLUMN "provider_id",
-DROP COLUMN "refresh_token",
-DROP COLUMN "refresh_token_expires_at",
-DROP COLUMN "updated_at",
-DROP COLUMN "user_id",
-ADD COLUMN     "accessToken" TEXT,
-ADD COLUMN     "accessTokenExpiresAt" TIMESTAMP(3),
-ADD COLUMN     "accountId" TEXT NOT NULL,
-ADD COLUMN     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-ADD COLUMN     "idToken" TEXT,
-ADD COLUMN     "providerId" TEXT NOT NULL,
-ADD COLUMN     "refreshToken" TEXT,
-ADD COLUMN     "refreshTokenExpiresAt" TIMESTAMP(3),
-ADD COLUMN     "updatedAt" TIMESTAMP(3) NOT NULL,
-ADD COLUMN     "userId" TEXT NOT NULL;
+-- CreateTable
+CREATE TABLE "auth_accounts" (
+    "id" TEXT NOT NULL,
+    "accountId" TEXT NOT NULL,
+    "providerId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "accessToken" TEXT,
+    "refreshToken" TEXT,
+    "idToken" TEXT,
+    "accessTokenExpiresAt" TIMESTAMP(3),
+    "refreshTokenExpiresAt" TIMESTAMP(3),
+    "scope" TEXT,
+    "password" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
--- AlterTable
-ALTER TABLE "auth_rate_limits" DROP COLUMN "last_request",
-ADD COLUMN     "lastRequest" BIGINT NOT NULL;
+    CONSTRAINT "auth_accounts_pkey" PRIMARY KEY ("id")
+);
 
--- AlterTable
-ALTER TABLE "auth_sessions" DROP COLUMN "created_at",
-DROP COLUMN "expires_at",
-DROP COLUMN "ip_address",
-DROP COLUMN "updated_at",
-DROP COLUMN "user_agent",
-DROP COLUMN "user_id",
-ADD COLUMN     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-ADD COLUMN     "expiresAt" TIMESTAMP(3) NOT NULL,
-ADD COLUMN     "ipAddress" TEXT,
-ADD COLUMN     "updatedAt" TIMESTAMP(3) NOT NULL,
-ADD COLUMN     "userAgent" TEXT,
-ADD COLUMN     "userId" TEXT NOT NULL;
+-- CreateTable
+CREATE TABLE "auth_verifications" (
+    "id" TEXT NOT NULL,
+    "identifier" TEXT NOT NULL,
+    "value" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
--- AlterTable
-ALTER TABLE "auth_users" DROP COLUMN "created_at",
-DROP COLUMN "email_verified",
-DROP COLUMN "updated_at",
-ADD COLUMN     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-ADD COLUMN     "emailVerified" BOOLEAN NOT NULL DEFAULT false,
-ADD COLUMN     "updatedAt" TIMESTAMP(3) NOT NULL;
+    CONSTRAINT "auth_verifications_pkey" PRIMARY KEY ("id")
+);
 
--- AlterTable
-ALTER TABLE "auth_verifications" DROP COLUMN "created_at",
-DROP COLUMN "expires_at",
-DROP COLUMN "updated_at",
-ADD COLUMN     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-ADD COLUMN     "expiresAt" TIMESTAMP(3) NOT NULL,
-ADD COLUMN     "updatedAt" TIMESTAMP(3) NOT NULL;
+-- CreateTable
+CREATE TABLE "auth_rate_limits" (
+    "id" TEXT NOT NULL,
+    "key" TEXT NOT NULL,
+    "count" INTEGER NOT NULL,
+    "lastRequest" BIGINT NOT NULL,
+
+    CONSTRAINT "auth_rate_limits_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "users" (
+    "id" UUID NOT NULL,
+    "email" TEXT NOT NULL,
+    "password" TEXT,
+    "name" TEXT NOT NULL,
+    "role" "Role" NOT NULL DEFAULT 'student',
+    "isAdmin" BOOLEAN NOT NULL DEFAULT false,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "isVerified" BOOLEAN NOT NULL DEFAULT false,
+    "lastLogin" TIMESTAMP(3),
+    "tier" "Tier" NOT NULL DEFAULT 'trial',
+    "trialStartedAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP,
+    "trialExpiresAt" TIMESTAMP(3),
+    "tierChangedAt" TIMESTAMP(3),
+    "subscriptionId" TEXT,
+    "subscriptionStartAt" TIMESTAMP(3),
+    "subscriptionEndAt" TIMESTAMP(3),
+    "subscriptionDurationMonths" INTEGER NOT NULL DEFAULT 0,
+    "autoRenew" BOOLEAN NOT NULL DEFAULT false,
+    "renewalDate" TIMESTAMP(3),
+    "canChangeAfter" TIMESTAMP(3),
+    "subscriptionExpiryNoticeSentAt" TIMESTAMP(3),
+    "entitlementPurchasedAt" TIMESTAMP(3),
+    "stripeCustomerId" TEXT,
+    "verificationToken" TEXT,
+    "verificationExpires" TIMESTAMP(3),
+    "verificationOtp" TEXT,
+    "verificationOtpExpires" TIMESTAMP(3),
+    "verificationOtpAttempts" INTEGER NOT NULL DEFAULT 0,
+    "resetPasswordToken" TEXT,
+    "resetPasswordExpires" TIMESTAMP(3),
+    "onboardingCompletedAt" TIMESTAMP(3),
+    "appliedCheckoutSessionIds" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    "appliedCouponIds" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    "notificationPreferences" JSONB NOT NULL,
+    "onboardingDraft" JSONB NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "users_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "refresh_tokens" (
+    "id" UUID NOT NULL,
+    "userId" UUID NOT NULL,
+    "tokenHash" TEXT NOT NULL,
+    "jti" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "refresh_tokens_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "coupons" (
+    "id" UUID NOT NULL,
+    "code" TEXT NOT NULL,
+    "targetTier" "Tier" NOT NULL,
+    "durationDays" INTEGER NOT NULL DEFAULT 30,
+    "createdBy" UUID,
+    "expiresAt" TIMESTAMP(3),
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "maxUses" INTEGER NOT NULL DEFAULT 1,
+    "usageCount" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "coupons_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "coupon_usages" (
+    "id" UUID NOT NULL,
+    "couponId" UUID NOT NULL,
+    "userId" UUID NOT NULL,
+    "redeemedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "coupon_usages_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "payments" (
+    "id" UUID NOT NULL,
+    "userId" UUID NOT NULL,
+    "stripeEventId" TEXT,
+    "stripeCheckoutSessionId" TEXT,
+    "stripeSubscriptionId" TEXT,
+    "stripeCustomerId" TEXT,
+    "tier" "Tier" NOT NULL,
+    "durationMonths" INTEGER NOT NULL DEFAULT 1,
+    "monthlyPriceCents" INTEGER,
+    "discountPercentage" INTEGER NOT NULL DEFAULT 0,
+    "status" "PaymentStatus" NOT NULL DEFAULT 'pending',
+    "amount" INTEGER,
+    "currency" TEXT NOT NULL DEFAULT 'usd',
+    "metadata" JSONB NOT NULL DEFAULT '{}',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "payments_pkey" PRIMARY KEY ("id")
+);
 
 -- CreateTable
 CREATE TABLE "user_profiles" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "userId" TEXT NOT NULL,
     "bio" VARCHAR(500),
     "avatar" TEXT NOT NULL,
@@ -204,7 +278,7 @@ CREATE TABLE "user_profiles" (
 
 -- CreateTable
 CREATE TABLE "friendships" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "requester" TEXT NOT NULL,
     "recipient" TEXT NOT NULL,
     "status" "FriendshipStatus" NOT NULL DEFAULT 'pending',
@@ -216,7 +290,7 @@ CREATE TABLE "friendships" (
 
 -- CreateTable
 CREATE TABLE "study_groups" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "groupId" TEXT NOT NULL,
     "name" VARCHAR(60) NOT NULL,
     "subject" VARCHAR(60) NOT NULL DEFAULT '',
@@ -230,8 +304,8 @@ CREATE TABLE "study_groups" (
 
 -- CreateTable
 CREATE TABLE "study_group_members" (
-    "id" VARCHAR(24) NOT NULL,
-    "groupId" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
+    "groupId" UUID NOT NULL,
     "userId" TEXT NOT NULL,
     "joinedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -240,8 +314,8 @@ CREATE TABLE "study_group_members" (
 
 -- CreateTable
 CREATE TABLE "study_group_invites" (
-    "id" VARCHAR(24) NOT NULL,
-    "groupId" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
+    "groupId" UUID NOT NULL,
     "userId" TEXT NOT NULL,
     "invitedBy" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -250,8 +324,22 @@ CREATE TABLE "study_group_invites" (
 );
 
 -- CreateTable
+CREATE TABLE "learningstyleprofiles" (
+    "id" UUID NOT NULL,
+    "userId" TEXT NOT NULL,
+    "primary" TEXT NOT NULL,
+    "ranking" JSONB NOT NULL DEFAULT '[]',
+    "provisional" BOOLEAN NOT NULL DEFAULT true,
+    "completedAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "learningstyleprofiles_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "availabilityslots" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "userId" TEXT NOT NULL,
     "dayOfWeek" TEXT NOT NULL,
     "startTime" TEXT NOT NULL,
@@ -267,7 +355,7 @@ CREATE TABLE "availabilityslots" (
 
 -- CreateTable
 CREATE TABLE "gamifications" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "userId" TEXT NOT NULL,
     "totalXp" INTEGER NOT NULL DEFAULT 0,
     "level" INTEGER NOT NULL DEFAULT 1,
@@ -283,7 +371,7 @@ CREATE TABLE "gamifications" (
 
 -- CreateTable
 CREATE TABLE "quests" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "userId" TEXT NOT NULL,
     "type" "QuestType" NOT NULL,
     "title" TEXT NOT NULL,
@@ -304,7 +392,7 @@ CREATE TABLE "quests" (
 
 -- CreateTable
 CREATE TABLE "learning_reward_ledger" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "awardId" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "completionKey" TEXT NOT NULL,
@@ -322,7 +410,7 @@ CREATE TABLE "learning_reward_ledger" (
 
 -- CreateTable
 CREATE TABLE "rankseasons" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "seasonCode" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "theme" TEXT,
@@ -340,9 +428,9 @@ CREATE TABLE "rankseasons" (
 
 -- CreateTable
 CREATE TABLE "userrankprofiles" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "userId" TEXT NOT NULL,
-    "currentSeasonId" VARCHAR(24),
+    "currentSeasonId" UUID,
     "knowledgePoints" INTEGER NOT NULL DEFAULT 0,
     "rankIndex" INTEGER NOT NULL DEFAULT 3,
     "rankName" TEXT NOT NULL,
@@ -365,8 +453,8 @@ CREATE TABLE "userrankprofiles" (
 
 -- CreateTable
 CREATE TABLE "seasonresultsnapshots" (
-    "id" VARCHAR(24) NOT NULL,
-    "seasonId" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
+    "seasonId" UUID NOT NULL,
     "userId" TEXT NOT NULL,
     "position" INTEGER,
     "finalRankIndex" INTEGER NOT NULL,
@@ -386,9 +474,9 @@ CREATE TABLE "seasonresultsnapshots" (
 
 -- CreateTable
 CREATE TABLE "rankeventledgers" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "userId" TEXT NOT NULL,
-    "seasonId" VARCHAR(24) NOT NULL,
+    "seasonId" UUID NOT NULL,
     "action" TEXT NOT NULL,
     "baseKP" INTEGER NOT NULL DEFAULT 0,
     "multipliers" JSONB NOT NULL,
@@ -412,7 +500,7 @@ CREATE TABLE "rankeventledgers" (
 
 -- CreateTable
 CREATE TABLE "rankbadges" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "rankIndex" INTEGER NOT NULL,
     "rankName" TEXT NOT NULL,
     "tier" TEXT NOT NULL,
@@ -428,7 +516,7 @@ CREATE TABLE "rankbadges" (
 
 -- CreateTable
 CREATE TABLE "subjects" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "userId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT,
@@ -442,7 +530,7 @@ CREATE TABLE "subjects" (
 
 -- CreateTable
 CREATE TABLE "topics" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "userId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT,
@@ -458,11 +546,11 @@ CREATE TABLE "topics" (
 
 -- CreateTable
 CREATE TABLE "courses" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "userId" TEXT NOT NULL,
     "scope" "CourseScope" NOT NULL DEFAULT 'personal',
     "visibility" "CourseVisibility",
-    "institutionId" VARCHAR(24),
+    "institutionId" UUID,
     "ownerUserId" TEXT,
     "assignedInstructorIds" TEXT[] DEFAULT ARRAY[]::TEXT[],
     "activeRevisionId" TEXT,
@@ -488,8 +576,8 @@ CREATE TABLE "courses" (
 
 -- CreateTable
 CREATE TABLE "course_revisions" (
-    "id" VARCHAR(24) NOT NULL,
-    "courseId" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
+    "courseId" UUID NOT NULL,
     "revisionTag" TEXT NOT NULL,
     "contentHash" TEXT NOT NULL,
     "status" "CourseRevisionStatus" NOT NULL DEFAULT 'draft',
@@ -510,6 +598,7 @@ CREATE TABLE "course_revisions" (
     "expectedActiveRevisionId" TEXT,
     "approvedActivities" JSONB,
     "revokedAt" TIMESTAMP(3),
+    "__v" INTEGER NOT NULL DEFAULT 0,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -518,9 +607,9 @@ CREATE TABLE "course_revisions" (
 
 -- CreateTable
 CREATE TABLE "course_enrollments" (
-    "id" VARCHAR(24) NOT NULL,
-    "courseId" VARCHAR(24) NOT NULL,
-    "institutionId" VARCHAR(24),
+    "id" UUID NOT NULL,
+    "courseId" UUID NOT NULL,
+    "institutionId" UUID,
     "userId" TEXT NOT NULL,
     "status" "CourseEnrollmentStatus" NOT NULL DEFAULT 'active',
     "enrolledAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -534,9 +623,9 @@ CREATE TABLE "course_enrollments" (
 
 -- CreateTable
 CREATE TABLE "course_invitations" (
-    "id" VARCHAR(24) NOT NULL,
-    "courseId" VARCHAR(24) NOT NULL,
-    "institutionId" VARCHAR(24),
+    "id" UUID NOT NULL,
+    "courseId" UUID NOT NULL,
+    "institutionId" UUID,
     "role" "CourseInvitationRole" NOT NULL DEFAULT 'student',
     "tokenHash" TEXT NOT NULL,
     "recipientEmail" TEXT,
@@ -554,9 +643,9 @@ CREATE TABLE "course_invitations" (
 
 -- CreateTable
 CREATE TABLE "public_course_joins" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "userId" TEXT NOT NULL,
-    "courseId" VARCHAR(24) NOT NULL,
+    "courseId" UUID NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "public_course_joins_pkey" PRIMARY KEY ("id")
@@ -564,7 +653,7 @@ CREATE TABLE "public_course_joins" (
 
 -- CreateTable
 CREATE TABLE "institutions" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "name" VARCHAR(120) NOT NULL,
     "slug" VARCHAR(80) NOT NULL,
     "domain" VARCHAR(253),
@@ -579,8 +668,8 @@ CREATE TABLE "institutions" (
 
 -- CreateTable
 CREATE TABLE "institution_memberships" (
-    "id" VARCHAR(24) NOT NULL,
-    "institutionId" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
+    "institutionId" UUID NOT NULL,
     "userId" TEXT NOT NULL,
     "role" "InstitutionMembershipRole" NOT NULL,
     "status" "InstitutionMembershipStatus" NOT NULL DEFAULT 'active',
@@ -593,8 +682,8 @@ CREATE TABLE "institution_memberships" (
 
 -- CreateTable
 CREATE TABLE "institution_invitations" (
-    "id" VARCHAR(24) NOT NULL,
-    "institutionId" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
+    "institutionId" UUID NOT NULL,
     "role" "InstitutionInvitationRole" NOT NULL,
     "tokenHash" TEXT NOT NULL,
     "status" "InstitutionInvitationStatus" NOT NULL DEFAULT 'pending',
@@ -611,7 +700,7 @@ CREATE TABLE "institution_invitations" (
 
 -- CreateTable
 CREATE TABLE "activity_records" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "courseId" TEXT NOT NULL,
     "revisionId" TEXT NOT NULL,
     "contentHash" TEXT NOT NULL,
@@ -629,7 +718,7 @@ CREATE TABLE "activity_records" (
 
 -- CreateTable
 CREATE TABLE "student_attempts" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "userId" TEXT NOT NULL,
     "attemptId" TEXT NOT NULL,
     "courseId" TEXT NOT NULL,
@@ -658,7 +747,7 @@ CREATE TABLE "student_attempts" (
 
 -- CreateTable
 CREATE TABLE "learning_evidences" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "evidenceId" TEXT NOT NULL,
     "evidenceVersion" TEXT NOT NULL DEFAULT '1.0.0',
     "userId" TEXT NOT NULL,
@@ -680,7 +769,7 @@ CREATE TABLE "learning_evidences" (
 
 -- CreateTable
 CREATE TABLE "learningsupports" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "userId" TEXT NOT NULL,
     "courseId" TEXT NOT NULL,
     "revisionId" TEXT NOT NULL,
@@ -695,7 +784,7 @@ CREATE TABLE "learningsupports" (
 
 -- CreateTable
 CREATE TABLE "visual_labs" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "labId" TEXT NOT NULL,
     "schemaVersion" INTEGER NOT NULL,
     "ownerUserId" TEXT NOT NULL,
@@ -723,7 +812,7 @@ CREATE TABLE "visual_labs" (
 
 -- CreateTable
 CREATE TABLE "course_nardouch_progress" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "userId" TEXT NOT NULL,
     "courseId" TEXT NOT NULL,
     "revisionId" TEXT NOT NULL,
@@ -736,7 +825,7 @@ CREATE TABLE "course_nardouch_progress" (
 
 -- CreateTable
 CREATE TABLE "nardouchconversations" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "userId" TEXT NOT NULL,
     "courseId" TEXT NOT NULL,
     "revisionId" TEXT NOT NULL,
@@ -757,7 +846,7 @@ CREATE TABLE "nardouchconversations" (
 
 -- CreateTable
 CREATE TABLE "learner_adaptation_preferences" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "userId" TEXT NOT NULL,
     "version" INTEGER NOT NULL DEFAULT 0,
     "recommendationsEnabled" BOOLEAN NOT NULL DEFAULT true,
@@ -775,7 +864,7 @@ CREATE TABLE "learner_adaptation_preferences" (
 
 -- CreateTable
 CREATE TABLE "experience_plan_requests" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "requestId" TEXT NOT NULL,
     "identity" TEXT NOT NULL,
     "courseId" TEXT NOT NULL,
@@ -805,7 +894,7 @@ CREATE TABLE "experience_plan_requests" (
 
 -- CreateTable
 CREATE TABLE "experience_plan_records" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "planId" TEXT NOT NULL,
     "courseId" TEXT NOT NULL,
     "revisionId" TEXT NOT NULL,
@@ -836,9 +925,9 @@ CREATE TABLE "experience_plan_records" (
 
 -- CreateTable
 CREATE TABLE "formulaproposals" (
-    "id" VARCHAR(24) NOT NULL,
-    "courseId" VARCHAR(24) NOT NULL,
-    "revisionId" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
+    "courseId" UUID NOT NULL,
+    "revisionId" UUID NOT NULL,
     "revisionTag" TEXT NOT NULL,
     "draftVersion" INTEGER NOT NULL,
     "documentId" TEXT NOT NULL,
@@ -868,7 +957,7 @@ CREATE TABLE "formulaproposals" (
 
 -- CreateTable
 CREATE TABLE "formularecognitionjobs" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "identity" TEXT NOT NULL,
     "courseId" TEXT NOT NULL,
     "revisionId" TEXT NOT NULL,
@@ -899,7 +988,7 @@ CREATE TABLE "formularecognitionjobs" (
 
 -- CreateTable
 CREATE TABLE "structuredassets" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "assetId" TEXT NOT NULL,
     "courseId" TEXT NOT NULL,
     "revisionId" TEXT NOT NULL,
@@ -926,7 +1015,7 @@ CREATE TABLE "structuredassets" (
 
 -- CreateTable
 CREATE TABLE "structured_asset_reviews" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "reviewId" TEXT NOT NULL,
     "courseId" TEXT NOT NULL,
     "revisionId" TEXT NOT NULL,
@@ -948,7 +1037,7 @@ CREATE TABLE "structured_asset_reviews" (
 
 -- CreateTable
 CREATE TABLE "study_rooms" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "createCommandId" TEXT,
     "roomId" TEXT NOT NULL,
     "inviteCode" TEXT NOT NULL,
@@ -977,7 +1066,7 @@ CREATE TABLE "study_rooms" (
 
 -- CreateTable
 CREATE TABLE "facilitatorinterventions" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "interventionId" TEXT NOT NULL,
     "roomId" TEXT NOT NULL,
     "strategy" TEXT NOT NULL,
@@ -996,7 +1085,7 @@ CREATE TABLE "facilitatorinterventions" (
 
 -- CreateTable
 CREATE TABLE "room_whiteboards" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "roomId" TEXT NOT NULL,
     "version" INTEGER NOT NULL DEFAULT 0,
     "locked" BOOLEAN NOT NULL DEFAULT false,
@@ -1009,7 +1098,7 @@ CREATE TABLE "room_whiteboards" (
 
 -- CreateTable
 CREATE TABLE "roomlearningproposals" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "proposalId" TEXT,
     "roomId" TEXT,
     "presenterUserId" TEXT,
@@ -1028,7 +1117,7 @@ CREATE TABLE "roomlearningproposals" (
 
 -- CreateTable
 CREATE TABLE "roomlearningchecks" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "checkId" TEXT,
     "roomId" TEXT,
     "round" TEXT,
@@ -1043,7 +1132,7 @@ CREATE TABLE "roomlearningchecks" (
 
 -- CreateTable
 CREATE TABLE "private_room_help" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "userId" TEXT NOT NULL,
     "roomId" TEXT NOT NULL,
     "requestId" TEXT NOT NULL,
@@ -1062,7 +1151,7 @@ CREATE TABLE "private_room_help" (
 
 -- CreateTable
 CREATE TABLE "studysessions" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "userId" TEXT NOT NULL,
     "taskId" TEXT,
     "topicId" TEXT,
@@ -1093,7 +1182,7 @@ CREATE TABLE "studysessions" (
 
 -- CreateTable
 CREATE TABLE "tasks" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "userId" TEXT NOT NULL,
     "studyPlanId" TEXT,
     "title" TEXT NOT NULL,
@@ -1116,7 +1205,7 @@ CREATE TABLE "tasks" (
 
 -- CreateTable
 CREATE TABLE "studyplans" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "resourceScope" JSONB,
     "userId" TEXT NOT NULL,
     "courseId" TEXT,
@@ -1135,7 +1224,7 @@ CREATE TABLE "studyplans" (
 
 -- CreateTable
 CREATE TABLE "learning_objectives" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "userId" TEXT NOT NULL,
     "documentId" TEXT NOT NULL,
     "objectiveId" TEXT NOT NULL,
@@ -1157,7 +1246,7 @@ CREATE TABLE "learning_objectives" (
 
 -- CreateTable
 CREATE TABLE "competency_profiles" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "userId" TEXT NOT NULL,
     "topicId" TEXT NOT NULL,
     "knowledgeType" TEXT NOT NULL,
@@ -1165,6 +1254,7 @@ CREATE TABLE "competency_profiles" (
     "score" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "confidence" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "evidence" JSONB NOT NULL DEFAULT '[]',
+    "__v" INTEGER NOT NULL DEFAULT 0,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -1173,7 +1263,7 @@ CREATE TABLE "competency_profiles" (
 
 -- CreateTable
 CREATE TABLE "competency_processing" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "correlationId" TEXT NOT NULL,
     "processedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1184,12 +1274,12 @@ CREATE TABLE "competency_processing" (
 
 -- CreateTable
 CREATE TABLE "eval_results" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "competencyProcessedAt" TIMESTAMP(3),
     "competencyLeaseUntil" TIMESTAMP(3),
     "competencyLeaseToken" TEXT,
     "correlationId" TEXT NOT NULL,
-    "messageId" TEXT NOT NULL,
+    "messageId" TEXT,
     "userId" TEXT NOT NULL,
     "sessionId" TEXT NOT NULL,
     "step" INTEGER NOT NULL,
@@ -1207,7 +1297,7 @@ CREATE TABLE "eval_results" (
 
 -- CreateTable
 CREATE TABLE "ai_jobs" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "jobId" TEXT NOT NULL,
     "type" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
@@ -1231,7 +1321,7 @@ CREATE TABLE "ai_jobs" (
 CREATE TABLE "course_ingestion_operations" (
     "id" VARCHAR(64) NOT NULL,
     "correlationId" TEXT NOT NULL,
-    "courseId" VARCHAR(24) NOT NULL,
+    "courseId" UUID NOT NULL,
     "revisionId" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "requestId" TEXT,
@@ -1251,7 +1341,7 @@ CREATE TABLE "course_ingestion_operations" (
 
 -- CreateTable
 CREATE TABLE "notifications" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "userId" TEXT NOT NULL,
     "type" TEXT NOT NULL,
     "title" VARCHAR(200) NOT NULL,
@@ -1268,7 +1358,7 @@ CREATE TABLE "notifications" (
 
 -- CreateTable
 CREATE TABLE "sessionchats" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "sessionId" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "messageType" TEXT NOT NULL,
@@ -1285,7 +1375,7 @@ CREATE TABLE "sessionchats" (
 
 -- CreateTable
 CREATE TABLE "voicesessions" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "sessionId" TEXT NOT NULL,
     "startedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "endedAt" TIMESTAMP(3),
@@ -1300,7 +1390,7 @@ CREATE TABLE "voicesessions" (
 
 -- CreateTable
 CREATE TABLE "focussessions" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "userId" TEXT NOT NULL,
     "studySessionId" TEXT,
     "startTime" TIMESTAMP(3) NOT NULL,
@@ -1316,7 +1406,7 @@ CREATE TABLE "focussessions" (
 
 -- CreateTable
 CREATE TABLE "analytics_events" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "userId" TEXT NOT NULL,
     "eventType" TEXT NOT NULL,
     "metadata" JSONB,
@@ -1338,7 +1428,7 @@ CREATE TABLE "api_instance_leases" (
 
 -- CreateTable
 CREATE TABLE "calendar" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "userId" TEXT NOT NULL,
     "taskId" TEXT,
     "planId" TEXT,
@@ -1355,7 +1445,7 @@ CREATE TABLE "calendar" (
 
 -- CreateTable
 CREATE TABLE "llm_approval_budgets" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "key" TEXT NOT NULL,
     "payload" JSONB NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1366,7 +1456,7 @@ CREATE TABLE "llm_approval_budgets" (
 
 -- CreateTable
 CREATE TABLE "experience_planner_eligibility" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "provider" TEXT,
     "model" TEXT,
     "payload" JSONB NOT NULL,
@@ -1378,7 +1468,7 @@ CREATE TABLE "experience_planner_eligibility" (
 
 -- CreateTable
 CREATE TABLE "experience_planning_consents" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "userId" TEXT,
     "scope" TEXT,
     "payload" JSONB NOT NULL,
@@ -1390,7 +1480,7 @@ CREATE TABLE "experience_planning_consents" (
 
 -- CreateTable
 CREATE TABLE "formula_source_consents" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "payload" JSONB NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -1400,7 +1490,7 @@ CREATE TABLE "formula_source_consents" (
 
 -- CreateTable
 CREATE TABLE "formula_provider_eligibility" (
-    "id" VARCHAR(24) NOT NULL,
+    "id" UUID NOT NULL,
     "provider" TEXT,
     "model" TEXT,
     "freeTier" BOOLEAN,
@@ -1415,6 +1505,81 @@ CREATE TABLE "formula_provider_eligibility" (
 
     CONSTRAINT "formula_provider_eligibility_pkey" PRIMARY KEY ("id")
 );
+
+-- CreateIndex
+CREATE UNIQUE INDEX "auth_users_email_key" ON "auth_users"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "auth_sessions_token_key" ON "auth_sessions"("token");
+
+-- CreateIndex
+CREATE INDEX "auth_sessions_userId_idx" ON "auth_sessions"("userId");
+
+-- CreateIndex
+CREATE INDEX "auth_accounts_userId_idx" ON "auth_accounts"("userId");
+
+-- CreateIndex
+CREATE INDEX "auth_verifications_identifier_idx" ON "auth_verifications"("identifier");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "auth_rate_limits_key_key" ON "auth_rate_limits"("key");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
+
+-- CreateIndex
+CREATE INDEX "users_isAdmin_idx" ON "users"("isAdmin");
+
+-- CreateIndex
+CREATE INDEX "users_isActive_idx" ON "users"("isActive");
+
+-- CreateIndex
+CREATE INDEX "users_subscriptionEndAt_idx" ON "users"("subscriptionEndAt");
+
+-- CreateIndex
+CREATE INDEX "users_verificationToken_idx" ON "users"("verificationToken");
+
+-- CreateIndex
+CREATE INDEX "users_resetPasswordToken_idx" ON "users"("resetPasswordToken");
+
+-- CreateIndex
+CREATE INDEX "refresh_tokens_userId_idx" ON "refresh_tokens"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "coupons_code_key" ON "coupons"("code");
+
+-- CreateIndex
+CREATE INDEX "coupons_targetTier_idx" ON "coupons"("targetTier");
+
+-- CreateIndex
+CREATE INDEX "coupons_expiresAt_idx" ON "coupons"("expiresAt");
+
+-- CreateIndex
+CREATE INDEX "coupons_isActive_idx" ON "coupons"("isActive");
+
+-- CreateIndex
+CREATE INDEX "coupon_usages_userId_idx" ON "coupon_usages"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "coupon_usages_couponId_userId_key" ON "coupon_usages"("couponId", "userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "payments_stripeEventId_key" ON "payments"("stripeEventId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "payments_stripeCheckoutSessionId_key" ON "payments"("stripeCheckoutSessionId");
+
+-- CreateIndex
+CREATE INDEX "payments_userId_idx" ON "payments"("userId");
+
+-- CreateIndex
+CREATE INDEX "payments_status_createdAt_idx" ON "payments"("status", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "payments_stripeSubscriptionId_idx" ON "payments"("stripeSubscriptionId");
+
+-- CreateIndex
+CREATE INDEX "payments_stripeCustomerId_idx" ON "payments"("stripeCustomerId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "user_profiles_userId_key" ON "user_profiles"("userId");
@@ -1451,6 +1616,9 @@ CREATE INDEX "study_group_invites_userId_idx" ON "study_group_invites"("userId")
 
 -- CreateIndex
 CREATE UNIQUE INDEX "study_group_invites_groupId_userId_key" ON "study_group_invites"("groupId", "userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "learningstyleprofiles_userId_key" ON "learningstyleprofiles"("userId");
 
 -- CreateIndex
 CREATE INDEX "availabilityslots_userId_dayOfWeek_idx" ON "availabilityslots"("userId", "dayOfWeek");
@@ -1989,17 +2157,17 @@ CREATE INDEX "calendar_userId_idx" ON "calendar"("userId");
 -- CreateIndex
 CREATE UNIQUE INDEX "llm_approval_budgets_key_key" ON "llm_approval_budgets"("key");
 
--- CreateIndex
-CREATE INDEX "auth_accounts_userId_idx" ON "auth_accounts"("userId");
-
--- CreateIndex
-CREATE INDEX "auth_sessions_userId_idx" ON "auth_sessions"("userId");
-
 -- AddForeignKey
 ALTER TABLE "auth_sessions" ADD CONSTRAINT "auth_sessions_userId_fkey" FOREIGN KEY ("userId") REFERENCES "auth_users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "auth_accounts" ADD CONSTRAINT "auth_accounts_userId_fkey" FOREIGN KEY ("userId") REFERENCES "auth_users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "refresh_tokens" ADD CONSTRAINT "refresh_tokens_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "coupon_usages" ADD CONSTRAINT "coupon_usages_couponId_fkey" FOREIGN KEY ("couponId") REFERENCES "coupons"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "study_group_members" ADD CONSTRAINT "study_group_members_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "study_groups"("id") ON DELETE CASCADE ON UPDATE CASCADE;

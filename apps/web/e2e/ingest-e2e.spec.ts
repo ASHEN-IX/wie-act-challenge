@@ -29,7 +29,7 @@ const login = async (page) => {
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        user: { _id: "e2e-user", email: "e2e@test.com", role: "student" },
+        user: { id: "e2e-user", email: "e2e@test.com", role: "student" },
       }),
     })
   );
@@ -46,7 +46,7 @@ const login = async (page) => {
       "auth-storage",
       JSON.stringify({
         state: {
-          user: { _id: "e2e-user", email: "e2e@test.com", role: "student" },
+          user: { id: "e2e-user", email: "e2e@test.com", role: "student" },
           token: "mock-jwt-token",
           sessionExpiry,
         },
@@ -167,7 +167,7 @@ test.describe("INGEST-10: Ingestion E2E", () => {
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          tasks: [{ _id: "t1", title: "Review Limits from Calculus 101", status: "todo" }],
+          tasks: [{ id: "t1", title: "Review Limits from Calculus 101", status: "todo" }],
         }),
       })
     );

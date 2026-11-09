@@ -2,7 +2,7 @@ import type { CourseNardouchProgress as CourseNardouchProgressRow } from '../../
 import { prisma } from '../../../../shared/database';
 import { table } from './_table';
 
-export type ICourseNardouchProgress = CourseNardouchProgressRow & { _id: string };
+export type ICourseNardouchProgress = CourseNardouchProgressRow & { id: string };
 
 export const CourseNardouchProgress = table<ICourseNardouchProgress>({
   delegate: () => prisma.courseNardouchProgress,

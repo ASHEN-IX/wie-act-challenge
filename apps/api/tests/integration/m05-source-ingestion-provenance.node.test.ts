@@ -34,8 +34,8 @@ test('M05 / ED-06: Scoped source ingestion, revision pinning, and provenance', a
     try {
       // Foreign keys cascade from the course to its revisions, so deleting the
       // course row removes the whole fixture.
-      if (createdCourseId) await Course.deleteMany({ _id: createdCourseId });
-      await Subject.deleteMany({ _id: subjectId });
+      if (createdCourseId) await Course.deleteMany({ id: createdCourseId });
+      await Subject.deleteMany({ id: subjectId });
     } catch {
       // ignore teardown error
     } finally {
@@ -44,7 +44,7 @@ test('M05 / ED-06: Scoped source ingestion, revision pinning, and provenance', a
   });
 
   await Subject.create({
-    _id: subjectId,
+    id: subjectId,
     userId,
     name: 'Distributed Systems',
     description: 'Core concepts',
@@ -212,9 +212,9 @@ test('M05 / ED-06: Scoped source ingestion, revision pinning, and provenance', a
     async () => {
       // Valid envelope with revisionId
       const valid = validateIngestPayload({
-        courseId: '64a000000000000000000001',
+        courseId: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
         revisionId: 'rev_20261023_v1',
-        fileRef: 'uploads/courses/64a000000000000000000001',
+        fileRef: 'uploads/courses/9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
         files: [
           { filename: 'a.pdf', originalName: 'a.pdf', mimetype: 'application/pdf', size: 100 }
         ]
@@ -223,9 +223,9 @@ test('M05 / ED-06: Scoped source ingestion, revision pinning, and provenance', a
 
       // Path traversal in revisionId rejected
       const invalidTraversal = validateIngestPayload({
-        courseId: '64a000000000000000000001',
+        courseId: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
         revisionId: '../../etc/passwd',
-        fileRef: 'uploads/courses/64a000000000000000000001',
+        fileRef: 'uploads/courses/9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
         files: []
       });
       assert.equal(invalidTraversal.valid, false);
@@ -233,8 +233,8 @@ test('M05 / ED-06: Scoped source ingestion, revision pinning, and provenance', a
 
       // Unknown fields rejected
       const unknownField = validateIngestPayload({
-        courseId: '64a000000000000000000001',
-        fileRef: 'uploads/courses/64a000000000000000000001',
+        courseId: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
+        fileRef: 'uploads/courses/9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
         forgedAdminKey: 'admin'
       });
       assert.equal(unknownField.valid, false);
@@ -244,8 +244,8 @@ test('M05 / ED-06: Scoped source ingestion, revision pinning, and provenance', a
 
   // Cleanup
   fs.rmSync(tmpDir, { recursive: true, force: true });
-  if (createdCourseId) await Course.deleteMany({ _id: createdCourseId });
-  await Subject.deleteMany({ _id: subjectId });
+  if (createdCourseId) await Course.deleteMany({ id: createdCourseId });
+  await Subject.deleteMany({ id: subjectId });
   await prisma.$queryRaw`SELECT 1`;
   await disconnectDatabase();
 });

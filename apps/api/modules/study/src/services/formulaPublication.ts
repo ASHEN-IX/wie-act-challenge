@@ -22,7 +22,7 @@ export async function reviewedPublication(actor: string, draft: any): Promise<st
     if (draft.contentDocumentHash !== draft.formulaPublication.projectionHash)
       conflict('Frozen formula publication checksum changed');
     const source = await CourseRevision.findOne({
-      _id: draft.formulaPublication.sourceDraftId,
+      id: draft.formulaPublication.sourceDraftId,
       courseId: draft.courseId,
       revisionTag: draft.formulaPublication.sourceTag,
       activationState: 'prepared',
@@ -42,15 +42,15 @@ export async function reviewedPublication(actor: string, draft: any): Promise<st
   if (!receipt?.targetTag) {
     const proposals: any[] = await FormulaProposal.find({
       courseId: draft.courseId,
-      revisionId: draft._id,
+      revisionId: draft.id,
       revisionTag: draft.revisionTag,
       draftVersion: draft.__v,
       state: { $in: ['accepted', 'corrected'] }
     })
-      .sort({ _id: 1 })
+      .sort({ id: 1 })
       .lean();
     if (!proposals.length) return null;
-    if (String((await findEditableDraft(String(draft.courseId)))?._id) !== String(draft._id))
+    if (String((await findEditableDraft(String(draft.courseId)))?.id) !== String(draft.id))
       conflict('Only the current draft can publish formula reviews');
     const canonical = parseCanonicalDocument(draft.contentDocument);
     const blocks = canonical.chapters.flatMap((c) => c.lessons.flatMap((l) => l.blocks)) as any[];
@@ -63,7 +63,7 @@ export async function reviewedPublication(actor: string, draft: any): Promise<st
         last.reviewVersion !== p.reviewVersion ||
         last.draftVersion !== draft.__v ||
         last.revisionTag !== draft.revisionTag ||
-        last.revisionId !== String(draft._id)
+        last.revisionId !== String(draft.id)
       )
         conflict('Formula review audit does not match this draft; review again');
       const block = blocks.find(
@@ -122,7 +122,7 @@ export async function reviewedPublication(actor: string, draft: any): Promise<st
         reviewedAt: new Date(last.at).toISOString(),
         documentHash: p.documentHash,
         cropHash: p.cropHash,
-        sourceDraftId: String(draft._id),
+        sourceDraftId: String(draft.id),
         sourceTag: draft.revisionTag,
         sourceVersion: draft.__v
       };
@@ -131,7 +131,7 @@ export async function reviewedPublication(actor: string, draft: any): Promise<st
     const projectionHash = activityDigest(canonical);
     const targetTag =
       'rev_formula_' +
-      activityDigest([String(draft._id), draft.revisionTag, draft.__v, projectionHash])
+      activityDigest([String(draft.id), draft.revisionTag, draft.__v, projectionHash])
         .replace(/^sha256:/, '')
         .slice(0, 32);
     receipt = {
@@ -146,7 +146,7 @@ export async function reviewedPublication(actor: string, draft: any): Promise<st
       throw Object.assign(new Error('Publication forbidden'), { status: 403 });
     const frozen = await CourseRevision.findOneAndUpdate(
       {
-        _id: draft._id,
+        id: draft.id,
         status: 'draft',
         revisionTag: draft.revisionTag,
         __v: draft.__v,
@@ -175,7 +175,7 @@ export async function reviewedPublication(actor: string, draft: any): Promise<st
         contentDocument: receipt.canonical,
         contentDocumentHash: receipt.projectionHash,
         formulaPublication: {
-          sourceDraftId: String(draft._id),
+          sourceDraftId: String(draft.id),
           sourceTag: receipt.sourceTag,
           sourceVersion: receipt.sourceVersion,
           projectionHash: receipt.projectionHash
@@ -186,7 +186,7 @@ export async function reviewedPublication(actor: string, draft: any): Promise<st
   );
   if (
     target!.contentDocumentHash !== receipt.projectionHash ||
-    target!.formulaPublication?.sourceDraftId !== String(draft._id)
+    target!.formulaPublication?.sourceDraftId !== String(draft.id)
   )
     conflict('Publication identity conflict');
   if (target!.status === 'draft' && !target!.activationState)

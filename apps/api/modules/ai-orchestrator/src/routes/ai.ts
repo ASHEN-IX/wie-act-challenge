@@ -31,7 +31,7 @@ async function authorizedCourseContext(req: DomainRequest, courseId: string) {
   });
   const course = response.data.course;
   if (!course || course.id !== courseId) throw new Error('Authorized context unavailable');
-  return { _id: course.id, title: course.title, topics: course.topics || [] };
+  return { id: course.id, title: course.title, topics: course.topics || [] };
 }
 
 interface AvailabilitySlot {
@@ -402,7 +402,7 @@ router.post(
       review_id:
         req.body?.review_id ||
         req.body?.reviewId ||
-        req.body?._id ||
+        req.body?.id ||
         req.body?.id ||
         req.body?.topicId,
       quality_score: req.body?.quality_score ?? req.body?.qualityScore ?? req.body?.quality

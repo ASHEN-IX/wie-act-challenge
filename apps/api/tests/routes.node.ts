@@ -19,7 +19,7 @@ describe('Nest public routes retain domain parameter constraints', () => {
     const req = { params: { planId: '0123456789abcdefABCDEF01' } } as unknown as DomainRequest;
     assert.equal(pipe.transform(req), req);
   });
-  for (const planId of ['current', 'not-an-id', '0123456789abcdefABCDEF0', 'z'.repeat(24)]) {
+  for (const planId of ['current', 'not-an-id', '0123456789abcdefABCDEF0', '061736d0-36e0-5d5c-9b25-bda89f3c816d']) {
     it(`rejects invalid ID ${planId}`, () => {
       assert.throws(
         () => pipe.transform({ params: { planId } } as unknown as DomainRequest),

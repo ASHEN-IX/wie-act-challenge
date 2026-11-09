@@ -18,7 +18,7 @@ afterAll(() => exitSpy.mockRestore());
 
 // ── Mock Notification model ──────────────────────
 const mockNotification = {
-  _id: 'notif-1',
+  id: 'notif-1',
   userId: 'user-123',
   type: 'study_reminder',
   title: 'Time to study!',

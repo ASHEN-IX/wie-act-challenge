@@ -287,7 +287,7 @@ export async function closeSeasonAndStartNext({
     const resetInfo = UserRankProfile.applySeasonReset(profile, season.resetPolicy || {});
     const newRank = getRankByIndex(resetInfo.newRankIndex);
 
-    profile.currentSeasonId = nextSeason._id;
+    profile.currentSeasonId = nextSeason.id;
     await UserRankProfile.save(profile);
 
     snapshots.push({

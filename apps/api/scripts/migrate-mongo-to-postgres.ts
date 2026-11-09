@@ -15,8 +15,8 @@
  *   --report=<path>  Where to write migration-report.json.
  *
  * Rules:
- *   * Identifiers are preserved: an ObjectId `_id` becomes its 24-character hex
- *     string, a string `_id` is copied verbatim. The same rule applies to every
+ *   * Identifiers are preserved: an ObjectId `id` becomes its 24-character hex
+ *     string, a string `id` is copied verbatim. The same rule applies to every
  *     reference field and to ObjectIds nested in JSON columns.
  *   * The run is idempotent: rows are inserted with `createMany({skipDuplicates})`
  *     in dependency order, so re-running never duplicates a row.
@@ -332,7 +332,7 @@ function normalizeRow(model: ModelInfo, raw: Record<string, unknown>): Normalize
   const issues: string[] = [];
   const unknownFields: string[] = [];
   for (const [key, value] of Object.entries(raw)) {
-    if (key === '__v' || key === '_id') continue;
+    if (key === '__v' || key === 'id') continue;
     const field = model.fields.get(key);
     if (!field) {
       unknownFields.push(key);
@@ -389,7 +389,7 @@ function defaultOnboardingDraft(): Record<string, unknown> {
 }
 
 function userRefreshTokens(doc: Record<string, unknown>): Array<Record<string, unknown>> {
-  const userId = idOf(doc._id);
+  const userId = idOf(doc.id);
   const tokens = Array.isArray(doc.refreshTokens) ? doc.refreshTokens : [];
   const rows: Array<Record<string, unknown>> = [];
   for (const token of tokens) {
@@ -410,7 +410,7 @@ function userRefreshTokens(doc: Record<string, unknown>): Array<Record<string, u
 }
 
 function couponUsages(doc: Record<string, unknown>): Array<Record<string, unknown>> {
-  const couponId = idOf(doc._id);
+  const couponId = idOf(doc.id);
   const byUser = new Map<string, Record<string, unknown>>();
   const fallback = doc.updatedAt ?? doc.createdAt;
   for (const entry of Array.isArray(doc.usageHistory) ? doc.usageHistory : []) {
@@ -433,7 +433,7 @@ function couponUsages(doc: Record<string, unknown>): Array<Record<string, unknow
 }
 
 function studyGroupMembers(doc: Record<string, unknown>): Array<Record<string, unknown>> {
-  const groupId = idOf(doc._id);
+  const groupId = idOf(doc.id);
   return (Array.isArray(doc.members) ? doc.members : []).flatMap((entry) => {
     if (!entry || typeof entry !== 'object') return [];
     const member = entry as Record<string, unknown>;
@@ -451,7 +451,7 @@ function studyGroupMembers(doc: Record<string, unknown>): Array<Record<string, u
 }
 
 function studyGroupInvites(doc: Record<string, unknown>): Array<Record<string, unknown>> {
-  const groupId = idOf(doc._id);
+  const groupId = idOf(doc.id);
   return (Array.isArray(doc.invites) ? doc.invites : []).flatMap((entry) => {
     if (!entry || typeof entry !== 'object') return [];
     const invite = entry as Record<string, unknown>;
@@ -813,7 +813,7 @@ async function main(): Promise<void> {
           ? derived
           : [
               {
-                id: idOf(doc._id),
+                id: idOf(doc.id),
                 ...doc,
                 ...(mapping.overrides ? mapping.overrides(doc) : {})
               }
@@ -827,7 +827,7 @@ async function main(): Promise<void> {
             report.complications.unknownFields[key] = [...known].sort();
           }
           if (!normalized.row) {
-            const id = String(candidate.id ?? idOf(doc._id) ?? '<no _id>');
+            const id = String(candidate.id ?? idOf(doc.id) ?? '<no id>');
             const reason = normalized.issues.join('; ');
             failureIds.push({ collection: mapping.collection, model: mapping.model, id, reason });
             stats.failed += 1;
@@ -931,7 +931,7 @@ async function main(): Promise<void> {
           const sourceDocs = docsByCollection.get(check.mustExistInSource);
           if (!sourceDocs) continue;
           allowed = new Set(
-            sourceDocs.map((doc) => idOf(doc._id)).filter((id): id is string => !!id)
+            sourceDocs.map((doc) => idOf(doc.id)).filter((id): id is string => !!id)
           );
         }
         const values = new Set<string>();

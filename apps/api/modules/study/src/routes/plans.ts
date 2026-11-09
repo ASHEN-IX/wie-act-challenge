@@ -87,7 +87,7 @@ router.post(
 
       let course: ICourse | null;
       try {
-        course = await Course.findOne({ _id: courseId, userId });
+        course = await Course.findOne({ id: courseId, userId });
       } catch {
         return res.status(400).json({ error: 'Invalid course ID format' });
       }
@@ -217,7 +217,7 @@ router.post('/create-status', async (req: DomainRequest, res: Response) => {
     for (const taskData of taskGraph.tasks || []) {
       const task = await Task.create({
         userId: job.userId,
-        studyPlanId: studyPlan._id.toString(),
+        studyPlanId: studyPlan.id.toString(),
         title: taskData.title,
         description: taskData.description,
         priority:
@@ -237,14 +237,14 @@ router.post('/create-status', async (req: DomainRequest, res: Response) => {
 
     logger.info('plan_finalised', {
       userId: job.userId,
-      planId: studyPlan._id.toString(),
+      planId: studyPlan.id.toString(),
       fallbackUsed: planPayload.fallbackUsed || false
     });
 
     return res.status(201).json({
       message: 'Study plan finalised',
       plan: {
-        id: studyPlan._id.toString(),
+        id: studyPlan.id.toString(),
         userId: studyPlan.userId,
         goal: studyPlan.goal,
         availableTimeMinutes: studyPlan.availableTimeMinutes,
@@ -281,7 +281,7 @@ router.get('/', async (req: DomainRequest, res: Response) => {
       if (plan.courseId ? await canReadCourse(userId, plan.courseId) : !!plan.resourceScope)
         authorizedPlans.push(plan);
     const formattedPlans = authorizedPlans.map((plan) => ({
-      id: plan._id.toString(),
+      id: plan.id.toString(),
       userId: plan.userId,
       courseId: plan.courseId,
       goal: plan.goal,
@@ -319,8 +319,8 @@ router.get('/calendar', async (req: DomainRequest, res: Response) => {
     for (const entry of entries) {
       if (typeof entry.planId === 'string' && !(await canReadPlanContext(userId, entry.planId)))
         continue;
-      if (typeof entry.taskId === 'string' && /^[a-f\d]{24}$/i.test(entry.taskId)) {
-        const task = await Task.findOne({ _id: entry.taskId, userId }).select('studyPlanId').lean();
+      if (typeof entry.taskId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(entry.taskId)) {
+        const task = await Task.findOne({ id: entry.taskId, userId }).select('studyPlanId').lean();
         if (!task || (task.studyPlanId && !(await canReadPlanContext(userId, task.studyPlanId))))
           continue;
       }
@@ -334,12 +334,12 @@ router.get('/calendar', async (req: DomainRequest, res: Response) => {
 });
 
 // Get specific study plan by ID
-router.get('/:planId([0-9a-fA-F]{24})', async (req: DomainRequest, res: Response) => {
+router.get('/:planId([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})', async (req: DomainRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
     const { planId } = req.params;
 
-    const plan = await StudyPlan.findOne({ _id: planId, userId });
+    const plan = await StudyPlan.findOne({ id: planId, userId });
 
     if (!plan || !(await canReadPlanSource(userId, plan))) {
       return res.status(404).json({ error: 'Study plan not found' });
@@ -349,7 +349,7 @@ router.get('/:planId([0-9a-fA-F]{24})', async (req: DomainRequest, res: Response
 
     res.json({
       plan: {
-        id: plan._id.toString(),
+        id: plan.id.toString(),
         userId: plan.userId,
         courseId: plan.courseId,
         goal: plan.goal,
@@ -385,7 +385,7 @@ router.post(
       const { planId } = req.params;
       const { calendarEvents, maxMinutesPerDay, allowLateNight } = req.body;
 
-      const plan = await StudyPlan.findOne({ _id: planId, userId });
+      const plan = await StudyPlan.findOne({ id: planId, userId });
 
       if (!plan || !(await canReadPlanSource(userId, plan))) {
         return res.status(404).json({ error: 'Study plan not found' });
@@ -419,7 +419,7 @@ router.post(
         try {
           const entries = (schedule.sessions || schedule || []).map((s: SchedulerSession) => ({
             userId,
-            planId: plan._id.toString(),
+            planId: plan.id.toString(),
             taskId: s.taskId || s.task_id || s.task || null,
             title: s.title || s.name || null,
             description: s.description || s.note || null,
@@ -448,7 +448,7 @@ router.post(
 
         res.json({
           message: 'Study plan scheduled successfully',
-          planId: plan._id.toString(),
+          planId: plan.id.toString(),
           schedule: schedule
         });
       } catch (aiError) {
@@ -471,7 +471,7 @@ router.get('/:planId/schedule', async (req: DomainRequest, res: Response) => {
     const userId = req.user!.userId;
     const { planId } = req.params;
 
-    const plan = await StudyPlan.findOne({ _id: planId, userId });
+    const plan = await StudyPlan.findOne({ id: planId, userId });
 
     if (!plan || !(await canReadPlanSource(userId, plan))) {
       return res.status(404).json({ error: 'Study plan not found' });
@@ -484,7 +484,7 @@ router.get('/:planId/schedule', async (req: DomainRequest, res: Response) => {
     const tasks = await Task.find({ studyPlanId: planId, userId }).lean();
 
     const schedule = {
-      planId: plan._id.toString(),
+      planId: plan.id.toString(),
       goal: plan.goal,
       scheduledAt: plan.scheduledAt,
       sessions: tasks.map((task, index) => {
@@ -493,7 +493,7 @@ router.get('/:planId/schedule', async (req: DomainRequest, res: Response) => {
         startDate.setHours(9, 0, 0, 0);
 
         return {
-          taskId: task._id.toString(),
+          taskId: task.id.toString(),
           title: task.title,
           description: task.description,
           status: task.status,
@@ -517,14 +517,14 @@ router.delete('/:planId', async (req: DomainRequest, res: Response) => {
     const userId = req.user!.userId;
     const { planId } = req.params;
 
-    const plan = await StudyPlan.findOne({ _id: planId, userId });
+    const plan = await StudyPlan.findOne({ id: planId, userId });
 
     if (!plan || !(await canReadPlanSource(userId, plan))) {
       return res.status(404).json({ error: 'Study plan not found' });
     }
 
     await Task.deleteMany({ studyPlanId: planId, userId });
-    await StudyPlan.deleteOne({ _id: planId, userId });
+    await StudyPlan.deleteOne({ id: planId, userId });
 
     res.json({ message: 'Study plan and associated tasks deleted successfully' });
   } catch (error) {
@@ -544,7 +544,7 @@ router.post(
 
       let tasks;
       if (taskIds && Array.isArray(taskIds) && taskIds.length > 0) {
-        tasks = await Task.find({ _id: { $in: taskIds }, userId }).lean();
+        tasks = await Task.find({ id: { $in: taskIds }, userId }).lean();
       } else {
         tasks = await Task.find({
           userId,
@@ -561,7 +561,7 @@ router.post(
         return res.status(400).json({ error: 'No tasks found to schedule' });
       }
 
-      const taskIdsToSchedule = tasks.map((t) => t._id.toString());
+      const taskIdsToSchedule = tasks.map((t) => t.id.toString());
       const existingScheduled = await CalendarEntry.findMany({
         userId,
         taskId: { in: taskIdsToSchedule },
@@ -570,7 +570,7 @@ router.post(
 
       if (existingScheduled.length > 0) {
         const scheduledTaskIds = new Set(existingScheduled.map((e) => e.taskId));
-        tasks = tasks.filter((t) => !scheduledTaskIds.has(t._id.toString()));
+        tasks = tasks.filter((t) => !scheduledTaskIds.has(t.id.toString()));
 
         if (tasks.length === 0) {
           return res.status(200).json({

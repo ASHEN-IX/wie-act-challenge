@@ -199,9 +199,9 @@ async function main() {
     if (i === 119) throw Error('QA Python unavailable');
   }
   for (const [id, email, role] of [
-    ['aaaaaaaaaaaaaaaaaaaaaaaa', 'final-instructor@example.test', 'instructor'],
-    ['cccccccccccccccccccccccc', 'final-student@example.test', 'student'],
-    ['dddddddddddddddddddddddd', 'final-outsider@example.test', 'student']
+    ['04b3da2d-ec14-5643-bf49-e43f550168bf', 'final-instructor@example.test', 'instructor'],
+    ['dfbaedb6-25c0-5dbd-a7b1-57ac70b60f57', 'final-student@example.test', 'student'],
+    ['f190c880-d5b0-5c87-bc57-ba8a930d9a1e', 'final-outsider@example.test', 'student']
   ]) {
     const password = await bcrypt.hash('FinalPass!123', 12);
     await prisma.user.create({
@@ -224,27 +224,27 @@ async function main() {
       data: { id: newId(), accountId: id, providerId: 'credential', userId: id, password }
     });
   }
-  const institutionId = 'eeeeeeeeeeeeeeeeeeeeeeee';
+  const institutionId = '265fd273-cda8-5cc6-a0c8-309008d054a0';
   await prisma.institution.create({
     data: {
       id: institutionId,
       name: 'Isolated QA',
       slug: name,
       status: 'active',
-      createdByUserId: 'aaaaaaaaaaaaaaaaaaaaaaaa'
+      createdByUserId: '04b3da2d-ec14-5643-bf49-e43f550168bf'
     }
   });
   for (const [userId, role] of [
-    ['aaaaaaaaaaaaaaaaaaaaaaaa', 'instructor'],
-    ['cccccccccccccccccccccccc', 'university_student']
+    ['04b3da2d-ec14-5643-bf49-e43f550168bf', 'instructor'],
+    ['dfbaedb6-25c0-5dbd-a7b1-57ac70b60f57', 'university_student']
   ] as const)
     await prisma.institutionMembership.create({
       data: { id: newId(), institutionId, userId, role, status: 'active' }
     });
   await prisma.subject.create({
     data: {
-      id: 'bbbbbbbbbbbbbbbbbbbbbbbb',
-      userId: 'aaaaaaaaaaaaaaaaaaaaaaaa',
+      id: 'ebf069b5-6c44-5857-8834-17d3bc9778d0',
+      userId: '04b3da2d-ec14-5643-bf49-e43f550168bf',
       name: 'Final QA'
     }
   });

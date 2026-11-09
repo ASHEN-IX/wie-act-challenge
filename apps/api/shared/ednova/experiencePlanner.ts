@@ -146,7 +146,7 @@ export function validatePlannerRequest(value: unknown): PlannerRequest {
   });
   return {
     schemaVersion: EXPERIENCE_PLAN_VERSION,
-    courseId: str(v.courseId, 24),
+    courseId: str(v.courseId, 36),
     revisionId: str(v.revisionId, 128),
     lesson: {
       topicId: lesson.topicId === null ? null : str(lesson.topicId, 128),

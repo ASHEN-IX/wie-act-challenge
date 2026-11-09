@@ -11,14 +11,14 @@ import {
   InstitutionMembershipRole
 } from '../models/Institution';
 
-const OBJECT_ID = /^[a-f\d]{24}$/i;
+const OBJECT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const INVITATION_TOKEN = /^[A-Za-z0-9_-]{32,200}$/;
 const DEFAULT_INVITATION_HOURS = 168;
 const MAX_INVITATION_HOURS = 720;
 
-type LeanInstitution = IInstitution & { _id: string };
-type LeanMembership = IInstitutionMembership & { _id: string };
-type LeanInvitation = IInstitutionInvitation & { _id: string };
+type LeanInstitution = IInstitution & { id: string };
+type LeanMembership = IInstitutionMembership & { id: string };
+type LeanInvitation = IInstitutionInvitation & { id: string };
 
 export class InstitutionError extends Error {
   constructor(
@@ -69,7 +69,7 @@ function parseUserId(value: string): string {
 
 function publicInstitution(institution: LeanInstitution) {
   return {
-    id: String(institution._id),
+    id: String(institution.id),
     name: institution.name,
     slug: institution.slug,
     ...(institution.domain ? { domain: institution.domain } : {}),
@@ -79,7 +79,7 @@ function publicInstitution(institution: LeanInstitution) {
 
 function publicMembership(membership: LeanMembership) {
   return {
-    id: String(membership._id),
+    id: String(membership.id),
     role: membership.role,
     status: membership.status,
     createdAt: membership.createdAt
@@ -180,9 +180,9 @@ export async function listInstitutionContexts(userId: string): Promise<Instituti
   });
   if (!memberships.length) return [];
   const institutions = await Institution.find({
-    _id: { $in: memberships.map((membership) => membership.institutionId) }
+    id: { $in: memberships.map((membership) => membership.institutionId) }
   });
-  const byId = new Map(institutions.map((institution) => [String(institution._id), institution]));
+  const byId = new Map(institutions.map((institution) => [String(institution.id), institution]));
   return memberships.flatMap((membership) => {
     const institution = byId.get(String(membership.institutionId));
     return institution ? [context(institution, membership)] : [];
@@ -225,7 +225,7 @@ export async function bootstrapInstitution(input: {
   }
   try {
     const membership = (await InstitutionMembership.create({
-      institutionId: institution._id,
+      institutionId: institution.id,
       userId: input.actorUserId,
       role: 'university_admin',
       status: 'active'
@@ -234,7 +234,7 @@ export async function bootstrapInstitution(input: {
   } catch (error) {
     // Mongo standalone has no cross-collection transaction here. Compensate so
     // a failed bootstrap cannot leave an institution without its initial admin.
-    await Institution.deleteOne({ _id: institution._id }).catch(() => undefined);
+    await Institution.deleteOne({ id: institution.id }).catch(() => undefined);
     throw error;
   }
 }
@@ -296,7 +296,7 @@ export async function issueInstitutionInvitation(input: {
   })) as unknown as LeanInvitation;
   return {
     invitation: {
-      id: String(invitation._id),
+      id: String(invitation.id),
       institutionId: String(invitation.institutionId),
       role: invitation.role,
       expiresAt: invitation.expiresAt
@@ -325,7 +325,7 @@ export async function acceptInstitutionInvitation(input: {
   }
   if (invitation.expiresAt.getTime() <= now.getTime()) {
     await InstitutionInvitation.updateOne(
-      { _id: invitation._id, status: 'pending' },
+      { id: invitation.id, status: 'pending' },
       { $set: { status: 'expired' } }
     );
     throw new InstitutionError(410, 'Invitation has expired');
@@ -340,7 +340,7 @@ export async function acceptInstitutionInvitation(input: {
 
   const claimed = await InstitutionInvitation.findOneAndUpdate(
     {
-      _id: invitation._id,
+      id: invitation.id,
       status: 'pending',
       expiresAt: { $gt: now }
     },
@@ -354,7 +354,7 @@ export async function acceptInstitutionInvitation(input: {
     { new: true }
   );
   if (!claimed) {
-    const latest = await InstitutionInvitation.findById(invitation._id);
+    const latest = await InstitutionInvitation.findById(invitation.id);
     if (!latest) throw new InstitutionError(404, 'Invitation not found');
     if (latest.status === 'revoked' || latest.status === 'expired') {
       throw new InstitutionError(410, 'Invitation is no longer available');
@@ -364,7 +364,7 @@ export async function acceptInstitutionInvitation(input: {
     }
     if (latest.expiresAt.getTime() <= now.getTime()) {
       await InstitutionInvitation.updateOne(
-        { _id: latest._id, status: 'pending' },
+        { id: latest.id, status: 'pending' },
         { $set: { status: 'expired' } }
       );
       throw new InstitutionError(410, 'Invitation has expired');
@@ -387,12 +387,12 @@ export async function revokeInstitutionInvitation(input: {
   const invitationId = parseInvitationId(input.invitationId);
   await requireInstitutionAdmin(input.actorUserId, institutionId);
   const invitation = await InstitutionInvitation.findOneAndUpdate(
-    { _id: invitationId, institutionId, status: 'pending' },
+    { id: invitationId, institutionId, status: 'pending' },
     { $set: { status: 'revoked', revokedAt: new Date() } },
     { new: true }
   );
   if (!invitation) throw new InstitutionError(404, 'Pending invitation not found');
-  return { id: String(invitation._id), status: invitation.status };
+  return { id: String(invitation.id), status: invitation.status };
 }
 
 export async function suspendInstitutionMembership(input: {
@@ -416,13 +416,13 @@ export async function suspendInstitutionMembership(input: {
     throw new InstitutionError(403, 'Administrator membership requires platform setup');
   }
   const updated = await InstitutionMembership.findOneAndUpdate(
-    { _id: target._id, status: 'active' },
+    { id: target.id, status: 'active' },
     { $set: { status: 'suspended' } },
     { new: true }
   );
   if (!updated) throw new InstitutionError(409, 'Membership changed concurrently; retry');
   return {
-    id: String(updated._id),
+    id: String(updated.id),
     userId: updated.userId,
     role: updated.role,
     status: updated.status

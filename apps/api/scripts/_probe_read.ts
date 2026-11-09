@@ -7,7 +7,7 @@ import { COMPONENT_REGISTRY_VERSION } from '../shared/ednova/componentRegistry';
 
 const URI = process.env.M48_MONGO || 'mongodb://127.0.0.1:27017';
 const DB = `test_probe_read_${process.pid}`;
-const courseId = '0123456789abcdef01234567';
+const courseId = 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d';
 
 function ctx(): ExperiencePlanValidationContext {
   return {

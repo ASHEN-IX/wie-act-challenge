@@ -50,7 +50,7 @@ import {
 import type { ExperiencePlannerProvider } from '../../../../shared/ednova/experiencePlannerProvider';
 import { COMPONENT_REGISTRY_VERSION } from '../../../../shared/ednova/componentRegistry';
 
-const courseId = '0123456789abcdef01234567';
+const courseId = 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d';
 const revisionId = 'rev_order';
 const contentHash = 'sha256:' + 'b'.repeat(64);
 
@@ -198,9 +198,9 @@ beforeEach(() => {
   load.mockResolvedValue({ status: 'absent' });
   store.mockResolvedValue({ stored: true, planId: 'plan-x' });
   upsert.mockReturnValue({
-    lean: async () => ({ _id: 'row-1', requestId: 'req-1', state: 'requested' })
+    lean: async () => ({ id: 'row-1', requestId: 'req-1', state: 'requested' })
   });
-  findOne.mockReturnValue({ lean: async () => ({ _id: 'row-1', state: 'authorized' }) });
+  findOne.mockReturnValue({ lean: async () => ({ id: 'row-1', state: 'authorized' }) });
   updateOne.mockResolvedValue({});
 });
 
@@ -262,8 +262,8 @@ describe('post-store crash window', () => {
    */
   it('adopts a durable plan instead of reporting a permanent failure', async () => {
     // The upsert finds the existing uncertain row (not a fresh `requested` one).
-    upsert.mockReturnValue({ lean: async () => ({ _id: 'row-1', state: 'uncertain' }) });
-    findOne.mockReturnValue({ lean: async () => ({ _id: 'row-1', state: 'uncertain' }) });
+    upsert.mockReturnValue({ lean: async () => ({ id: 'row-1', state: 'uncertain' }) });
+    findOne.mockReturnValue({ lean: async () => ({ id: 'row-1', state: 'uncertain' }) });
     peek.mockResolvedValue(true);
     load.mockResolvedValue({ status: 'available', plan: { digest: 'fnv1a64:deadbeef' } });
     (ExperiencePlanRecord.findOne as jest.Mock).mockReturnValue({
@@ -272,10 +272,10 @@ describe('post-store crash window', () => {
     // The promotion is a conditional findOneAndUpdate; simulate winning it.
     // (The first findOneAndUpdate call is the upsert, which already returned
     // the uncertain row, so this only affects the promotion.)
-    const promote = { lean: async () => ({ _id: 'row-1', state: 'validated' }) };
+    const promote = { lean: async () => ({ id: 'row-1', state: 'validated' }) };
     let call = 0;
     upsert.mockImplementation(() =>
-      call++ === 0 ? { lean: async () => ({ _id: 'row-1', state: 'uncertain' }) } : promote
+      call++ === 0 ? { lean: async () => ({ id: 'row-1', state: 'uncertain' }) } : promote
     );
 
     const outcome = await run();
@@ -293,8 +293,8 @@ describe('post-store crash window', () => {
   });
 
   it('keeps the uncertain failure when no durable plan exists', async () => {
-    upsert.mockReturnValue({ lean: async () => ({ _id: 'row-1', state: 'uncertain' }) });
-    findOne.mockReturnValue({ lean: async () => ({ _id: 'row-1', state: 'uncertain' }) });
+    upsert.mockReturnValue({ lean: async () => ({ id: 'row-1', state: 'uncertain' }) });
+    findOne.mockReturnValue({ lean: async () => ({ id: 'row-1', state: 'uncertain' }) });
     peek.mockResolvedValue(false);
 
     const outcome = await run();

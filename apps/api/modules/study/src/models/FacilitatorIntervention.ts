@@ -25,7 +25,7 @@ export type InterventionStatus = 'proposed' | 'delivered' | 'accepted' | 'declin
 
 // The model had `timestamps: false`: there is no `updatedAt` column.
 export type IFacilitatorIntervention = Omit<FacilitatorInterventionRow, 'proposedUICommand'> & {
-  _id: string;
+  id: string;
   proposedUICommand?: {
     action: string;
     activityId?: string;

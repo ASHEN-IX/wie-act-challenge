@@ -68,7 +68,7 @@ async function stopWorker() {
 }
 async function freshVersion() {
   draft = await CourseRevision.findOneAndUpdate(
-    { _id: draft._id },
+    { id: draft.id },
     { $inc: { __v: 1 } },
     { new: true }
   );
@@ -89,10 +89,10 @@ async function waitJob(id: string) {
   throw new Error('job did not finish');
 }
 beforeAll(async () => {
-  dbName = 'test_formula_jobs_' + process.pid;
+  // Load the repo env first: it must not overwrite the test database below.
+  config({ path: path.resolve('../../.env') });
   process.env.DATABASE_URL =
     process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
-  config({ path: path.resolve('../../.env') });
   process.env.RABBITMQ_URL = `amqp://${encodeURIComponent(process.env.RABBITMQ_USER || 'ednova')}:${encodeURIComponent(process.env.RABBITMQ_PASS || '')}@localhost:5672/${encodeURIComponent(process.env.RABBITMQ_VHOST || 'ednova')}`;
   process.env.FORMULA_QUEUE = FORMULA_QUEUE; // queue name was set by test invocation before imports
   process.env.FORMULA_ROUTING_KEY = 'test.formula.' + process.pid;
@@ -112,7 +112,7 @@ beforeAll(async () => {
     title: 'Job fixture'
   });
   draft = await CourseRevision.create({
-    courseId: course._id,
+    courseId: course.id,
     revisionTag: 'rev_jobs',
     status: 'draft',
     contentHash: hash.slice(7),
@@ -130,14 +130,14 @@ beforeAll(async () => {
     ]
   });
   published = await CourseRevision.create({
-    courseId: course._id,
+    courseId: course.id,
     revisionTag: 'rev_old',
     status: 'published',
     contentHash: hash.slice(7),
     isInstructorReviewed: true
   });
-  publishedSnapshot = JSON.stringify(await CourseRevision.findById(published._id).lean());
-  base = `/courses/${course._id}/drafts/rev_jobs`;
+  publishedSnapshot = JSON.stringify(await CourseRevision.findById(published.id).lean());
+  base = `/courses/${course.id}/drafts/rev_jobs`;
   server = http.createServer(async (req, res) => {
     let raw = '';
     for await (const chunk of req) raw += chunk;
@@ -254,7 +254,7 @@ it('denies missing consent, authorization, approval, budget and stale version', 
 it('HTTP -> RabbitMQ -> separate worker -> MongoDB proposal -> authenticated GET; duplicate-safe', async () => {
   const a = await submit();
   expect(a.status).toBe(202);
-  const job = await waitJob(a.body.job._id);
+  const job = await waitJob(a.body.job.id);
   expect(job.state).toBe('completed');
   expect(calls).toBe(1);
   const proposal = await request(app)
@@ -262,14 +262,14 @@ it('HTTP -> RabbitMQ -> separate worker -> MongoDB proposal -> authenticated GET
     .set('x-user', 'owner');
   expect(proposal.status).toBe(200);
   expect(proposal.body.proposal.state).toBe('pending');
-  expect((await submit()).body.job._id).toBe(job._id.toString());
-  await dispatch(String(job._id));
+  expect((await submit()).body.job.id).toBe(job.id.toString());
+  await dispatch(String(job.id));
   await pause(100);
   expect(calls).toBe(1);
   expect(
     (
       await request(app)
-        .get(base + '/recognition-jobs/' + job._id)
+        .get(base + '/recognition-jobs/' + job.id)
         .set('x-user', 'owner')
     ).status
   ).toBe(200);
@@ -281,10 +281,10 @@ it.each(['timeout', 'malformed'])(
     mode = variant;
     const response = await submit();
     expect(response.status).toBe(202);
-    const job = await waitJob(response.body.job._id);
+    const job = await waitJob(response.body.job.id);
     expect(job.state).toBe('uncertain');
     const before = calls;
-    await dispatch(String(job._id));
+    await dispatch(String(job.id));
     await pause(100);
     expect(calls).toBe(before);
     mode = 'ok';
@@ -296,27 +296,27 @@ it('recovers queued messages after restart; competing claims and cancellation ar
   const response = await submit();
   expect(response.status).toBe(202);
   await startWorker();
-  const job = await waitJob(response.body.job._id);
+  const job = await waitJob(response.body.job.id);
   expect(job.state).toBe('completed');
   await stopWorker();
   await freshVersion();
   const next = await submit();
   const before = calls;
-  await Promise.all([processJob(next.body.job._id), processJob(next.body.job._id)]);
+  await Promise.all([processJob(next.body.job.id), processJob(next.body.job.id)]);
   expect(calls).toBe(before + 1);
   await freshVersion();
   const cancelled = await submit();
   expect(
     (
       await request(app)
-        .post(base + '/recognition-jobs/' + cancelled.body.job._id + '/cancel')
+        .post(base + '/recognition-jobs/' + cancelled.body.job.id + '/cancel')
         .set('x-user', 'owner')
     ).body.job.state
   ).toBe('cancelled');
-  await processJob(cancelled.body.job._id);
+  await processJob(cancelled.body.job.id);
   expect(calls).toBe(before + 1);
   await startWorker();
-  expect(JSON.stringify(await CourseRevision.findById(published._id).lean())).toBe(
+  expect(JSON.stringify(await CourseRevision.findById(published.id).lean())).toBe(
     publishedSnapshot
   );
 });
@@ -343,25 +343,25 @@ it('does not accept cancelled or stale in-flight results and marks interrupted w
   for (let i = 0; i < 100 && calls === before; i++) await pause(10);
   expect(calls).toBe(before + 1);
   await request(app)
-    .post(base + '/recognition-jobs/' + response.body.job._id + '/cancel')
+    .post(base + '/recognition-jobs/' + response.body.job.id + '/cancel')
     .set('x-user', 'owner');
   await pause(500);
-  expect((await waitJob(response.body.job._id)).state).toBe('cancelled');
+  expect((await waitJob(response.body.job.id)).state).toBe('cancelled');
   await freshVersion();
   before = calls;
   const stale = await submit();
   for (let i = 0; i < 100 && calls === before; i++) await pause(10);
   await freshVersion();
-  expect((await waitJob(stale.body.job._id)).state).toBe('stale');
+  expect((await waitJob(stale.body.job.id)).state).toBe('stale');
   mode = 'ok';
   await stopWorker();
   await Jobs.updateOne(
-    { _id: stale.body.job._id },
+    { id: stale.body.job.id },
     { $set: { state: 'running', startedAt: new Date(Date.now() - 180000) } }
   );
   before = calls;
   await recover();
-  expect((await waitJob(stale.body.job._id)).state).toBe('uncertain');
+  expect((await waitJob(stale.body.job.id)).state).toBe('uncertain');
   expect(calls).toBe(before);
   await startWorker();
 });

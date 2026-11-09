@@ -19,11 +19,11 @@ import path from 'node:path';
 import { prisma } from '../shared/database';
 import { newId } from '../shared/ids';
 
-const courseId = '0123456789abcdef01234567';
+const courseId = 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d';
 const revisionTag = 'rev_m41_fixture';
-const instructorId = 'aaaaaaaaaaaaaaaaaaaaaaaa';
-const studentId = 'cccccccccccccccccccccccc';
-const institutionId = 'eeeeeeeeeeeeeeeeeeeeeeee';
+const instructorId = '04b3da2d-ec14-5643-bf49-e43f550168bf';
+const studentId = 'dfbaedb6-25c0-5dbd-a7b1-57ac70b60f57';
+const institutionId = '265fd273-cda8-5cc6-a0c8-309008d054a0';
 
 /** The same canonical digest the application uses: sorted-key JSON, sha256. */
 function canonical(value: unknown): string {

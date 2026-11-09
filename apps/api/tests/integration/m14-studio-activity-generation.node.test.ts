@@ -57,7 +57,7 @@ test('M14 / ED-32: Course Studio Source-Backed Activity Proposal Generation Inte
       }
       await Course.deleteMany({ userId: { contains: testPrefix } });
       await InstitutionMembership.deleteMany({ institutionId });
-      await Institution.deleteMany({ _id: institutionId });
+      await Institution.deleteMany({ id: institutionId });
     } finally {
       await disconnectDatabase().catch(() => {});
     }
@@ -94,7 +94,7 @@ test('M14 / ED-32: Course Studio Source-Backed Activity Proposal Generation Inte
         topics: []
       });
 
-      courseId = courseDoc._id.toString();
+      courseId = courseDoc.id.toString();
 
       await prepareCourseFixture(courseId, t);
 

@@ -5,7 +5,7 @@ import { newId } from '../../../../shared/ids';
 export type RankSeasonStatus = 'upcoming' | 'active' | 'closed' | 'archived';
 
 export type IRankSeason = Omit<RankSeasonRow, 'resetPolicy'> & {
-  _id: string;
+  id: string;
   resetPolicy: { lowBracketDrop: number; highBracketDrop: number; seasonFloorIndex: number };
 };
 

@@ -31,7 +31,7 @@ const asCursor = (rows: unknown[]) => {
 
 // ── Mock Models ──────────────────────────────────
 const mockCourse = {
-  _id: '64a000000000000000000001',
+  id: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
   userId: 'user-123',
   title: 'Test Course',
   status: 'active',
@@ -43,14 +43,14 @@ const mockCourse = {
 };
 
 const mockPlan = {
-  _id: 'plan-1',
+  id: 'plan-1',
   userId: 'user-123',
-  courseId: '64a000000000000000000001',
+  courseId: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
   title: 'Test Plan',
   status: 'active',
   tasks: [
-    { _id: 'task-1', title: 'Task 1', status: 'pending', duration_minutes: 30 },
-    { _id: 'task-2', title: 'Task 2', status: 'pending', duration_minutes: 45 }
+    { id: 'task-1', title: 'Task 1', status: 'pending', duration_minutes: 30 },
+    { id: 'task-2', title: 'Task 2', status: 'pending', duration_minutes: 45 }
   ],
   toJSON: function () {
     return { ...this };
@@ -70,7 +70,7 @@ jest.mock('../models/index', () => ({
     exists: jest.fn().mockResolvedValue(false)
   },
   Course: {
-    exists: jest.fn().mockResolvedValue({ _id: '64a000000000000000000001' }),
+    exists: jest.fn().mockResolvedValue({ id: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514' }),
     find: jest.fn(),
     findOne: jest.fn(),
     findById: jest.fn(),
@@ -248,7 +248,7 @@ describe('Study Service', () => {
       it('should return a specific course', async () => {
         Course.findOne.mockResolvedValue(mockCourse);
 
-        const res = await request(app).get('/api/v1/study/courses/64a000000000000000000001');
+        const res = await request(app).get('/api/v1/study/courses/9fc0fd30-b00a-55fb-a19f-a23a3f1d5514');
         expect(res.status).toBe(200);
       });
 
@@ -264,7 +264,7 @@ describe('Study Service', () => {
       it('should delete a course', async () => {
         Course.findByIdAndDelete.mockResolvedValue(mockCourse);
 
-        const res = await request(app).delete('/api/v1/study/courses/64a000000000000000000001');
+        const res = await request(app).delete('/api/v1/study/courses/9fc0fd30-b00a-55fb-a19f-a23a3f1d5514');
         expect(res.status).toBe(200);
       });
     });
@@ -290,14 +290,14 @@ describe('Study Service', () => {
           lean: jest.fn().mockResolvedValue([])
         });
 
-        const res = await request(app).get('/api/v1/study/plans/507f1f77bcf86cd799439011');
+        const res = await request(app).get('/api/v1/study/plans/05bffe3e-3126-53ab-89a5-ab5f9c128da7');
         expect(res.status).toBe(200);
       });
 
       it('should return 404 for missing plan', async () => {
         StudyPlan.findOne.mockResolvedValue(null);
 
-        const res = await request(app).get('/api/v1/study/plans/507f1f77bcf86cd799439012');
+        const res = await request(app).get('/api/v1/study/plans/17833296-91d3-5498-ade4-d01d61169e51');
         expect(res.status).toBe(404);
       });
     });

@@ -8,7 +8,7 @@ import { newId } from '../../../../shared/ids';
  * of the auth module already relies on.
  */
 export type IUser = UserRow & {
-  _id: string;
+  id: string;
   /** Prisma surfaces this as a relation; the API used to read it inline. */
   refreshTokens?: RefreshTokenRow[];
 };

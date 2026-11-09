@@ -51,7 +51,7 @@ interface GroupDetail {
   invites: { userId: string; name: string }[];
 }
 interface Notice {
-  _id: string;
+  id: string;
   type: string;
   message: string;
   metadata?: { kind?: string; inviteCode?: string; roomTitle?: string };
@@ -113,16 +113,16 @@ export default async function Connections({
           </h2>
           <ul className="divide-y rounded-lg border">
             {roomInvites.map((n) => (
-              <li key={n._id} className="flex flex-wrap items-center justify-between gap-3 p-4">
+              <li key={n.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
                 <p className="min-w-0 text-sm">{n.message}</p>
                 <div className="flex gap-2">
                   {!teaching && (
                     <ActionForm action={joinRoom} submit="Join room" className="flex items-center gap-2">
                       <input type="hidden" name="code" value={n.metadata!.inviteCode} />
-                      <input type="hidden" name="commandId" value={n._id} />
+                      <input type="hidden" name="commandId" value={n.id} />
                     </ActionForm>
                   )}
-                  <RowAction action={dismissNotification} fields={{ id: n._id }} label="Dismiss" variant="ghost" />
+                  <RowAction action={dismissNotification} fields={{ id: n.id }} label="Dismiss" variant="ghost" />
                 </div>
               </li>
             ))}

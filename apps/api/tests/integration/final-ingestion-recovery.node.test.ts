@@ -39,7 +39,7 @@ test('Durable source dispatch linkage, uncertain acknowledgement, cancellation a
       status: 'processing',
       files: []
     });
-    const courseId = String(course._id);
+    const courseId = String(course.id);
     await CourseRevision.create({
       courseId,
       revisionTag: 'rev_ingest',
@@ -171,10 +171,10 @@ test('Durable source dispatch linkage, uncertain acknowledgement, cancellation a
       );
       const enqueued = await enqueueCourseIngestionOperation(params);
       await CourseIngestionOperation.updateOne(
-        { _id: enqueued.jobId },
+        { id: enqueued.jobId },
         { $set: { result: result(enqueued.correlationId) } }
       );
-      await Course.updateOne({ _id: params.courseId }, { $set: { status: 'completed' } });
+      await Course.updateOne({ id: params.courseId }, { $set: { status: 'completed' } });
       await CourseRevision.updateOne(
         { courseId: params.courseId },
         {

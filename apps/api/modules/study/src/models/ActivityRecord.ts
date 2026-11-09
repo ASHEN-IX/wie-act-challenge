@@ -6,7 +6,7 @@ import { prisma } from '../../../../shared/database';
 import { table } from './_table';
 
 export type IActivityRecord = Omit<ActivityRecordRow, 'publicDefinition' | 'serverEvaluation'> & {
-  _id: string;
+  id: string;
   publicDefinition: Record<string, unknown>;
   serverEvaluation: Record<string, unknown>;
 };

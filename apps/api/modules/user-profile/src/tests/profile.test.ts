@@ -11,7 +11,7 @@ process.env.NODE_ENV = 'test';
 
 // ── Mock UserProfile model ──────────────────────
 const mockProfile = {
-  _id: '507f1f77bcf86cd799439022',
+  id: 'b36ad774-a8b4-5254-b2c3-342ad9bab772',
   userId: 'user-123',
   nickname: 'TestNick',
   bio: 'Test bio',

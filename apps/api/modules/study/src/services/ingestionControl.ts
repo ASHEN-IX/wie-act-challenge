@@ -17,7 +17,7 @@ export async function enqueueCourseIngestionOperation(
   const messageId = crypto.randomUUID(),
     correlationId = crypto.randomUUID();
   const operation = await CourseIngestionOperation.create({
-    _id: messageId,
+    id: messageId,
     correlationId,
     courseId: params.courseId,
     revisionId: params.revisionId,
@@ -31,7 +31,7 @@ export async function enqueueCourseIngestionOperation(
   // This linkage is durable BEFORE publishing, including the fast-result path.
   const reserved = await Course.updateOne(
     {
-      _id: params.courseId,
+      id: params.courseId,
       jobId: expectedJobId === undefined ? { $exists: false } : expectedJobId
     },
     {
@@ -49,11 +49,11 @@ export async function enqueueCourseIngestionOperation(
   // `updateOne` resolves to `{ matchedCount, modifiedCount }`, which is truthy
   // even when nothing matched; the compare-and-set result is the count.
   if (!reserved.matchedCount) {
-    await CourseIngestionOperation.updateOne({ _id: messageId }, { $set: { state: 'superseded' } });
+    await CourseIngestionOperation.updateOne({ id: messageId }, { $set: { state: 'superseded' } });
     throw new IngestionConflictError('Another ingestion operation already changed this course');
   }
   await dispatchIngestionOperation(messageId);
-  return { jobId: operation._id as string, correlationId };
+  return { jobId: operation.id as string, correlationId };
 }
 
 export async function dispatchIngestionOperation(jobId: string) {
@@ -62,7 +62,7 @@ export async function dispatchIngestionOperation(jobId: string) {
     throw new IngestionConflictError('Operation cannot be dispatched');
   if (
     !(await Course.exists({
-      _id: operation.courseId,
+      id: operation.courseId,
       jobId,
       correlationId: operation.correlationId,
       status: 'processing'
@@ -70,7 +70,7 @@ export async function dispatchIngestionOperation(jobId: string) {
   )
     throw new IngestionConflictError('Operation is no longer current');
   await CourseIngestionOperation.updateOne(
-    { _id: jobId, state: { $in: ['prepared', 'queued'] } },
+    { id: jobId, state: { $in: ['prepared', 'queued'] } },
     { $set: { state: 'queued', lastDispatchedAt: new Date() }, $inc: { dispatchCount: 1 } }
   );
   try {
@@ -91,7 +91,7 @@ export async function dispatchIngestionOperation(jobId: string) {
     // same identity and all bytes; explicit reconciliation republishes safely.
     await Course.updateOne(
       {
-        _id: operation.courseId,
+        id: operation.courseId,
         jobId,
         correlationId: operation.correlationId,
         status: 'processing'
@@ -113,8 +113,8 @@ async function authorize(actor: string, courseId: string, expectedJobId: string)
     throw Object.assign(new Error('Forbidden'), { status: 403 });
   if (typeof expectedJobId !== 'string' || !expectedJobId)
     throw new IngestionConflictError('Expected operation identity required');
-  const course = await Course.findOne({ _id: courseId, jobId: expectedJobId });
-  const operation = await CourseIngestionOperation.findOne({ _id: expectedJobId, courseId }).lean();
+  const course = await Course.findOne({ id: courseId, jobId: expectedJobId });
+  const operation = await CourseIngestionOperation.findOne({ id: expectedJobId, courseId }).lean();
   if (!course || !operation)
     throw new IngestionConflictError('Operation changed; reload its current state');
   return { course, operation };
@@ -128,7 +128,7 @@ export async function cancelIngestionOperation(
   const { operation } = await authorize(actor, courseId, expectedJobId);
   const stopped = await Course.updateOne(
     {
-      _id: courseId,
+      id: courseId,
       jobId: expectedJobId,
       status: { $in: ['processing', 'failed'] },
       correlationId: operation.correlationId
@@ -145,7 +145,7 @@ export async function cancelIngestionOperation(
   if (!stopped.matchedCount)
     throw new IngestionConflictError('Operation already completed or cancelled');
   await CourseIngestionOperation.updateOne(
-    { _id: expectedJobId },
+    { id: expectedJobId },
     { $set: { state: 'cancelled' } }
   );
   return { jobId: expectedJobId, status: 'cancelled', workerCancellation: 'at_stage_boundaries' };
@@ -171,7 +171,7 @@ export async function reconcileIngestionOperation(
       detail: 'Worker processing or terminal outcome; no success inferred.'
     };
   await Course.updateOne(
-    { _id: courseId, jobId: expectedJobId, correlationId: operation.correlationId },
+    { id: courseId, jobId: expectedJobId, correlationId: operation.correlationId },
     { $set: { status: 'processing', ingestError: '', ingestDetail: 'queued' } }
   );
   await dispatchIngestionOperation(expectedJobId);

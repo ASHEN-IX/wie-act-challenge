@@ -14,7 +14,7 @@ export default async function Session({
   const { sessionId } = await params;
   const result = await load<{
     session: {
-      _id: string;
+      id: string;
       status: string;
       taskProgress?: {
         currentTaskIndex: number;

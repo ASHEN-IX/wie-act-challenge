@@ -86,8 +86,8 @@ const union =
   };
 const version = enumeration('1.0.0');
 const id = text(128, /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/);
-const courseId = text(24, /^[a-f0-9]{24}$/);
-const uuid = text(36, /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/);
+const courseId = text(36, /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+const uuid = text(36, /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
 const hash = text(71, /^sha256:[a-f0-9]{64}$/);
 const time = refine(
   text(24, /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z$/),
@@ -111,7 +111,10 @@ const sources = refine(
   list(sourceRef, 1, 32),
   (v) => unique(v, (r) => `${r.documentId}:${r.pageNumber}`).length === v.length
 );
-const vectorIndexRef = text(256, /^faiss\/[a-f0-9]{24}\/[a-zA-Z0-9][a-zA-Z0-9_-]*\.faiss$/);
+const vectorIndexRef = text(
+  280,
+  /^faiss\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/[a-zA-Z0-9][a-zA-Z0-9_-]*\.faiss$/i
+);
 const objective = object({ objectiveId: id, statement: text(2000), bloomLevel: bloom });
 const topic = union(
   object({ topicId: id, title: text(200), objectives: list(objective, 1, 50) }),

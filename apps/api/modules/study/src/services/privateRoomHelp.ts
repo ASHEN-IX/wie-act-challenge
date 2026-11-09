@@ -10,7 +10,6 @@ import { ActivityBoundaryError } from './activityResolution';
 import { resolveRoomSourceRevision } from './roomActivity';
 export interface HelpRow {
   id: string;
-  _id: string;
   userId: string;
   roomId: string;
   requestId: string;

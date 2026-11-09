@@ -274,7 +274,7 @@ export async function verifyRevisionArtifact(revision: {
   try {
     const courseId = String(revision.courseId),
       revisionId = revision.revisionTag;
-    if (!/^[a-f0-9]{24}$/.test(courseId) || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(revisionId))
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(courseId) || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(revisionId))
       throw new Error();
     const documents = revision.sourceManifest as SourceDocument[];
     if (!documents?.length || documents.some((d) => !d.storageRef)) throw new Error();
@@ -428,7 +428,7 @@ export async function prepareRevisionSources(actor: string, courseId: string, re
   // are updated only by explicit authorized preparation, never by a read.
   const changed = await CourseRevision.updateOne(
     {
-      _id: draft._id,
+      id: draft.id,
       revisionTag: revisionId,
       status: 'draft',
       __v: draft.__v,
@@ -453,7 +453,7 @@ export async function prepareRevisionSources(actor: string, courseId: string, re
     throw new SourceIntegrityError('Reviewed representation missing from exact retrieval index');
   const pinned = await CourseRevision.updateOne(
     {
-      _id: draft._id,
+      id: draft.id,
       revisionTag: revisionId,
       status: 'draft',
       __v: draft.__v,

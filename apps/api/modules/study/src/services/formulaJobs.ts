@@ -10,6 +10,7 @@ import { fail, validateCorrection } from './formulaReview';
 import aiClient from '../../../../shared/aiClient';
 import { EXCHANGE_JOBS } from '../../../../shared/ai-messaging/topology';
 import { prisma } from '../../../../shared/database';
+import { newId } from '../../../../shared/ids';
 import { isDuplicateKey } from '../models/_table';
 
 export const FORMULA_QUEUE = process.env.FORMULA_QUEUE || 'ai.work.study.formula.recognize';
@@ -24,7 +25,7 @@ export async function snapshot(
 ) {
   if (!actor) fail(401, 'UNAUTHENTICATED');
   if (
-    !/^[a-f0-9]{24}$/.test(courseId) ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(courseId) ||
     !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(tag) ||
     !Number.isSafeInteger(version) ||
     version < 0
@@ -102,7 +103,7 @@ export async function consent(
   } else {
     await prisma.formulaSourceConsent.create({
       data: {
-        id: crypto.randomBytes(12).toString('hex'),
+        id: newId(),
         payload: {
           identity,
           courseId,
@@ -226,7 +227,7 @@ export async function submit(actor: string, courseId: string, tag: string, body:
   await prerequisites(actor, courseId, region.documentHash, model);
   const identity = digest([
     courseId,
-    String(draft._id),
+    String(draft.id),
     tag,
     draft.__v,
     region.documentHash,
@@ -237,7 +238,7 @@ export async function submit(actor: string, courseId: string, tag: string, body:
   const payload = {
     identity,
     courseId,
-    revisionId: String(draft._id),
+    revisionId: String(draft.id),
     revisionTag: tag,
     draftVersion: draft.__v,
     actor,
@@ -263,30 +264,30 @@ export async function submit(actor: string, courseId: string, tag: string, body:
     job = await Jobs.findOne({ identity });
   }
   if (!job || Array.isArray(job)) fail(503, 'JOB_UNAVAILABLE');
-  if (job.state === 'queued') await dispatch(String(job._id));
+  if (job.state === 'queued') await dispatch(String(job.id));
   return job;
 }
 export async function status(actor: string, courseId: string, tag: string, id: string) {
   if (!actor) fail(401, 'UNAUTHENTICATED');
-  if (!/^[a-f0-9]{24}$/.test(id)) fail(422, 'INVALID_JOB');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) fail(422, 'INVALID_JOB');
   if (!(await canManageCourse(actor, courseId))) fail(403, 'FORBIDDEN');
-  const job = await Jobs.findOne({ _id: id, courseId, revisionTag: tag });
+  const job = await Jobs.findOne({ id: id, courseId, revisionTag: tag });
   if (!job || Array.isArray(job)) fail(404, 'NOT_FOUND');
   return job;
 }
 export async function cancel(actor: string, courseId: string, tag: string, id: string) {
   await status(actor, courseId, tag, id);
   await Jobs.updateOne(
-    { _id: id, state: { $in: ['queued', 'running'] } },
+    { id: id, state: { $in: ['queued', 'running'] } },
     { $set: { state: 'cancelled', finishedAt: new Date() } }
   );
   return status(actor, courseId, tag, id);
 }
 export async function processJob(id: string) {
-  if (!/^[a-f0-9]{24}$/.test(id)) return;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) return;
   const claim = crypto.randomUUID();
   const job: any = await Jobs.findOneAndUpdate(
-    { _id: id, state: 'queued' },
+    { id: id, state: 'queued' },
     { $set: { state: 'running', claim, startedAt: new Date() } },
     { new: true }
   );
@@ -294,12 +295,12 @@ export async function processJob(id: string) {
   let dispatched = false;
   try {
     const draft = await snapshot(job.actor, job.courseId, job.revisionTag, job.draftVersion);
-    if (String(draft._id) !== job.revisionId) fail(409, 'DRAFT_CHANGED');
+    if (String(draft.id) !== job.revisionId) fail(409, 'DRAFT_CHANGED');
     const { manifest, region } = await inspect(draft, job.documentId, job.regionId);
     if (region.cropHash !== job.cropHash || region.documentHash !== job.documentHash)
       fail(409, 'SOURCE_CHANGED');
     await prerequisites(job.actor, job.courseId, job.documentHash, job.model);
-    if (!(await Jobs.exists({ _id: id, state: 'running', claim }))) return;
+    if (!(await Jobs.exists({ id: id, state: 'running', claim }))) return;
     dispatched = true;
     const { data } = await aiClient.post(
       '/api/ai/sources/recognize-formula',
@@ -327,10 +328,10 @@ export async function processJob(id: string) {
       fail(503, 'INVALID_PROPOSAL');
     if (p.response.status !== 'proposed') fail(422, 'UNRESOLVED');
     validateCorrection(p.response.content);
-    await Jobs.updateOne({ _id: id, claim }, { $set: { usage: data.usage, result: p } });
+    await Jobs.updateOne({ id: id, claim }, { $set: { usage: data.usage, result: p } });
     await snapshot(job.actor, job.courseId, job.revisionTag, job.draftVersion);
     await prerequisites(job.actor, job.courseId, job.documentHash, job.model);
-    if (!(await Jobs.exists({ _id: id, state: 'running', claim }))) return;
+    if (!(await Jobs.exists({ id: id, state: 'running', claim }))) return;
     const identity = digest([job.identity, p.proposal_sha256]);
     const saved: any = await FormulaProposal.findOneAndUpdate(
       { identity },
@@ -363,11 +364,11 @@ export async function processJob(id: string) {
       { upsert: true, new: true }
     );
     await Jobs.updateOne(
-      { _id: id, state: 'running', claim },
+      { id: id, state: 'running', claim },
       {
         $set: {
           state: 'completed',
-          proposalId: String(saved._id),
+          proposalId: String(saved.id),
           usage: data.usage,
           finishedAt: new Date()
         }
@@ -376,7 +377,7 @@ export async function processJob(id: string) {
   } catch (e) {
     const status = (e as any).status;
     await Jobs.updateOne(
-      { _id: id, state: 'running', claim },
+      { id: id, state: 'running', claim },
       {
         $set: {
           state: status === 409 ? 'stale' : dispatched ? 'uncertain' : 'failed',
@@ -394,5 +395,5 @@ export async function recover() {
     { $set: { state: 'uncertain', error: 'WORKER_INTERRUPTED', finishedAt: new Date() } }
   );
   const queued = await Jobs.find({ state: 'queued' }).limit(100);
-  for (const job of queued) await dispatch(String(job._id));
+  for (const job of queued) await dispatch(String(job.id));
 }

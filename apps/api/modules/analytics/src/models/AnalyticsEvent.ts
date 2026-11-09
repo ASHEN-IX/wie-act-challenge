@@ -17,7 +17,7 @@ export type AnalyticsEventType =
   | 'profile_updated';
 
 export type IAnalyticsEvent = AnalyticsEventRow & {
-  _id: string;
+  id: string;
   metadata: (Record<string, unknown> & { duration?: number }) | null;
 };
 

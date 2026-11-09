@@ -218,13 +218,13 @@ export async function generateExperiencePlan(input: {
   // only one caller can move `requested` forward.
   if (String(row.state) === 'requested') {
     const claimed = await ExperiencePlanRequest.findOneAndUpdate(
-      { _id: row._id, state: 'requested' },
+      { id: row.id, state: 'requested' },
       { $set: { state: 'authorized' } },
       { new: true },
     ).lean();
     if (!claimed) {
       // Another process won the claim. Re-read to report its state honestly.
-      const current = await ExperiencePlanRequest.findOne({ _id: row._id }).lean();
+      const current = await ExperiencePlanRequest.findOne({ id: row.id }).lean();
       recordEvent('duplicate_suppressed');
       return { status: 'duplicate', requestId: String(current?.requestId ?? requestId) };
     }
@@ -287,14 +287,14 @@ export async function generateExperiencePlan(input: {
       // Single-winner promotion: two callers may both see `uncertain`, but only
       // one transitions the row. The loser re-reads rather than inventing state.
       const promoted = await ExperiencePlanRequest.findOneAndUpdate(
-        { _id: row._id, state: 'uncertain' },
+        { id: row.id, state: 'uncertain' },
         {
           $set: { state: 'validated', planDigest: adopted.digest, finishedAt: new Date() },
           $unset: { code: 1 },
         },
         { new: true },
       ).lean();
-      const current = promoted ?? (await ExperiencePlanRequest.findOne({ _id: row._id }).lean());
+      const current = promoted ?? (await ExperiencePlanRequest.findOne({ id: row.id }).lean());
       if (String(current?.state) === 'validated') {
         recordEvent('already_accepted_reuse');
         return { status: 'already_accepted', planDigest: adopted.digest, requestId };
@@ -316,7 +316,7 @@ export async function generateExperiencePlan(input: {
     });
   } catch (error) {
     await ExperiencePlanRequest.updateOne(
-      { _id: row._id },
+      { id: row.id },
       { $set: { state: 'failed', code: 'BUDGET_UNAVAILABLE', finishedAt: new Date() } },
     );
     return {
@@ -330,7 +330,7 @@ export async function generateExperiencePlan(input: {
   // between reserving and dispatching leaves evidence recovery can refund. With
   // both fields written only after dispatch, that window was invisible.
   await ExperiencePlanRequest.updateOne(
-    { _id: row._id },
+    { id: row.id },
     {
       $set: {
         state: 'reserved',
@@ -341,7 +341,7 @@ export async function generateExperiencePlan(input: {
   );
 
   await ExperiencePlanRequest.updateOne(
-    { _id: row._id },
+    { id: row.id },
     { $set: { state: 'dispatched', dispatchAt: new Date() } },
   );
 
@@ -378,7 +378,7 @@ export async function generateExperiencePlan(input: {
   }).catch(() => ({ chargedTokens: reservation.reservedTokens, refunded: 0, usageReported: false }));
 
   await ExperiencePlanRequest.updateOne(
-    { _id: row._id },
+    { id: row.id },
     {
       $set: {
         usageReported: accounting.usageReported,
@@ -397,7 +397,7 @@ export async function generateExperiencePlan(input: {
     const uncertain = outcome.failure === 'uncertain' || failureClass(outcome.code) === 'uncertain';
     recordEvent(uncertain ? 'uncertain_outcome' : 'known_failure');
     await ExperiencePlanRequest.updateOne(
-      { _id: row._id },
+      { id: row.id },
       {
         $set: {
           state: uncertain ? 'uncertain' : 'failed',
@@ -410,7 +410,7 @@ export async function generateExperiencePlan(input: {
   }
 
   // ---- independent validation -------------------------------------------
-  await ExperiencePlanRequest.updateOne({ _id: row._id }, { $set: { state: 'validating' } });
+  await ExperiencePlanRequest.updateOne({ id: row.id }, { $set: { state: 'validating' } });
   const validation: ValidationOutcome = tryValidateExperiencePlan(
     outcome.proposal,
     input.validationContext,
@@ -419,7 +419,7 @@ export async function generateExperiencePlan(input: {
   if (!validation.ok) {
     recordEvent('validation_reject');
     await ExperiencePlanRequest.updateOne(
-      { _id: row._id },
+      { id: row.id },
       {
         $set: {
           state: 'rejected',
@@ -456,7 +456,7 @@ export async function generateExperiencePlan(input: {
     // A plan that validated but cannot be stored is not usable to a learner.
     // Record the failure plainly instead of pretending the plan exists.
     await ExperiencePlanRequest.updateOne(
-      { _id: row._id },
+      { id: row.id },
       {
         $set: {
           state: 'failed',
@@ -475,7 +475,7 @@ export async function generateExperiencePlan(input: {
   }
 
   await ExperiencePlanRequest.updateOne(
-    { _id: row._id },
+    { id: row.id },
     {
       $set: {
         state: 'validated',
@@ -564,7 +564,7 @@ export async function recoverStalePlanningRequests(
     state: { $in: ['authorized', 'reserved'] },
     updatedAt: { $lt: cutoff },
   })
-    .select({ _id: 1, requestId: 1, approvalId: 1, reservedTokens: 1 })
+    .select({ id: 1, requestId: 1, approvalId: 1, reservedTokens: 1 })
     .limit(50)
     .lean();
 
@@ -572,7 +572,7 @@ export async function recoverStalePlanningRequests(
   for (const row of stale) {
     // Claim the row first so two recovery workers cannot both act on it.
     const claimed = await ExperiencePlanRequest.findOneAndUpdate(
-      { _id: row._id, state: { $in: ['authorized', 'reserved'] } },
+      { id: row.id, state: { $in: ['authorized', 'reserved'] } },
       { $set: { state: 'failed', code: 'PRE_DISPATCH_INTERRUPTED', finishedAt: new Date() } },
       { new: true },
     ).lean();

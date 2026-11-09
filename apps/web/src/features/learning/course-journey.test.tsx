@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { CourseJourney, courseJourney } from "./course-journey";
 
-const ID = "6af0828d13939199bb8badec";
+const ID = "ba8725ad-45d0-50c8-977c-a9eca8763a43";
 
 describe("course journey", () => {
   it("offers the visual step only when the course has concepts to show", () => {

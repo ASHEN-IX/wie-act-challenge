@@ -51,7 +51,7 @@ function authHeader() {
 
 function ownProfile() {
   return {
-    _id: 'profile-alice',
+    id: 'profile-alice',
     userId: 'user-alice',
     nickname: 'Alice',
     bio: '',

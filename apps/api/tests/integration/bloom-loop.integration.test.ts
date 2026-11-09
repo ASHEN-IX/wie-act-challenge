@@ -55,7 +55,7 @@ async function wipeLoopCollections() {
 
 function seedCourse() {
   return Course.create({
-    _id: COURSE_ID,
+    id: COURSE_ID,
     userId: USER,
     subjectId: 'subj-1',
     title: 'Data Structures',
@@ -254,9 +254,11 @@ describe('BLOOM-12 end-to-end loop (real Mongo + real services)', () => {
       { knowledgeType: 'procedural', bloomLevel: 'APPLY', score: 0.5 }
     ];
     for (const row of bRows) {
+      // The identity is (user, topic, knowledgeType, bloomLevel); the row's own
+      // fields belong to the write, not the filter, or the upsert creates nothing.
       await CompetencyProfile.updateOne(
-        { userId: USER, topicId: TOPIC_B, ...row },
-        { $set: { confidence: 0.4, evidence: [], updatedAt: new Date() } },
+        { userId: USER, topicId: TOPIC_B, knowledgeType: row.knowledgeType, bloomLevel: row.bloomLevel },
+        { $set: { score: row.score, confidence: 0.4, evidence: [], updatedAt: new Date() } },
         { upsert: true }
       );
     }
@@ -296,7 +298,7 @@ describe('BLOOM-12 end-to-end loop (real Mongo + real services)', () => {
         }
       ]
     });
-    const weak = await getWeakCompetenciesForCourse(USER, bareCourse._id.toString(), 10);
+    const weak = await getWeakCompetenciesForCourse(USER, bareCourse.id.toString(), 10);
     expect(Array.isArray(weak)).toBe(true);
     expect(weak).toHaveLength(1);
     expect(weak[0].current_level).toBeNull(); // not started

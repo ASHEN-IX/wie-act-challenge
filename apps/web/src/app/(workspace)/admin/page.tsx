@@ -6,7 +6,7 @@ export default async function Admin() {
   await requireIdentity("admin");
   const result = await load<{
     users: {
-      _id: string;
+      id: string;
       email: string;
       name?: string;
       role: string;
@@ -32,7 +32,7 @@ export default async function Admin() {
             </thead>
             <tbody className="divide-y">
               {result.data.users.map((user) => (
-                <tr key={user._id}>
+                <tr key={user.id}>
                   <td className="p-4">{user.name || "—"}</td>
                   <td className="p-4">{user.email}</td>
                   <td className="p-4">{user.role}</td>

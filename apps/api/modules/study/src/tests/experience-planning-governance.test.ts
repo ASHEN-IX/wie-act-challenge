@@ -93,9 +93,9 @@ import {
 } from '../../../../shared/ednova/planningContext';
 import type { LessonBlockV2 } from '../../../../shared/ednova/learningDocumentV2';
 
-const courseId = '0123456789abcdef01234567';
+const courseId = 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d';
 const revisionId = 'rev_1';
-const actor = 'aaaaaaaaaaaaaaaaaaaaaaaa';
+const actor = '04b3da2d-ec14-5643-bf49-e43f550168bf';
 
 const findById = Course.findById as jest.Mock;
 const canManage = canManageCourse as jest.Mock;

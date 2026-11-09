@@ -118,7 +118,7 @@ test('M07 / ED-30: Course Studio Versioned Draft APIs & Learning Objectives', as
       topics: initialTopics,
       files: [{ filename: 'lecture.pdf', originalName: 'lecture.pdf', fileHash: 'hash123' }]
     });
-    courseId = courseDoc._id.toString();
+    courseId = courseDoc.id.toString();
     await prepareCourseFixture(courseId, t);
 
     await CourseEnrollment.create({
@@ -314,7 +314,7 @@ test('M07 / ED-30: Course Studio Versioned Draft APIs & Learning Objectives', as
       });
 
       // Pin activeRevisionId to the published revision
-      await Course.findByIdAndUpdate(courseId, { activeRevisionId: publishedRev._id.toString() });
+      await Course.findByIdAndUpdate(courseId, { activeRevisionId: publishedRev.id.toString() });
 
       const currentDraft = await getCourseDraft(instructorId, courseId);
 
@@ -345,10 +345,10 @@ test('M07 / ED-30: Course Studio Versioned Draft APIs & Learning Objectives', as
 
       // Verify course activeRevisionId still points to published revision!
       const updatedCourse = await Course.findById(courseId);
-      assert.equal(updatedCourse!.activeRevisionId, publishedRev._id.toString());
+      assert.equal(updatedCourse!.activeRevisionId, publishedRev.id.toString());
 
       // Verify published revision content was not mutated!
-      const verifyPub = await CourseRevision.findById(publishedRev._id);
+      const verifyPub = await CourseRevision.findById(publishedRev.id);
       assert.equal((verifyPub!.topics as Array<{ title: string }>)[0].title, 'Published Topic v1');
     }
   );
@@ -360,7 +360,7 @@ test('M07 / ED-30: Course Studio Versioned Draft APIs & Learning Objectives', as
       const activeTag = activeBefore!.activeRevisionId!;
       const active = await CourseRevision.findOne({
         courseId,
-        ...(activeTag.startsWith('rev_') ? { revisionTag: activeTag } : { _id: activeTag })
+        ...(activeTag.startsWith('rev_') ? { revisionTag: activeTag } : { id: activeTag })
       }).lean();
       assert.ok((active?.topics as unknown[])?.length);
       const stale = await CourseRevision.create({
@@ -376,7 +376,7 @@ test('M07 / ED-30: Course Studio Versioned Draft APIs & Learning Objectives', as
       assert.notEqual(draft.revisionTag, stale.revisionTag);
       assert.equal((draft.topics as unknown[]).length, (active!.topics as unknown[]).length);
       assert.notEqual((draft.topics as Array<{ title: string }>)[0].title, '');
-      assert.equal((await CourseRevision.findById(stale._id))!.status, 'draft');
+      assert.equal((await CourseRevision.findById(stale.id))!.status, 'draft');
       assert.equal((await Course.findById(courseId))!.activeRevisionId, activeTag);
     }
   );

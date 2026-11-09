@@ -34,8 +34,8 @@ import { parseNardouchInput, parseNardouchAnswer } from '../../../../shared/edno
 import express from 'express';
 import request from 'supertest';
 import router from '../routes/nardouch';
-const courseId = 'a'.repeat(24),
-  id = 'b'.repeat(24),
+const courseId = '01020ca1-fc51-5c10-92c0-16c54abb997f',
+  id = '593d63a2-44fc-53df-803a-f264599307e7',
   hash = 'sha256:' + 'c'.repeat(64);
 const input = {
   courseId,
@@ -46,7 +46,7 @@ const input = {
   expectedVersion: 0
 };
 const record = {
-  _id: id,
+  id: id,
   userId: 'owner',
   courseId,
   revisionId: 'rev_1',
@@ -162,10 +162,10 @@ test('denies course access before retrieval or dispatch', async () => {
 test('owner-scopes retrieval and does not project locks, feedback or identity', async () => {
   (C.findOne as jest.Mock).mockReturnValue(lean(null));
   await expect(getConversation('stranger', id)).rejects.toMatchObject({ status: 404 });
-  expect(C.findOne).toHaveBeenCalledWith(expect.objectContaining({ _id: id, userId: 'stranger' }));
+  expect(C.findOne).toHaveBeenCalledWith(expect.objectContaining({ id: id, userId: 'stranger' }));
 });
 test('rejects mismatched course histories', async () => {
-  (C.findOne as jest.Mock).mockReturnValue(lean({ ...record, courseId: 'd'.repeat(24) }));
+  (C.findOne as jest.Mock).mockReturnValue(lean({ ...record, courseId: '78740652-c3d8-5a84-b2d0-36d6ac2c2f2b' }));
   await expect(submitTurn('owner', { ...input, conversationId: id })).rejects.toMatchObject({
     status: 409
   });

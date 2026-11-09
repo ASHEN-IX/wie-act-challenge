@@ -8,7 +8,7 @@ import type { Response, NextFunction } from 'express';
 import express from 'express';
 import request from 'supertest';
 
-const MOCK_COURSE = { _id: 'course-1', userId: 'user-123', status: 'completed' };
+const MOCK_COURSE = { id: 'course-1', userId: 'user-123', status: 'completed' };
 
 jest.mock('../models/index', () => ({
   Course: {
@@ -27,7 +27,7 @@ jest.mock('../models/index', () => ({
           | 'taskGraph'
         >
       ) => ({
-        _id: { toString: () => 'plan-1' },
+        id: { toString: () => 'plan-1' },
         ...doc,
         userId: doc.userId,
         goal: doc.goal,
@@ -41,7 +41,7 @@ jest.mock('../models/index', () => ({
     )
   },
   Task: {
-    create: jest.fn(async (doc: object) => ({ _id: 'task-1', ...doc }))
+    create: jest.fn(async (doc: object) => ({ id: 'task-1', ...doc }))
   }
 }));
 

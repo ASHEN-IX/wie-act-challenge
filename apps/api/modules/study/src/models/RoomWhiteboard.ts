@@ -18,7 +18,7 @@ import type { BoardElement } from '../../../../shared/ednova/whiteboard';
  * index on `updatedAt`; PostgreSQL sweeps in `ednova_sweep_expired_rows`.
  */
 export type IRoomWhiteboard = Omit<RoomWhiteboardRow, 'elements'> & {
-  _id: string;
+  id: string;
   elements: BoardElement[];
 };
 

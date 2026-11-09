@@ -20,7 +20,7 @@ const { test, expect } = require("@playwright/test");
 const NUDGE_MESSAGE =
   "You seem distracted — take a short break, then return to your task.";
 
-const USER = { _id: "e2e-coach-user", email: "e2e@test.com", role: "student", isVerified: true };
+const USER = { id: "e2e-coach-user", email: "e2e@test.com", role: "student", isVerified: true };
 
 /**
  * Login through the real UI with every backend call route-mocked. This sets
@@ -86,7 +86,7 @@ test.describe("COACH-11: Coach nudge E2E", () => {
           status: 200,
           contentType: "application/json",
           body: JSON.stringify({
-            session: { _id: "session-e2e-coach-1", userId: USER._id, status: "active" },
+            session: { id: "session-e2e-coach-1", userId: USER.id, status: "active" },
           }),
         });
       }

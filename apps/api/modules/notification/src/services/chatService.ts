@@ -119,7 +119,7 @@ export async function processSearchQuery({ sessionId, userId, query }: ProcessSe
   });
 
   return {
-    messageId: stored._id,
+    messageId: stored.id,
     sessionId,
     userId,
     question: query,

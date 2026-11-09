@@ -14,7 +14,7 @@ import { canAdministerCourse, canManageEnrollments } from './resourceAccess';
 
 const INVITATION_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
-const OBJECT_ID = /^[a-f\d]{24}$/i;
+const OBJECT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const DEFAULT_INVITATION_HOURS = 168; // 7 days
 const MAX_INVITATION_HOURS = 720; // 30 days
 
@@ -96,7 +96,7 @@ export async function assignInstructorToCourse(
   );
 
   return {
-    courseId: updatedCourse!._id.toString(),
+    courseId: updatedCourse!.id.toString(),
     assignedInstructorIds: updatedCourse!.assignedInstructorIds || []
   };
 }
@@ -127,7 +127,7 @@ export async function revokeInstructorAssignment(
   );
 
   return {
-    courseId: updatedCourse!._id.toString(),
+    courseId: updatedCourse!.id.toString(),
     assignedInstructorIds: updatedCourse!.assignedInstructorIds || []
   };
 }
@@ -173,7 +173,7 @@ export async function issueCourseInvitation(
   const tokenHash = sha256(rawToken);
 
   const invitation = await CourseInvitation.create({
-    courseId: course._id,
+    courseId: course.id,
     institutionId: course.institutionId,
     role,
     tokenHash,
@@ -184,8 +184,8 @@ export async function issueCourseInvitation(
   });
 
   return {
-    invitationId: invitation._id.toString(),
-    courseId: course._id.toString(),
+    invitationId: invitation.id.toString(),
+    courseId: course.id.toString(),
     role,
     token: role === 'student' ? rawToken.match(/.{4}/g)!.join('-') : rawToken,
     expiresAt
@@ -229,7 +229,7 @@ export async function acceptAddressedCourseInvitation(
     throw new EnrollmentError(404, 'Invitation not found or invalid');
   }
   return claimCourseInvitation(userId, {
-    _id: invitationId,
+    id: invitationId,
     recipientEmail: email.trim().toLowerCase(),
     role: 'student'
   });
@@ -251,13 +251,13 @@ export async function listAddressedCourseInvitations(email?: string) {
       .lean(),
     CourseInvitation.countDocuments(filter)
   ]);
-  const courses = await Course.find({ _id: { $in: rows.map((row) => row.courseId) } })
+  const courses = await Course.find({ id: { $in: rows.map((row) => row.courseId) } })
     .select('title')
     .lean();
-  const titles = new Map(courses.map((course) => [course._id.toString(), course.title]));
+  const titles = new Map(courses.map((course) => [course.id.toString(), course.title]));
   const invitations = rows.flatMap((row) => {
     const title = titles.get(row.courseId.toString());
-    return title ? [{ id: row._id.toString(), title, expiresAt: row.expiresAt }] : [];
+    return title ? [{ id: row.id.toString(), title, expiresAt: row.expiresAt }] : [];
   });
   return { invitations, pendingCount };
 }
@@ -303,7 +303,7 @@ async function claimCourseInvitation(userId: string, selector: FilterQuery) {
         if (enrollment) {
           return {
             courseId: existing.courseId.toString(),
-            enrollmentId: enrollment._id.toString(),
+            enrollmentId: enrollment.id.toString(),
             status: enrollment.status,
             recovered: true
           };
@@ -324,7 +324,7 @@ async function claimCourseInvitation(userId: string, selector: FilterQuery) {
     });
     if (!isMember) {
       // Revert the claim if user is not in the institution
-      await CourseInvitation.findByIdAndUpdate(claimed._id, {
+      await CourseInvitation.findByIdAndUpdate(claimed.id, {
         $set: { status: 'pending', acceptedByUserId: null, acceptedAt: null }
       });
       throw new EnrollmentError(
@@ -366,7 +366,7 @@ async function claimCourseInvitation(userId: string, selector: FilterQuery) {
   if (!enrollment) throw new EnrollmentError(503, 'Enrollment could not be persisted');
   return {
     courseId: String(claimed.courseId),
-    enrollmentId: enrollment._id,
+    enrollmentId: enrollment.id,
     status: enrollment.status
   };
 }
@@ -425,9 +425,9 @@ export async function enrollStudentDirectly(
 
   if (!enrollment) throw new EnrollmentError(503, 'Enrollment could not be persisted');
   return {
-    courseId: course._id,
+    courseId: course.id,
     userId: studentUserId,
-    enrollmentId: enrollment._id,
+    enrollmentId: enrollment.id,
     status: enrollment.status
   };
 }
@@ -483,7 +483,7 @@ export async function listCourseEnrollments(actorUserId: string, courseIdRaw: st
     .lean();
 
   return enrollments.map((e) => ({
-    enrollmentId: e._id.toString(),
+    enrollmentId: e.id.toString(),
     userId: e.userId,
     status: e.status,
     enrolledAt: e.enrolledAt
@@ -499,7 +499,7 @@ export async function listAccessibleCourses(userId: string, institutionIdRaw?: s
   if (institutionIdRaw) {
     const institutionId = parseId(institutionIdRaw, 'Institution');
 
-    if (!(await Institution.exists({ _id: institutionId, status: 'active' }))) {
+    if (!(await Institution.exists({ id: institutionId, status: 'active' }))) {
       throw new EnrollmentError(403, 'Institution is not active');
     }
 
@@ -517,7 +517,7 @@ export async function listAccessibleCourses(userId: string, institutionIdRaw?: s
     if (membership.role === 'university_admin') {
       // Admin sees all institutional courses for this institution
       return Course.find({ institutionId, scope: 'institutional' })
-        .select('_id title scope institutionId assignedInstructorIds createdAt updatedAt')
+        .select('id title scope institutionId assignedInstructorIds createdAt updatedAt')
         .sort({ createdAt: -1 })
         .lean();
     }
@@ -544,7 +544,7 @@ export async function listAccessibleCourses(userId: string, institutionIdRaw?: s
 
     const enrolledCourseIds = activeEnrollments.map((e) => e.courseId);
     return Course.find({
-      _id: { $in: enrolledCourseIds },
+      id: { $in: enrolledCourseIds },
       institutionId,
       scope: 'institutional'
     })

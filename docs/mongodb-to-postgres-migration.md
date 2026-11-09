@@ -16,7 +16,7 @@ is the [runbook](runbooks/postgres-migration.md).
 | Persistence | MongoDB 7 through Mongoose 8 | PostgreSQL 17 through Prisma 7.10.1 |
 | Schema of record | 48 Mongoose schema files (~5.8k lines) | `apps/api/prisma/schema.prisma` |
 | Auth storage | `@better-auth/mongo-adapter` | `@better-auth/prisma-adapter` |
-| Identifier shape | 24-char ObjectId hex, exposed as `_id` | unchanged — 24-char hex primary keys, still exposed as `_id` |
+| Identifier shape | 24-char ObjectId hex, exposed as `_id` | native PostgreSQL `uuid`, exposed as `id` |
 | Query surface | ~480 Mongoose call sites | Prisma delegates, same call semantics |
 
 ### Collections → tables
@@ -66,6 +66,7 @@ updates. Each one is preserved explicitly:
 | Jest — whole API | 101 suites / 1350 tests passing |
 | `node:test` — routes and top-level suites | 15/15 passing |
 | `node:test` — integration suites (41 files) | 352/360 passing (8 LiveKit media cases blocked, see below) |
+| Jest — web app | 42 files / 282 tests passing |
 | Data migration dry run + apply against the live Mongo copy | see below |
 
 The 8 integration tests that do not pass are all in the two LiveKit media

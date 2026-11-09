@@ -46,7 +46,7 @@ async function main() {
     for (const name of ["Admin", "Alice", "Bob", "Charlie"]) {
       const id = new ObjectId();
       await db.collection("users").insertOne({
-        _id: id,
+        id: id,
         name: `M04B ${name}`,
         email: `${name.toLowerCase()}-${Date.now()}@m04b.browser.test`,
         password: passwordHash,
@@ -59,7 +59,7 @@ async function main() {
       actors.push({ id, name, email: "", page: undefined as unknown as Page });
     }
     for (const actor of actors) {
-      const row = await db.collection("users").findOne({ _id: actor.id });
+      const row = await db.collection("users").findOne({ id: actor.id });
       actor.email = String(row!.email);
     }
     const [adminData, aliceData, bobData, charlieData] = actors;
@@ -67,7 +67,7 @@ async function main() {
     // Create institutions
     const institutionA = new ObjectId();
     await db.collection("institutions").insertOne({
-      _id: institutionA,
+      id: institutionA,
       name: "Acme University A",
       slug: `acme-a-${Date.now()}`,
       status: "active",
@@ -77,7 +77,7 @@ async function main() {
 
     const institutionB = new ObjectId();
     await db.collection("institutions").insertOne({
-      _id: institutionB,
+      id: institutionB,
       name: "Beta College B",
       slug: `beta-b-${Date.now()}`,
       status: "active",
@@ -117,7 +117,7 @@ async function main() {
     // Charlie personal course
     const charlieCourseId = new ObjectId();
     await db.collection("courses").insertOne({
-      _id: charlieCourseId,
+      id: charlieCourseId,
       userId: charlieData.id.toString(),
       ownerUserId: charlieData.id.toString(),
       scope: "personal",
@@ -134,7 +134,7 @@ async function main() {
     // Institutional Course in Institution A
     const instCourseId = new ObjectId();
     await db.collection("courses").insertOne({
-      _id: instCourseId,
+      id: instCourseId,
       userId: aliceData.id.toString(),
       ownerUserId: adminData.id.toString(),
       scope: "institutional",

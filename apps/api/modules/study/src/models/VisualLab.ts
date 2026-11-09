@@ -7,7 +7,7 @@ import { table } from './_table';
  * the derived answer key stays here and is never projected to a browser.
  */
 export type IVisualLab = Omit<VisualLabRow, 'definition' | 'guidance' | 'check'> & {
-  _id: string;
+  id: string;
   definition: Record<string, unknown>;
   guidance: Record<string, unknown>;
   check: {

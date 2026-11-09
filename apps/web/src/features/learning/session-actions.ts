@@ -13,7 +13,7 @@ export async function startSession(
   await requireIdentity();
   let id: string;
   try {
-    const data = await api<{ session: { _id: string } }>(
+    const data = await api<{ session: { id: string } }>(
       "/api/v1/study/sessions/setup",
       {
         method: "POST",
@@ -23,7 +23,7 @@ export async function startSession(
         }),
       },
     );
-    id = data.session._id;
+    id = data.session.id;
   } catch (error) {
     unstable_rethrow(error);
     return {

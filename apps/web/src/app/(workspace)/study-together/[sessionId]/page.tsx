@@ -36,7 +36,7 @@ export default async function Room({
   ]);
 
   const [history, interventionsRes] = await Promise.all([
-    load<{ items: { _id: string; content: string; messageType: string }[] }>(
+    load<{ items: { id: string; content: string; messageType: string }[] }>(
       `/api/v1/session-chat/${id}/history`,
     ),
     load<{ interventions: FacilitatorInterventionInfo[] }>(
@@ -113,7 +113,7 @@ export default async function Room({
           <h2 className="text-xl font-semibold">Session questions</h2>
           {history.data?.items.length ? (
             history.data.items.map((item) => (
-              <article key={item._id} className="rounded-lg border p-5">
+              <article key={item.id} className="rounded-lg border p-5">
                 <p className="mb-2 text-xs capitalize text-muted-foreground">
                   {item.messageType.replaceAll("_", " ")}
                 </p>

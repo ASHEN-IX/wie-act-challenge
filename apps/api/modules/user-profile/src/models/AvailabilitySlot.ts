@@ -2,7 +2,7 @@ import type { AvailabilitySlot as SlotRow, Prisma } from '../../../../src/genera
 import { prisma, toDocument } from '../../../../shared/database';
 import { newId } from '../../../../shared/ids';
 
-export type IAvailabilitySlot = SlotRow & { _id: string };
+export type IAvailabilitySlot = SlotRow & { id: string };
 
 function hydrate(row: SlotRow): IAvailabilitySlot {
   return toDocument(row) as unknown as IAvailabilitySlot;

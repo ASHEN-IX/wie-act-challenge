@@ -53,7 +53,7 @@ import {
 } from '../services/visualLabPlanning';
 import { fallbackCandidate } from '../../../../shared/visualLab/definition';
 
-const COURSE = '64f1a2b3c4d5e6f7a8b9c0d1';
+const COURSE = '6b6c876a-068c-5071-982b-9591d6e077ab';
 const ACTOR = 'actor-1';
 const aiPost = aiClient.post as jest.Mock;
 
@@ -110,7 +110,7 @@ beforeEach(() => {
   // `create()` returns the row directly now (no `toObject()`).
   (VisualLab.create as jest.Mock).mockImplementation(async (doc: Record<string, unknown>) => ({
     ...doc,
-    _id: 'lab-row',
+    id: 'lab-row',
     createdAt: new Date('2026-11-01T10:00:00.000Z')
   }));
   aiPost.mockResolvedValue({

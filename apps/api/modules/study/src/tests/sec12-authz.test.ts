@@ -92,7 +92,7 @@ describe('SEC-12 tasks are isolated per user', () => {
 
     expect(res.status).toBe(404);
     expect(Task.findOne).toHaveBeenCalledWith(
-      expect.objectContaining({ _id: 'task-1', userId: 'user-a' })
+      expect.objectContaining({ id: 'task-1', userId: 'user-a' })
     );
   });
 
@@ -117,7 +117,7 @@ describe('SEC-12 topics are isolated per user', () => {
 
     expect(res.status).toBe(404);
     expect(Topic.findOne).toHaveBeenCalledWith(
-      expect.objectContaining({ _id: 'topic-1', userId: 'user-a' })
+      expect.objectContaining({ id: 'topic-1', userId: 'user-a' })
     );
   });
 });
@@ -129,14 +129,14 @@ describe('SEC-12 sessions are isolated per user', () => {
 
     expect(res.status).toBe(404);
     expect(StudySession.findOne).toHaveBeenCalledWith(
-      expect.objectContaining({ _id: 'session-1', userId: 'user-a' })
+      expect.objectContaining({ id: 'session-1', userId: 'user-a' })
     );
   });
 });
 
 describe('SEC-12 plans are isolated per user', () => {
   const fakeAiJobColl = { findOne: mockAiJobFindOne };
-  const OBJECT_ID = '64b000000000000000000001';
+  const OBJECT_ID = '4ceb228e-c504-5be1-8e0a-9bba982f30ba';
 
   it("GET /plans/:planId 404s for another user's plan", async () => {
     StudyPlan.findOne.mockReturnValue(renderable(null));
@@ -144,7 +144,7 @@ describe('SEC-12 plans are isolated per user', () => {
 
     expect(res.status).toBe(404);
     expect(StudyPlan.findOne).toHaveBeenCalledWith(
-      expect.objectContaining({ _id: OBJECT_ID, userId: 'user-a' })
+      expect.objectContaining({ id: OBJECT_ID, userId: 'user-a' })
     );
   });
 
@@ -158,7 +158,7 @@ describe('SEC-12 plans are isolated per user', () => {
       result: { task_graph: { goal: 'G', tasks: [] } }
     });
     StudyPlan.create.mockResolvedValue({
-      _id: 'plan-new',
+      id: 'plan-new',
       userId: 'user-b',
       createdAt: new Date()
     });
@@ -190,7 +190,7 @@ describe('SEC-12 plans are isolated per user', () => {
       }
     });
     StudyPlan.create.mockResolvedValue({
-      _id: 'plan-new',
+      id: 'plan-new',
       ...{ userId: 'user-a', goal: 'Learn' },
       createdAt: new Date()
     });
@@ -215,7 +215,7 @@ describe('SEC-12 plans are isolated per user', () => {
       result: { task_graph: { goal: 'G', tasks: [] } }
     });
     StudyPlan.create.mockResolvedValue({
-      _id: 'plan-new',
+      id: 'plan-new',
       ...{ userId: 'user-b', goal: 'G' },
       createdAt: new Date()
     });

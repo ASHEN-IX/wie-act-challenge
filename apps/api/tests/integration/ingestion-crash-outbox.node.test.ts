@@ -55,7 +55,7 @@ test('Physical ingestion crash-boundary testing and concurrent outbox/replacemen
       ],
       ...overrides
     });
-    const courseId = String(course._id);
+    const courseId = String(course.id);
     const revisionTag = 'rev_initial_' + crypto.randomUUID().slice(0, 8);
     await CourseRevision.create({
       courseId,
@@ -334,7 +334,7 @@ test('Physical ingestion crash-boundary testing and concurrent outbox/replacemen
       const correlationId = crypto.randomUUID();
 
       await Course.updateOne(
-        { _id: params.courseId },
+        { id: params.courseId },
         {
           $set: {
             jobId,
@@ -347,7 +347,7 @@ test('Physical ingestion crash-boundary testing and concurrent outbox/replacemen
       // Simulate: worker finished and persisted result in CourseIngestionOperation,
       // but process died before applying it to Course
       await CourseIngestionOperation.create({
-        _id: jobId,
+        id: jobId,
         correlationId,
         courseId: params.courseId,
         revisionId: params.revisionId,
@@ -450,7 +450,7 @@ test('Physical ingestion crash-boundary testing and concurrent outbox/replacemen
 
       // Request 2 pushes files before CAS
       await Course.updateOne(
-        { _id: courseId },
+        { id: courseId },
         { $push: { files: { $each: stagedReplacementFiles } } }
       );
       const loserRevisionTag = 'rev_loser_' + Date.now();
@@ -475,7 +475,7 @@ test('Physical ingestion crash-boundary testing and concurrent outbox/replacemen
         if (err instanceof IngestionConflictError) {
           caughtConflict = true;
           // Rollback newly added files and clean up orphan revision
-          await Course.updateOne({ _id: courseId }, { $set: { files: initialFiles } });
+          await Course.updateOne({ id: courseId }, { $set: { files: initialFiles } });
           await CourseRevision.deleteOne({ courseId, revisionTag: loserRevisionTag });
         }
       }

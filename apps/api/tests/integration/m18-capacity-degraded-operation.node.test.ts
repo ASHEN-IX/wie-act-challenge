@@ -83,7 +83,7 @@ test('M18 / ED-12: Capacity-Aware Routing and Degraded Operation Integration', a
       }
       await Course.deleteMany({ userId: { contains: testPrefix } });
       await InstitutionMembership.deleteMany({ institutionId });
-      await Institution.deleteMany({ _id: institutionId });
+      await Institution.deleteMany({ id: institutionId });
       if (roomId) {
         await StudyRoom.deleteMany({ roomId });
       }
@@ -121,7 +121,7 @@ test('M18 / ED-12: Capacity-Aware Routing and Degraded Operation Integration', a
         subjectId: 'sub_systems',
         assignedInstructorIds: [instructorId]
       });
-      courseId = rawCourse._id.toString();
+      courseId = rawCourse.id.toString();
       await prepareCourseFixture(courseId, t);
 
       await CourseEnrollment.createMany([
@@ -153,7 +153,7 @@ test('M18 / ED-12: Capacity-Aware Routing and Degraded Operation Integration', a
       ];
 
       await CourseRevision.create({
-        courseId: rawCourse._id,
+        courseId: rawCourse.id,
         revisionTag: initialDraftTag,
         contentHash,
         status: 'draft',

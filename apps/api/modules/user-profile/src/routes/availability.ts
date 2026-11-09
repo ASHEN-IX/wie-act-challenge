@@ -32,7 +32,7 @@ router.get('/', async (req: DomainRequest, res: Response) => {
 
     // Convert to frontend format
     const formattedSlots = slots.map((slot) => ({
-      _id: slot._id.toString(),
+      id: slot.id.toString(),
       day_of_week: slot.dayOfWeek,
       start_time: slot.startTime,
       end_time: slot.endTime,
@@ -111,7 +111,7 @@ router.post('/', async (req: DomainRequest, res: Response) => {
         entries.push({
           userId,
           planId: null,
-          taskId: slot._id.toString(),
+          taskId: slot.id.toString(),
           title: value.label,
           description: `Blocked time: ${value.label}`,
           startTime,
@@ -136,7 +136,7 @@ router.post('/', async (req: DomainRequest, res: Response) => {
 
     // Return in frontend format
     res.status(201).json({
-      _id: slot._id.toString(),
+      id: slot.id.toString(),
       day_of_week: slot.dayOfWeek,
       start_time: slot.startTime,
       end_time: slot.endTime,

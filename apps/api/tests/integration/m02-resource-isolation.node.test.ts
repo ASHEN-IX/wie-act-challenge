@@ -110,7 +110,8 @@ test(
       await prisma.taskRecord.deleteMany({ where: { id: { in: taskIds } } });
       await prisma.studyPlan.deleteMany({ where: { id: { in: planIds } } });
       await prisma.sessionChat.deleteMany({ where: { sessionId: { in: roomIds } } });
-      await prisma.studyRoom.deleteMany({ where: { id: { in: roomIds } } });
+      // `roomIds` holds each room's public `roomId`, not the row id.
+      await prisma.studyRoom.deleteMany({ where: { roomId: { in: roomIds } } });
       await prisma.voiceSession.deleteMany({ where: { sessionId: { in: sessionIds } } });
       await prisma.studySession.deleteMany({ where: { id: { in: sessionIds } } });
       await prisma.authUser.deleteMany({ where: { id: { in: userIds } } });
@@ -119,10 +120,12 @@ test(
       await disconnectDatabase().catch(() => {});
     });
     const password = await bcrypt.hash('Synthetic!123', 12);
+    const runId = `${process.pid}_${Date.now()}`;
     const actors = ['owner', 'peer', 'outsider', 'admin'].map((name) => ({
       id: newId(),
       name,
-      email: `${name}@m02.test`,
+      // Run-unique: suites share one database and do not drop it.
+      email: `${name}-${runId}@m02.test`,
       cookie: ''
     }));
     for (const actor of actors) {
@@ -222,7 +225,7 @@ test(
     await symlink(path.join(sourceRoot, 'private.pdf'), linkFile);
     cleanupPaths.push(privateRoot, sourceRoot, publicFile, linkFile);
     await Course.create({
-      _id: courseId,
+      id: courseId,
       userId: String(owner.id),
       ownerUserId: String(owner.id),
       subjectId: newId(),
@@ -317,11 +320,12 @@ test(
     const team = newId();
     sessionIds.push(team);
     await StudySession.create({
-      _id: team,
+      id: team,
       userId: String(owner.id),
       type: 'team',
       status: 'active',
-      inviteCode: 'M02SAFE',
+      // Unique per run: invite codes are globally unique and the DB is shared.
+      inviteCode: `M02${runId.slice(-10)}`,
       startTime: new Date(Date.now() - 3600000),
       maxParticipants: 4,
       participants: [
@@ -382,15 +386,15 @@ test(
       assert.ok(session);
       const participants = structuredClone(session.participants);
       participants[1].leftAt = new Date();
-      await StudySession.updateOne({ _id: team }, { participants });
+      await StudySession.updateOne({ id: team }, { participants });
       assert.equal((await request(peer, `/api/v1/voice/${team}/status`)).status, 403);
     });
     await t.test(
       'completed legacy sessions deny transport even with stale active roster flags',
       async () => {
-        await StudySession.updateOne({ _id: team }, { status: 'completed' });
+        await StudySession.updateOne({ id: team }, { status: 'completed' });
         assert.equal((await request(owner, `/api/v1/voice/${team}/status`)).status, 403);
-        await StudySession.updateOne({ _id: team }, { status: 'active' });
+        await StudySession.updateOne({ id: team }, { status: 'active' });
       }
     );
     await t.test('source grant is independent of legacy team invite or membership', async () => {
@@ -398,7 +402,7 @@ test(
       assert.ok(session);
       const participants = structuredClone(session.participants);
       delete participants[1].leftAt;
-      await StudySession.updateOne({ _id: team }, { courseId: String(courseId), participants });
+      await StudySession.updateOne({ id: team }, { courseId: String(courseId), participants });
       assert.equal(
         (await request(peer, `/api/v1/study/sessions/team/${team}/participants`)).status,
         403
@@ -540,7 +544,7 @@ test(
           { ...result, correlationId: randomUUID() }
         ]) {
           await handleResult(forged);
-          assert.equal((await AiJob.findById(job._id))!.status, 'PENDING');
+          assert.equal((await AiJob.findById(job.id))!.status, 'PENDING');
         }
         // The Mongo assertion counted every document in the database because the
         // suite owned a private one. Shared here, the equivalent is "this job
@@ -593,8 +597,8 @@ test(
         assert.equal(response.status, 201);
         assert.equal(lastAiBody.user_id, String(owner.id));
         const context = lastAiBody.course_knowledge as Record<string, unknown>;
-        assert.deepEqual(Object.keys(context).sort(), ['_id', 'title', 'topics']);
-        assert.equal(context._id, String(courseId));
+        assert.deepEqual(Object.keys(context).sort(), ['id', 'title', 'topics']);
+        assert.equal(context.id, String(courseId));
         assert.ok(JSON.stringify(context).includes('M02_PRIVATE_SOURCE_SENTINEL'));
         assert.equal(context.files, undefined);
       }
@@ -691,7 +695,7 @@ test(
     planIds.push(materializedPlanId);
     taskIds.push(materializedTaskId);
     await StudyPlan.create({
-      _id: materializedPlanId,
+      id: materializedPlanId,
       userId: String(owner.id),
       courseId: String(courseId),
       resourceScope: { courseId: String(courseId) },
@@ -701,7 +705,7 @@ test(
       taskGraph: { tasks: [] }
     });
     await Task.create({
-      _id: materializedTaskId,
+      id: materializedTaskId,
       userId: String(owner.id),
       studyPlanId: String(materializedPlanId),
       title: 'M02_PRIVATE_SOURCE_SENTINEL',
@@ -725,15 +729,15 @@ test(
           handleResult(result),
           handleResult({ ...result, payload: { ...result.payload, mastery_score: 0.9 } })
         ]);
-        const accepted = await AiJob.findById(job._id);
+        const accepted = await AiJob.findById(job.id);
         await handleResult({ ...result, payload: { ...result.payload, mastery_score: 0.1 } });
-        assert.deepEqual((await AiJob.findById(job._id))!.result, accepted!.result);
+        assert.deepEqual((await AiJob.findById(job.id))!.result, accepted!.result);
         assert.equal(
           (await prisma.evalResult.findFirst({ where: { correlationId: job.correlationId } }))!
             .masteryScore,
           (accepted!.result as { mastery_score: number }).mastery_score
         );
-        assert.equal((await AiJob.findById(job._id))!.status, 'COMPLETED');
+        assert.equal((await AiJob.findById(job.id))!.status, 'COMPLETED');
         assert.equal(
           await prisma.evalResult.count({
             where: { correlationId: job.correlationId, userId: String(owner.id) }
@@ -751,7 +755,7 @@ test(
         holdAi = true;
         const inFlight = request(owner, `/api/v1/ai/vector/status/${courseId}`);
         await until(() => !!pendingAi, 'held synthetic inference response');
-        await Course.updateOne({ _id: courseId }, { userId: String(outsider.id) });
+        await Course.updateOne({ id: courseId }, { userId: String(outsider.id) });
         pendingAi!.setHeader('content-type', 'application/json');
         pendingAi!.end(JSON.stringify({ marker: 'M02_PRIVATE_SOURCE_SENTINEL' }));
         holdAi = false;

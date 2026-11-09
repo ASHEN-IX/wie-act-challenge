@@ -18,7 +18,7 @@ const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => 
 afterAll(() => exitSpy.mockRestore());
 
 const mockStudySession = {
-  _id: 'session-1',
+  id: 'session-1',
   userId: 'user-123',
   status: 'active',
   subjectId: 'subject-1'

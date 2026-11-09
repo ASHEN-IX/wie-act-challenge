@@ -82,7 +82,6 @@ const calculateChallengeXP = ({ difficulty, baseXP }: CalculateChallengeXPParams
 
 interface CompletionSession {
   id: string;
-  _id: { toString(): string } | string;
   mode?: string | null;
   duration?: number | null;
   taskId?: string | null;
@@ -142,7 +141,7 @@ interface AwardSessionCompletionParams {
 }
 
 async function awardSessionCompletion({ session, authorization }: AwardSessionCompletionParams) {
-  const sessionId = String(session?._id || '');
+  const sessionId = String(session?.id || '');
   const durationMinutes = Number(session?.duration || 0);
   const completionContext = getSessionCompletionContext(session);
   const computedTotalXP = completionContext.isChallenge
@@ -217,7 +216,7 @@ async function processSessionCompletionRewards({
         `${USER_PROFILE_URL}/api/v1/users/gamification/award-xp`,
         {
           action: 'daily_streak',
-          metadata: { sessionId: session._id.toString() }
+          metadata: { sessionId: session.id.toString() }
         },
         {
           headers: buildInternalHeaders(authorization)

@@ -81,7 +81,7 @@ test('M17 / ED-07 & ED-29: Real Shared Room Synchronized Activity & Private Subm
       }
       await Course.deleteMany({ userId: { contains: testPrefix } });
       await InstitutionMembership.deleteMany({ institutionId });
-      await Institution.deleteMany({ _id: institutionId });
+      await Institution.deleteMany({ id: institutionId });
       if (roomId) await StudyRoom.deleteMany({ roomId });
     } finally {
       await disconnectDatabase().catch(() => {});
@@ -126,7 +126,7 @@ test('M17 / ED-07 & ED-29: Real Shared Room Synchronized Activity & Private Subm
         subjectId: 'sub_thermo',
         assignedInstructorIds: [instructorId]
       });
-      courseId = rawCourse._id.toString();
+      courseId = rawCourse.id.toString();
       await prepareCourseFixture(courseId, t);
 
       // The instructor publishes the revision, then two learners study it.
@@ -163,7 +163,7 @@ test('M17 / ED-07 & ED-29: Real Shared Room Synchronized Activity & Private Subm
       ];
 
       await CourseRevision.create({
-        courseId: rawCourse._id,
+        courseId: rawCourse.id,
         revisionTag: initialDraftTag,
         contentHash,
         status: 'draft',

@@ -156,7 +156,7 @@ export async function publishCourseRevision(
   if (!draft.activationState) {
     const prepared = await CourseRevision.findOneAndUpdate(
       {
-        _id: draft._id,
+        id: draft.id,
         status: 'draft',
         revisionTag: draft.revisionTag,
         __v: draft.__v,
@@ -185,7 +185,7 @@ export async function publishCourseRevision(
   if (!(await canPublishCourse(actorUserId, courseId))) throw new PublicationForbiddenError();
   const active = await Course.findOneAndUpdate(
     {
-      _id: courseId,
+      id: courseId,
       $or: [
         { activeRevisionId: draft.expectedActiveRevisionId || null },
         { activeRevisionId: draft.revisionTag }
@@ -196,7 +196,7 @@ export async function publishCourseRevision(
   );
   if (!active) throw new PublicationConflictError('Another revision won activation');
   await CourseRevision.updateOne(
-    { _id: draft._id, activationState: 'prepared', status: 'draft' },
+    { id: draft.id, activationState: 'prepared', status: 'draft' },
     { $set: { activationState: 'committed', status: 'published' } }
   );
   if (draft.expectedActiveRevisionId)
@@ -255,7 +255,7 @@ export async function getPublishedCourseContext(
   const pubRev =
     requestedRevisionTag || course.activeRevisionId
       ? await CourseRevision.findOne({
-          courseId: course._id,
+          courseId: course.id,
           revisionTag: requestedRevisionTag || course.activeRevisionId,
           status: { $in: ['published', 'deprecated'] },
           activationState: 'committed',
@@ -317,7 +317,7 @@ export async function getPublishedCourseContext(
   return {
     schemaVersion: '1.0.0',
     visibility: 'authorized_learner',
-    courseId: course._id.toString(),
+    courseId: course.id.toString(),
     revisionId: pubRev.revisionTag,
     contentHash: formattedHash,
     title: course.title,
@@ -375,7 +375,7 @@ export async function resolveCourseSource(
   const pubRev =
     requestedRevisionTag || course.activeRevisionId
       ? await CourseRevision.findOne({
-          courseId: course._id,
+          courseId: course.id,
           revisionTag: requestedRevisionTag || course.activeRevisionId,
           status: { $in: ['published', 'deprecated'] },
           activationState: 'committed',
@@ -400,7 +400,7 @@ export async function resolveCourseSource(
   const formattedHash = `sha256:${rawContentHash.length === 64 ? rawContentHash : '0'.repeat(64)}`;
 
   const pin = {
-    courseId: course._id.toString(),
+    courseId: course.id.toString(),
     revisionId: pubRev.revisionTag,
     contentHash: formattedHash
   };
@@ -439,6 +439,6 @@ export async function resolveCourseSource(
     },
     sources,
     vectorIndexRef:
-      pubRev.vectorIndexRef || `faiss/${course._id.toString()}/${pubRev.revisionTag}.faiss`
+      pubRev.vectorIndexRef || `faiss/${course.id.toString()}/${pubRev.revisionTag}.faiss`
   };
 }

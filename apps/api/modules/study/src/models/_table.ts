@@ -9,7 +9,7 @@
  *   const course = await Course.findById(id).select('title scope').lean();
  *   const rows   = await Course.find({ scope: 'institutional' }).sort({ title: 1 });
  *
- * Rows come back as plain objects with `_id` (the column value, mirrored), which
+ * Rows come back as plain objects with `id` (the column value, mirrored), which
  * is what every route reads.
  */
 import { Prisma } from '../../../../src/generated/prisma/client';
@@ -242,7 +242,7 @@ function translateOperators(
   return out;
 }
 
-/** Translate a `{ _id, __v }`-style filter to its Prisma shape. */
+/** Translate a `{ id, __v }`-style filter to its Prisma shape. */
 export function translateWhere(
   where: Record<string, unknown> = {},
   jsonColumns: string[] = [],
@@ -253,7 +253,7 @@ export function translateWhere(
   let impossible = false;
   for (const [rawKey, rawValue] of Object.entries(where)) {
     let key = rawKey;
-    if (key === '_id') key = 'id';
+    if (key === 'id') key = 'id';
     else if (key === '__v') key = 'version';
     if (key === '$or' || key === '$and' || key === '$nor') {
       const target = key === '$or' ? 'OR' : key === '$and' ? 'AND' : 'NOT';
@@ -435,7 +435,7 @@ function asOrderBy(value: Record<string, unknown> | undefined) {
 function translateSort(spec: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [rawKey, direction] of Object.entries(spec)) {
-    const key = rawKey === '_id' ? 'id' : rawKey === '__v' ? 'version' : rawKey;
+    const key = rawKey === 'id' ? 'id' : rawKey === '__v' ? 'version' : rawKey;
     // `findFirst`/`findUnique` reject sorting on the primary key; a scanned
     // single row has no order anyway, so a tiebreaker on `id` is a no-op there.
     if (key === 'id') continue;
@@ -451,7 +451,7 @@ function translateSelect(spec: unknown): Record<string, boolean> | undefined {
   if (typeof spec === 'string') {
     for (const field of spec.split(/\s+/).filter(Boolean)) {
       if (field.startsWith('+')) continue;
-      out[field === '_id' ? 'id' : field] = true;
+      out[field === 'id' ? 'id' : field] = true;
     }
     return out;
   }
@@ -461,7 +461,7 @@ function translateSelect(spec: unknown): Record<string, boolean> | undefined {
       if (Number(value) === 1 || value === true) inclusive = true;
     }
     for (const [rawKey, value] of Object.entries(spec)) {
-      const key = rawKey === '_id' ? 'id' : rawKey;
+      const key = rawKey === 'id' ? 'id' : rawKey;
       if (inclusive) {
         if (Number(value) === 1 || value === true) out[key] = true;
       } else if (Number(value) === 0 || value === false) {
@@ -601,7 +601,7 @@ export class SingleCursor<Row> extends Cursor<Row | null> {
   }
 }
 
-export type Hydrated<Row> = Row & { _id: string; __v?: number };
+export type Hydrated<Row> = Row & { id: string; __v?: number };
 
 export function table<Row extends { id: string }>(options: TableOptions<Row>) {
   const hydrate = (row: unknown): Hydrated<Row> => {
@@ -728,9 +728,8 @@ export function table<Row extends { id: string }>(options: TableOptions<Row>) {
   /** Prisma refuses relation/operator objects on create; keep scalar values only. */
   const asCreateData = (fields: Record<string, unknown>) => {
     const created: Record<string, unknown> = { ...fields };
-    // A document created with an explicit `_id` keeps that id.
-    if (created._id !== undefined && created.id === undefined) created.id = created._id;
-    delete created._id;
+    // An explicit `id` on the payload is honoured; only the Mongo-only counter
+    // is dropped. (`createOne` supplies a fresh id when none was given.)
     delete created.__v;
     for (const key of Object.keys(created)) {
       const value = created[key];
@@ -791,7 +790,7 @@ export function table<Row extends { id: string }>(options: TableOptions<Row>) {
     },
 
     find(where: Record<string, unknown> = {}) {
-      const field = (raw: string) => (raw === '_id' ? 'id' : raw);
+      const field = (raw: string) => (raw === 'id' ? 'id' : raw);
       return new ListCursor<Hydrated<Row>>(
         (find) => paginate(where, find),
         async (requested) => {

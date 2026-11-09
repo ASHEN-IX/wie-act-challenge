@@ -134,7 +134,7 @@ export async function migrateInstitutionInvitationIndexes(
   if (missing.some((index) => index.name === 'tokenHash_1')) {
     const duplicate = await collection
       .aggregate([
-        { $group: { _id: '$tokenHash', count: { $sum: 1 } } },
+        { $group: { id: '$tokenHash', count: { $sum: 1 } } },
         { $match: { count: { $gt: 1 } } },
         { $limit: 1 }
       ])

@@ -22,7 +22,7 @@ async function login(page: any) {
   await page.getByLabel("Password", { exact: true }).fill("FormulaPass!123");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page).toHaveURL(/dashboard/);
-  await page.goto("/courses/bbbbbbbbbbbbbbbbbbbbbbbb/studio");
+  await page.goto("/courses/ebf069b5-6c44-5857-8834-17d3bc9778d0/studio");
   await page
     .getByText("Check individual equations (optional)", { exact: true })
     .click();
@@ -38,7 +38,7 @@ test("instructor recognizes, reviews and reloads persisted formulas in Studio", 
   await page.getByLabel("Password", { exact: true }).fill("FormulaPass!123");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page).toHaveURL(/dashboard/);
-  await page.goto("/courses/bbbbbbbbbbbbbbbbbbbbbbbb/studio");
+  await page.goto("/courses/ebf069b5-6c44-5857-8834-17d3bc9778d0/studio");
   await page
     .getByText("Check individual equations (optional)", { exact: true })
     .click();
@@ -187,7 +187,7 @@ test("unavailability and terminal jobs retain source inspection; stale reviews r
     proposal = await db.collection("formulaproposals").findOne({});
   });
   const reviewed = await page.request.post(
-    `http://localhost:5351/api/v1/study/courses/bbbbbbbbbbbbbbbbbbbbbbbb/drafts/rev_browser/formula-proposals/${proposal._id}/review`,
+    `http://localhost:5351/api/v1/study/courses/ebf069b5-6c44-5857-8834-17d3bc9778d0/drafts/rev_browser/formula-proposals/${proposal.id}/review`,
     {
       headers: { origin: "http://localhost:5350" },
       data: { action: "accept", reviewVersion: 0, draftVersion: 0 },
@@ -231,7 +231,7 @@ test("unauthorized course users cannot access formula controls", async ({
   await database(async (db) => {
     await db.collection("courses").updateOne(
       {
-        _id: new (await import("mongodb")).ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
+        id: new (await import("mongodb")).ObjectId("ebf069b5-6c44-5857-8834-17d3bc9778d0"),
       },
       { $set: { ownerUserId: "other", userId: "other" } },
     );
@@ -250,26 +250,26 @@ test("assigned instructors inspect sources but cannot grant owner consent", asyn
 }) => {
   await database(async (db) => {
     const { ObjectId } = await import("mongodb");
-    const institutionId = new ObjectId("cccccccccccccccccccccccc");
+    const institutionId = new ObjectId("dfbaedb6-25c0-5dbd-a7b1-57ac70b60f57");
     await db.collection("institutions").insertOne({
-      _id: institutionId,
+      id: institutionId,
       name: "Fixture institution",
       slug: "fixture",
       status: "active",
     });
     await db.collection("institution_memberships").insertOne({
       institutionId,
-      userId: "aaaaaaaaaaaaaaaaaaaaaaaa",
+      userId: "04b3da2d-ec14-5643-bf49-e43f550168bf",
       role: "instructor",
       status: "active",
     });
     await db.collection("courses").updateOne(
-      { _id: new ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb") },
+      { id: new ObjectId("ebf069b5-6c44-5857-8834-17d3bc9778d0") },
       {
         $set: {
           scope: "institutional",
           institutionId,
-          assignedInstructorIds: ["aaaaaaaaaaaaaaaaaaaaaaaa"],
+          assignedInstructorIds: ["04b3da2d-ec14-5643-bf49-e43f550168bf"],
         },
       },
     );

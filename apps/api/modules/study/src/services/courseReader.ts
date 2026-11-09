@@ -393,7 +393,7 @@ function canonicalBlockShape(
 
 function parseReadingDocumentBlock(value: unknown): LessonBlockV2[] {
   const probe = {
-    schemaVersion: '2.0.0', courseId: '0'.repeat(24), revisionId: 'canonical',
+    schemaVersion: '2.0.0', courseId: '00c180a3-7613-594f-947a-320f302cf5cc', revisionId: 'canonical',
     contentHash: 'sha256:' + '0'.repeat(64), title: 'Canonical',
     canonical: { extraction: 'deterministic', projectionVersion: '2.0.0', passages: [], mappings: [] },
     generated: { summary: '', objectives: [], outline: [] },

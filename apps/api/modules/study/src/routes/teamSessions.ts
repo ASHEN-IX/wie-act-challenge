@@ -37,7 +37,7 @@ router.post('/team', async (req: DomainRequest, res: Response) => {
     const tasks: Array<ITaskProgressEntry & { estimatedMinutes: number }> = [];
     if (courseId) {
       const course = await Course.findOne({
-        _id: courseId,
+        id: courseId,
         userId
       });
       if (!course) return res.status(404).json({ error: 'Course not found' });
@@ -122,7 +122,7 @@ router.post('/team/:sessionId/join', async (req: DomainRequest, res: Response) =
     const { inviteCode } = req.body;
     const { sessionId } = req.params;
     const session = await StudySession.findOne({
-      _id: sessionId,
+      id: sessionId,
       type: 'team',
       status: 'active'
     });
@@ -172,7 +172,7 @@ router.post('/team/:sessionId/join', async (req: DomainRequest, res: Response) =
           title: 'Someone joined your session',
           message: `A classmate joined your team session!`,
           metadata: {
-            sessionId: session._id.toString()
+            sessionId: session.id.toString()
           }
         },
         {
@@ -247,7 +247,7 @@ router.post('/team/join-by-code', async (req: DomainRequest, res: Response) => {
           title: 'Someone joined your session',
           message: `A classmate joined your team session!`,
           metadata: {
-            sessionId: session._id.toString()
+            sessionId: session.id.toString()
           }
         },
         {
@@ -260,7 +260,7 @@ router.post('/team/join-by-code', async (req: DomainRequest, res: Response) => {
     res.json({
       message: 'Joined team session',
       session,
-      sessionId: session._id.toString(),
+      sessionId: session.id.toString(),
       inviteCode: session.inviteCode
     });
   } catch (error) {
@@ -276,7 +276,7 @@ router.post('/team/:sessionId/leave', async (req: DomainRequest, res: Response) 
   try {
     const userId = req.user!.userId;
     const session = await StudySession.findOne({
-      _id: req.params.sessionId,
+      id: req.params.sessionId,
       type: 'team',
       status: 'active'
     });
@@ -306,7 +306,7 @@ router.post('/team/:sessionId/invite', async (req: DomainRequest, res: Response)
   try {
     const userId = req.user!.userId;
     const session = await StudySession.findOne({
-      _id: req.params.sessionId,
+      id: req.params.sessionId,
       type: 'team',
       status: 'active'
     });
@@ -328,7 +328,7 @@ router.post('/team/:sessionId/invite', async (req: DomainRequest, res: Response)
         error: 'friendId required'
       });
     }
-    console.log(`[Team Invite] Inviting ${friendId} to session ${session._id}`);
+    console.log(`[Team Invite] Inviting ${friendId} to session ${session.id}`);
 
     // Lookup inviter nickname and course title for a personalised notification
     let inviterName = 'A friend';
@@ -345,7 +345,7 @@ router.post('/team/:sessionId/invite', async (req: DomainRequest, res: Response)
     }
     if (session.courseId && (await canReadCourse(friendId, session.courseId))) {
       try {
-        const course = await Course.findOne({ _id: session.courseId, userId: friendId })
+        const course = await Course.findOne({ id: session.courseId, userId: friendId })
           .select('title')
           .lean();
         if (course) courseName = course.title;
@@ -362,7 +362,7 @@ router.post('/team/:sessionId/invite', async (req: DomainRequest, res: Response)
         title: 'Game Room Invite',
         message: `${inviterName} invited you to join a Game Room!`,
         metadata: {
-          sessionId: session._id.toString(),
+          sessionId: session.id.toString(),
           inviteCode: session.inviteCode,
           inviterName,
           ...(courseName && {
@@ -398,7 +398,7 @@ router.put('/team/:sessionId/start', async (req: DomainRequest, res: Response) =
   try {
     const userId = req.user!.userId;
     const session = await StudySession.findOne({
-      _id: req.params.sessionId,
+      id: req.params.sessionId,
       type: 'team',
       status: 'active'
     });
@@ -427,7 +427,7 @@ router.put('/team/:sessionId/start', async (req: DomainRequest, res: Response) =
           userIds: activeUserIds,
           payload: {
             type: 'session_start',
-            sessionId: session._id.toString(),
+            sessionId: session.id.toString(),
             inviteCode: session.inviteCode
           }
         },
@@ -440,7 +440,7 @@ router.put('/team/:sessionId/start', async (req: DomainRequest, res: Response) =
     }
     res.json({
       message: 'Session started',
-      sessionId: session._id.toString()
+      sessionId: session.id.toString()
     });
   } catch (error) {
     console.error('[Team Start] Error:', error);
@@ -460,7 +460,7 @@ router.put('/team/:sessionId/voice-consent', async (req: DomainRequest, res: Res
     return res.status(400).json({ error: 'Explicit boolean consent required' });
   const actor = req.user!.userId;
   const session = await StudySession.findOne({
-    _id: req.params.sessionId,
+    id: req.params.sessionId,
     type: 'team',
     status: 'active'
   });
@@ -479,7 +479,7 @@ router.put('/team/:sessionId/voice-consent', async (req: DomainRequest, res: Res
         : participant
   );
   const changed = await StudySession.updateOne(
-    { _id: session._id, status: 'active' },
+    { id: session.id, status: 'active' },
     { participants }
   );
   if (
@@ -487,7 +487,7 @@ router.put('/team/:sessionId/voice-consent', async (req: DomainRequest, res: Res
     (session.courseId && !(await canReadCourse(actor, session.courseId)))
   )
     return res.status(403).json({ error: 'Session access revoked' });
-  return res.json({ sessionId: String(session._id), hasVoiceConsent: req.body.hasVoiceConsent });
+  return res.json({ sessionId: String(session.id), hasVoiceConsent: req.body.hasVoiceConsent });
 });
 
 // GET /team/:sessionId/participants — List participants
@@ -495,7 +495,7 @@ router.get('/team/:sessionId/participants', async (req: DomainRequest, res: Resp
   try {
     const userId = req.user!.userId;
     const session = await StudySession.findOne({
-      _id: req.params.sessionId,
+      id: req.params.sessionId,
       type: 'team',
       status: 'active'
     });
@@ -537,7 +537,7 @@ router.put('/team/:sessionId/end', async (req: DomainRequest, res: Response) => 
   try {
     const userId = req.user!.userId;
     const session = await StudySession.findOne({
-      _id: req.params.sessionId,
+      id: req.params.sessionId,
       type: 'team',
       status: 'active'
     });
@@ -588,7 +588,7 @@ router.put('/team/:sessionId/end', async (req: DomainRequest, res: Response) => 
             xp_amount: computedAwardedXP,
             userId: participantUserId,
             metadata: {
-              sessionId: session._id.toString(),
+              sessionId: session.id.toString(),
               participantUserId,
               participantRole: participant.role || 'member',
               teamSize: participantMap.size
@@ -627,7 +627,7 @@ router.put('/team/:sessionId/end', async (req: DomainRequest, res: Response) => 
         authorization: req.headers.cookie,
         eventType: 'study_session_completed',
         metadata: {
-          sessionId: session._id.toString(),
+          sessionId: session.id.toString(),
           duration: session.duration || 0,
           sessionType: 'team',
           participantRole: participant.role || 'member',

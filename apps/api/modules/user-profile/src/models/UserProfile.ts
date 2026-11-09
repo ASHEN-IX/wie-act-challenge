@@ -19,7 +19,7 @@ export type IUserProfile = Omit<
   | 'animatedBackgroundSettings'
   | 'teamStats'
 > & {
-  _id: string;
+  id: string;
   learningProfile?: LearningProfile | null;
   privacy: {
     showOnlineStatus: boolean;

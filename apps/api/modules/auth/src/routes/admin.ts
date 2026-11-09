@@ -94,7 +94,7 @@ router.get('/users', async (req: DomainRequest, res: Response) => {
         updatedAt: true
       }
     });
-    const users = rows.map((row) => ({ ...row, _id: row.id }));
+    const users = rows.map((row) => ({ ...row, id: row.id }));
     const total = await User.countDocuments(filter);
 
     return res.json({ users, total, page: pageNumber, limit: pageSize });
@@ -119,7 +119,7 @@ router.get('/users/:userId', async (req: DomainRequest, res: Response) => {
         resetPasswordExpires: true
       }
     });
-    const user = userRow ? { ...userRow, _id: userRow.id } : null;
+    const user = userRow ? { ...userRow, id: userRow.id } : null;
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -284,7 +284,7 @@ router.get('/analytics/revenue', async (req: DomainRequest, res: Response) => {
     const monthly = [...byMonth.values()]
       .sort((a, b) => a.year - b.year || a.month - b.month)
       .map((entry) => ({
-        _id: { year: entry.year, month: entry.month },
+        id: { year: entry.year, month: entry.month },
         revenueCents: entry.revenueCents,
         count: entry.count
       }));
@@ -399,7 +399,6 @@ router.get('/coupons', async (req: DomainRequest, res: Response) => {
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
       .map((coupon) => ({
         id: coupon.id,
-        _id: coupon._id,
         code: coupon.code,
         targetTier: coupon.targetTier,
         durationDays: coupon.durationDays,
@@ -511,7 +510,7 @@ router.get('/coupons/:couponId/usage', async (req: DomainRequest, res: Response)
 
     return res.json({
       coupon: {
-        _id: coupon._id,
+        id: coupon.id,
         code: coupon.code,
         targetTier: coupon.targetTier,
         durationDays: coupon.durationDays,

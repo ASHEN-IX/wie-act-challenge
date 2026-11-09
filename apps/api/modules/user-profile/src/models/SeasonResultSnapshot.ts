@@ -7,7 +7,7 @@ import { newId } from '../../../../shared/ids';
 import { json } from './_helpers';
 
 export type ISeasonResultSnapshot = Omit<SnapshotRow, 'resetApplied'> & {
-  _id: string;
+  id: string;
   resetApplied: {
     demotedBy: number;
     newRankIndex: number;

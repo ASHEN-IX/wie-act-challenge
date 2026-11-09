@@ -103,7 +103,7 @@ router.get('/', async (req: DomainRequest, res: Response) => {
       const friendId = f.requester === userId ? f.recipient : f.requester;
       const profile = profileMap[friendId] || {};
       return {
-        friendshipId: f._id,
+        friendshipId: f.id,
         userId: friendId,
         name: profile.nickname || 'User',
         avatar: profile.avatar,
@@ -145,7 +145,7 @@ router.get('/requests/incoming', async (req: DomainRequest, res: Response) => {
     });
 
     const result = requests.map((r) => ({
-      friendshipId: r._id,
+      friendshipId: r.id,
       userId: r.requester,
       name: profileMap[r.requester]?.nickname || 'User',
       avatar: profileMap[r.requester]?.avatar,
@@ -184,7 +184,7 @@ router.get('/requests/outgoing', async (req: DomainRequest, res: Response) => {
     });
 
     const result = requests.map((r) => ({
-      friendshipId: r._id,
+      friendshipId: r.id,
       userId: r.recipient,
       name: profileMap[r.recipient]?.nickname || 'User',
       avatar: profileMap[r.recipient]?.avatar,
@@ -273,7 +273,7 @@ router.post('/request', async (req: DomainRequest, res: Response) => {
           'friend_request',
           'New Friend Request',
           `Someone wants to be your friend!`,
-          { friendshipId: existing._id },
+          { friendshipId: existing.id },
           req.headers.cookie
         );
         return res.json({ message: 'Friend request sent', friendship: existing });
@@ -288,7 +288,7 @@ router.post('/request', async (req: DomainRequest, res: Response) => {
       'friend_request',
       'New Friend Request',
       `Someone wants to be your friend!`,
-      { friendshipId: friendship._id },
+      { friendshipId: friendship.id },
       req.headers.cookie
     );
 
@@ -321,7 +321,7 @@ router.put('/request/:friendshipId/accept', async (req: DomainRequest, res: Resp
       'friend_accepted',
       'Friend Request Accepted',
       'Your friend request was accepted!',
-      { friendshipId: friendship._id },
+      { friendshipId: friendship.id },
       req.headers.cookie
     );
 
@@ -335,7 +335,7 @@ router.put('/request/:friendshipId/accept', async (req: DomainRequest, res: Resp
           {
             action: 'friend_added',
             userId: String(uid),
-            metadata: { friendshipId: friendship._id.toString() }
+            metadata: { friendshipId: friendship.id.toString() }
           },
           { headers: buildInternalHeaders(req.headers.cookie) }
         );

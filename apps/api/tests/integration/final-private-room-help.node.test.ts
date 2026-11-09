@@ -58,7 +58,7 @@ test('Private room help persists only requester history and fails closed at deli
     subjectId: 'fixture',
     status: 'completed'
   });
-  courseId = String(course._id);
+  courseId = String(course.id);
   await CourseRevision.create({
     courseId,
     revisionTag: 'rev_private',
@@ -173,7 +173,7 @@ test('Private room help persists only requester history and fails closed at deli
       });
       await started;
       await Course.updateOne(
-        { _id: courseId },
+        { id: courseId },
         { $set: { ownerUserId: 'revoked', userId: 'revoked' } }
       );
       release();
@@ -184,7 +184,7 @@ test('Private room help persists only requester history and fails closed at deli
       assert.equal(records.length, 1);
       assert.equal(records[0].state, 'unavailable');
       assert.equal(records[0].result, null);
-      await Course.updateOne({ _id: courseId }, { $set: { ownerUserId: actor, userId: actor } });
+      await Course.updateOne({ id: courseId }, { $set: { ownerUserId: actor, userId: actor } });
       aiClient.post = (async () => {
         calls++;
         throw new Error('Synthetic provider outage');
@@ -196,7 +196,7 @@ test('Private room help persists only requester history and fails closed at deli
     assert.equal(recovered.history.length, 2);
     assert.ok(recovered.history.some((row) => row.requestId === request.requestId));
     await Course.updateOne(
-      { _id: courseId },
+      { id: courseId },
       { $set: { ownerUserId: 'revoked', userId: 'revoked' } }
     );
     await assert.rejects(() => privateHelpHistory(actor, roomId));

@@ -10,7 +10,7 @@ import { LessonReader, lessonHref } from "./lesson-reader";
 import { COMPONENT_REGISTRY_VERSION } from "@ednova/shared/ednova/componentRegistry";
 import type { PublishedExperiencePlanV1 } from "@ednova/shared/ednova/publishedExperiencePlan";
 
-const courseId = "0123456789abcdef01234567";
+const courseId = "a57d9f30-21c4-58ff-b48c-1e9e140f4c6d";
 const revisionId = "rev_formula_test";
 const contentHash = "sha256:" + "a".repeat(64);
 const documentId = "doc-1";
@@ -335,7 +335,7 @@ describe("validated experience plan integration (M4.1)", () => {
   });
 
   it("ignores a plan bound to another course", () => {
-    const html = renderWithPlan(boundPlan({ courseId: "fedcba9876543210fedcba98" }));
+    const html = renderWithPlan(boundPlan({ courseId: "4a7c48be-d706-50df-b493-72752cd0e9f9" }));
     expect(html).not.toContain('data-experience-plan="plan-test"');
   });
 

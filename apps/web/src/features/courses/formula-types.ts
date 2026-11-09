@@ -1,6 +1,6 @@
 export type FormulaState = "pending" | "accepted" | "corrected" | "rejected";
 export interface FormulaProposal {
-  _id: string;
+  id: string;
   regionId: string;
   documentId: string;
   latex: string;
@@ -23,7 +23,7 @@ export interface FormulaProposal {
   }[];
 }
 export interface FormulaJob {
-  _id: string;
+  id: string;
   regionId: string;
   documentId: string;
   proposalId?: string;

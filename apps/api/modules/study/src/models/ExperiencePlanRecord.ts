@@ -14,7 +14,7 @@ import { table } from './_table';
  * path re-runs the trusted validator.
  */
 export type IExperiencePlanRecord = Omit<ExperiencePlanRecordRow, 'plan'> & {
-  _id: string;
+  id: string;
   /** The accepted plan body, as proposed and validated. Untrusted on read. */
   plan: unknown;
 };

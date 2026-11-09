@@ -13,10 +13,9 @@ to roll back if something goes wrong.
 | `auth_users`, `auth_accounts`, `auth_sessions`, `auth_verifications`, `auth_rate_limits` | PostgreSQL tables, managed by better-auth through `@better-auth/prisma-adapter` |
 | Python-owned collections (`coach_actions`, `pacing_data`, `review_schedule`, `search_history`, `task_scheduling`, `chunk_embeddings`, …) | unchanged, still MongoDB |
 
-Identifiers are preserved. Every MongoDB `_id` that was an ObjectId becomes the
-same 24-character hex string as the row's primary key, so every stored reference
-and every URL that already contains an id keeps working. The API still returns
-the value under `_id`.
+Identifiers are preserved on the way in: every MongoDB `_id` becomes a row key,
+so stored references stay valid. Primary keys are PostgreSQL `uuid` columns and
+the API returns `id`.
 
 ## 1. Back up MongoDB first
 

@@ -36,9 +36,9 @@ import {
 } from '../services/learnerAdaptation';
 import { DEFAULT_PREFERENCES } from '../../../../shared/ednova/learningAdaptation';
 
-const userId = 'aaaaaaaaaaaaaaaaaaaaaaaa';
-const otherUser = 'bbbbbbbbbbbbbbbbbbbbbbbb';
-const courseId = '0123456789abcdef01234567';
+const userId = '04b3da2d-ec14-5643-bf49-e43f550168bf';
+const otherUser = 'ebf069b5-6c44-5857-8834-17d3bc9778d0';
+const courseId = 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d';
 const revisionId = 'rev_m44';
 
 const findEvidence = LearningEvidence.find as jest.Mock;

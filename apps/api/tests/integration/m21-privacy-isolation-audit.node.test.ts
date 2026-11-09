@@ -97,7 +97,7 @@ test('M21 / ED-13: Comprehensive Privacy, Resource Isolation & Synthetic Complia
     try {
       const courseIds = [courseAId, courseBId].filter((id): id is string => Boolean(id));
       if (courseIds.length) {
-        await Course.deleteMany({ _id: { $in: courseIds } });
+        await Course.deleteMany({ id: { $in: courseIds } });
         await CourseRevision.deleteMany({ courseId: { $in: courseIds } });
         await CourseEnrollment.deleteMany({ courseId: { $in: courseIds } });
         await ActivityRecord.deleteMany({ courseId: { $in: courseIds } });
@@ -105,7 +105,7 @@ test('M21 / ED-13: Comprehensive Privacy, Resource Isolation & Synthetic Complia
         await LearningEvidence.deleteMany({ userId: { startsWith: testPrefix } });
       }
       await InstitutionMembership.deleteMany({ institutionId: { $in: [instAId, instBId] } });
-      await Institution.deleteMany({ _id: { $in: [instAId, instBId] } });
+      await Institution.deleteMany({ id: { $in: [instAId, instBId] } });
       await Course.deleteMany({ userId: { startsWith: testPrefix } });
       if (roomId) {
         await StudyRoom.deleteMany({ roomId });
@@ -118,7 +118,7 @@ test('M21 / ED-13: Comprehensive Privacy, Resource Isolation & Synthetic Complia
   await t.test('Setup: Create dual synthetic institutions, courses, and memberships', async () => {
     // Institution A
     await Institution.create({
-      _id: instAId,
+      id: instAId,
       name: 'Synthetic Institute of Technology',
       slug: `sit-${testPrefix}`,
       createdByUserId: instAAdmin,
@@ -144,7 +144,7 @@ test('M21 / ED-13: Comprehensive Privacy, Resource Isolation & Synthetic Complia
 
     // Institution B
     await Institution.create({
-      _id: instBId,
+      id: instBId,
       name: 'Synthetic Academy of Science',
       slug: `sas-${testPrefix}`,
       createdByUserId: instBInstructor,
@@ -169,7 +169,7 @@ test('M21 / ED-13: Comprehensive Privacy, Resource Isolation & Synthetic Complia
       status: 'completed',
       topics: []
     });
-    courseAId = courseADoc._id.toString();
+    courseAId = courseADoc.id.toString();
     await prepareCourseFixture(courseAId, t);
 
     // Course B
@@ -185,7 +185,7 @@ test('M21 / ED-13: Comprehensive Privacy, Resource Isolation & Synthetic Complia
       status: 'completed',
       topics: []
     });
-    courseBId = courseBDoc._id.toString();
+    courseBId = courseBDoc.id.toString();
     await prepareCourseFixture(courseBId, t);
 
     // Draft & Publish Course A
@@ -532,7 +532,7 @@ test('M21 / ED-13: Comprehensive Privacy, Resource Isolation & Synthetic Complia
       }
 
       const allCourses = await Course.find({
-        _id: { $in: [courseAId, courseBId] }
+        id: { $in: [courseAId, courseBId] }
       }).lean();
 
       for (const c of allCourses) {

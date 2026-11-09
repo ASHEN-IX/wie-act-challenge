@@ -115,7 +115,7 @@ export async function reservePlanningBudget(input: {
   const updated = await withBudget((collection) =>
     collection.findOneAndUpdate(
       {
-        _id: input.approvalId as never,
+        id: input.approvalId as never,
         task: input.task,
         model: input.model,
         maxTokens: input.maxTokens,
@@ -183,7 +183,7 @@ export async function releaseUndispatchedReservation(input: {
       }
     ).findOneAndUpdate(
       {
-        _id: input.approvalId,
+        id: input.approvalId,
         releaseMarkers: { $ne: input.releaseToken },
         usedTokens: { $gte: input.reservedTokens },
       },
@@ -216,7 +216,7 @@ async function reconcile(input: {
   const refund = input.reservedTokens - reported;
   await withBudget((collection) =>
     collection.updateOne(
-      { _id: input.approvalId as never },
+      { id: input.approvalId as never },
       [{ $set: { usedTokens: { $max: [0, { $subtract: ['$usedTokens', refund] }] } } }],
     ),
   );
@@ -228,7 +228,7 @@ export async function planningBudgetStatus(
   approvalId: string,
 ): Promise<{ usedTokens: number; maxTokens: number } | null> {
   const row = await withBudget((collection) =>
-    collection.findOne({ _id: approvalId as never }),
+    collection.findOne({ id: approvalId as never }),
   );
   if (!row) return null;
   const used = Number((row as Record<string, unknown>).usedTokens ?? 0);

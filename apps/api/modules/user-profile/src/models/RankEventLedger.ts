@@ -4,7 +4,7 @@ import { newId } from '../../../../shared/ids';
 import { json } from './_helpers';
 
 export type IRankEventLedger = Omit<LedgerRow, 'multipliers' | 'metadata' | 'reasonBreakdown'> & {
-  _id: string;
+  id: string;
   multipliers: {
     difficulty: number;
     performance: number;

@@ -102,7 +102,7 @@ describe('POST /api/v1/search/query', () => {
     scoped.use(express.json());
     scoped.use((req, res, next) => {
       Object.assign(req, { user: { userId: 'user-1' } });
-      res.locals.sourceCourseId = '0123456789abcdef01234567';
+      res.locals.sourceCourseId = 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d';
       next();
     });
     scoped.use(searchRoutes);
@@ -112,7 +112,7 @@ describe('POST /api/v1/search/query', () => {
     expect(AiJob.createPending).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: 'user-1',
-        payloadSnapshot: { ...VALID_SEARCH, courseId: '0123456789abcdef01234567' }
+        payloadSnapshot: { ...VALID_SEARCH, courseId: 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d' }
       })
     );
   });

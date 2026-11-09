@@ -66,7 +66,7 @@ export async function operationPolicy(req: Request, res: Response, next: NextFun
         req.query[snake]
       ].filter((value) => value !== undefined && value !== null && value !== '');
       if (!candidates.length) continue;
-      if (candidates.some((id) => typeof id !== 'string' || !/^[a-f\d]{24}$/i.test(id))) {
+      if (candidates.some((id) => typeof id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))) {
         return res.status(422).json({ error: `Invalid ${camel}` });
       }
       if (new Set(candidates).size !== 1)
@@ -75,12 +75,12 @@ export async function operationPolicy(req: Request, res: Response, next: NextFun
       const found =
         camel === 'courseId'
           ? await canReadCourse(user.userId, id)
-          : await model.exists({ _id: id, userId: user.userId });
+          : await model.exists({ id: id, userId: user.userId });
       if (!found) return res.status(404).json({ error: 'Resource not found' });
       if (camel === 'courseId') res.locals.sourceCourseId = id;
       if (camel === 'sessionId' || camel === 'planId') {
         const parent = await model
-          .findOne({ _id: id, userId: user.userId })
+          .findOne({ id: id, userId: user.userId })
           .select('courseId')
           .lean();
         if (parent?.courseId) {

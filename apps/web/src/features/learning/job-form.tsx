@@ -32,7 +32,7 @@ function ResultContent({ value }: { value: unknown }) {
         "userId",
         "sessionId",
         "correlationId",
-        "_id",
+        "id",
         "createdAt",
         "updatedAt",
       ].includes(key),

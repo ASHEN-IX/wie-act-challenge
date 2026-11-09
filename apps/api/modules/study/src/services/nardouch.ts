@@ -24,12 +24,12 @@ function upstreamObject(value: unknown, keys: string[]) {
   }
 }
 function identifier(id: string) {
-  if (!/^[a-f0-9]{24}$/.test(id)) throw new NardouchError(404, 'Conversation not found');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new NardouchError(404, 'Conversation not found');
 }
 export async function getConversation(userId: string, id: string) {
   identifier(id);
   const record = await Conversations.findOne({
-    _id: id,
+    id: id,
     userId,
     expiresAt: { $gt: new Date() }
   });
@@ -41,7 +41,7 @@ export async function getConversation(userId: string, id: string) {
   return record;
 }
 export function publicConversation(record: {
-  _id: unknown;
+  id: unknown;
   courseId: string;
   revisionId: string;
   version: number;
@@ -50,7 +50,7 @@ export function publicConversation(record: {
   language: NardouchConversation['language'];
 }): NardouchConversation {
   return {
-    id: String(record._id),
+    id: String(record.id),
     courseId: record.courseId,
     revisionId: record.revisionId,
     version: record.version,
@@ -101,7 +101,7 @@ export async function submitTurn(userId: string, raw: unknown) {
   const lockToken = randomUUID();
   const locked = await Conversations.findOneAndUpdate(
     {
-      _id: record._id,
+      id: record.id,
       userId,
       version: input.expectedVersion,
       $or: [{ lockedUntil: { $exists: false } }, { lockedUntil: { $lt: new Date() } }]
@@ -164,7 +164,7 @@ export async function submitTurn(userId: string, raw: unknown) {
       { id: randomUUID(), role: 'assistant', content: answer.displayText, answer }
     ];
     const saved = await Conversations.findOneAndUpdate(
-      { _id: locked._id, userId, lockToken, version: input.expectedVersion },
+      { id: locked.id, userId, lockToken, version: input.expectedVersion },
       {
         $push: { messages: { $each: messages } },
         $inc: { version: 1 },
@@ -177,7 +177,7 @@ export async function submitTurn(userId: string, raw: unknown) {
     return publicConversation(saved);
   } finally {
     await Conversations.updateOne(
-      { _id: locked._id, userId, lockToken },
+      { id: locked.id, userId, lockToken },
       { $unset: { lockedUntil: 1, lockToken: 1 } }
     );
   }
@@ -195,7 +195,7 @@ export async function submitFeedback(userId: string, id: string, raw: unknown) {
     throw new NardouchError(404, 'Response not found');
   // Bounded one feedback per response; does not enter assessment or room channels.
   await Conversations.updateOne(
-    { _id: id, userId, 'feedback.messageId': { $ne: body.messageId } },
+    { id: id, userId, 'feedback.messageId': { $ne: body.messageId } },
     {
       $push: {
         feedback: { messageId: body.messageId, helpful: body.helpful, comment: body.comment || '' }
@@ -209,7 +209,7 @@ export async function transcribeSpeech(userId: string, raw: unknown) {
   const body = exactObject(raw, ['courseId', 'revisionId', 'audioBase64', 'locale', 'consent']);
   if (
     typeof body.courseId !== 'string' ||
-    !/^[a-f0-9]{24}$/.test(body.courseId) ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.courseId) ||
     typeof body.revisionId !== 'string' ||
     body.revisionId.length > 128 ||
     typeof body.audioBase64 !== 'string' ||

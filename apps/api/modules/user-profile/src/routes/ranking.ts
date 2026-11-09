@@ -72,7 +72,7 @@ router.get('/seasons/current', async (req, res) => {
     const season = await getOrCreateActiveSeason();
     return res.json({
       season: {
-        id: season._id,
+        id: season.id,
         seasonCode: season.seasonCode,
         name: season.name,
         theme: season.theme,
@@ -94,7 +94,7 @@ router.get('/profile', async (req, res) => {
 
     return res.json({
       season: {
-        id: season._id,
+        id: season.id,
         seasonCode: season.seasonCode,
         name: season.name,
         theme: season.theme,
@@ -118,7 +118,7 @@ router.get('/progress', async (req, res) => {
 
     return res.json({
       season: {
-        id: season._id,
+        id: season.id,
         seasonCode: season.seasonCode,
         name: season.name,
         theme: season.theme,
@@ -150,7 +150,7 @@ router.get('/history', async (req, res) => {
 
     return res.json({
       season: {
-        id: season._id,
+        id: season.id,
         seasonCode: season.seasonCode,
         name: season.name
       },
@@ -170,7 +170,7 @@ router.get('/leaderboard', async (req, res) => {
 
     return res.json({
       season: {
-        id: season._id,
+        id: season.id,
         seasonCode: season.seasonCode,
         name: season.name,
         theme: season.theme,
@@ -192,7 +192,7 @@ router.get('/session-result', async (req, res) => {
 
     return res.json({
       season: {
-        id: result.season._id,
+        id: result.season.id,
         seasonCode: result.season.seasonCode,
         name: result.season.name,
         theme: result.season.theme
@@ -245,7 +245,7 @@ router.post('/seasons/reset-preview', requireAdmin, async (req, res) => {
 
     return res.json({
       season: {
-        id: season._id,
+        id: season.id,
         seasonCode: season.seasonCode,
         name: season.name,
         status: season.status,
@@ -276,7 +276,7 @@ router.post('/seasons/start', requireAdmin, async (req, res) => {
     return res.status(201).json({
       message: 'Season started',
       season: {
-        id: season._id,
+        id: season.id,
         seasonCode: season.seasonCode,
         name: season.name,
         theme: season.theme,
@@ -303,12 +303,12 @@ router.post('/seasons/close', requireAdmin, async (req, res) => {
     return res.json({
       message: 'Season closed and next season started',
       closedSeason: {
-        id: result.closedSeason._id,
+        id: result.closedSeason.id,
         seasonCode: result.closedSeason.seasonCode,
         endedAt: result.closedSeason.endAt
       },
       startedSeason: {
-        id: result.startedSeason._id,
+        id: result.startedSeason.id,
         seasonCode: result.startedSeason.seasonCode,
         startedAt: result.startedSeason.startAt
       },

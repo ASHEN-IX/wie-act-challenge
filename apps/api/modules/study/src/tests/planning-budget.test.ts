@@ -58,7 +58,7 @@ describe('budget reservation', () => {
   });
 
   it('reserves atomically and returns the reservation', async () => {
-    mocks.findOneAndUpdate.mockResolvedValue({ _id: 'approval-1' });
+    mocks.findOneAndUpdate.mockResolvedValue({ id: 'approval-1' });
     const result = await reservePlanningBudget(reservation);
     expect(result).toEqual({ approvalId: 'approval-1', reservedTokens: 32768 });
     // The update is conditional on remaining budget, which is the whole safety

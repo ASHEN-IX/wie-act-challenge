@@ -65,7 +65,7 @@ test(
     }));
     async function seedCourse() {
       const course = await Course.create({
-        _id: newId(),
+        id: newId(),
         userId: actor,
         ownerUserId: actor,
         scope: 'personal',
@@ -74,7 +74,7 @@ test(
         status: 'completed',
         activeRevisionId: 'rev_growth'
       });
-      const courseId = course._id.toString();
+      const courseId = course.id.toString();
       courseIds.push(courseId);
       await CourseRevision.create({
         courseId,

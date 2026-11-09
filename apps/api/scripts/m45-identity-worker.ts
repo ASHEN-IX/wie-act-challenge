@@ -28,7 +28,7 @@ async function main() {
         $setOnInsert: {
           requestId: `req-${process.pid}`,
           identity,
-          courseId: '0123456789abcdef01234567',
+          courseId: 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d',
           revisionId: 'rev_1',
           lessonId: 'lesson-1',
           mode: 'guided',
@@ -48,7 +48,7 @@ async function main() {
     // The production claim: one conditional update, so only one process can
     // move `requested` forward.
     const claimed = await ExperiencePlanRequest.findOneAndUpdate(
-      { _id: row._id, state: 'requested' },
+      { id: row.id, state: 'requested' },
       { $set: { state: 'authorized' } },
       { new: true },
     ).lean();

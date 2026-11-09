@@ -141,7 +141,7 @@ async function main() {
       const id = new ObjectId(),
         email = name.toLowerCase() + "@p0r3.browser.test";
       await db.collection("users").insertOne({
-        _id: id,
+        id: id,
         name: "R3 " + name,
         email,
         password: hashed,
@@ -312,7 +312,7 @@ async function main() {
       .collection("institutions")
       .findOne({ slug: "r3-browser" });
     assert.ok(institution);
-    const institutionId = institution._id.toString();
+    const institutionId = institution.id.toString();
     for (const a of [instructor, ...roomLearners]) {
       await admin.page.goto(webOrigin + "/institutions");
       await admin.page
@@ -447,7 +447,7 @@ async function main() {
       .collection("courses")
       .findOne({ title: "R3 source arithmetic" });
     assert.ok(uploadedRow);
-    const courseId = uploadedRow._id.toString();
+    const courseId = uploadedRow.id.toString();
     await instructor.page
       .getByRole("link", { name: "Open course", exact: true })
       .click();
@@ -466,7 +466,7 @@ async function main() {
             (
               await db
                 .collection("courses")
-                .findOne({ _id: new ObjectId(courseId) })
+                .findOne({ id: new ObjectId(courseId) })
             )?.status,
           ),
         { timeout: 60000 },
@@ -1351,7 +1351,7 @@ async function main() {
       ),
     ).toBeVisible();
     assert.equal(
-      (await db.collection("courses").findOne({ _id: new ObjectId(courseId) }))
+      (await db.collection("courses").findOne({ id: new ObjectId(courseId) }))
         ?.status,
       "processing",
     );

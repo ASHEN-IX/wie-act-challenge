@@ -285,7 +285,7 @@ export async function generateActivityCandidate(
   if (!(await canManageCourse(actorUserId, courseId))) throw new PublicationForbiddenError();
   if (
     !(await CourseRevision.exists({
-      _id: revision._id,
+      id: revision.id,
       revisionTag: draft.revisionTag,
       status: 'draft',
       activationState: { $ne: 'prepared' }

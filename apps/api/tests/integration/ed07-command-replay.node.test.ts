@@ -48,7 +48,7 @@ test('ED-07 durable replay against real Nest and PostgreSQL', { timeout: 60000 }
     for (const socket of sockets) socket.terminate();
     for (const cleanup of cleanups) await cleanup();
     await StudyRoom.deleteMany({ hostUserId: { $in: actors.map((actor) => actor.id) } });
-    if (courseIds.length) await Course.deleteMany({ _id: { $in: courseIds } });
+    if (courseIds.length) await Course.deleteMany({ id: { $in: courseIds } });
     const ids = actors.map((actor) => actor.id);
     await prisma.authSession.deleteMany({ where: { userId: { in: ids } } });
     await prisma.authAccount.deleteMany({ where: { userId: { in: ids } } });
@@ -509,7 +509,7 @@ test('ED-07 durable replay against real Nest and PostgreSQL', { timeout: 60000 }
         404
       );
       assert.equal((await snapshot(id))!.commandReceipts.length, 2);
-      await Course.updateOne({ _id: courseId }, { userId: outsider.id });
+      await Course.updateOne({ id: courseId }, { userId: outsider.id });
       assert.equal((await request(host, path(id, '/phase'), 'PUT', body)).status, 403);
       assert.equal((await snapshot(id))!.seq, 2);
     }

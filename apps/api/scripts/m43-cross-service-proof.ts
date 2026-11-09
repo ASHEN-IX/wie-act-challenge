@@ -60,7 +60,7 @@ async function seedLedger(usedTokens: number) {
   const budget = client.db(BUDGET_DB).collection('llm_approval_budgets');
   await client.db(BUDGET_DB).dropDatabase().catch(() => undefined);
   await budget.insertOne({
-    _id: APPROVAL as never,
+    id: APPROVAL as never,
     task: 'experience_planning',
     model: MODEL,
     limit: 10,
@@ -76,7 +76,7 @@ async function used(): Promise<number> {
   const row = await client
     .db(BUDGET_DB)
     .collection('llm_approval_budgets')
-    .findOne({ _id: APPROVAL as never });
+    .findOne({ id: APPROVAL as never });
   return Number(row?.usedTokens ?? 0);
 }
 
@@ -93,11 +93,11 @@ async function seedRequest(requestId: string, state = 'dispatched') {
   await client.db(DB).collection('experience_plan_requests').insertOne({
     requestId,
     identity: `sha256:${crypto.randomBytes(32).toString('hex')}`,
-    courseId: '0123456789abcdef01234567',
+    courseId: 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d',
     revisionId: 'rev_m43',
     lessonId: 'lesson-1',
     mode: 'guided',
-    actor: 'aaaaaaaaaaaaaaaaaaaaaaaa',
+    actor: '04b3da2d-ec14-5643-bf49-e43f550168bf',
     provider: 'gemini',
     providerModel: MODEL,
     contextFingerprint: 'fnv1a64:0123456789abcdef',

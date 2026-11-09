@@ -63,13 +63,13 @@ test(
           await models.CourseEnrollment.deleteMany({ courseId: { $in: courses } });
           await models.ActivityRecord.deleteMany({ courseId: { $in: courses } });
           await models.StudentAttempt.deleteMany({ courseId: { $in: courses } });
-          await models.Course.deleteMany({ _id: { $in: courses } });
+          await models.Course.deleteMany({ id: { $in: courses } });
         }
         if (models && institutions.length) {
           await models.InstitutionMembership.deleteMany({
             institutionId: { $in: institutions }
           });
-          await models.Institution.deleteMany({ _id: { $in: institutions } });
+          await models.Institution.deleteMany({ id: { $in: institutions } });
         }
       } finally {
         await disconnectDatabase().catch(() => {});
@@ -141,40 +141,40 @@ test(
       slug: 'p0r1-a-' + Date.now(),
       createdByUserId: admin.id
     });
-    institutions.push(institution._id.toString());
+    institutions.push(institution.id.toString());
     const otherInstitution = await m.Institution.create({
       name: 'P0R1 B',
       slug: 'p0r1-b-' + Date.now(),
       createdByUserId: foreign.id
     });
-    institutions.push(otherInstitution._id.toString());
+    institutions.push(otherInstitution.id.toString());
     await m.InstitutionMembership.createMany([
       {
-        institutionId: institution._id,
+        institutionId: institution.id,
         userId: instructor.id,
         role: 'instructor',
         status: 'active'
       },
       {
-        institutionId: institution._id,
+        institutionId: institution.id,
         userId: learner.id,
         role: 'university_student',
         status: 'active'
       },
       {
-        institutionId: institution._id,
+        institutionId: institution.id,
         userId: peer.id,
         role: 'university_student',
         status: 'active'
       },
       {
-        institutionId: institution._id,
+        institutionId: institution.id,
         userId: admin.id,
         role: 'university_admin',
         status: 'active'
       },
       {
-        institutionId: otherInstitution._id,
+        institutionId: otherInstitution.id,
         userId: foreign.id,
         role: 'instructor',
         status: 'active'
@@ -211,7 +211,7 @@ test(
       userId: instructor.id,
       ownerUserId: instructor.id,
       scope: 'institutional',
-      institutionId: institution._id,
+      institutionId: institution.id,
       assignedInstructorIds: [instructor.id],
       status: 'completed',
       activeRevisionId: 'rev_source',
@@ -226,7 +226,7 @@ test(
         }
       ]
     });
-    const courseId = course._id.toString();
+    const courseId = course.id.toString();
     courses.push(courseId);
     await m.CourseRevision.create({
       courseId,
@@ -241,7 +241,7 @@ test(
     for (const a of [learner, peer])
       await m.CourseEnrollment.create({
         courseId,
-        institutionId: institution._id,
+        institutionId: institution.id,
         userId: a.id,
         status: 'active'
       });
@@ -263,9 +263,9 @@ test(
         await m.CourseEnrollment.updateOne({ userId: learner.id }, { $set: { status: 'revoked' } });
         assert.equal((await request(learner, 'GET', context)).status, 403);
         await m.CourseEnrollment.updateOne({ userId: learner.id }, { $set: { status: 'active' } });
-        await m.Institution.updateOne({ _id: institution._id }, { $set: { status: 'suspended' } });
+        await m.Institution.updateOne({ id: institution.id }, { $set: { status: 'suspended' } });
         assert.equal((await request(learner, 'GET', context)).status, 403);
-        await m.Institution.updateOne({ _id: institution._id }, { $set: { status: 'active' } });
+        await m.Institution.updateOne({ id: institution.id }, { $set: { status: 'active' } });
         assert.equal((await request(foreign, 'GET', context)).status, 403);
         const c = await m.Course.create({
           title: 'Personal',
@@ -273,7 +273,7 @@ test(
           userId: personal.id,
           scope: 'personal'
         });
-        courses.push(c._id.toString());
+        courses.push(c.id.toString());
         assert.equal((await request(personal, 'GET', '/api/v1/study/courses/' + c.id)).status, 200);
         assert.equal((await request(admin, 'GET', '/api/v1/study/courses/' + c.id)).status, 404);
       }
@@ -296,13 +296,13 @@ test(
             .status,
           200
         );
-        await m.Course.updateOne({ _id: courseId }, { $set: { assignedInstructorIds: [] } });
+        await m.Course.updateOne({ id: courseId }, { $set: { assignedInstructorIds: [] } });
         assert.equal(
           (await request(instructor, 'GET', '/api/v1/study/courses/' + courseId + '/draft')).status,
           403
         );
         await m.Course.updateOne(
-          { _id: courseId },
+          { id: courseId },
           { $set: { assignedInstructorIds: [instructor.id] } }
         );
       }
@@ -777,12 +777,12 @@ test(
       'DIRECT SERVICE: published original survives mutable course upload replacement',
       async () => {
         const before = await m.Course.findById(courseId).lean();
-        await m.Course.updateOne({ _id: courseId }, { $set: { files: [] } });
+        await m.Course.updateOne({ id: courseId }, { $set: { files: [] } });
         assert.equal(
           (await service.getPublicActivity(learner.id, guided.activityId)).activityId,
           guided.activityId
         );
-        await m.Course.updateOne({ _id: courseId }, { $set: { files: before!.files } });
+        await m.Course.updateOne({ id: courseId }, { $set: { files: before!.files } });
       }
     );
 

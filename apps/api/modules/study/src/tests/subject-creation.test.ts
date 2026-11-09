@@ -49,7 +49,6 @@ describe('subject creation', () => {
     Subject.create.mockImplementation(async (data: Record<string, unknown>) => ({
       ...data,
       id: 'subject-new',
-      _id: 'subject-new',
       color: '#ff4655'
     }));
 
@@ -65,7 +64,7 @@ describe('subject creation', () => {
   });
 
   test('rejects a duplicate subject name for the same account', async () => {
-    Subject.findOne.mockResolvedValue({ _id: 'existing-subject', name: 'Physics' });
+    Subject.findOne.mockResolvedValue({ id: 'existing-subject', name: 'Physics' });
 
     const res = await request(app).post('/api/v1/study/subjects').send({ name: 'Physics' });
 

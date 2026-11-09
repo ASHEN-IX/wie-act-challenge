@@ -336,7 +336,7 @@ router.get(
       if (!(await canAuthorCourse(req.user!.userId, String(req.params.courseId))))
         return res.status(404).json({ error: 'Source file not found' });
       const course = await Course.findOne({
-        _id: req.params.courseId
+        id: req.params.courseId
       });
       const filename = req.params.filename;
       if (
@@ -348,7 +348,7 @@ router.get(
         return res.status(404).json({ error: 'Source file not found' });
       }
       const root = await fs.promises.realpath(
-        path.resolve(process.env.INGEST_UPLOADS_DIR || 'uploads', 'courses', String(course._id))
+        path.resolve(process.env.INGEST_UPLOADS_DIR || 'uploads', 'courses', String(course.id))
       );
       const target = await fs.promises.realpath(path.join(root, filename));
       if (!target.startsWith(root + path.sep))
@@ -405,7 +405,7 @@ router.get('/', async (req: DomainRequest, res: Response) => {
           { userId },
           { ownerUserId: userId },
           { assignedInstructorIds: userId },
-          { _id: { $in: enrolledIds } }
+          { id: { $in: enrolledIds } }
         ]
       };
       if (subject_id) {
@@ -413,12 +413,12 @@ router.get('/', async (req: DomainRequest, res: Response) => {
       }
       const candidates = (await Course.find(query).sort({ createdAt: -1 })) as unknown as ICourse[];
       for (const candidate of candidates) {
-        if (await canReadCourse(userId, candidate._id.toString())) courses.push(candidate);
+        if (await canReadCourse(userId, candidate.id.toString())) courses.push(candidate);
       }
     }
 
     const coursesWithDetails = courses.map((course) => ({
-      id: course._id.toString(),
+      id: course.id.toString(),
       title: course.title,
       description: course.description,
       scope: course.scope || 'personal',
@@ -482,7 +482,7 @@ router.post(
         });
         if (
           !membership ||
-          !(await Institution.exists({ _id: targetInstitutionId, status: 'active' }))
+          !(await Institution.exists({ id: targetInstitutionId, status: 'active' }))
         ) {
           return res.status(403).json({
             error:
@@ -497,7 +497,7 @@ router.post(
       }
 
       // Verify subject exists and belongs to user
-      const subject = await Subject.findOne({ _id: subject_id, userId });
+      const subject = await Subject.findOne({ id: subject_id, userId });
       if (!subject) {
         return res.status(404).json({ error: 'Subject not found' });
       }
@@ -525,12 +525,12 @@ router.post(
       // INGEST-05: stage files under a course-scoped dir, then enqueue the
       // async ingestion job. The request returns 202 { jobId } immediately —
       // the worker (INGEST-06) parses/embeds and resolves the course status.
-      const staged = stageCourseFiles(courseUploads(req), course._id.toString());
+      const staged = stageCourseFiles(courseUploads(req), course.id.toString());
       const revisionTag = `rev_${crypto.randomUUID().replace(/-/g, '')}`;
       const fileHashes = staged.map((f) => f.fileHash).filter(Boolean);
       const contentHash = crypto
         .createHash('sha256')
-        .update(fileHashes.sort().join(':') || course._id.toString())
+        .update(fileHashes.sort().join(':') || course.id.toString())
         .digest('hex');
 
       course.files = staged.map((file) => ({
@@ -543,23 +543,23 @@ router.post(
 
       await Course.save(course);
       await CourseRevision.create({
-        courseId: course._id,
+        courseId: course.id,
         revisionTag,
         contentHash,
         status: 'draft',
         isInstructorReviewed: false,
-        sourceManifest: await captureImmutableSources(course._id.toString(), course.files, '2.0'),
-        vectorIndexRef: `faiss/${course._id.toString()}/${revisionTag}.faiss`
+        sourceManifest: await captureImmutableSources(course.id.toString(), course.files, '2.0'),
+        vectorIndexRef: `faiss/${course.id.toString()}/${revisionTag}.faiss`
       });
 
       try {
         const { jobId } = await enqueueCourseIngestionOperation(
           {
             userId,
-            courseId: course._id,
+            courseId: course.id,
             courseTitle: course.title,
             revisionId: revisionTag,
-            fileRef: courseFileRef(course._id.toString()),
+            fileRef: courseFileRef(course.id.toString()),
             files: staged,
             requestId: req.get('X-Request-ID')
           },
@@ -569,7 +569,7 @@ router.post(
         console.log('Ingestion job triggered:', jobId);
         return res.status(202).json({
           jobId,
-          courseId: course._id.toString(),
+          courseId: course.id.toString(),
           status: 'processing'
         });
       } catch (publishErr) {
@@ -662,7 +662,7 @@ router.get('/:courseId', async (req: DomainRequest, res: Response) => {
 
     res.json({
       course: {
-        id: course._id.toString(),
+        id: course.id.toString(),
         title: course.title,
         description: course.description,
         scope: course.scope || 'personal',
@@ -809,7 +809,7 @@ router.post('/:courseId/drafts/:revisionId/approve', async (req: DomainRequest, 
       req.body?.extractionReviewAcknowledged === true ? withExtractionReview(canonical) : canonical;
     const changed = await CourseRevision.updateOne(
       {
-        _id: draft._id,
+        id: draft.id,
         revisionTag: tag,
         __v: draft.__v,
         status: 'draft',
@@ -1107,12 +1107,12 @@ router.get(
         )
         .slice(0, 200);
       const [proposals, jobs] = await Promise.all([
-        FormulaProposal.find({ courseId, revisionId: draft._id, draftVersion: draft.__v }).limit(
+        FormulaProposal.find({ courseId, revisionId: draft.id, draftVersion: draft.__v }).limit(
           200
         ),
         FormulaRecognitionJob.find({
           courseId,
-          revisionId: String(draft._id),
+          revisionId: String(draft.id),
           draftVersion: draft.__v
         })
           .sort({ createdAt: -1 })
@@ -1130,7 +1130,7 @@ router.get(
           courseId,
           state: { $in: ['accepted', 'corrected'] },
           $or: [
-            { revisionId: { $ne: draft._id } },
+            { revisionId: { $ne: draft.id } },
             { revisionTag: { $ne: tag } },
             { draftVersion: { $ne: draft.__v } }
           ]
@@ -1241,7 +1241,7 @@ router.post(
         Object.keys(req.body || {}).some(
           (k) => !['documentId', 'regionId', 'draftVersion'].includes(k)
         ) ||
-        !/^[a-f0-9]{24}$/.test(courseId) ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(courseId) ||
         !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(revisionId) ||
         typeof documentId !== 'string' ||
         !/^doc_[a-f0-9]{16}$/.test(documentId) ||
@@ -1262,7 +1262,7 @@ router.post(
       });
       if (!draft || draft.__v !== draftVersion)
         return res.status(409).json({ error: 'DRAFT_CHANGED' });
-      if (String((await findEditableDraft(courseId))?._id) !== String(draft._id))
+      if (String((await findEditableDraft(courseId))?.id) !== String(draft.id))
         return res.status(409).json({ error: 'DRAFT_CHANGED' });
       const documents = draft.sourceManifest || [];
       if (!documents.length || documents.some((d) => !d.storageRef || !d.mediaType))
@@ -1313,7 +1313,7 @@ router.post(
       if (
         !(await canManageCourse(req.user.userId, courseId)) ||
         !(await CourseRevision.exists({
-          _id: draft._id,
+          id: draft.id,
           courseId,
           revisionTag: revisionId,
           status: 'draft',
@@ -1329,7 +1329,7 @@ router.post(
           .update(
             JSON.stringify([
               courseId,
-              String(draft._id),
+              String(draft.id),
               revisionId,
               draftVersion,
               documentId,
@@ -1345,7 +1345,7 @@ router.post(
       const payload = {
         identity,
         courseId,
-        revisionId: draft._id,
+        revisionId: draft.id,
         revisionTag: revisionId,
         draftVersion,
         documentId,
@@ -1397,9 +1397,9 @@ router.post(
         return res.status(409).json({ error: 'PROPOSAL_IDENTITY_CONFLICT' });
       if (
         !(await canManageCourse(req.user.userId, courseId)) ||
-        String((await findEditableDraft(courseId))?._id) !== String(draft._id) ||
+        String((await findEditableDraft(courseId))?.id) !== String(draft.id) ||
         !(await CourseRevision.exists({
-          _id: draft._id,
+          id: draft.id,
           courseId,
           revisionTag: revisionId,
           status: 'draft',
@@ -1460,9 +1460,9 @@ router.post(
       await ensureSnapshot(actor!, draft);
       const updated = await FormulaProposal.findOneAndUpdate(
         {
-          _id: proposal._id,
+          id: proposal.id,
           courseId: draft.courseId,
-          revisionId: draft._id,
+          revisionId: draft.id,
           revisionTag: draft.revisionTag,
           draftVersion,
           state: 'pending',
@@ -1481,7 +1481,7 @@ router.post(
               at: new Date(),
               draftVersion,
               revisionTag: draft.revisionTag,
-              revisionId: String(draft._id),
+              revisionId: String(draft.id),
               reviewVersion: reviewVersion + 1
             }
           }
@@ -1533,7 +1533,7 @@ router.get(
         revisionId = String(req.params.revisionId),
         proposalId = String(req.params.proposalId);
       if (!req.user?.userId) return res.status(401).json({ error: 'UNAUTHENTICATED' });
-      if (!/^[a-f0-9]{24}$/.test(courseId) || !/^[a-f0-9]{24}$/.test(proposalId))
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(courseId) || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(proposalId))
         return res.status(422).json({ error: 'INVALID_REQUEST' });
       if (!(await canManageCourse(req.user.userId, courseId)))
         return res.status(403).json({ error: 'FORBIDDEN' });
@@ -1544,12 +1544,12 @@ router.get(
         revokedAt: { $exists: false }
       });
       if (!draft) return res.status(409).json({ error: 'DRAFT_CHANGED' });
-      if (String((await findEditableDraft(courseId))?._id) !== String(draft._id))
+      if (String((await findEditableDraft(courseId))?.id) !== String(draft.id))
         return res.status(409).json({ error: 'DRAFT_CHANGED' });
       const proposal = await FormulaProposal.findOne({
-        _id: proposalId,
+        id: proposalId,
         courseId,
-        revisionId: draft._id,
+        revisionId: draft.id,
         revisionTag: revisionId
       });
       if (!proposal || Array.isArray(proposal)) return res.status(404).json({ error: 'NOT_FOUND' });
@@ -1558,7 +1558,7 @@ router.get(
       if (
         !(await canManageCourse(req.user.userId, courseId)) ||
         !(await CourseRevision.exists({
-          _id: draft._id,
+          id: draft.id,
           status: 'draft',
           __v: draft.__v,
           revisionTag: revisionId
@@ -1581,7 +1581,7 @@ router.get(
         documentId = String(req.params.documentId),
         regionId = String(req.params.regionId);
       if (
-        !/^[a-f0-9]{24}$/.test(courseId) ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(courseId) ||
         !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(revisionId) ||
         !/^doc_[a-f0-9]{16}$/.test(documentId) ||
         !/^region_[a-f0-9]{20}$/.test(regionId)
@@ -1625,7 +1625,7 @@ router.get(
       if (
         !(await canManageCourse(req.user!.userId, courseId)) ||
         !(await CourseRevision.exists({
-          _id: draft._id,
+          id: draft.id,
           status: 'draft',
           __v: draft.__v,
           revokedAt: { $exists: false }
@@ -1749,7 +1749,7 @@ router.delete('/:courseId', async (req: DomainRequest, res: Response) => {
 
     // BLOOM-06: remove learning objectives for deleted course
     try {
-      await deleteObjectivesForDocument(course._id.toString());
+      await deleteObjectivesForDocument(course.id.toString());
     } catch (objErr) {
       console.warn('Learning objective cleanup failed (non-fatal):', errorDetails(objErr).message);
     }
@@ -1828,7 +1828,7 @@ router.post(
       }
 
       // INGEST-05: stage the newly added files and enqueue async re-processing.
-      const staged = stageCourseFiles(courseUploads(req), course._id.toString());
+      const staged = stageCourseFiles(courseUploads(req), course.id.toString());
       const revisionTag = `rev_${crypto.randomUUID().replace(/-/g, '')}`;
       const newFiles = staged.map((file) => ({
         filename: file.filename,
@@ -1845,28 +1845,28 @@ router.post(
         .filter(Boolean);
       const contentHash = crypto
         .createHash('sha256')
-        .update(allFileHashes.sort().join(':') || course._id.toString())
+        .update(allFileHashes.sort().join(':') || course.id.toString())
         .digest('hex');
 
       await Course.save(course);
       await CourseRevision.create({
-        courseId: course._id,
+        courseId: course.id,
         revisionTag,
         contentHash,
         status: 'draft',
         isInstructorReviewed: false,
-        sourceManifest: await captureImmutableSources(course._id.toString(), course.files, '2.0'),
-        vectorIndexRef: `faiss/${course._id.toString()}/${revisionTag}.faiss`
+        sourceManifest: await captureImmutableSources(course.id.toString(), course.files, '2.0'),
+        vectorIndexRef: `faiss/${course.id.toString()}/${revisionTag}.faiss`
       });
 
       try {
         const { jobId } = await enqueueCourseIngestionOperation(
           {
             userId,
-            courseId: course._id,
+            courseId: course.id,
             courseTitle: course.title,
             revisionId: revisionTag,
-            fileRef: courseFileRef(course._id.toString()),
+            fileRef: courseFileRef(course.id.toString()),
             files: staged,
             requestId: req.get('X-Request-ID')
           },
@@ -1875,14 +1875,14 @@ router.post(
 
         return res.status(202).json({
           jobId,
-          courseId: course._id.toString(),
+          courseId: course.id.toString(),
           status: 'processing'
         });
       } catch (publishErr) {
         console.error('Ingestion job enqueue failed:', errorDetails(publishErr).message);
         if (publishErr instanceof IngestionConflictError) {
-          await Course.updateOne({ _id: course._id }, { $set: { files: originalFiles } });
-          await CourseRevision.deleteOne({ courseId: course._id, revisionTag });
+          await Course.updateOne({ id: course.id }, { $set: { files: originalFiles } });
+          await CourseRevision.deleteOne({ courseId: course.id, revisionTag });
           return res.status(409).json({ error: publishErr.code });
         }
         // Failed and uncertain replacement bytes are retained for reconciliation.
@@ -1923,7 +1923,7 @@ router.post('/manual', async (req: DomainRequest, res: Response) => {
         status: 'active'
       });
       const activeInstitution = await Institution.exists({
-        _id: targetInstitutionId,
+        id: targetInstitutionId,
         status: 'active'
       });
       if (!membership || !activeInstitution) {
@@ -1936,7 +1936,7 @@ router.post('/manual', async (req: DomainRequest, res: Response) => {
     }
 
     // Verify subject exists and belongs to user
-    const subject = await Subject.findOne({ _id: subject_id, userId });
+    const subject = await Subject.findOne({ id: subject_id, userId });
     if (!subject) {
       return res.status(404).json({ error: 'Subject not found' });
     }
@@ -1978,7 +1978,7 @@ router.post('/manual', async (req: DomainRequest, res: Response) => {
         `${USER_PROFILE_URL}/api/v1/users/gamification/award-xp`,
         {
           action: 'course_upload',
-          metadata: { courseId: course._id.toString(), title: course.title, manual: true }
+          metadata: { courseId: course.id.toString(), title: course.title, manual: true }
         },
         {
           headers: buildInternalHeaders(req.headers.cookie)
@@ -1990,7 +1990,7 @@ router.post('/manual', async (req: DomainRequest, res: Response) => {
 
     res.status(201).json({
       course: {
-        id: course._id.toString(),
+        id: course.id.toString(),
         title: course.title,
         description: course.description,
         scope: course.scope || 'personal',

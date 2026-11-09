@@ -23,7 +23,7 @@ const login = async (page) => {
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        user: { _id: "e2e-user", email: "e2e@test.com", role: "student" },
+        user: { id: "e2e-user", email: "e2e@test.com", role: "student" },
       }),
     })
   );
@@ -33,7 +33,7 @@ const login = async (page) => {
       "auth-storage",
       JSON.stringify({
         state: {
-          user: { _id: "e2e-user", email: "e2e@test.com", role: "student" },
+          user: { id: "e2e-user", email: "e2e@test.com", role: "student" },
           token: "mock-jwt-token",
           sessionExpiry: Date.now() + 3600_000,
         },
@@ -47,7 +47,7 @@ const seedSession = async (page) => {
   await page.evaluate(async () => {
     const mod = await import("/src/store/sessionStore.js");
     const task1 = {
-      _id: "t1",
+      id: "t1",
       title: "Recursion",
       description: "Understand recursion with a base case",
       status: "in-progress",
@@ -55,7 +55,7 @@ const seedSession = async (page) => {
       startedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
     };
     const task2 = {
-      _id: "t2",
+      id: "t2",
       title: "Memoization",
       description: "Optimize recursion with caching",
       status: "pending",
@@ -65,7 +65,7 @@ const seedSession = async (page) => {
       step: "session",
       mode: "solo",
       activeSession: {
-        _id: "sess-e2e",
+        id: "sess-e2e",
         name: "Solo Study",
         userId: "e2e-user",
         inviteCode: null,
@@ -91,7 +91,7 @@ const mockCompleteTask = async (page) => {
         currentTaskIndex: 1,
         completedTasks: 1,
         allTasksComplete: false,
-        nextTask: { _id: "t2", title: "Memoization" },
+        nextTask: { id: "t2", title: "Memoization" },
       }),
     });
   });

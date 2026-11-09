@@ -159,7 +159,7 @@ describe('versioned reading migration', () => {
   it('migrates strict v1 content without pretending to know topic mappings', () => {
     const migrated = migrateReadingDocumentV1({
       schemaVersion: '1.0.0',
-      courseId: 'a'.repeat(24),
+      courseId: '01020ca1-fc51-5c10-92c0-16c54abb997f',
       revisionId: 'rev-1',
       contentHash: 'sha256:' + 'b'.repeat(64),
       title: 'Legacy',
@@ -214,7 +214,7 @@ describe('versioned reading migration', () => {
 describe('experience planner boundary', () => {
   const document = parseReadingDocumentV2({
     schemaVersion: '2.0.0',
-    courseId: 'a'.repeat(24),
+    courseId: '01020ca1-fc51-5c10-92c0-16c54abb997f',
     revisionId: 'rev-1',
     contentHash: 'sha256:' + 'b'.repeat(64),
     title: 'Planner demo',
@@ -250,7 +250,7 @@ describe('experience planner boundary', () => {
   });
   const request = validatePlannerRequest({
     schemaVersion: '1.0.0',
-    courseId: 'a'.repeat(24),
+    courseId: '01020ca1-fc51-5c10-92c0-16c54abb997f',
     revisionId: 'rev-1',
     lesson: { topicId: 'network', subtopicId: 'handshake', title: 'Handshake' },
     sourceReferences: [

@@ -38,8 +38,8 @@ const {
   CompetencyProfile
 } = require('../models/index');
 
-const SUBJECT_ID = '507f1f77bcf86cd799439011';
-const COURSE_ID = '507f1f77bcf86cd799439012';
+const SUBJECT_ID = '05bffe3e-3126-53ab-89a5-ab5f9c128da7';
+const COURSE_ID = '17833296-91d3-5498-ade4-d01d61169e51';
 
 const revisionTopics = [
   {
@@ -66,7 +66,7 @@ beforeEach(() => {
     select: jest.fn().mockImplementation(() =>
       leaned([
         {
-          _id: COURSE_ID,
+          id: COURSE_ID,
           userId: 'instructor-1',
           subjectId: SUBJECT_ID,
           title: 'CS301',
@@ -85,14 +85,14 @@ beforeEach(() => {
   Subject.find.mockReturnValue({
     select: jest
       .fn()
-      .mockImplementation(() => leaned([{ _id: SUBJECT_ID, name: 'Computer Science' }]))
+      .mockImplementation(() => leaned([{ id: SUBJECT_ID, name: 'Computer Science' }]))
   });
 });
 
 describe('accepted evidence becomes competency evidence', () => {
   test('writes a profile row keyed by lowercase bloom level', async () => {
     CompetencyProfile.findOne.mockResolvedValue(null);
-    CompetencyProfile.findOneAndUpdate.mockResolvedValue({ _id: 'profile-1' });
+    CompetencyProfile.findOneAndUpdate.mockResolvedValue({ id: 'profile-1' });
 
     await recordAcceptedEvidence({
       userId: 'learner-1',

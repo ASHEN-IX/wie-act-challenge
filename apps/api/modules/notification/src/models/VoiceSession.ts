@@ -19,7 +19,7 @@ export interface IParticipant {
 }
 
 export type IVoiceSession = Omit<VoiceSessionRow, 'participants'> & {
-  _id: string;
+  id: string;
   participants: IParticipant[];
 };
 

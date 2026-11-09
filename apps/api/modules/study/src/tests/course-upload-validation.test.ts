@@ -29,8 +29,8 @@ jest.mock('../services/ingestionControl', () => ({
     try {
       const result = await publishCourseIngestionJob(params);
       const instance =
-        Course.instances.find((row: { _id: string }) => String(row._id) === params.courseId) ||
-        (await Course.findOne({ _id: params.courseId, userId: params.userId }));
+        Course.instances.find((row: { id: string }) => String(row.id) === params.courseId) ||
+        (await Course.findOne({ id: params.courseId, userId: params.userId }));
       if (instance) {
         instance.jobId = result.jobId;
         instance.correlationId = result.correlationId;
@@ -40,7 +40,7 @@ jest.mock('../services/ingestionControl', () => ({
       return result;
     } catch (error) {
       const instance = Course.instances.find(
-        (row: { _id: string }) => String(row._id) === params.courseId
+        (row: { id: string }) => String(row.id) === params.courseId
       );
       if (instance) {
         instance.status = 'failed';
@@ -57,7 +57,7 @@ jest.mock('../models/index', () => {
   const mockCourse = Object.assign(
     jest.fn().mockImplementation(function (this: CourseFixture, data: object) {
       Object.assign(this, data);
-      this._id = 'course-new';
+      this.id = 'course-new';
       this.save = jest.fn().mockResolvedValue(true);
       mockCourse.instances.push(this);
     }),
@@ -75,7 +75,7 @@ jest.mock('../models/index', () => {
       findOne: jest.fn(),
       // `findById` returns a promise-like cursor with a chainable `select`.
       findById: jest.fn().mockImplementation((id: string) => {
-        const value = mockCourse.findOne({ _id: id, userId: 'user-123' });
+        const value = mockCourse.findOne({ id: id, userId: 'user-123' });
         const result = Promise.resolve(value) as Promise<unknown> & {
           select: () => Promise<unknown>;
         };
@@ -159,7 +159,7 @@ describe('INGEST-01 POST /api/v1/study/courses (file validation)', () => {
     publishAiJob.mockReset();
     Course.instances = [];
     Course.prototype = {};
-    Subject.findOne.mockResolvedValue({ _id: 'subj-1', userId: 'user-123' });
+    Subject.findOne.mockResolvedValue({ id: 'subj-1', userId: 'user-123' });
   });
 
   test('rejects an executable disguised as .pdf with 422 and no course created', async () => {
@@ -309,7 +309,7 @@ describe('INGEST-02 POST /api/v1/study/courses (size limits → 413)', () => {
     jest.clearAllMocks();
     Course.instances = [];
     Course.prototype = {};
-    Subject.findOne.mockResolvedValue({ _id: 'subj-1', userId: 'user-123' });
+    Subject.findOne.mockResolvedValue({ id: 'subj-1', userId: 'user-123' });
   });
 
   test(`rejects a single file over ${MAX_UPLOAD_MB}MB with 413`, async () => {
@@ -350,7 +350,7 @@ describe('INGEST-03 POST /api/v1/study/courses (content-type allowlist → 415)'
     jest.clearAllMocks();
     Course.instances = [];
     Course.prototype = {};
-    Subject.findOne.mockResolvedValue({ _id: 'subj-1', userId: 'user-123' });
+    Subject.findOne.mockResolvedValue({ id: 'subj-1', userId: 'user-123' });
   });
 
   test('rejects JSON-typed upload with 415 before any persistence', async () => {
@@ -383,7 +383,7 @@ describe('INGEST-04 POST /api/v1/study/courses (polyglot/trailer/encryption → 
     jest.clearAllMocks();
     Course.instances = [];
     Course.prototype = {};
-    Subject.findOne.mockResolvedValue({ _id: 'subj-1', userId: 'user-123' });
+    Subject.findOne.mockResolvedValue({ id: 'subj-1', userId: 'user-123' });
   });
 
   test('rejects a truncated PDF (no %%EOF trailer)', async () => {
@@ -462,9 +462,9 @@ describe('INGEST-05 POST /api/v1/study/courses/:courseId/files (async re-ingest 
     jest.clearAllMocks();
     Course.instances = [];
     Course.prototype = {};
-    Subject.findOne.mockResolvedValue({ _id: 'subj-1', userId: 'user-123' });
+    Subject.findOne.mockResolvedValue({ id: 'subj-1', userId: 'user-123' });
     reIngestCourse = {
-      _id: '64a000000000000000000001',
+      id: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
       userId: 'user-123',
       title: 'Existing Course',
       subjectId: 'subj-1',
@@ -479,13 +479,13 @@ describe('INGEST-05 POST /api/v1/study/courses/:courseId/files (async re-ingest 
 
   test('stages new files, enqueues a job and returns 202 immediately', async () => {
     const res = await request(app)
-      .post('/api/v1/study/courses/64a000000000000000000001/files')
+      .post('/api/v1/study/courses/9fc0fd30-b00a-55fb-a19f-a23a3f1d5514/files')
       .set(authHeader())
       .attach('files', VALID_PDF, { filename: 'more.pdf', contentType: 'application/pdf' });
 
     expect(res.status).toBe(202);
     expect(res.body.jobId).toBe('job-re');
-    expect(res.body.courseId).toBe('64a000000000000000000001');
+    expect(res.body.courseId).toBe('9fc0fd30-b00a-55fb-a19f-a23a3f1d5514');
     expect(res.body.status).toBe('processing');
 
     expect(reIngestCourse.jobId).toBe('job-re');
@@ -497,8 +497,8 @@ describe('INGEST-05 POST /api/v1/study/courses/:courseId/files (async re-ingest 
       'study.ingest.course',
       'user-123',
       expect.objectContaining({
-        courseId: '64a000000000000000000001',
-        fileRef: 'uploads/courses/64a000000000000000000001',
+        courseId: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
+        fileRef: 'uploads/courses/9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
         files: expect.arrayContaining([
           expect.objectContaining({ originalName: 'more.pdf', size: VALID_PDF.length })
         ])
@@ -511,7 +511,7 @@ describe('INGEST-05 POST /api/v1/study/courses/:courseId/files (async re-ingest 
     publishAiJob.mockRejectedValue(new Error('broker down'));
 
     const res = await request(app)
-      .post('/api/v1/study/courses/64a000000000000000000001/files')
+      .post('/api/v1/study/courses/9fc0fd30-b00a-55fb-a19f-a23a3f1d5514/files')
       .set(authHeader())
       .attach('files', VALID_PDF, { filename: 'extra.pdf', contentType: 'application/pdf' });
 
@@ -526,7 +526,7 @@ describe('SEC-11 stored filenames are sanitized (no traversal, no client name)',
     publishAiJob.mockReset();
     publishAiJob.mockResolvedValue({ messageId: 'job-1', correlationId: 'corr-1' });
     Course.instances = [];
-    Subject.findOne.mockResolvedValue({ _id: 'subj-1', userId: 'user-123' });
+    Subject.findOne.mockResolvedValue({ id: 'subj-1', userId: 'user-123' });
   });
 
   test('path-traversal filename lands in the course dir with a generated safe name', async () => {

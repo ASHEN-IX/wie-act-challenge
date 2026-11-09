@@ -21,7 +21,7 @@ import learningRouter from '../modules/study/src/routes/learning';
 
 const URI = process.env.M46B_MONGO || 'mongodb://127.0.0.1:27017';
 const DB = `test_m46b_closure_${process.pid}`;
-const courseId = '0123456789abcdef01234567';
+const courseId = 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d';
 const revisionId = 'rev_m46b';
 const lessonId = 'lesson-1';
 const mode = 'guided';

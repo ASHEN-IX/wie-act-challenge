@@ -45,7 +45,7 @@ export interface JobResourceScope {
 }
 
 export interface IAiJob extends Omit<AiJobRow, 'resourceScope' | 'result'> {
-  _id: string;
+  id: string;
   resourceScope: JobResourceScope | null;
   result: unknown;
   transitionTo(nextStatus: JobStatus | string): Promise<IAiJob>;

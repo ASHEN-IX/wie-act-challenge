@@ -36,7 +36,7 @@ function buildApp(authUserId = 'host-1') {
 function makeActiveTeamSession() {
   const now = Date.now();
   return {
-    _id: 'session-1',
+    id: 'session-1',
     type: 'team',
     status: 'active',
     userId: 'host-1',
@@ -162,7 +162,7 @@ describe('Team Session Rewards Integration', () => {
   test('PUT /:sessionId emits challenge action and challenge XP rewards for exam-mode sessions', async () => {
     const now = Date.now();
     const challengeSession = {
-      _id: 'challenge-session-1',
+      id: 'challenge-session-1',
       userId: 'host-1',
       status: 'active',
       type: 'solo',

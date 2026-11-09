@@ -217,7 +217,7 @@ export async function decideRoomSupport(
   if (['declined', 'expired'].includes(proposal.status)) return fail(409, 'Proposal unavailable');
   if (input.decision === 'decline') {
     const declined = await Proposal.updateOne(
-      { _id: proposal._id, status: 'proposed' },
+      { id: proposal.id, status: 'proposed' },
       { $set: { status: 'declined' } }
     );
     if (!declined.modifiedCount) return fail(409, 'Proposal decision already in progress');
@@ -229,7 +229,7 @@ export async function decideRoomSupport(
   )
     return fail(409, 'Stale proposal');
   const claim = await Proposal.updateOne(
-    { _id: proposal._id, status: 'proposed' },
+    { id: proposal.id, status: 'proposed' },
     { $set: { status: 'accepting' } }
   );
   if (!claim.modifiedCount && !['accepting', 'accepted'].includes(proposal.status))
@@ -247,8 +247,8 @@ export async function decideRoomSupport(
     async (courseId) => ({ authorized: await canReadCourse(actor, courseId) })
   );
   if (result.status === 200)
-    await Proposal.updateOne({ _id: proposal._id }, { $set: { status: 'accepted' } });
+    await Proposal.updateOne({ id: proposal.id }, { $set: { status: 'accepted' } });
   if (result.status === 409)
-    await Proposal.updateOne({ _id: proposal._id }, { $set: { status: 'expired' } });
+    await Proposal.updateOne({ id: proposal.id }, { $set: { status: 'expired' } });
   return result;
 }

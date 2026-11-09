@@ -10,7 +10,7 @@ import { table } from './_table';
  * records who decided and when, and is revocable. An AI provider can never write
  * here, and no proposal field can create one.
  */
-export type IStructuredAssetReview = StructuredAssetReviewRow & { _id: string };
+export type IStructuredAssetReview = StructuredAssetReviewRow & { id: string };
 
 export const StructuredAssetReview = table<IStructuredAssetReview>({
   delegate: () => prisma.structuredAssetReview,

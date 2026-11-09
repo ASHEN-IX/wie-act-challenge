@@ -14,7 +14,7 @@ import {
   type PresentationBuildInput,
 } from '@ednova/shared/ednova/presentationDocument';
 
-const courseId = '0123456789abcdef01234567';
+const courseId = 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d';
 const revisionId = 'rev_batch3_preview';
 const contentHash = 'sha256:' + 'c'.repeat(64);
 const documentId = 'doc_aaaaaaaaaaaaaaaa';

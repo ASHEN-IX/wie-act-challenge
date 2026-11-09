@@ -17,8 +17,8 @@ jest.mock('../services/resourceAccess', () => ({
 import type { Request, Response } from 'express';
 import learningRouter from '../routes/learning';
 
-const courseA = '0123456789abcdef0123456a';
-const courseB = '0123456789abcdef0123456b';
+const courseA = '04cbcb08-c764-532b-a7c8-ef9bb696557d';
+const courseB = '1c7d7ef3-2b70-5b4f-aed4-084fff432aaf';
 
 type Handler = (req: Request, res: Response, next?: () => void) => unknown;
 

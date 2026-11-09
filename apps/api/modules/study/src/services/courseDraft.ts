@@ -142,7 +142,7 @@ export async function findEditableDraft(courseId: string) {
         (a, b) =>
           Number(Boolean(b.contentDocument)) - Number(Boolean(a.contentDocument)) ||
           b.updatedAt.getTime() - a.updatedAt.getTime() ||
-          String(b._id).localeCompare(String(a._id))
+          String(b.id).localeCompare(String(a.id))
       )[0] || null
   );
 }
@@ -162,7 +162,7 @@ export async function getCourseDraft(actorUserId: string, courseId: string) {
     throw new DraftNotFoundError('Course not found');
   }
 
-  let draft = await findEditableDraft(course._id.toString());
+  let draft = await findEditableDraft(course.id.toString());
 
   // A published revision can leave an older, empty draft behind. Opening that
   // draft would hide the material the instructor just published. Start a new
@@ -172,10 +172,10 @@ export async function getCourseDraft(actorUserId: string, courseId: string) {
     const activeRevisionId = course.activeRevisionId;
     const active = activeRevisionId
       ? await CourseRevision.findOne({
-          courseId: course._id,
+          courseId: course.id,
           ...(activeRevisionId.startsWith('rev_')
             ? { revisionTag: activeRevisionId }
-            : { _id: activeRevisionId }),
+            : { id: activeRevisionId }),
           status: { $in: ['published', 'deprecated'] },
           activationState: 'committed',
           revokedAt: { $exists: false }
@@ -189,7 +189,7 @@ export async function getCourseDraft(actorUserId: string, courseId: string) {
         for (const c of originalCanonical.chapters || [])
           for (const l of c.lessons || []) for (const b of l.blocks || []) delete b.reviewedFormula;
       draft = await CourseRevision.create({
-        courseId: course._id,
+        courseId: course.id,
         revisionTag: `rev_${crypto.randomUUID().replace(/-/g, '')}`,
         contentHash: active.contentHash,
         status: 'draft',
@@ -212,7 +212,7 @@ export async function getCourseDraft(actorUserId: string, courseId: string) {
     const initialTopics = course.topics || [];
     const contentHash = computeTopicsHash(initialTopics);
     draft = await CourseRevision.create({
-      courseId: course._id,
+      courseId: course.id,
       revisionTag,
       contentHash,
       status: 'draft',
@@ -223,7 +223,7 @@ export async function getCourseDraft(actorUserId: string, courseId: string) {
   }
 
   return {
-    courseId: course._id.toString(),
+    courseId: course.id.toString(),
     revisionTag: draft.revisionTag,
     contentHash: draft.contentHash,
     status: draft.status,
@@ -260,10 +260,10 @@ export async function updateCourseDraft(
     );
   }
 
-  const sourceRevision = await findEditableDraft(course._id.toString());
+  const sourceRevision = await findEditableDraft(course.id.toString());
   const canonicalSource = sourceRevision
     ? await authoritativeCanonicalDocument(
-        course._id,
+        course.id,
         sourceRevision.revisionTag,
         sourceRevision.contentDocument
       )
@@ -284,7 +284,7 @@ export async function updateCourseDraft(
     throw new HierarchyValidationError('topics must be a non-empty array');
   }
 
-  const draft = await findEditableDraft(course._id.toString());
+  const draft = await findEditableDraft(course.id.toString());
 
   if (!draft || draft.revisionTag !== input.expectedRevisionTag) {
     throw new StaleRevisionError(
@@ -418,7 +418,7 @@ export async function updateCourseDraft(
 
   const changed = await CourseRevision.findOneAndUpdate(
     {
-      _id: draft._id,
+      id: draft.id,
       revisionTag: input.expectedRevisionTag,
       status: 'draft',
       __v: draft.__v
@@ -454,7 +454,7 @@ export async function updateCourseDraft(
   Object.assign(draft, changed);
   return {
     success: true,
-    courseId: course._id.toString(),
+    courseId: course.id.toString(),
     revisionTag: newRevisionTag,
     previousRevisionTag: input.expectedRevisionTag,
     contentHash: newContentHash,

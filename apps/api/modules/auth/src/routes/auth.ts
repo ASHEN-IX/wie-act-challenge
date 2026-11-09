@@ -189,7 +189,7 @@ router.post(
       });
     }
 
-    const reservation = storedCoupon ? await reserveCoupon(storedCoupon._id, user._id) : null;
+    const reservation = storedCoupon ? await reserveCoupon(storedCoupon.id, user.id) : null;
     const redeemedAt = reservation?.redeemedAt || new Date();
 
     user.tier = resolvedTier;
@@ -239,15 +239,15 @@ router.post(
         'canChangeAfter'
       ] as const;
       const updates = Object.fromEntries(fields.map((field) => [field, user[field]]));
-      const couponId = String(storedCoupon._id);
+      const couponId = String(storedCoupon.id);
       await prisma.$transaction(async (tx) => {
         const current = await tx.user.findUnique({
-          where: { id: user._id },
+          where: { id: user.id },
           select: { appliedCouponIds: true }
         });
         const alreadyApplied = current?.appliedCouponIds.includes(couponId) ?? false;
         await tx.user.update({
-          where: { id: user._id },
+          where: { id: user.id },
           data: {
             ...updates,
             appliedCouponIds: alreadyApplied
@@ -256,7 +256,7 @@ router.post(
           }
         });
       });
-      const refreshed = await User.findById(user._id);
+      const refreshed = await User.findById(user.id);
       if (refreshed) Object.assign(user, refreshed);
     } else {
       await User.save(user);

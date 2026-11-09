@@ -22,7 +22,7 @@ import {
 } from '../../../../shared/ednova/mockExperiencePlanner';
 import { COMPONENT_REGISTRY_VERSION } from '../../../../shared/ednova/componentRegistry';
 
-const courseId = '0123456789abcdef01234567';
+const courseId = 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d';
 const revisionId = 'rev_m41';
 const contentHash = 'sha256:' + 'b'.repeat(64);
 const lessonId = 'lesson-math';
@@ -163,7 +163,7 @@ describe('LearningExperiencePlanV1 contract', () => {
 
   it('binds the plan to course, revision, content hash and lesson', () => {
     const proposal = validProposal();
-    proposal.claims.courseId = 'fedcba9876543210fedcba98';
+    proposal.claims.courseId = '4a7c48be-d706-50df-b493-72752cd0e9f9';
     expectCode(() => validateExperiencePlan(proposal, context()), 'PLAN_IDENTITY_COURSE_MISMATCH');
 
     const revision = validProposal();

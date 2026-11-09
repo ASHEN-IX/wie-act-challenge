@@ -20,7 +20,7 @@ export interface FormulaProposalDecision {
 }
 
 export type IFormulaProposal = Omit<FormulaProposalRow, 'usage' | 'history' | 'bbox'> & {
-  _id: string;
+  id: string;
   usage?: unknown;
   history: FormulaProposalDecision[];
   bbox: number[];

@@ -49,7 +49,7 @@ test('ED-07 real Nest/PostgreSQL authorization regressions', { timeout: 60000 },
     for (const cleanup of cleanups) await cleanup();
     await StudyRoom.deleteMany({ hostUserId: { $in: actors.map((actor) => actor.id) } });
     await SessionChat.deleteOne({ content: 'room-only text' });
-    if (courseIds.length) await Course.deleteMany({ _id: { $in: courseIds } });
+    if (courseIds.length) await Course.deleteMany({ id: { $in: courseIds } });
     const ids = actors.map((actor) => actor.id);
     await prisma.authSession.deleteMany({ where: { userId: { in: ids } } });
     await prisma.authAccount.deleteMany({ where: { userId: { in: ids } } });
@@ -371,7 +371,7 @@ test('ED-07 real Nest/PostgreSQL authorization regressions', { timeout: 60000 },
       assert.equal((await request(host, path(id))).status, 200);
       const { socket, received } = await connect(id, host);
       await waitFor(() => received.some((m) => m.type === 'ROOM_STATE_SYNC'));
-      await Course.updateOne({ _id: courseId }, { userId: outsider.id });
+      await Course.updateOne({ id: courseId }, { userId: outsider.id });
       assert.equal((await request(host, path(id))).status, 403);
       received.length = 0;
       const { broadcastToSession } = await import('../../modules/notification/src/realtime.js');

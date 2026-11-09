@@ -49,7 +49,7 @@ export async function createRoom(
     } catch (error) {
       if (!(error instanceof ApiError) || error.status !== 404) throw error;
       // Fallback to legacy team session if needed
-      const data = await api<{ session: { _id: string } }>(
+      const data = await api<{ session: { id: string } }>(
         "/api/v1/study/sessions/team",
         {
           method: "POST",
@@ -60,7 +60,7 @@ export async function createRoom(
           }),
         },
       );
-      id = data.session._id;
+      id = data.session.id;
     }
 
     revalidatePath("/study-together");
@@ -103,11 +103,11 @@ export async function joinRoom(
     } catch (error) {
       if (!(error instanceof ApiError) || error.status !== 404) throw error;
       // Fallback to legacy join-by-code
-      const data = await api<{ session: { _id: string } }>(
+      const data = await api<{ session: { id: string } }>(
         "/api/v1/study/sessions/team/join-by-code",
         { method: "POST", body: JSON.stringify({ inviteCode }) },
       );
-      id = data.session._id;
+      id = data.session.id;
     }
   } catch (error) {
     unstable_rethrow(error);

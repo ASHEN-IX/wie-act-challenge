@@ -398,7 +398,7 @@ function parsePresentationPlan(
   return {
     schemaVersion: PRESENTATION_PLAN_VERSION,
     registryVersion: COMPONENT_REGISTRY_VERSION,
-    courseId: str(v.courseId, 24),
+    courseId: str(v.courseId, 36),
     revisionId: str(v.revisionId, 128),
     contentHash: str(v.contentHash, 71),
     mode: 'read',
@@ -496,8 +496,8 @@ export function parsePublishedPresentation(value: unknown): PublishedPresentatio
     'warnings',
   ]);
   if (v.schemaVersion !== PRESENTATION_SCHEMA_VERSION) fail();
-  const courseId = str(v.courseId, 24);
-  if (!/^[a-f0-9]{24}$/.test(courseId)) fail();
+  const courseId = str(v.courseId, 36);
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(courseId)) fail();
   const contentHash = str(v.contentHash, 71);
   if (!/^sha256:[a-f0-9]{64}$/.test(contentHash)) fail();
   const canonicalContentHash = str(v.canonicalContentHash, 71);

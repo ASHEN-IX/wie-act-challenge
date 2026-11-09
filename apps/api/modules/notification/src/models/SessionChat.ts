@@ -37,7 +37,7 @@ export type ISessionChat = Omit<
   SessionChatRow,
   'messageType' | 'peerMessages' | 'searchResults'
 > & {
-  _id: string;
+  id: string;
   messageType: SessionChatMessageType;
   peerMessages: IPeerMessage[];
   searchResults: ISearchResult[];

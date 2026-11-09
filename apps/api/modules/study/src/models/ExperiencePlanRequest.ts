@@ -24,7 +24,7 @@ export type ExperiencePlanRequestState =
   | 'uncertain'
   | 'cancelled';
 
-export type IExperiencePlanRequest = ExperiencePlanRequestRow & { _id: string };
+export type IExperiencePlanRequest = ExperiencePlanRequestRow & { id: string };
 
 export const ExperiencePlanRequest = table<IExperiencePlanRequest>({
   delegate: () => prisma.experiencePlanRequest,

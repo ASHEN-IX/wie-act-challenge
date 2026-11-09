@@ -5,7 +5,7 @@ import type {
 import { prisma, toDocument } from '../../../../shared/database';
 import { newId } from '../../../../shared/ids';
 
-export type ILearningRewardLedger = LedgerRow & { _id: string };
+export type ILearningRewardLedger = LedgerRow & { id: string };
 
 function hydrate(row: LedgerRow): ILearningRewardLedger {
   return toDocument(row) as unknown as ILearningRewardLedger;

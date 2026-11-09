@@ -21,7 +21,7 @@ async function registerTests() {
   const db = client.db();
   const id = new ObjectId();
   await db.collection('users').insertOne({
-    _id: id,
+    id: id,
     email: 'nest@example.test',
     name: 'Nest',
     password: await bcrypt.hash('LegacyPass!123', 12),
@@ -66,7 +66,7 @@ async function registerTests() {
   test('Nest session guard supplies preserved identity and fresh role authorization', async () => {
     const me = await fetch(url + '/api/v1/auth/me', { headers: { cookie } });
     assert.equal(me.status, 200, await me.clone().text());
-    assert.equal((await me.json()).user._id, String(id));
+    assert.equal((await me.json()).user.id, String(id));
     assert.equal(
       (await fetch(url + '/api/v1/monitoring/metrics', { headers: { cookie } })).status,
       403
@@ -77,7 +77,7 @@ async function registerTests() {
       (await fetch(url + '/api/v1/auth/admin/stats', { headers: { cookie } })).status,
       403
     );
-    await db.collection('users').updateOne({ _id: id }, { $set: { role: 'admin', isAdmin: true } });
+    await db.collection('users').updateOne({ id: id }, { $set: { role: 'admin', isAdmin: true } });
     assert.equal(
       (await fetch(url + '/api/v1/auth/admin/stats', { headers: { cookie } })).status,
       200
@@ -95,10 +95,10 @@ async function registerTests() {
       body: JSON.stringify({ title: 'Private task' })
     });
     assert.equal(task.status, 201);
-    const taskId = (await task.json()).task._id;
+    const taskId = (await task.json()).task.id;
     const other = new ObjectId();
     await db.collection('users').insertOne({
-      _id: other,
+      id: other,
       email: 'other@example.test',
       name: 'Other',
       password: await bcrypt.hash('OtherPass!123', 12),

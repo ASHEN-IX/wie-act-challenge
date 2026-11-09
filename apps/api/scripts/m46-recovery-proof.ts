@@ -37,7 +37,7 @@ let client: MongoClient;
 async function reset() {
   await client.db(DB).dropDatabase().catch(() => undefined);
   await client.db(DB).collection('llm_approval_budgets').insertOne({
-    _id: APPROVAL as never,
+    id: APPROVAL as never,
     task: 'experience_planning',
     model: MODEL,
     limit: 10,
@@ -49,7 +49,7 @@ async function reset() {
 }
 
 const used = async (): Promise<number> => {
-  const row = await client.db(DB).collection('llm_approval_budgets').findOne({ _id: APPROVAL as never });
+  const row = await client.db(DB).collection('llm_approval_budgets').findOne({ id: APPROVAL as never });
   return Number(row?.usedTokens ?? 0);
 };
 
@@ -67,7 +67,7 @@ async function main() {
     await ExperiencePlanRequest.create({
       requestId: 'req-before-reserve',
       identity,
-      courseId: '0123456789abcdef01234567',
+      courseId: 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d',
       revisionId: 'rev_1',
       lessonId: 'lesson-1',
       mode: 'guided',
@@ -95,7 +95,7 @@ async function main() {
     const row = await ExperiencePlanRequest.create({
       requestId: 'req-after-reserve',
       identity,
-      courseId: '0123456789abcdef01234567',
+      courseId: 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d',
       revisionId: 'rev_1',
       lessonId: 'lesson-1',
       mode: 'guided',
@@ -121,7 +121,7 @@ async function main() {
     // The process dies before writing `dispatched`. Record what production now
     // writes: the reservation on the row, so recovery can release it.
     await ExperiencePlanRequest.updateOne(
-      { _id: row._id },
+      { id: row.id },
       { $set: { state: 'reserved', approvalId: APPROVAL, reservedTokens: reservation.reservedTokens } },
     );
     const recovered = { modifiedCount: await recoverStalePlanningRequests(0) };

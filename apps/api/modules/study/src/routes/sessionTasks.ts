@@ -67,7 +67,7 @@ router.post('/setup', async (req: DomainRequest, res: Response) => {
     if (!courseId) return res.status(400).json({ error: 'courseId is required' });
 
     // Load the course to get tasks/topics
-    const course = await Course.findOne({ _id: courseId, userId });
+    const course = await Course.findOne({ id: courseId, userId });
     if (!course) return res.status(404).json({ error: 'Course not found' });
 
     // INGEST-07: a course is only usable once its ingestion completed.
@@ -81,7 +81,7 @@ router.post('/setup', async (req: DomainRequest, res: Response) => {
     let tasks: ITaskProgressEntry[] = [];
 
     if (studyPlanId) {
-      const plan = await StudyPlan.findOne({ _id: studyPlanId, userId });
+      const plan = await StudyPlan.findOne({ id: studyPlanId, userId });
       if (plan && plan.taskGraph && plan.taskGraph.tasks) {
         // Fetch Task documents linked to this plan so we can sync completion later
         const planTaskDocs = await Task.find({
@@ -93,7 +93,7 @@ router.post('/setup', async (req: DomainRequest, res: Response) => {
           // Try to match by title (tasks are created in the same order as taskGraph.tasks)
           const matchedDoc = planTaskDocs[index] || planTaskDocs.find((d) => d.title === t.title);
           return {
-            taskId: matchedDoc ? matchedDoc._id.toString() : t.id || `task-${index}`,
+            taskId: matchedDoc ? matchedDoc.id.toString() : t.id || `task-${index}`,
             title: t.title,
             description: t.description || '',
             estimatedMinutes: Number(
@@ -161,7 +161,7 @@ router.post('/setup', async (req: DomainRequest, res: Response) => {
     res.status(201).json({
       message: 'Session setup complete',
       session: {
-        _id: session._id,
+        id: session.id,
         courseId: session.courseId,
         mode: session.mode,
         type: session.type,
@@ -182,7 +182,7 @@ router.post('/:sessionId/task/complete', async (req: DomainRequest, res: Respons
     const userId = req.user!.userId;
     const { sessionId } = req.params;
 
-    const session = await StudySession.findOne({ _id: sessionId, status: 'active' });
+    const session = await StudySession.findOne({ id: sessionId, status: 'active' });
     if (!session) return res.status(404).json({ error: 'Active session not found' });
 
     // Allow host or the session owner
@@ -237,7 +237,7 @@ router.post('/:sessionId/task/complete', async (req: DomainRequest, res: Respons
     // Sync completion back to the Task collection if taskId is a real MongoDB ObjectId
     if (completedTaskId && isObjectId(completedTaskId)) {
       Task.findOneAndUpdate(
-        { _id: completedTaskId, userId: session.userId },
+        { id: completedTaskId, userId: session.userId },
         { status: 'completed', completedAt: new Date() }
       ).catch((err: unknown) => console.warn('Task sync failed:', errorDetails(err).message));
     }
@@ -258,7 +258,7 @@ router.post('/:sessionId/task/complete', async (req: DomainRequest, res: Respons
           metadata: {
             taskId: completedTaskId ? completedTaskId.toString() : undefined,
             taskIndex: currentIndex,
-            sessionId: session._id.toString(),
+            sessionId: session.id.toString(),
             title: taskProgress.tasks[currentIndex]?.title
           }
         },
@@ -284,7 +284,7 @@ router.post('/:sessionId/task/complete', async (req: DomainRequest, res: Respons
       authorization: req.headers.cookie,
       eventType: 'task_completed',
       metadata: {
-        sessionId: session._id.toString(),
+        sessionId: session.id.toString(),
         taskId: completedTaskId ? completedTaskId.toString() : null,
         taskIndex: currentIndex,
         taskTitle: taskProgress.tasks[currentIndex]?.title,
@@ -314,7 +314,7 @@ router.post('/:sessionId/task/skip', async (req: DomainRequest, res: Response) =
   try {
     const { sessionId } = req.params;
 
-    const session = await StudySession.findOne({ _id: sessionId, status: 'active' });
+    const session = await StudySession.findOne({ id: sessionId, status: 'active' });
     if (!session) return res.status(404).json({ error: 'Active session not found' });
 
     const { taskProgress } = session;

@@ -9,7 +9,7 @@ import { table } from './_table';
  * instructor analytics, and a public learner is not an institution member. This
  * record grants nothing by itself; access comes from the course being public.
  */
-export type IPublicCourseJoin = PublicCourseJoinRow & { _id: string };
+export type IPublicCourseJoin = PublicCourseJoinRow & { id: string };
 
 export const PublicCourseJoin = table<IPublicCourseJoin>({
   delegate: () => prisma.publicCourseJoin,

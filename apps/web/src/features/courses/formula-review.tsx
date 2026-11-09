@@ -76,10 +76,10 @@ export function FormulaReview({
   useEffect(() => {
     setCropError(false);
     setCorrection(proposal?.reviewedLatex || proposal?.latex || "");
-  }, [selected, proposal?._id, proposal?.reviewVersion]);
+  }, [selected, proposal?.id, proposal?.reviewVersion]);
   useEffect(() => {
     if (!job || !active) return;
-    if (polls.current.id !== job._id) polls.current = { id: job._id, count: 0 };
+    if (polls.current.id !== job.id) polls.current = { id: job.id, count: 0 };
     let stopped = false,
       timer: ReturnType<typeof setTimeout>;
     const token = serial.current;
@@ -92,7 +92,7 @@ export function FormulaReview({
       const result = await actions.getFormulaJob(
         courseId,
         revisionTag,
-        job!._id,
+        job!.id,
       );
       if (stopped || token !== serial.current) return;
       if (!result.ok) {
@@ -105,7 +105,7 @@ export function FormulaReview({
             ? {
                 ...w,
                 jobs: w.jobs.map((j) =>
-                  j._id === result.data.job._id ? result.data.job : j,
+                  j.id === result.data.job.id ? result.data.job : j,
                 ),
               }
             : w,
@@ -133,12 +133,12 @@ export function FormulaReview({
               ? {
                   ...w,
                   jobs: w.jobs.map((j) =>
-                    j._id === result.data.job._id ? result.data.job : j,
+                    j.id === result.data.job.id ? result.data.job : j,
                   ),
                   proposals: [
                     saved.data.proposal,
                     ...w.proposals.filter(
-                      (p) => p._id !== saved.data.proposal._id,
+                      (p) => p.id !== saved.data.proposal.id,
                     ),
                   ],
                 }
@@ -151,7 +151,7 @@ export function FormulaReview({
             ? {
                 ...w,
                 jobs: w.jobs.map((j) =>
-                  j._id === result.data.job._id ? result.data.job : j,
+                  j.id === result.data.job.id ? result.data.job : j,
                 ),
               }
             : w,
@@ -169,7 +169,7 @@ export function FormulaReview({
       stopped = true;
       clearTimeout(timer);
     };
-  }, [job?._id, active, courseId, revisionTag, pollGeneration]);
+  }, [job?.id, active, courseId, revisionTag, pollGeneration]);
   async function perform<T>(
     work: () => Promise<FormulaResult<T>>,
     success: string,
@@ -377,7 +377,7 @@ export function FormulaReview({
                             actions.cancelFormulaJob(
                               courseId,
                               revisionTag,
-                              job._id,
+                              job.id,
                             ),
                           "Cancellation requested.",
                         )
@@ -455,7 +455,7 @@ export function FormulaReview({
                                       actions.reviewFormulaProposal(
                                         courseId,
                                         revisionTag,
-                                        proposal._id,
+                                        proposal.id,
                                         action,
                                         proposal.reviewVersion,
                                         workspace.draftVersion,
@@ -486,7 +486,7 @@ export function FormulaReview({
                             .formulaReviewHistory(
                               courseId,
                               revisionTag,
-                              proposal._id,
+                              proposal.id,
                             )
                             .then((r) => {
                               if (token !== serial.current) return;
@@ -496,7 +496,7 @@ export function FormulaReview({
                                     ? {
                                         ...w,
                                         proposals: w.proposals.map((p) =>
-                                          p._id === proposal._id
+                                          p.id === proposal.id
                                             ? { ...p, history: r.data.history }
                                             : p,
                                         ),

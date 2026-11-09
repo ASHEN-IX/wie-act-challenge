@@ -13,7 +13,7 @@ import {
   type RankLadderItem
 } from './rankingConfig';
 
-export type IUserRankProfile = UserRankProfileRow & { _id: string };
+export type IUserRankProfile = UserRankProfileRow & { id: string };
 
 function hydrate(row: UserRankProfileRow): IUserRankProfile {
   return toDocument(row) as unknown as IUserRankProfile;

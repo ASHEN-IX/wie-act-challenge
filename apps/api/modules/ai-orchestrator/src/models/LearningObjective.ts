@@ -18,7 +18,7 @@ import type {
 import { prisma, toDocument } from '../../../../shared/database';
 
 export interface ILearningObjective extends LearningObjectiveRow {
-  _id: string;
+  id: string;
 }
 
 function hydrate(row: LearningObjectiveRow): ILearningObjective {

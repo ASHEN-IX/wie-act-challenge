@@ -41,7 +41,7 @@ import { COMPONENT_REGISTRY_VERSION } from '../shared/ednova/componentRegistry';
 
 const URI = process.env.M48_MONGO || 'mongodb://127.0.0.1:27017';
 const DB = `test_m48_recovery_${process.pid}`;
-const courseId = '0123456789abcdef01234567';
+const courseId = 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d';
 const revisionId = 'rev_m48';
 const lessonId = 'lesson-1';
 const mode = 'guided';
@@ -140,7 +140,7 @@ const PLANNING_FINGERPRINT = buildPlanningContext(CONTEXT_INPUT).fingerprint;
 async function seedGovernance() {
   const db = mongoose.connection.db!;
   await db.collection('courses').insertOne({
-    _id: new mongoose.Types.ObjectId(courseId),
+    id: new mongoose.Types.ObjectId(courseId),
     ownerUserId: 'author-a',
     userId: 'author-a'
   } as never);
@@ -173,7 +173,7 @@ async function seedWindow(ctx: ExperiencePlanValidationContext) {
   await seedGovernance();
   const plan = validateExperiencePlan(proposal(ctx) as never, ctx);
   await mongoose.connection.db!.collection('llm_approval_budgets').insertOne({
-    _id: 'approval-1' as never,
+    id: 'approval-1' as never,
     task: 'experience_planning',
     model: PLANNER.version,
     maxTokens: 100_000,

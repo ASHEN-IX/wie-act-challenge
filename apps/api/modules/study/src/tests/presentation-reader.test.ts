@@ -15,7 +15,7 @@ describe('published presentation projection', () => {
   it('fails closed with a 409 when the revision has no canonical document', async () => {
     load.mockResolvedValue({
       context: {
-        courseId: '0123456789abcdef01234567',
+        courseId: 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d',
         revisionId: 'rev_source',
         contentHash: 'sha256:' + 'a'.repeat(64),
         title: 'Math',
@@ -26,12 +26,12 @@ describe('published presentation projection', () => {
       canonical: null,
     } as never);
     await expect(
-      getPublishedPresentation('owner', '0123456789abcdef01234567', 'rev_source'),
+      getPublishedPresentation('owner', 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d', 'rev_source'),
     ).rejects.toBeInstanceOf(PresentationUnavailableError);
     await expect(
-      getPublishedPresentation('owner', '0123456789abcdef01234567', 'rev_source'),
+      getPublishedPresentation('owner', 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d', 'rev_source'),
     ).rejects.toMatchObject({ status: 409 });
-    expect(load).toHaveBeenCalledWith('owner', '0123456789abcdef01234567', 'rev_source');
+    expect(load).toHaveBeenCalledWith('owner', 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d', 'rev_source');
   });
 
   it('projects a deterministic read-mode plan from canonical content', async () => {
@@ -45,7 +45,7 @@ describe('published presentation projection', () => {
     );
     load.mockResolvedValue({
       context: {
-        courseId: '0123456789abcdef01234567',
+        courseId: 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d',
         revisionId: 'rev_plan',
         contentHash: 'sha256:' + 'b'.repeat(64),
         title: 'Séries',
@@ -89,7 +89,7 @@ describe('published presentation projection', () => {
 
     const presentation = await getPublishedPresentation(
       'owner',
-      '0123456789abcdef01234567',
+      'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d',
       'rev_plan',
     );
     const plan = presentation.plan;

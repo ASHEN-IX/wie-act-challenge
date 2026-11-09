@@ -75,7 +75,7 @@ export async function materializeRevisionFixture(
   await fs.writeFile(base + '.meta.json', JSON.stringify(meta));
   cleanup.add(path.dirname(base));
   await CourseRevision.updateOne(
-    { _id: revision._id },
+    { id: revision.id },
     {
       sourceManifest: [document],
       sourceManifestDigest: meta.manifestDigest,

@@ -158,7 +158,7 @@ describe('state machine', () => {
     const second = await AiJob.completeByCorrelation(correlationId, { answer: 'y' });
     expect(first.result.answer).toBe('x'); // first write wins
     // Ids are plain hex strings now, not BSON ObjectIds.
-    expect(second._id).toBe(first._id);
+    expect(second.id).toBe(first.id);
   });
 
   test('failByCorrelation sanitizes long errors to 512 chars', async () => {

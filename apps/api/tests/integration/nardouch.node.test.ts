@@ -87,7 +87,7 @@ test(
         if (courseId) {
           await NardouchConversationModel.deleteMany({ courseId });
           await CourseRevision.deleteMany({ courseId });
-          await Course.deleteMany({ _id: courseId });
+          await Course.deleteMany({ id: courseId });
         }
         await prisma.authSession.deleteMany({ where: { userId: { in: actorIds } } });
         await prisma.authAccount.deleteMany({ where: { userId: { in: actorIds } } });
@@ -154,9 +154,9 @@ test(
       status: 'completed',
       activeRevisionId: 'rev_nardouch'
     });
-    courseId = course._id.toString();
+    courseId = course.id.toString();
     await CourseRevision.create({
-      courseId: course._id,
+      courseId: course.id,
       revisionTag: 'rev_nardouch',
       contentHash: 'c'.repeat(64),
       status: 'published',
@@ -249,7 +249,7 @@ test(
     });
     await t.test('course revocation removes access to stored history', async () => {
       await Course.updateOne(
-        { _id: course._id },
+        { id: course.id },
         { $set: { userId: 'revoked', ownerUserId: 'revoked' } }
       );
       assert.equal((await call(0, 'GET', `/conversations/${id}`)).status, 403);

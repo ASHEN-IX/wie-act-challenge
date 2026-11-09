@@ -39,7 +39,7 @@ export default async function Rooms({
     getCourses(),
     load<{
       sessions: {
-        _id: string;
+        id: string;
         type: string;
         status: string;
         inviteCode?: string;
@@ -163,7 +163,7 @@ export default async function Rooms({
 
           {legacyRooms.map((room) => (
             <div
-              key={room._id}
+              key={room.id}
               className="flex items-center justify-between rounded-lg border p-5"
             >
               <p className="text-sm">
@@ -173,7 +173,7 @@ export default async function Rooms({
                 </code>
               </p>
               <Button asChild variant="outline">
-                <Link href={`/study-together/${room._id}`}>Open room</Link>
+                <Link href={`/study-together/${room.id}`}>Open room</Link>
               </Button>
             </div>
           ))}

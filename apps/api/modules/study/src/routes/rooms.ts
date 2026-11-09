@@ -393,8 +393,8 @@ async function verifyCourseAccess(
         const canRead = await canReadCourse(req.user.userId, courseId);
         if (canRead) {
           // `courseId` in the path is the course's own id. The old `$or` also
-          // matched a non-existent `courseId` column; only `_id` was ever real.
-          const course = await Course.findOne({ _id: courseId }).lean();
+          // matched a non-existent `courseId` column; only `id` was ever real.
+          const course = await Course.findOne({ id: courseId }).lean();
           return { authorized: true, title: course?.title };
         }
       } catch {
@@ -891,7 +891,7 @@ router.post('/join', durableRoomCommand('join'), async (req: RoomRequest, res: R
     let capacityFull = false;
     let notJoinable = false;
     const updatedRoom: IStudyRoom | null = await mutateRoom(
-      { _id: room._id, status: 'active' },
+      { id: room.id, status: 'active' },
       (candidate) => {
         const active = candidate.participants.filter((p) => !p.leftAt);
         if (active.length >= candidate.maxParticipants) {
@@ -930,7 +930,7 @@ router.post('/join', durableRoomCommand('join'), async (req: RoomRequest, res: R
       }
     );
     if (!updatedRoom && capacityFull) {
-      const fresh = await StudyRoom.findById(room._id);
+      const fresh = await StudyRoom.findById(room.id);
       if (
         fresh?.status === 'active' &&
         fresh.participants.some((p) => p.userId === userId && !p.leftAt)
@@ -952,7 +952,7 @@ router.post('/join', durableRoomCommand('join'), async (req: RoomRequest, res: R
     if (!updatedRoom && notJoinable) return res.status(400).json({ error: 'Unable to join room' });
 
     if (!updatedRoom) {
-      const fresh = await StudyRoom.findById(room._id).lean();
+      const fresh = await StudyRoom.findById(room.id).lean();
       if (
         fresh?.status === 'active' &&
         fresh.participants.some((p) => p.userId === userId && !p.leftAt)
@@ -1049,7 +1049,7 @@ router.get('/:roomId', requireActiveRoom, async (req: RoomRequest, res: Response
   try {
     const { roomId } = req.params;
     const room = await StudyRoom.findOne({
-      $or: [{ roomId }, { _id: roomId.match(/^[0-9a-fA-F]{24}$/) ? roomId : null }]
+      roomId
     });
 
     if (!room) return res.status(404).json({ error: 'Room not found' });
@@ -1099,7 +1099,7 @@ router.get('/:roomId/participants', requireActiveRoom, async (req: RoomRequest, 
   try {
     const { roomId } = req.params;
     const room = await StudyRoom.findOne({
-      $or: [{ roomId }, { _id: roomId.match(/^[0-9a-fA-F]{24}$/) ? roomId : null }]
+      roomId
     });
 
     if (!room) return res.status(404).json({ error: 'Room not found' });
@@ -1137,7 +1137,7 @@ router.post(
 
       const { roomId } = req.params;
       const room = await StudyRoom.findOne({
-        $or: [{ roomId }, { _id: roomId.match(/^[0-9a-fA-F]{24}$/) ? roomId : null }],
+        roomId,
         status: 'active'
       });
 
@@ -1163,7 +1163,7 @@ router.post(
       }
 
       const updatedRoom = await StudyRoom.findOneAndUpdate(
-        { _id: room._id, status: 'active', seq: room.seq },
+        { id: room.id, status: 'active', seq: room.seq },
         {
           $set: {
             participants: room.participants,
@@ -1269,7 +1269,7 @@ router.put(
 
       if (!updatedRoom) {
         const exists = await StudyRoom.findOne({
-          $or: [{ roomId }, { _id: roomId.match(/^[0-9a-fA-F]{24}$/) ? roomId : null }]
+          roomId
         }).lean();
         if (!exists || exists.status !== 'active')
           return res.status(404).json({ error: 'Room not found or closed' });
@@ -1340,7 +1340,7 @@ router.put(
 
       if (!updatedRoom) {
         const exists = await StudyRoom.findOne({
-          $or: [{ roomId }, { _id: roomId.match(/^[0-9a-fA-F]{24}$/) ? roomId : null }]
+          roomId
         }).lean();
         if (!exists || exists.status !== 'active')
           return res.status(404).json({ error: 'Room not found or closed' });
@@ -1396,7 +1396,7 @@ router.post(
 
       const { roomId } = req.params;
       const room = await StudyRoom.findOne({
-        $or: [{ roomId }, { _id: roomId.match(/^[0-9a-fA-F]{24}$/) ? roomId : null }],
+        roomId,
         status: 'active'
       });
       if (!room) return res.status(404).json({ error: 'Room not found or closed' });
@@ -1537,7 +1537,7 @@ router.post(
 
       const updatedRoom = await StudyRoom.findOneAndUpdate(
         {
-          _id: room._id,
+          id: room.id,
           status: 'active',
           seq: room.seq,
           participants: { $elemMatch: { userId, leftAt: { $exists: false } } }
@@ -1594,7 +1594,7 @@ router.post(
 
       const { roomId } = req.params;
       const room = await StudyRoom.findOne({
-        $or: [{ roomId }, { _id: roomId.match(/^[0-9a-fA-F]{24}$/) ? roomId : null }],
+        roomId,
         status: 'active'
       });
       if (!room) return res.status(404).json({ error: 'Room not found or closed' });
@@ -1720,7 +1720,7 @@ router.post(
 
       const updatedRoom = await StudyRoom.findOneAndUpdate(
         {
-          _id: room._id,
+          id: room.id,
           status: 'active',
           seq: room.seq,
           participants: { $elemMatch: { userId, leftAt: { $exists: false } } }
@@ -1776,7 +1776,7 @@ router.get(
 
       const { roomId } = req.params;
       const room = await StudyRoom.findOne({
-        $or: [{ roomId }, { _id: roomId.match(/^[0-9a-fA-F]{24}$/) ? roomId : null }],
+        roomId,
         status: 'active'
       });
       if (!room) return res.status(404).json({ error: 'Room not found' });

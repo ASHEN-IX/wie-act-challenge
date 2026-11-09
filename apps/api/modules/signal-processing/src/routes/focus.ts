@@ -55,7 +55,7 @@ router.post(
 
     res.status(201).json({
       message: 'Focus tracking started',
-      sessionId: session._id
+      sessionId: session.id
     });
   })
 );
@@ -177,7 +177,7 @@ router.post(
           `${USER_PROFILE_URL}/api/v1/users/gamification/award-xp`,
           {
             action: 'perfect_focus_session',
-            metadata: { sessionId: session._id.toString(), focusScore: session.focusScore }
+            metadata: { sessionId: session.id.toString(), focusScore: session.focusScore }
           },
           {
             headers: buildInternalHeaders(req.headers.cookie)

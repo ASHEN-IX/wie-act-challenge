@@ -93,7 +93,7 @@ router.get('/leaderboard', async (req: DomainRequest, res: Response) => {
         coursesUploaded: e.stats?.coursesUploaded,
         tasksCompleted: e.stats?.tasksCompleted
       },
-      _id: e._id,
+      id: e.id,
       nickname: nicknameMap[e.userId] || null
     }));
 

@@ -21,7 +21,7 @@ export type EvalStatus = 'MASTERY_CONFIRMED' | 'FAILED' | 'CONTINUE';
 export const EVAL_STATUSES: EvalStatus[] = ['MASTERY_CONFIRMED', 'FAILED', 'CONTINUE'];
 
 export interface IEvalResult extends Omit<EvalResultRow, 'scores'> {
-  _id: string;
+  id: string;
   scores: Record<string, number>;
 }
 

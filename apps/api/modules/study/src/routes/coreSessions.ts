@@ -99,7 +99,7 @@ router.get(
     const userId = req.user!.userId;
     const { sessionId } = req.params;
 
-    const session = await StudySession.findOne({ _id: sessionId, userId });
+    const session = await StudySession.findOne({ id: sessionId, userId });
 
     if (!session) {
       return res.status(404).json({ error: 'Session not found' });
@@ -145,7 +145,7 @@ router.put(
     const userId = req.user!.userId;
     const { sessionId } = req.params;
 
-    const session = await StudySession.findOne({ _id: sessionId, userId });
+    const session = await StudySession.findOne({ id: sessionId, userId });
 
     if (!session) {
       return res.status(404).json({ error: 'Session not found' });
@@ -175,7 +175,7 @@ router.put(
         authorization: req.headers.cookie,
         eventType: 'study_session_completed',
         metadata: {
-          sessionId: session._id.toString(),
+          sessionId: session.id.toString(),
           duration: session.duration || 0,
           focusScore: session.focusScore || 0,
           completedTasks: session.taskProgress?.completedTasks || 0,

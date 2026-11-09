@@ -12,7 +12,7 @@ export interface ICouponUsageHistory {
 }
 
 export type ICoupon = CouponRow & {
-  _id: string;
+  id: string;
   /** `usedBy` and `usageHistory` were embedded arrays; they are now rows. */
   usedBy: string[];
   usageHistory: ICouponUsageHistory[];

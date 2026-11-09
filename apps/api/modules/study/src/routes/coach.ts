@@ -52,7 +52,7 @@ router.post('/nudge', tierGate('vip_plus', 'trial'), async (req: DomainRequest, 
     let sessionId = value.session_id;
     let session = null;
     if (sessionId) {
-      const owned = await StudySession.findOne({ _id: sessionId, userId });
+      const owned = await StudySession.findOne({ id: sessionId, userId });
       if (!owned) {
         return res.status(404).json({ error: 'Session not found' });
       }
@@ -68,7 +68,7 @@ router.post('/nudge', tierGate('vip_plus', 'trial'), async (req: DomainRequest, 
         return res.status(400).json({ error: 'No active study session for this user' });
       }
       session = active;
-      sessionId = active._id.toString();
+      sessionId = active.id.toString();
     }
 
     const payload: Record<string, unknown> = { session_id: sessionId };

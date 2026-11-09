@@ -14,7 +14,7 @@ const span = {
 function fixture() {
   return {
     schemaVersion: '1.0.0',
-    courseId: '64a000000000000000000001',
+    courseId: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
     title: 'Course',
     provenance: { content: 'extracted', structure: 'deterministic' },
     verification: 'source_text_unverified',

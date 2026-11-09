@@ -14,7 +14,7 @@ import { newId } from '../../../../shared/ids';
  * keys the Mongo documents had.
  */
 export interface ICalendarEntry extends Omit<CalendarEntryRow, 'payload'> {
-  _id: string;
+  id: string;
   description?: string | null;
   estimatedMinutes?: number | null;
   source?: string | null;
@@ -25,7 +25,7 @@ const PAYLOAD_KEYS = ['description', 'estimatedMinutes', 'source'] as const;
 
 function hydrate(row: CalendarEntryRow): ICalendarEntry {
   const payload = (row.payload ?? {}) as Record<string, unknown>;
-  return { ...row, ...payload, _id: row.id } as ICalendarEntry;
+  return { ...row, ...payload, id: row.id } as ICalendarEntry;
 }
 
 function split(data: Record<string, unknown>) {

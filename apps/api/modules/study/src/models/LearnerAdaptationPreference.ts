@@ -18,7 +18,7 @@ import { table } from './_table';
  * version is rejected rather than silently winning.
  */
 export type ILearnerAdaptationPreference = Omit<LearnerAdaptationPreferenceRow, 'dismissed'> & {
-  _id: string;
+  id: string;
   dismissed: Array<{
     courseId: string;
     revisionId: string;

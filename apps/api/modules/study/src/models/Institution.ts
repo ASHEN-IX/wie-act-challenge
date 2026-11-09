@@ -27,9 +27,9 @@ export const INSTITUTION_INVITATION_STATUSES = [
 ] as const;
 export type InstitutionInvitationStatus = (typeof INSTITUTION_INVITATION_STATUSES)[number];
 
-export type IInstitution = InstitutionRow & { _id: string };
-export type IInstitutionMembership = InstitutionMembershipRow & { _id: string };
-export type IInstitutionInvitation = InstitutionInvitationRow & { _id: string };
+export type IInstitution = InstitutionRow & { id: string };
+export type IInstitutionMembership = InstitutionMembershipRow & { id: string };
+export type IInstitutionInvitation = InstitutionInvitationRow & { id: string };
 
 export const Institution = table<IInstitution>({
   delegate: () => prisma.institution,

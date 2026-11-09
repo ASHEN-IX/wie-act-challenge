@@ -78,7 +78,7 @@ interface RevisionTopicRecord {
 /** Index one course's hierarchy into topicId → metadata. */
 function indexTopics(
   index: Map<string, TopicMeta>,
-  course: { _id: unknown; subjectId?: string; title?: string },
+  course: { id: unknown; subjectId?: string; title?: string },
   topics: RevisionTopicRecord[]
 ) {
   for (const topic of topics) {
@@ -90,16 +90,16 @@ function indexTopics(
       index.set(topic.id, {
         title: topic.title || topic.id,
         parentTopic: '',
-        subjectId: course.subjectId || String(course._id),
-        courseId: String(course._id)
+        subjectId: course.subjectId || String(course.id),
+        courseId: String(course.id)
       });
     for (const sub of topic.subtopics || []) {
       if (!sub || !sub.id) continue;
       index.set(sub.id, {
         title: sub.title || sub.id,
         parentTopic: parentTitle,
-        subjectId: course.subjectId || String(course._id),
-        courseId: String(course._id)
+        subjectId: course.subjectId || String(course.id),
+        courseId: String(course.id)
       });
     }
   }
@@ -123,7 +123,7 @@ async function buildTopicIndex(userId: string): Promise<Map<string, TopicMeta>> 
       { userId },
       { ownerUserId: userId },
       { assignedInstructorIds: userId },
-      { _id: { $in: enrolledIds } }
+      { id: { $in: enrolledIds } }
     ]
   }).select('subjectId title topics activeRevisionId');
 
@@ -136,11 +136,11 @@ async function buildTopicIndex(userId: string): Promise<Map<string, TopicMeta>> 
   // pinned to; index those too so revision-only courses resolve.
   if (courses.length) {
     const revisions = await CourseRevision.find({
-      courseId: { $in: courses.map((c) => c._id) },
+      courseId: { $in: courses.map((c) => c.id) },
       status: { $in: ['published', 'deprecated'] },
       activationState: 'committed'
     }).select('courseId revisionTag topics');
-    const byId = new Map(courses.map((c) => [String(c._id), c]));
+    const byId = new Map(courses.map((c) => [String(c.id), c]));
     for (const revision of revisions) {
       const course = byId.get(String(revision.courseId));
       if (course)
@@ -236,13 +236,13 @@ async function getUserCompetencyMap(
   // Resolve subject names. Courses may carry either a Subject ObjectId or a slug,
   // so only well-formed ids are sent to an ObjectId query.
   const subjectIds = [...subjects.keys()];
-  const objectIds = subjectIds.filter((id) => /^[a-f\d]{24}$/i.test(id));
+  const objectIds = subjectIds.filter((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id));
   // Subjects are authored by whoever created the course, not by the learner
   // reading their progress, so scope the lookup to the ids the learner can reach.
   const subjectDocs = objectIds.length
-    ? await Subject.find({ _id: { $in: objectIds } }).select('name')
+    ? await Subject.find({ id: { $in: objectIds } }).select('name')
     : [];
-  const nameById = new Map(subjectDocs.map((s) => [String(s._id), s.name]));
+  const nameById = new Map(subjectDocs.map((s) => [String(s.id), s.name]));
 
   const result: Array<{
     subjectId: string;

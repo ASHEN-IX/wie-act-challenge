@@ -41,7 +41,7 @@ let client: MongoClient;
 async function reset() {
   await client.db(DB).dropDatabase().catch(() => undefined);
   await client.db(DB).collection('llm_approval_budgets').insertOne({
-    _id: APPROVAL as never,
+    id: APPROVAL as never,
     task: 'experience_planning',
     model: MODEL,
     limit: 10,
@@ -53,7 +53,7 @@ async function reset() {
 }
 
 const used = async (): Promise<number> => {
-  const row = await client.db(DB).collection('llm_approval_budgets').findOne({ _id: APPROVAL as never });
+  const row = await client.db(DB).collection('llm_approval_budgets').findOne({ id: APPROVAL as never });
   return Number(row?.usedTokens ?? 0);
 };
 const requestRows = (): Promise<number> =>

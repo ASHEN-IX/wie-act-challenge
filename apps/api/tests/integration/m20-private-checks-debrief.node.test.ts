@@ -82,7 +82,7 @@ test('M20 / ED-11: Private Participant Understanding Checks, Debrief and Next St
       }
       await Course.deleteMany({ userId: { contains: testPrefix } });
       await InstitutionMembership.deleteMany({ institutionId });
-      await Institution.deleteMany({ _id: institutionId });
+      await Institution.deleteMany({ id: institutionId });
       if (roomId) {
         await StudyRoom.deleteMany({ roomId });
       }
@@ -119,7 +119,7 @@ test('M20 / ED-11: Private Participant Understanding Checks, Debrief and Next St
         subjectId: 'sub_eval',
         assignedInstructorIds: [instructorId]
       });
-      courseId = rawCourse._id.toString();
+      courseId = rawCourse.id.toString();
       await prepareCourseFixture(courseId, t);
 
       await CourseEnrollment.createMany([
@@ -150,7 +150,7 @@ test('M20 / ED-11: Private Participant Understanding Checks, Debrief and Next St
       ];
 
       await CourseRevision.create({
-        courseId: rawCourse._id,
+        courseId: rawCourse.id,
         revisionTag: initialDraftTag,
         contentHash,
         status: 'draft',

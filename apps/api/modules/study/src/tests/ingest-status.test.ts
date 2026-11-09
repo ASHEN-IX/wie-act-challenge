@@ -42,7 +42,7 @@ jest.mock('../models/index', () => {
   const mockCourse = Object.assign(
     jest.fn().mockImplementation(function (this: CourseFixture, data: object) {
       Object.assign(this, data);
-      this._id = 'course-new';
+      this.id = 'course-new';
       this.save = jest.fn().mockResolvedValue(true);
       mockCourse.instances.push(this);
     }),
@@ -52,7 +52,7 @@ jest.mock('../models/index', () => {
       findOne: jest.fn(),
       updateOne: jest.fn().mockResolvedValue({ matchedCount: 1, modifiedCount: 1 }),
       findById: jest.fn().mockImplementation((id: string) => {
-        const value = mockCourse.findOne({ _id: id, userId: 'user-123' });
+        const value = mockCourse.findOne({ id: id, userId: 'user-123' });
         const result = Promise.resolve(value) as Promise<unknown> & {
           select: () => Promise<unknown>;
         };
@@ -67,7 +67,7 @@ jest.mock('../models/index', () => {
     Subject: { findOne: jest.fn() },
     StudySession: {
       findOne: jest.fn(),
-      create: jest.fn().mockResolvedValue({ _id: 'session-1' })
+      create: jest.fn().mockResolvedValue({ id: 'session-1' })
     },
     StudyPlan: { findOne: jest.fn() },
     Task: { find: jest.fn() }
@@ -125,7 +125,7 @@ const BASE = {
 } as const;
 
 const WORKER_COURSE = {
-  course_id: '64a000000000000000000001',
+  course_id: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
   course_title: 'Graph Theory',
   source_files: ['notes.pdf'],
   topics: [
@@ -164,7 +164,7 @@ beforeEach(() => {
 describe('handleIngestProgress (progress routing key)', () => {
   test('records stage/percentage on the correlated course', async () => {
     const course = {
-      _id: '64a000000000000000000001',
+      id: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
       status: 'processing',
       ingestStage: null,
       ingestProgress: 0,
@@ -186,7 +186,7 @@ describe('handleIngestProgress (progress routing key)', () => {
     expect(course.ingestProgress).toBe(0.6);
     expect(course.ingestDetail).toBe('chunking and embedding');
     expect(Course.updateOne).toHaveBeenCalledWith(
-      expect.objectContaining({ _id: course._id, correlationId: BASE.correlationId }),
+      expect.objectContaining({ id: course.id, correlationId: BASE.correlationId }),
       expect.objectContaining({ $set: expect.any(Object) })
     );
     expect(course.save).not.toHaveBeenCalled();
@@ -213,7 +213,7 @@ describe('handleIngestProgress (progress routing key)', () => {
 describe('handleIngestResult (ingest result routing key)', () => {
   test('completes the course and persists the whitelisted course structure', async () => {
     const course: CourseFixture = {
-      _id: '64a000000000000000000001',
+      id: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
       status: 'processing',
       ingestStage: 'embedding',
       ingestProgress: 0.6,
@@ -229,7 +229,7 @@ describe('handleIngestResult (ingest result routing key)', () => {
     await handleIngestResult({
       ...BASE,
       status: 'completed',
-      payload: { courseId: '64a000000000000000000001', status: 'completed', course: WORKER_COURSE }
+      payload: { courseId: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514', status: 'completed', course: WORKER_COURSE }
     });
 
     expect(course.status).toBe('completed');
@@ -256,7 +256,7 @@ describe('handleIngestResult (ingest result routing key)', () => {
     expect(Reflect.get(sub, 'tokenized_chunks')).toBeUndefined();
     expect(Reflect.get(sub, 'chunk_embeddings')).toBeUndefined();
     expect(Course.updateOne).toHaveBeenCalledWith(
-      expect.objectContaining({ _id: course._id, correlationId: BASE.correlationId }),
+      expect.objectContaining({ id: course.id, correlationId: BASE.correlationId }),
       expect.objectContaining({ $set: expect.any(Object) })
     );
     expect(course.save).not.toHaveBeenCalled();
@@ -264,7 +264,7 @@ describe('handleIngestResult (ingest result routing key)', () => {
 
   test('completing without a course payload keeps topics untouched', async () => {
     const course = {
-      _id: '64a000000000000000000001',
+      id: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
       status: 'processing',
       topics: [{ title: 'old' }],
       save: jest.fn().mockResolvedValue(true)
@@ -274,7 +274,7 @@ describe('handleIngestResult (ingest result routing key)', () => {
     await handleIngestResult({
       ...BASE,
       status: 'completed',
-      payload: { courseId: '64a000000000000000000001' }
+      payload: { courseId: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514' }
     });
     expect(course.status).toBe('completed');
     expect(course.topics).toEqual([{ title: 'old' }]);
@@ -282,7 +282,7 @@ describe('handleIngestResult (ingest result routing key)', () => {
 
   test('fails the course with a sanitized reason', async () => {
     const course: CourseFixture = {
-      _id: '64a000000000000000000001',
+      id: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
       status: 'processing',
       ingestStage: null,
       ingestProgress: 0,
@@ -300,7 +300,7 @@ describe('handleIngestResult (ingest result routing key)', () => {
     expect(course.status).toBe('failed');
     expect(course.ingestError).toMatch(/encrypted/);
     expect(Course.updateOne).toHaveBeenCalledWith(
-      expect.objectContaining({ _id: course._id, correlationId: BASE.correlationId }),
+      expect.objectContaining({ id: course.id, correlationId: BASE.correlationId }),
       expect.objectContaining({ $set: expect.any(Object) })
     );
     expect(course.save).not.toHaveBeenCalled();
@@ -339,7 +339,7 @@ describe('startIngestStatusTracker (INGEST-07)', () => {
 describe('buildIngestStatus (status shape)', () => {
   test('queued → stage "queued", retry null', () => {
     const status = buildIngestStatus({
-      _id: '64a000000000000000000001',
+      id: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
       status: 'processing',
       jobId: 'job-1',
       ingestStage: null,
@@ -349,7 +349,7 @@ describe('buildIngestStatus (status shape)', () => {
       updatedAt: new Date('2026-08-19T00:00:00Z')
     });
     expect(status).toMatchObject({
-      courseId: '64a000000000000000000001',
+      courseId: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
       status: 'processing',
       jobId: 'job-1',
       stage: 'queued',
@@ -361,7 +361,7 @@ describe('buildIngestStatus (status shape)', () => {
 
   test('completed → progress 1, no error, no retry', () => {
     const status = buildIngestStatus({
-      _id: '64a000000000000000000001',
+      id: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
       status: 'completed',
       ingestStage: 'indexing',
       ingestProgress: 1,
@@ -377,7 +377,7 @@ describe('buildIngestStatus (status shape)', () => {
 
   test('failed → sanitized error + retry action', () => {
     const status = buildIngestStatus({
-      _id: '64a000000000000000000001',
+      id: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
       status: 'failed',
       jobId: 'job-1',
       ingestStage: 'parsing',
@@ -390,7 +390,7 @@ describe('buildIngestStatus (status shape)', () => {
     expect(status.error).toMatch(/encrypted/);
     expect(status.retry).toMatchObject({
       action: 're-upload',
-      endpoint: '/api/v1/study/courses/64a000000000000000000001/files',
+      endpoint: '/api/v1/study/courses/9fc0fd30-b00a-55fb-a19f-a23a3f1d5514/files',
       method: 'POST'
     });
   });
@@ -399,7 +399,7 @@ describe('buildIngestStatus (status shape)', () => {
 describe('GET /api/v1/study/courses/:courseId/ingest-status', () => {
   test('returns progress + status for the authenticated user', async () => {
     Course.findOne.mockResolvedValue({
-      _id: '64a000000000000000000001',
+      id: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
       userId: 'user-123',
       status: 'processing',
       jobId: 'job-1',
@@ -411,12 +411,12 @@ describe('GET /api/v1/study/courses/:courseId/ingest-status', () => {
     });
 
     const res = await request(app)
-      .get('/api/v1/study/courses/64a000000000000000000001/ingest-status')
+      .get('/api/v1/study/courses/9fc0fd30-b00a-55fb-a19f-a23a3f1d5514/ingest-status')
       .set(authHeader());
 
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({
-      courseId: '64a000000000000000000001',
+      courseId: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
       status: 'processing',
       jobId: 'job-1',
       stage: 'enriching',
@@ -425,7 +425,7 @@ describe('GET /api/v1/study/courses/:courseId/ingest-status', () => {
       retry: null
     });
     expect(Course.findOne).toHaveBeenCalledWith({
-      _id: '64a000000000000000000001',
+      id: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
       userId: 'user-123'
     });
   });
@@ -433,18 +433,18 @@ describe('GET /api/v1/study/courses/:courseId/ingest-status', () => {
   test('scopes the lookup to the authenticated user', async () => {
     Course.findOne.mockResolvedValue(null);
     const res = await request(app)
-      .get('/api/v1/study/courses/64a000000000000000000001/ingest-status')
+      .get('/api/v1/study/courses/9fc0fd30-b00a-55fb-a19f-a23a3f1d5514/ingest-status')
       .set(authHeader());
     expect(res.status).toBe(404);
     expect(Course.findOne).toHaveBeenCalledWith({
-      _id: '64a000000000000000000001',
+      id: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
       userId: 'user-123'
     });
   });
 
   test('surfaces failure reason + retry for a failed course', async () => {
     Course.findOne.mockResolvedValue({
-      _id: '64a000000000000000000001',
+      id: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
       status: 'failed',
       userId: 'user-123',
       jobId: 'job-1',
@@ -457,7 +457,7 @@ describe('GET /api/v1/study/courses/:courseId/ingest-status', () => {
     });
 
     const res = await request(app)
-      .get('/api/v1/study/courses/64a000000000000000000001/ingest-status')
+      .get('/api/v1/study/courses/9fc0fd30-b00a-55fb-a19f-a23a3f1d5514/ingest-status')
       .set(authHeader());
 
     expect(res.status).toBe(200);
@@ -469,7 +469,7 @@ describe('GET /api/v1/study/courses/:courseId/ingest-status', () => {
 describe('course gating (INGEST-07)', () => {
   test('session setup rejects a course that is still processing', async () => {
     Course.findOne.mockResolvedValue({
-      _id: '64a000000000000000000001',
+      id: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
       userId: 'user-123',
       status: 'processing'
     });
@@ -477,7 +477,7 @@ describe('course gating (INGEST-07)', () => {
     const res = await request(app)
       .post('/api/v1/study/sessions/setup')
       .set(authHeader())
-      .send({ courseId: '64a000000000000000000001' });
+      .send({ courseId: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514' });
 
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/still being processed/);
@@ -485,7 +485,7 @@ describe('course gating (INGEST-07)', () => {
 
   test('session setup allows a completed course through the gate', async () => {
     Course.findOne.mockResolvedValue({
-      _id: '64a000000000000000000001',
+      id: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
       userId: 'user-123',
       status: 'completed'
     });
@@ -497,7 +497,7 @@ describe('course gating (INGEST-07)', () => {
     const res = await request(app)
       .post('/api/v1/study/sessions/setup')
       .set(authHeader())
-      .send({ courseId: '64a000000000000000000001' });
+      .send({ courseId: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514' });
 
     expect([200, 201, 202, 204]).toContain(res.status);
   });

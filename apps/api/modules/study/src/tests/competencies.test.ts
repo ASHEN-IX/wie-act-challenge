@@ -8,7 +8,7 @@ import express from 'express';
 import request from 'supertest';
 
 // Subject ids are ObjectIds in real data; the reader only queries well-formed ids.
-const SUBJECT_ID = '507f1f77bcf86cd799439011';
+const SUBJECT_ID = '05bffe3e-3126-53ab-89a5-ab5f9c128da7';
 
 jest.mock('../services/competencyQueries', () => ({
   getUserCompetencyMap: jest.fn(),
@@ -188,7 +188,7 @@ describe('getUserCompetencyMap (real implementation, mocked models)', () => {
       select: jest.fn().mockImplementation(() =>
         leaned([
           {
-            _id: 'course-1',
+            id: 'course-1',
             subjectId: SUBJECT_ID,
             title: 'CS',
             topics: [
@@ -222,7 +222,7 @@ describe('getUserCompetencyMap (real implementation, mocked models)', () => {
     ]);
 
     Subject.find.mockReturnValue({
-      select: jest.fn().mockImplementation(() => leaned([{ _id: SUBJECT_ID, name: 'Algorithms' }]))
+      select: jest.fn().mockImplementation(() => leaned([{ id: SUBJECT_ID, name: 'Algorithms' }]))
     });
 
     const map = await realGetUserCompetencyMap('u1');
@@ -239,13 +239,13 @@ describe('getUserCompetencyMap (real implementation, mocked models)', () => {
       select: jest.fn().mockImplementation(() =>
         leaned([
           {
-            _id: 'c1',
+            id: 'c1',
             subjectId: SUBJECT_ID,
             title: 'A',
             topics: [{ title: 'T', subtopics: [{ id: 't1', title: 'S' }] }]
           },
           {
-            _id: 'c2',
+            id: 'c2',
             subjectId: 'subj-2',
             title: 'B',
             topics: [{ title: 'T', subtopics: [{ id: 't2', title: 'S2' }] }]
@@ -272,7 +272,7 @@ describe('getUserCompetencyMap (real implementation, mocked models)', () => {
       }
     ]);
     Subject.find.mockReturnValue({
-      select: jest.fn().mockImplementation(() => leaned([{ _id: SUBJECT_ID, name: 'A' }]))
+      select: jest.fn().mockImplementation(() => leaned([{ id: SUBJECT_ID, name: 'A' }]))
     });
 
     const map = await realGetUserCompetencyMap('u1', { subjectId: SUBJECT_ID });
@@ -286,7 +286,7 @@ describe('getUserCompetencyMap (real implementation, mocked models)', () => {
       select: jest.fn().mockImplementation(() =>
         leaned([
           {
-            _id: 'c1',
+            id: 'c1',
             subjectId: SUBJECT_ID,
             title: 'A',
             topics: [{ title: 'T', subtopics: [{ id: 't1', title: 'S' }] }]
@@ -313,7 +313,7 @@ describe('getUserCompetencyMap (real implementation, mocked models)', () => {
       }
     ]);
     Subject.find.mockReturnValue({
-      select: jest.fn().mockImplementation(() => leaned([{ _id: SUBJECT_ID, name: 'A' }]))
+      select: jest.fn().mockImplementation(() => leaned([{ id: SUBJECT_ID, name: 'A' }]))
     });
 
     const map = await realGetUserCompetencyMap('u1');
@@ -326,7 +326,7 @@ describe('getUserCompetencyMap (real implementation, mocked models)', () => {
       select: jest.fn().mockImplementation(() =>
         leaned([
           {
-            _id: 'c1',
+            id: 'c1',
             subjectId: SUBJECT_ID,
             title: 'A',
             topics: [{ title: 'T', subtopics: [{ id: 't1', title: 'S' }] }]
@@ -353,7 +353,7 @@ describe('getUserCompetencyMap (real implementation, mocked models)', () => {
       }
     ]);
     Subject.find.mockReturnValue({
-      select: jest.fn().mockImplementation(() => leaned([{ _id: SUBJECT_ID, name: 'A' }]))
+      select: jest.fn().mockImplementation(() => leaned([{ id: SUBJECT_ID, name: 'A' }]))
     });
 
     const map = await realGetUserCompetencyMap('u1', { knowledgeTypeBreakdown: true });
@@ -381,7 +381,7 @@ describe('getTopicDetail (real implementation, mocked models)', () => {
       select: jest.fn().mockImplementation(() =>
         leaned([
           {
-            _id: 'c1',
+            id: 'c1',
             subjectId: SUBJECT_ID,
             title: 'A',
             topics: [{ title: 'T', subtopics: [{ id: 't1', title: 'Sorting' }] }]

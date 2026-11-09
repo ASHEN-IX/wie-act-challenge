@@ -30,7 +30,7 @@ async function main() {
     const password = await bcrypt.hash("Synthetic!123", 12);
     for (const user of users)
       await db.collection("users").insertOne({
-        _id: user.id,
+        id: user.id,
         name: user.name,
         email: user.email,
         password,
@@ -47,7 +47,7 @@ async function main() {
       "M02_PRIVATE_BROWSER_SOURCE",
     );
     await db.collection("courses").insertOne({
-      _id: courseId,
+      id: courseId,
       userId: String(owner.id),
       subjectId: String(new ObjectId()),
       title: "M02 private browser course",
@@ -238,7 +238,7 @@ async function main() {
     );
     await db
       .collection("courses")
-      .updateOne({ _id: courseId }, { $set: { userId: String(peer.id) } });
+      .updateOne({ id: courseId }, { $set: { userId: String(peer.id) } });
     // The new actual course owner can use the explicit room invite. This real
     // membership mutation triggers recipient validation of the revoked owner.
     assert.equal(
