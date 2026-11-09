@@ -78,7 +78,7 @@ def test_agent_config_resolves_model_and_defaults():
 def test_agent_config_fallback_chain_from_yaml():
     planner = agent_config("planner")
     assert planner.model.startswith("groq/")
-    assert "nvidia_nim/meta/llama-3.2-11b-vision-instruct" in planner.fallback_models
+    assert "nvidia_nim/meta/llama-3.3-70b-instruct" in planner.fallback_models
     assert len(planner.fallback_models) >= 1
     evaluator = agent_config("evaluator")
     assert len(evaluator.fallback_models) >= 2
@@ -329,7 +329,7 @@ def test_router_fallbacks_are_disabled_because_approval_binds_an_exact_model():
 def test_configured_fallback_chains_are_visible_to_operators():
     """The declared chains must resolve even though they are not routed."""
     assert agent_config("coach").fallback_models == ("groq/openai/gpt-oss-120b",)
-    assert "nvidia_nim/meta/llama-3.2-11b-vision-instruct" in (
+    assert "nvidia_nim/meta/llama-3.3-70b-instruct" in (
         agent_config("facilitator").fallback_models
     )
 

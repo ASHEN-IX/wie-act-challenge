@@ -17,6 +17,7 @@ model_list:
     temperature: 0.2
     max_tokens: 2400
     timeout: 18
+    reasoning_effort: low
     drop_params: true
 
 - model_name: nardouch_capable
@@ -36,6 +37,7 @@ model_list:
     api_key: os.environ/GROQ_API_KEY
     temperature: 0.5
     max_tokens: 1024
+    reasoning_effort: low
     drop_params: true
 
 # PLANNER — goal decomposition into plans: strong open-weights reasoning.
@@ -50,7 +52,7 @@ model_list:
 # SEARCH — web-result synthesis: long-context + fast.
 - model_name: search
   litellm_params:
-    model: groq/openai/gpt-oss-120b
+    model: groq/llama-3.3-70b-versatile
     api_key: os.environ/GROQ_API_KEY
     temperature: 0.2
     max_tokens: 1536
@@ -59,7 +61,7 @@ model_list:
 # REFLECTION — empathetic, long-form journaling.
 - model_name: reflection
   litellm_params:
-    model: groq/openai/gpt-oss-120b
+    model: groq/llama-3.3-70b-versatile
     api_key: os.environ/GROQ_API_KEY
     temperature: 0.7
     max_tokens: 2048
@@ -72,8 +74,11 @@ model_list:
     api_key: os.environ/GROQ_API_KEY
     temperature: 0.1
     max_tokens: 1024
+    reasoning_effort: low
     drop_params: true
 
+# Gemini's free tier may use prompts to improve Google's products, so it is kept
+# off learner text and only used for consent-gated, non-personal formula crops.
 # Research alias, not enabled for generic ask(): processing requires consent,
 # durable budget controls, and verification that the project is free-tier.
 - model_name: course_multimodal_prototype
@@ -107,7 +112,8 @@ model_list:
     model: groq/openai/gpt-oss-20b
     api_key: os.environ/GROQ_API_KEY
     temperature: 0.1
-    max_tokens: 512
+    max_tokens: 1024
+    reasoning_effort: low
     drop_params: true
 
 # VISUAL LAB PLANNER — configures a course-specific experiment: capable reasoning.
@@ -129,6 +135,10 @@ model_list:
     drop_params: true
 
 # ————————————————— shared fallback providers —————————————————————
+# Free-tier only. NOT routed at runtime (an approval binds one exact model, see
+# utils/llm_client.build_router); they document the operator's next approvals.
+# Groq limits are per model, so the aliases above are spread across models to
+# multiply the free quota instead of sharing one 200K-tokens/day bucket.
 
 - model_name: groq-main
   litellm_params:
@@ -138,13 +148,13 @@ model_list:
 
 - model_name: nvidia-main
   litellm_params:
-    model: nvidia_nim/meta/llama-3.2-11b-vision-instruct
+    model: nvidia_nim/meta/llama-3.3-70b-instruct
     api_key: os.environ/NVIDIA_API_KEY
     drop_params: true
 
 - model_name: openrouter-main
   litellm_params:
-    model: openrouter/meta-llama/llama-3.3-70b-instruct
+    model: openrouter/meta-llama/llama-3.3-70b-instruct:free
     api_key: os.environ/OPENROUTER_API_KEY
     drop_params: true
 

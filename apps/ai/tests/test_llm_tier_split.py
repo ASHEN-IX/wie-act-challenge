@@ -17,7 +17,7 @@ def test_compact_and_capable_assignments_are_explicit():
 def test_facilitator_alias_runs_on_the_capable_model():
     cfg = llm_client.agent_config("facilitator")
     assert cfg.model == "groq/openai/gpt-oss-120b"
-    assert "nvidia_nim/meta/llama-3.2-11b-vision-instruct" in cfg.fallback_models
+    assert "nvidia_nim/meta/llama-3.3-70b-instruct" in cfg.fallback_models
 
 
 def test_facilitator_llm_path_calls_the_facilitator_alias():
