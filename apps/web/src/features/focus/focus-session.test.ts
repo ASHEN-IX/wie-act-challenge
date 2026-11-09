@@ -7,6 +7,7 @@ import {
   remainingMs,
   restoreFocus,
   resumeFocus,
+  startAutoFocus,
   startFocus,
   tick,
   type FocusState,
@@ -68,5 +69,23 @@ describe("focus session", () => {
   it("never links time spent to mastery in the next step", () => {
     const ended = endFocus(startFocus(T0, 25, "", "/x"), T0 + min(25));
     if (ended.status === "ended") expect(nextStepFor(ended)).not.toMatch(/\b(mastery|xp|score)\b/i);
+  });
+
+  it("starts Deep Focus with no timer and counts only active time", () => {
+    let s = startAutoFocus(T0, "/courses/a/learn");
+    expect(s.status === "running" && s.auto).toBe(true);
+    s = pauseFocus(s, T0 + min(20)); // tab hidden
+    s = resumeFocus(s, T0 + min(50)); // back
+    expect(focusedMs(s, T0 + min(55))).toBe(min(25));
+    const ended = endFocus(s, T0 + min(55));
+    expect(ended.status === "ended" && ended.auto).toBe(true);
+  });
+
+  it("keeps the auto flag across a refresh and defaults old sessions to manual", () => {
+    const auto = startAutoFocus(T0, "/x");
+    expect(restoreFocus(JSON.stringify(auto), T0 + 1000)).toMatchObject({ status: "running", auto: true });
+    const legacy = { ...startFocus(T0, 25, "", "/x") } as Record<string, unknown>;
+    delete legacy.auto;
+    expect(restoreFocus(JSON.stringify(legacy), T0 + 1000)).toMatchObject({ auto: false });
   });
 });

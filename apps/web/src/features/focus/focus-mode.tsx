@@ -1,12 +1,14 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
-import { Maximize2, Minimize2, Pause, Play, Square, Timer } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Maximize2, Minimize2, Pause, Play, ShieldCheck, Square, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { listenGuard, reportFocus } from "./guard";
 import {
   IDLE,
+  IDLE_AFTER_MS,
   clampMinutes,
   endFocus,
   focusedMs,
@@ -16,6 +18,7 @@ import {
   remainingMs,
   restoreFocus,
   resumeFocus,
+  startAutoFocus,
   startFocus,
   tick,
   type FocusState,
@@ -25,6 +28,28 @@ const STORAGE_KEY = "ednova:focus-session:v1";
 const PRESETS = [25, 45, 60] as const;
 /** Pages where starting a session makes sense. A running session follows the learner anywhere. */
 const ELIGIBLE = [/^\/courses\/[^/]+\/learn/, /^\/study-together/, /^\/sessions/, /^\/practice/];
+
+/** Deep Focus starts by itself here: reading a lesson or being inside a study room. */
+const AUTO = [/^\/courses\/[^/]+\/learn/, /^\/study-together\/(?!connections(\/|$))[^/]+/];
+const SUPPRESS_KEY = "ednova:deep-focus:off";
+const isAuto = (path: string) => AUTO.some((pattern) => pattern.test(path));
+
+/** "Exit Deep Focus" is respected for the rest of this browser tab session. */
+function suppressed(): boolean {
+  try {
+    return sessionStorage.getItem(SUPPRESS_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function setSuppressed(value: boolean) {
+  try {
+    if (value) sessionStorage.setItem(SUPPRESS_KEY, "1");
+    else sessionStorage.removeItem(SUPPRESS_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 
 function save(state: FocusState) {
   try {
@@ -44,6 +69,10 @@ export function FocusMode({ suggestedMinutes = 25 }: { suggestedMinutes?: number
   const [objective, setObjective] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [guard, setGuard] = useState(false);
+  const stateRef = useRef<FocusState>(IDLE);
+  const lastInteraction = useRef(0);
 
   const apply = useCallback((next: FocusState) => {
     setState(next);
@@ -63,7 +92,13 @@ export function FocusMode({ suggestedMinutes = 25 }: { suggestedMinutes?: number
     if (restored.status === "paused" && raw && JSON.parse(raw).status === "running") {
       setNotice("Your session was paused while you were away. Continue where you left off?");
     }
+    lastInteraction.current = Date.now();
+    setReady(true);
   }, []);
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   // Keep other tabs in sync.
   useEffect(() => {
@@ -122,6 +157,111 @@ export function FocusMode({ suggestedMinutes = 25 }: { suggestedMinutes?: number
     };
   }, [running]);
 
+  const auto = state.status !== "idle" && state.status !== "ended" && state.auto;
+
+  // Deep Focus: start by itself when the learner starts studying.
+  useEffect(() => {
+    if (!ready || state.status !== "idle" || !isAuto(pathname) || suppressed()) return;
+    const t = Date.now();
+    lastInteraction.current = t;
+    setNow(t);
+    apply(startAutoFocus(t, pathname));
+  }, [ready, state.status, pathname, apply]);
+
+  // ...and end cleanly when the learner leaves the studying pages.
+  useEffect(() => {
+    if (!auto || isAuto(pathname)) return;
+    const next = endFocus(stateRef.current, Date.now());
+    apply(next.status === "ended" && next.focusedMs < 60_000 ? IDLE : next);
+    setNotice(null);
+  }, [auto, pathname, apply]);
+
+  // Count only time the page is visible and in use. Away or idle time is never banked.
+  useEffect(() => {
+    if (!auto) return;
+    const awayNow = () => {
+      const cur = stateRef.current;
+      if (cur.status === "running" && cur.auto) apply(pauseFocus(cur, Date.now()));
+    };
+    const back = () => {
+      lastInteraction.current = Date.now();
+      const cur = stateRef.current;
+      if (cur.status === "paused" && cur.auto && !document.hidden) {
+        apply(resumeFocus(cur, Date.now()));
+        setNotice("Welcome back. Your Deep Focus session continues.");
+      }
+    };
+    const onVisibility = () => (document.hidden ? awayNow() : back());
+    const onInput = () => {
+      const t = Date.now();
+      const wasQuiet = t - lastInteraction.current > 1000;
+      lastInteraction.current = t;
+      if (wasQuiet) back();
+    };
+    const events = ["pointerdown", "pointermove", "keydown", "scroll", "touchstart"] as const;
+    events.forEach((name) => window.addEventListener(name, onInput, { passive: true, capture: true }));
+    document.addEventListener("visibilitychange", onVisibility);
+    const id = window.setInterval(() => {
+      const cur = stateRef.current;
+      if (cur.status !== "running" || !cur.auto) return;
+      if (document.hidden) awayNow();
+      else if (Date.now() - lastInteraction.current > IDLE_AFTER_MS) {
+        apply(pauseFocus(cur, Math.max(cur.lastResumeAt, lastInteraction.current + 60_000)));
+      }
+    }, 5000);
+    return () => {
+      events.forEach((name) => window.removeEventListener(name, onInput, { capture: true }));
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.clearInterval(id);
+    };
+  }, [auto, apply]);
+
+  // Tab-strip nudge while the learner is away from the study tab.
+  useEffect(() => {
+    if (!auto) return;
+    const original = document.title;
+    const sync = () => {
+      document.title = document.hidden ? "● Your study session is waiting" : original;
+    };
+    document.addEventListener("visibilitychange", sync);
+    return () => {
+      document.removeEventListener("visibilitychange", sync);
+      document.title = original;
+    };
+  }, [auto]);
+
+  // Optional extension: block other sites while a session is active; heartbeat so it can
+  // never stay on if this tab goes away.
+  const blocking = state.status === "running" || state.status === "paused";
+  useEffect(() => {
+    if (!blocking) {
+      reportFocus(false);
+      return;
+    }
+    reportFocus(true);
+    const id = window.setInterval(() => reportFocus(true), 20_000);
+    return () => {
+      window.clearInterval(id);
+      reportFocus(false);
+    };
+  }, [blocking]);
+  useEffect(
+    () =>
+      listenGuard((message) => {
+        if (message.type === "ready") {
+          // Only note that the extension is present. Never answer with another report:
+          // the extension replies "ready" to every report, so that would loop forever.
+          setGuard(true);
+        } else {
+          // Emergency exit pressed in the extension.
+          setSuppressed(true);
+          const cur = stateRef.current;
+          if (cur.status === "running" || cur.status === "paused") finishRef.current(endFocus(cur, Date.now()));
+        }
+      }),
+    [],
+  );
+
   const eligible = ELIGIBLE.some((pattern) => pattern.test(pathname));
   const canFullscreen = typeof document !== "undefined" && document.fullscreenEnabled;
 
@@ -139,6 +279,10 @@ export function FocusMode({ suggestedMinutes = 25 }: { suggestedMinutes?: number
     if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
     setNotice(null);
   };
+  const finishRef = useRef(finish);
+  useEffect(() => {
+    finishRef.current = finish;
+  });
 
   if (state.status === "idle") {
     if (!eligible) return null;
@@ -196,6 +340,24 @@ export function FocusMode({ suggestedMinutes = 25 }: { suggestedMinutes?: number
               This hides EdNova&apos;s own menus and keeps a timer. It cannot
               block other tabs or apps.
             </p>
+            {isAuto(pathname) && (
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="mt-3 w-full"
+                onClick={() => {
+                  setSuppressed(false);
+                  const t = Date.now();
+                  lastInteraction.current = t;
+                  setNow(t);
+                  apply(startAutoFocus(t, pathname));
+                  setOpen(false);
+                }}
+              >
+                Turn Deep Focus back on (no timer)
+              </Button>
+            )}
             <div className="mt-3 flex gap-2">
               <Button type="submit" size="sm">
                 Begin
@@ -224,12 +386,14 @@ export function FocusMode({ suggestedMinutes = 25 }: { suggestedMinutes?: number
       >
         <div className="w-full max-w-md rounded-xl border bg-card p-6 shadow-xl">
           <h2 id="focus-summary" className="text-xl font-semibold tracking-tight">
-            {state.completed ? "Session complete" : "Session ended"}
+            {state.auto ? "Deep Focus ended" : state.completed ? "Session complete" : "Session ended"}
           </h2>
           <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
             <dt className="text-muted-foreground">Time focused</dt>
             <dd className="font-medium tabular-nums">
-              {formatClock(state.focusedMs)} of {Math.round(state.plannedMs / 60_000)} min
+              {state.auto
+                ? formatClock(state.focusedMs)
+                : `${formatClock(state.focusedMs)} of ${Math.round(state.plannedMs / 60_000)} min`}
             </dd>
             {state.objective && (
               <>
@@ -270,17 +434,28 @@ export function FocusMode({ suggestedMinutes = 25 }: { suggestedMinutes?: number
         <span
           className="text-xl font-semibold tabular-nums"
           role="timer"
-          aria-label={`${formatClock(left)} remaining`}
+          aria-label={state.auto ? `${formatClock(focusedMs(state, now))} focused` : `${formatClock(left)} remaining`}
         >
-          {formatClock(left)}
+          {state.auto ? formatClock(focusedMs(state, now)) : formatClock(left)}
         </span>
         <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
-          {state.status === "paused" ? "Paused. " : ""}
-          {state.objective || "Focus session"}
-          {" · "}
-          {formatClock(focusedMs(state, now))} focused
+          {state.auto ? (
+            <>
+              <ShieldCheck className="mr-1 inline size-4" aria-hidden />
+              Deep Focus · {state.status === "paused" ? "away, resumes when you return" : "counting active study time"}
+              {" · "}
+              {guard ? "other sites blocked" : "other sites not blocked (extension not installed)"}
+            </>
+          ) : (
+            <>
+              {state.status === "paused" ? "Paused. " : ""}
+              {state.objective || "Focus session"}
+              {" · "}
+              {formatClock(focusedMs(state, now))} focused
+            </>
+          )}
         </span>
-        {state.status === "running" ? (
+        {state.auto ? null : state.status === "running" ? (
           <Button size="sm" variant="outline" onClick={() => apply(pauseFocus(state, Date.now()))}>
             <Pause className="size-4" /> Pause
           </Button>
@@ -295,8 +470,15 @@ export function FocusMode({ suggestedMinutes = 25 }: { suggestedMinutes?: number
             {fullscreen ? "Exit fullscreen" : "Fullscreen"}
           </Button>
         )}
-        <Button size="sm" variant="destructive" onClick={() => finish(endFocus(state, Date.now()))}>
-          <Square className="size-4" /> End
+        <Button
+          size="sm"
+          variant="destructive"
+          onClick={() => {
+            if (state.auto) setSuppressed(true);
+            finish(endFocus(state, Date.now()));
+          }}
+        >
+          <Square className="size-4" /> {state.auto ? "Exit Deep Focus" : "End"}
         </Button>
       </div>
       {(notice || offRoute) && (
