@@ -191,7 +191,7 @@ export function LearningPreferencesForm({
             aria-label="Onboarding progress"
             value={step + 1}
             max={panels.length}
-            className="h-1.5 w-full overflow-hidden rounded-full bg-muted accent-primary"
+            className="h-1.5 w-full appearance-none overflow-hidden rounded-full [&::-webkit-progress-bar]:bg-primary/10 [&::-webkit-progress-value]:bg-primary [&::-moz-progress-bar]:bg-primary"
           />
         </div>
       )}

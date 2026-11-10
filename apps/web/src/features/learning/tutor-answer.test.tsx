@@ -121,4 +121,22 @@ describe("FormattedText", () => {
     expect(html).not.toContain("```");
     expect(html).not.toContain("###");
   });
+
+  it("renders single-asterisk emphasis instead of raw asterisks", () => {
+    const html = renderToStaticMarkup(
+      <FormattedText
+        text={"that cell would be a *group* of values. 1NF says: *keep every cell atomic.*"}
+      />,
+    );
+    expect(html).toContain("a <em>group</em> of values");
+    expect(html).toContain("<em>keep every cell atomic.</em>");
+    expect(html).not.toContain("*");
+  });
+
+  it("keeps literal asterisks inside code fences", () => {
+    const html = renderToStaticMarkup(
+      <FormattedText text={"```\nSELECT * FROM t\n```"} />,
+    );
+    expect(html).toContain("SELECT * FROM t");
+  });
 });

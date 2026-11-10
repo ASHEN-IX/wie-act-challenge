@@ -40,7 +40,7 @@ export function RewardSummary({ rewards }: { rewards: LearningRewards }) {
         aria-label="Motivation level progress"
         value={rewards.levelProgress}
         max={rewards.nextLevelXp}
-        className="w-full"
+        className="w-full appearance-none overflow-hidden rounded-full [&::-webkit-progress-bar]:bg-primary/10 [&::-webkit-progress-value]:bg-primary [&::-moz-progress-bar]:bg-primary"
       />
       {rewards.legacyXp > 0 && (
         <p>

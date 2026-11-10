@@ -237,7 +237,7 @@ export default async function Dashboard() {
               aria-label="Progress to next level"
               value={rewards.data?.levelProgress ?? 0}
               max={rewards.data?.nextLevelXp ?? 100}
-              className="h-2 w-full overflow-hidden rounded-full bg-muted accent-primary"
+              className="h-2 w-full appearance-none overflow-hidden rounded-full [&::-webkit-progress-bar]:bg-primary/10 [&::-webkit-progress-value]:bg-primary [&::-moz-progress-bar]:bg-primary"
             />
             <p className="text-xs text-muted-foreground">
               XP counts practice activity. It is not a mastery score.

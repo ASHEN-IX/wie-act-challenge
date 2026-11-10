@@ -74,12 +74,22 @@ export function cleanExcerpt(text: string): string {
     .trim();
 }
 
+function emphasis(part: string): ReactNode | null {
+  if (part.startsWith("**") && part.endsWith("**") && part.length > 4)
+    return <strong>{part.slice(2, -2)}</strong>;
+  // Single-asterisk emphasis is common in model output; render it rather than
+  // showing the raw markers.
+  if (part.startsWith("*") && part.endsWith("*") && part.length > 2)
+    return <em>{part.slice(1, -1)}</em>;
+  return null;
+}
+
 function inline(text: string, keyBase: string): ReactNode[] {
-  // **bold** and `code` only; everything else stays literal text.
-  return text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((part, i) => {
-    if (part.startsWith("**") && part.endsWith("**") && part.length > 4)
-      return <strong key={`${keyBase}-${i}`}>{part.slice(2, -2)}</strong>;
-    if (part.startsWith("`") && part.endsWith("`") && part.length > 2)
+  // bold, italic and `code`; everything else stays literal text.
+  return text.split(/(\*\*[^*]+\*\*|\*[^*\s][^*]*\*|`[^`]+`)/g).map((part, i) => {
+    const node = emphasis(part);
+    if (node) return <Fragment key={`${keyBase}-${i}`}>{node}</Fragment>;
+    if (part.length > 2 && part.startsWith("`") && part.endsWith("`"))
       return (
         <code
           key={`${keyBase}-${i}`}

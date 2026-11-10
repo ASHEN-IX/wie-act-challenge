@@ -306,7 +306,8 @@ export function RoomLearningPanel({
           </Button>
           {check && (
             <p>
-              Private check: {check.status} {check.message} {check.checkId}
+              Private check: {check.status}
+              {check.message ? ` ${check.message}` : ""}
             </p>
           )}
           {check?.activity && check.checkId && (
