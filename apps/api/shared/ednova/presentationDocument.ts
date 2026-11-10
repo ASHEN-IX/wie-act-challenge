@@ -9,14 +9,11 @@
  * source-faithful reader remains the fallback whenever this projection is
  * unavailable or invalid. */
 
-import {
-  parseLessonBlock,
-  type LessonBlockV2,
-} from './learningDocumentV2';
+import { parseLessonBlock, type LessonBlockV2 } from './learningDocumentV2';
 import {
   buildPresentationPlan,
   PRESENTATION_PLAN_VERSION,
-  type PresentationPlan,
+  type PresentationPlan
 } from './presentationPlan';
 import {
   ASSET_COMPONENTS,
@@ -24,7 +21,7 @@ import {
   STRUCTURED_ASSET_SCHEMA_VERSION,
   parseStructuredAsset,
   projectStructuredAsset,
-  type PublishedStructuredAssetV1,
+  type PublishedStructuredAssetV1
 } from './structuredAsset';
 import { COMPONENT_REGISTRY_VERSION, COMPONENT_TYPES } from './componentRegistry';
 
@@ -40,16 +37,10 @@ export const CANONICAL_SCHEMA_VERSION = '1.0.0' as const;
  * consumer to render the preserved source instead of trusting the projection. */
 export type PresentationRenderPolicy = 'primary' | 'source_faithful';
 export type PresentationRenderReason =
-  | 'reviewed_formula'
-  | 'unreviewed_formula'
-  | 'missing_source_asset'
-  | 'extracted_content';
+  'reviewed_formula' | 'unreviewed_formula' | 'missing_source_asset' | 'extracted_content';
 
 export type PresentationVerificationStatus =
-  | 'no_math'
-  | 'unreviewed'
-  | 'partially_reviewed'
-  | 'reviewed';
+  'no_math' | 'unreviewed' | 'partially_reviewed' | 'reviewed';
 
 export const PRESENTATION_DISCLOSURES: Record<PresentationVerificationStatus, string> = {
   no_math:
@@ -59,7 +50,7 @@ export const PRESENTATION_DISCLOSURES: Record<PresentationVerificationStatus, st
   partially_reviewed:
     'Mathematical content is structurally extracted and not semantically verified. Instructor-reviewed formulas are typeset; every other formula renders from the original document.',
   reviewed:
-    'Every display formula in this revision has instructor review. Instructor review is not independent mathematical verification.',
+    'Every display formula in this revision has instructor review. Instructor review is not independent mathematical verification.'
 };
 
 export type PresentationBlockV1 = {
@@ -195,7 +186,7 @@ const objective = (value: unknown) => {
   return {
     objectiveId: str(v.objectiveId, 128),
     statement: str(v.statement, 2000),
-    bloomLevel: str(v.bloomLevel, 40),
+    bloomLevel: str(v.bloomLevel, 40)
   };
 };
 
@@ -207,7 +198,7 @@ const presentationBlock = (value: unknown): PresentationBlockV1 => {
       'reviewed_formula',
       'unreviewed_formula',
       'missing_source_asset',
-      'extracted_content',
+      'extracted_content'
     ].includes(String(v.reason))
   )
     fail();
@@ -258,7 +249,7 @@ function mathSummary(blocks: PresentationBlockV1[]) {
   return {
     status,
     math: { total, reviewed, sourceFallback: total - reviewed },
-    disclosure: PRESENTATION_DISCLOSURES[status],
+    disclosure: PRESENTATION_DISCLOSURES[status]
   };
 }
 
@@ -280,7 +271,7 @@ const PLAN_SELECTIONS = [
   'process',
   'chart',
   'unsupported_block',
-  'invalid_props',
+  'invalid_props'
 ] as const;
 
 /** Strict plan validation. The plan must describe exactly the blocks the
@@ -288,7 +279,7 @@ const PLAN_SELECTIONS = [
  * cannot add, drop, reorder or relabel content. */
 function parsePresentationPlan(
   value: unknown,
-  chapters: PresentationChapterV1[],
+  chapters: PresentationChapterV1[]
 ): PublishedPresentationPlanV1 {
   const v = exact(value, [
     'schemaVersion',
@@ -298,13 +289,13 @@ function parsePresentationPlan(
     'contentHash',
     'mode',
     'lessons',
-    'unclassified',
+    'unclassified'
   ]);
   if (v.schemaVersion !== PRESENTATION_PLAN_VERSION) fail();
   if (v.registryVersion !== COMPONENT_REGISTRY_VERSION) fail();
   if (v.mode !== 'read') fail();
   const lessons = new Map<string, PresentationLessonV1>(
-    chapters.flatMap((chapter) => chapter.lessons.map((l) => [l.id, l] as const)),
+    chapters.flatMap((chapter) => chapter.lessons.map((l) => [l.id, l] as const))
   );
   const planned = list(
     v.lessons,
@@ -326,7 +317,7 @@ function parsePresentationPlan(
             'reason',
             'interactive',
             'degraded',
-            'hasSourceRegion',
+            'hasSourceRegion'
           ]);
           if (!COMPONENT_TYPES.includes(String(i.component) as never)) fail();
           if (!(PLAN_SELECTIONS as readonly string[]).includes(String(i.selection))) fail();
@@ -351,10 +342,10 @@ function parsePresentationPlan(
             reason: String(i.reason) as never,
             interactive,
             ...(degraded ? { degraded } : {}),
-            hasSourceRegion,
+            hasSourceRegion
           };
         },
-        400,
+        400
       );
       if (instances.length !== lesson.blocks.length) fail();
       // Positional binding: the plan is a projection of these exact blocks.
@@ -369,7 +360,8 @@ function parsePresentationPlan(
       if (
         count(counts.total) !== instances.length ||
         count(counts.primary) !== instances.filter((x) => x.render === 'primary').length ||
-        count(counts.sourceFallback) !== instances.filter((x) => x.render === 'source_faithful').length ||
+        count(counts.sourceFallback) !==
+          instances.filter((x) => x.render === 'source_faithful').length ||
         count(counts.interactive) !== instances.filter((x) => x.interactive).length
       )
         fail();
@@ -381,18 +373,18 @@ function parsePresentationPlan(
           total: instances.length,
           primary: counts.primary as number,
           sourceFallback: counts.sourceFallback as number,
-          interactive: counts.interactive as number,
-        },
+          interactive: counts.interactive as number
+        }
       };
     },
-    200,
+    200
   );
   if (planned.length !== lessons.size) fail();
   const unclassified = count(v.unclassified);
   const expectedUnclassified = planned.reduce(
     (total, lesson) =>
       total + lesson.instances.filter((i) => i.selection === 'unsupported_block').length,
-    0,
+    0
   );
   if (unclassified !== expectedUnclassified) fail();
   return {
@@ -403,7 +395,7 @@ function parsePresentationPlan(
     contentHash: str(v.contentHash, 71),
     mode: 'read',
     lessons: planned,
-    unclassified,
+    unclassified
   };
 }
 
@@ -422,12 +414,12 @@ export function buildPublishedPresentation(input: PresentationBuildInput): Publi
       blocks: lesson.blocks.map((block) => {
         const policy = policyForBlock(block);
         return { id: block.id, ...policy, block: parseLessonBlock(block) };
-      }),
-    })),
+      })
+    }))
   }));
   if (!chapters.length) fail();
   const allBlocks = chapters.flatMap((chapter) =>
-    chapter.lessons.flatMap((lesson) => lesson.blocks),
+    chapter.lessons.flatMap((lesson) => lesson.blocks)
   );
   const verification = mathSummary(allBlocks);
   const document: PublishedPresentationV1 = {
@@ -442,7 +434,7 @@ export function buildPublishedPresentation(input: PresentationBuildInput): Publi
       policy: 'deterministic_source_faithful',
       canonicalSchemaVersion: CANONICAL_SCHEMA_VERSION,
       readerSchemaVersion: PRESENTATION_READER_SCHEMA_VERSION,
-      contentHashVerified: true,
+      contentHashVerified: true
     },
     verification,
     objectives: input.objectives.map(objective),
@@ -456,22 +448,22 @@ export function buildPublishedPresentation(input: PresentationBuildInput): Publi
         chapter.lessons.map((lesson) => ({
           id: lesson.id,
           title: lesson.title,
-          blocks: lesson.blocks,
-        })),
-      ),
+          blocks: lesson.blocks
+        }))
+      )
     }),
     sources: input.sources.map((source) => ({
       documentId: str(source.documentId, 128),
       contentHash: source.contentHash,
       pageNumber: nullableInt(source.pageNumber),
-      href: href(source.href, '/api/v1/study/'),
+      href: href(source.href, '/api/v1/study/')
     })),
     fallback: {
       readerHref: `/courses/${input.courseId}/learn?revisionId=${encodeURIComponent(input.revisionId)}`,
       schemaVersion: PRESENTATION_READER_SCHEMA_VERSION,
-      deterministic: true,
+      deterministic: true
     },
-    warnings: input.warnings.map((warning) => plain(warning, 2000)),
+    warnings: input.warnings.map((warning) => plain(warning, 2000))
   };
   return parsePublishedPresentation(document);
 }
@@ -493,11 +485,12 @@ export function parsePublishedPresentation(value: unknown): PublishedPresentatio
     'assets',
     'sources',
     'fallback',
-    'warnings',
+    'warnings'
   ]);
   if (v.schemaVersion !== PRESENTATION_SCHEMA_VERSION) fail();
   const courseId = str(v.courseId, 36);
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(courseId)) fail();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(courseId))
+    fail();
   const contentHash = str(v.contentHash, 71);
   if (!/^sha256:[a-f0-9]{64}$/.test(contentHash)) fail();
   const canonicalContentHash = str(v.canonicalContentHash, 71);
@@ -507,7 +500,7 @@ export function parsePublishedPresentation(value: unknown): PublishedPresentatio
     'policy',
     'canonicalSchemaVersion',
     'readerSchemaVersion',
-    'contentHashVerified',
+    'contentHashVerified'
   ]);
   if (
     provenance.policy !== 'deterministic_source_faithful' ||
@@ -552,21 +545,20 @@ export function parsePublishedPresentation(value: unknown): PublishedPresentatio
               id: str(l.id, 128),
               title: str(l.title, 500),
               summary: plain(l.summary, 2000),
-              blocks: list(l.blocks, presentationBlock, 400),
+              blocks: list(l.blocks, presentationBlock, 400)
             };
           },
-          200,
-        ),
+          200
+        )
       };
     },
-    500,
+    500
   );
   if (!chapters.length) fail();
 
   // The plan is optional for forward compatibility with a 1.0.0 consumer that
   // predates it, but when present it must describe this document's blocks.
-  const plan =
-    v.plan === undefined ? undefined : parsePresentationPlan(v.plan, chapters);
+  const plan = v.plan === undefined ? undefined : parsePresentationPlan(v.plan, chapters);
   if (plan && (plan.courseId !== courseId || plan.contentHash !== contentHash)) fail();
   if (plan && plan.revisionId !== String(v.revisionId)) fail();
 
@@ -593,7 +585,7 @@ export function parsePublishedPresentation(value: unknown): PublishedPresentatio
               'payload',
               'label',
               'fallback',
-              'disclosure',
+              'disclosure'
             ]);
             if (raw.schemaVersion !== STRUCTURED_ASSET_SCHEMA_VERSION) fail();
             if (!ASSET_COMPONENTS.includes(String(raw.component) as never)) fail();
@@ -615,7 +607,7 @@ export function parsePublishedPresentation(value: unknown): PublishedPresentatio
                   review: raw.review,
                   audience: 'course',
                   fallback: raw.fallback,
-                  disclosure: raw.disclosure,
+                  disclosure: raw.disclosure
                 });
               } catch {
                 return fail();
@@ -623,18 +615,18 @@ export function parsePublishedPresentation(value: unknown): PublishedPresentatio
             })();
             const projected = projectStructuredAsset(parsed, {
               courseId: String(v.courseId),
-              revisionId: String(v.revisionId),
+              revisionId: String(v.revisionId)
             });
             // A null projection means the asset must not be shown to a learner.
             if (projected === null) return fail();
             if (projected.label !== raw.label) fail();
             return projected;
           },
-          ASSET_LIMITS.maxAssetsPerRevision,
+          ASSET_LIMITS.maxAssetsPerRevision
         );
   if (assets) {
     const lessonIds = new Set(
-      chapters.flatMap((chapter) => chapter.lessons.map((lesson) => lesson.id)),
+      chapters.flatMap((chapter) => chapter.lessons.map((lesson) => lesson.id))
     );
     // An asset must point at a lesson that exists in this document.
     for (const asset of assets) if (!lessonIds.has(asset.lessonId)) fail();
@@ -650,10 +642,10 @@ export function parsePublishedPresentation(value: unknown): PublishedPresentatio
         documentId: str(s.documentId, 128),
         contentHash: sourceHash,
         pageNumber: nullableInt(s.pageNumber),
-        href: href(s.href, '/api/v1/study/'),
+        href: href(s.href, '/api/v1/study/')
       };
     },
-    32,
+    32
   );
 
   const fallback = exact(v.fallback, ['readerHref', 'schemaVersion', 'deterministic']);
@@ -664,9 +656,9 @@ export function parsePublishedPresentation(value: unknown): PublishedPresentatio
     fail();
   const readerHref = str(fallback.readerHref, 2048);
   if (
-    !new RegExp(
-      `^/courses/${courseId}/learn(\\?revisionId=[A-Za-z0-9_-]{1,128})?$`,
-    ).test(readerHref)
+    !new RegExp(`^/courses/${courseId}/learn(\\?revisionId=[A-Za-z0-9_-]{1,128})?$`).test(
+      readerHref
+    )
   )
     fail();
 
@@ -682,12 +674,12 @@ export function parsePublishedPresentation(value: unknown): PublishedPresentatio
       policy: 'deterministic_source_faithful',
       canonicalSchemaVersion: CANONICAL_SCHEMA_VERSION,
       readerSchemaVersion: PRESENTATION_READER_SCHEMA_VERSION,
-      contentHashVerified: true,
+      contentHashVerified: true
     },
     verification: {
       status,
       math: { total, reviewed, sourceFallback },
-      disclosure: PRESENTATION_DISCLOSURES[status],
+      disclosure: PRESENTATION_DISCLOSURES[status]
     },
     objectives: list(v.objectives, objective, 500),
     chapters,
@@ -697,8 +689,8 @@ export function parsePublishedPresentation(value: unknown): PublishedPresentatio
     fallback: {
       readerHref,
       schemaVersion: PRESENTATION_READER_SCHEMA_VERSION,
-      deterministic: true,
+      deterministic: true
     },
-    warnings: list(v.warnings, (warning) => plain(warning, 2000), 20),
+    warnings: list(v.warnings, (warning) => plain(warning, 2000), 20)
   };
 }

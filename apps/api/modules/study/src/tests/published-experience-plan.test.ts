@@ -1,6 +1,6 @@
 import {
   parsePublishedExperiencePlan,
-  type PublishedExperiencePlanV1,
+  type PublishedExperiencePlanV1
 } from '../../../../shared/ednova/publishedExperiencePlan';
 import { COMPONENT_REGISTRY_VERSION } from '../../../../shared/ednova/componentRegistry';
 
@@ -28,7 +28,7 @@ function plan(overrides: Partial<PublishedExperiencePlanV1> = {}): PublishedExpe
         componentVersion: '1.0.0',
         group: 'none',
         disclosure: 'expanded',
-        fallback: 'ConceptExplanation',
+        fallback: 'ConceptExplanation'
       },
       {
         placementId: 'p-2',
@@ -38,7 +38,7 @@ function plan(overrides: Partial<PublishedExperiencePlanV1> = {}): PublishedExpe
         componentVersion: '1.0.0',
         group: 'none',
         disclosure: 'expanded',
-        fallback: 'ConceptExplanation',
+        fallback: 'ConceptExplanation'
       },
       {
         placementId: 'p-3',
@@ -49,8 +49,8 @@ function plan(overrides: Partial<PublishedExperiencePlanV1> = {}): PublishedExpe
         group: 'concept',
         disclosure: 'expanded',
         interaction: { showLineNumbers: true },
-        fallback: 'CodeViewer',
-      },
+        fallback: 'CodeViewer'
+      }
     ],
     supplemental: [
       {
@@ -62,11 +62,11 @@ function plan(overrides: Partial<PublishedExperiencePlanV1> = {}): PublishedExpe
         assetId: 'asset_1',
         group: 'example',
         disclosure: 'expanded',
-        fallback: 'CodeViewer',
-      },
+        fallback: 'CodeViewer'
+      }
     ],
     disclosure: 'Mock plan.',
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -121,7 +121,7 @@ describe('published experience plan boundary parser', () => {
   it('rejects an interaction value that is not a primitive', () => {
     const value = plan();
     (value.canonical[2] as unknown as Record<string, unknown>).interaction = {
-      showLineNumbers: { nested: true },
+      showLineNumbers: { nested: true }
     };
     expect(() => parsePublishedExperiencePlan(value, blocks)).toThrow('INVALID_EXPERIENCE_PLAN');
   });

@@ -51,7 +51,7 @@ export const PROVIDER_FAILURE_CODES = [
   'PROVIDER_SCHEMA_INCOMPATIBLE',
   'PROVIDER_USAGE_MISSING',
   'PROVIDER_CANCELLED_AFTER_DISPATCH',
-  'PROVIDER_UNAVAILABLE',
+  'PROVIDER_UNAVAILABLE'
 ] as const;
 
 export type ProviderFailureCode = (typeof PROVIDER_FAILURE_CODES)[number];
@@ -68,7 +68,7 @@ export const KNOWN_FAILURE_CODES: readonly ProviderFailureCode[] = Object.freeze
   'PROVIDER_APPROVAL_MISSING',
   'PROVIDER_CREDENTIAL_MISMATCH',
   'PROVIDER_CANCELLED_BEFORE_DISPATCH',
-  'PROVIDER_CONCURRENT_DUPLICATE',
+  'PROVIDER_CONCURRENT_DUPLICATE'
 ]);
 
 export function failureClass(code: ProviderFailureCode): ProviderFailureClass {
@@ -162,5 +162,5 @@ export const NO_USAGE: ProviderUsage = Object.freeze({
   totalTokens: null,
   reservedTokens: 0,
   modelVersion: null,
-  costUsd: null,
+  costUsd: null
 });

@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import type {
   NardouchCitation,
   NardouchMessage,
-} from "@ednova/shared/ednova/nardouch";
+} from "@noveris/shared/ednova/nardouch";
 import { sendNardouchFeedback } from "./actions";
+import { FormattedText } from "@/features/learning/tutor-answer";
 
 export function SourceReferences({
   citations,
@@ -107,12 +108,18 @@ export function MessageBubble({
       <p className="mb-2 text-xs font-medium text-muted-foreground">
         {message.role === "user" ? "You" : "Nardouch"}
       </p>
-      <p
-        dir="auto"
-        className="whitespace-pre-wrap break-words text-sm leading-7"
-      >
-        {message.content}
-      </p>
+      {message.role === "user" ? (
+        <p
+          dir="auto"
+          className="whitespace-pre-wrap break-words text-sm leading-7"
+        >
+          {message.content}
+        </p>
+      ) : (
+        <div dir="auto" className="break-words">
+          <FormattedText text={message.content} />
+        </div>
+      )}
       {message.answer && (
         <div className="mt-3 space-y-3">
           <SourceReferences

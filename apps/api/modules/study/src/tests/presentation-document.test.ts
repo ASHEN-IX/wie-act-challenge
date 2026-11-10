@@ -5,7 +5,7 @@ import {
   buildPublishedPresentation,
   parsePublishedPresentation,
   policyForBlock,
-  type PresentationBuildInput,
+  type PresentationBuildInput
 } from '../../../../shared/ednova/presentationDocument';
 
 const courseId = 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d';
@@ -21,7 +21,7 @@ const sourceMeta = {
   extractionMethod: 'text' as const,
   confidence: 0.9,
   reviewRequired: false,
-  issues: [],
+  issues: []
 };
 
 const paragraph: LessonBlockV2 = {
@@ -29,7 +29,7 @@ const paragraph: LessonBlockV2 = {
   id: 'p1',
   text: 'Deterministic extracted paragraph.',
   evidence: ['chunk-1'],
-  provenance: evidence,
+  provenance: evidence
 };
 const reviewedMath: LessonBlockV2 = {
   type: 'math',
@@ -43,8 +43,8 @@ const reviewedMath: LessonBlockV2 = {
     state: 'corrected',
     originalExpression: 'S_n = \\sum u_p',
     modelExpression: 'S_n = \\sum_{p=0}^{n} u_p',
-    reviewer: 'instructor-1',
-  },
+    reviewer: 'instructor-1'
+  }
 };
 const unreviewedMath: LessonBlockV2 = {
   type: 'math',
@@ -53,14 +53,14 @@ const unreviewedMath: LessonBlockV2 = {
   notation: 'plain',
   evidence: ['chunk-1'],
   provenance: evidence,
-  sourceMeta,
+  sourceMeta
 };
 const mediaWithoutSource: LessonBlockV2 = {
   type: 'media',
   id: 'img1',
   mediaType: 'image',
   alt: 'Diagram of the band split',
-  evidence: ['chunk-1'],
+  evidence: ['chunk-1']
 };
 
 function input(overrides: Partial<PresentationBuildInput> = {}): PresentationBuildInput {
@@ -72,7 +72,7 @@ function input(overrides: Partial<PresentationBuildInput> = {}): PresentationBui
     title: 'Discrete Structures',
     summary: 'A published revision.',
     objectives: [
-      { objectiveId: 'obj-1', statement: 'Apply summation identities.', bloomLevel: 'apply' },
+      { objectiveId: 'obj-1', statement: 'Apply summation identities.', bloomLevel: 'apply' }
     ],
     chapters: [
       {
@@ -84,21 +84,21 @@ function input(overrides: Partial<PresentationBuildInput> = {}): PresentationBui
             id: 'lesson-1',
             title: 'Closed forms',
             summary: 'Lesson summary.',
-            blocks: [paragraph, reviewedMath, unreviewedMath, mediaWithoutSource],
-          },
-        ],
-      },
+            blocks: [paragraph, reviewedMath, unreviewedMath, mediaWithoutSource]
+          }
+        ]
+      }
     ],
     sources: [
       {
         documentId,
         contentHash,
         pageNumber: null,
-        href: `/api/v1/study/courses/${courseId}/revisions/${revisionId}/sources/${documentId}`,
-      },
+        href: `/api/v1/study/courses/${courseId}/revisions/${revisionId}/sources/${documentId}`
+      }
     ],
     warnings: ['Extraction fidelity is unverified.'],
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -110,18 +110,18 @@ describe('published presentation contract', () => {
       'p1',
       'm1',
       'm2',
-      'img1',
+      'img1'
     ]);
     expect(document.chapters[0].lessons[0].blocks.map((entry) => entry.render)).toEqual([
       'primary',
       'primary',
       'source_faithful',
-      'source_faithful',
+      'source_faithful'
     ]);
     expect(document.fallback).toEqual({
       readerHref: `/courses/${courseId}/learn?revisionId=${revisionId}`,
       schemaVersion: '2.0.0',
-      deterministic: true,
+      deterministic: true
     });
   });
 
@@ -130,7 +130,7 @@ describe('published presentation contract', () => {
     expect(document.verification).toEqual({
       status: 'partially_reviewed',
       math: { total: 2, reviewed: 1, sourceFallback: 1 },
-      disclosure: PRESENTATION_DISCLOSURES.partially_reviewed,
+      disclosure: PRESENTATION_DISCLOSURES.partially_reviewed
     });
     expect(document.verification.disclosure).toContain('not semantically verified');
     expect(document.verification.disclosure).not.toContain('is verified');
@@ -144,12 +144,10 @@ describe('published presentation contract', () => {
             id: 'chapter-1',
             title: 'Summations',
             summary: '',
-            lessons: [
-              { id: 'lesson-1', title: 'Closed forms', summary: '', blocks: [paragraph] },
-            ],
-          },
-        ],
-      }),
+            lessons: [{ id: 'lesson-1', title: 'Closed forms', summary: '', blocks: [paragraph] }]
+          }
+        ]
+      })
     );
     expect(noMath.verification.status).toBe('no_math');
     expect(noMath.verification.math).toEqual({ total: 0, reviewed: 0, sourceFallback: 0 });
@@ -163,38 +161,38 @@ describe('published presentation contract', () => {
             title: 'Summations',
             summary: '',
             lessons: [
-              { id: 'lesson-1', title: 'Closed forms', summary: '', blocks: [reviewedMath] },
-            ],
-          },
-        ],
-      }),
+              { id: 'lesson-1', title: 'Closed forms', summary: '', blocks: [reviewedMath] }
+            ]
+          }
+        ]
+      })
     );
     expect(allReviewed.verification.status).toBe('reviewed');
     expect(allReviewed.verification.disclosure).toBe(PRESENTATION_DISCLOSURES.reviewed);
     expect(allReviewed.verification.disclosure).toContain(
-      'Instructor review is not independent mathematical verification.',
+      'Instructor review is not independent mathematical verification.'
     );
   });
 
   it('is deterministic for identical input', () => {
     expect(JSON.stringify(buildPublishedPresentation(input()))).toBe(
-      JSON.stringify(buildPublishedPresentation(input())),
+      JSON.stringify(buildPublishedPresentation(input()))
     );
   });
 
   it('fails closed on an unknown version, an extra key or free-text disclosure', () => {
     const document = JSON.parse(JSON.stringify(buildPublishedPresentation(input())));
     expect(() => parsePublishedPresentation({ ...document, schemaVersion: '0.9.0' })).toThrow(
-      'INVALID_PRESENTATION_DOCUMENT',
+      'INVALID_PRESENTATION_DOCUMENT'
     );
     expect(() => parsePublishedPresentation({ ...document, verificationOverride: true })).toThrow(
-      'INVALID_PRESENTATION_DOCUMENT',
+      'INVALID_PRESENTATION_DOCUMENT'
     );
     expect(() =>
       parsePublishedPresentation({
         ...document,
-        verification: { ...document.verification, disclosure: 'Everything is verified.' },
-      }),
+        verification: { ...document.verification, disclosure: 'Everything is verified.' }
+      })
     ).toThrow('INVALID_PRESENTATION_DOCUMENT');
   });
 
@@ -206,7 +204,7 @@ describe('published presentation contract', () => {
     expect(() => parsePublishedPresentation(tampered)).toThrow('INVALID_PRESENTATION_DOCUMENT');
     expect(policyForBlock(unreviewedMath)).toEqual({
       render: 'source_faithful',
-      reason: 'unreviewed_formula',
+      reason: 'unreviewed_formula'
     });
   });
 
@@ -218,7 +216,7 @@ describe('published presentation contract', () => {
     const foreignSource = JSON.parse(JSON.stringify(buildPublishedPresentation(input())));
     foreignSource.sources[0].href = 'https://files.example.com/source.pdf';
     expect(() => parsePublishedPresentation(foreignSource)).toThrow(
-      'INVALID_PRESENTATION_DOCUMENT',
+      'INVALID_PRESENTATION_DOCUMENT'
     );
 
     const markup = JSON.parse(JSON.stringify(buildPublishedPresentation(input())));
@@ -235,13 +233,13 @@ describe('published presentation contract', () => {
       'p1',
       'm1',
       'm2',
-      'img1',
+      'img1'
     ]);
     expect(plan.lessons[0].instances.map((entry) => entry.component)).toEqual([
       'ConceptExplanation',
       'ReviewedFormula',
       'SourceMathFallback',
-      'SourceDiagram',
+      'SourceDiagram'
     ]);
     // Read mode never offers an interaction.
     expect(plan.lessons[0].counts.interactive).toBe(0);
@@ -270,7 +268,7 @@ describe('published presentation contract', () => {
     const foreignComponent = base();
     foreignComponent.plan.lessons[0].instances[0].component = 'EvilComponent';
     expect(() => parsePublishedPresentation(foreignComponent)).toThrow(
-      'INVALID_PRESENTATION_DOCUMENT',
+      'INVALID_PRESENTATION_DOCUMENT'
     );
 
     const wrongCounts = base();
@@ -298,11 +296,11 @@ describe('published presentation contract', () => {
         component: 'CodeWalkthrough',
         language: 'python',
         code: 'a = 1\nb = 2',
-        annotations: [{ line: 0, explanation: 'Assigns a.' }],
+        annotations: [{ line: 0, explanation: 'Assigns a.' }]
       },
       label: 'Instructor-authored material',
       fallback: 'CodeViewer',
-      disclosure: 'Instructor-authored walkthrough.',
+      disclosure: 'Instructor-authored walkthrough.'
     };
     const withAssets = JSON.parse(JSON.stringify(document));
     withAssets.assets = [asset];
@@ -327,16 +325,14 @@ describe('published presentation contract', () => {
           component: 'CodeWalkthrough',
           language: 'python',
           code: 'x = 1',
-          annotations: [{ line: 0, explanation: 'x' }],
+          annotations: [{ line: 0, explanation: 'x' }]
         },
         label: 'Instructor-authored material',
         fallback: 'CodeViewer',
-        disclosure: 'Walkthrough.',
-      },
+        disclosure: 'Walkthrough.'
+      }
     ];
-    expect(() => parsePublishedPresentation(withAssets)).toThrow(
-      'INVALID_PRESENTATION_DOCUMENT',
-    );
+    expect(() => parsePublishedPresentation(withAssets)).toThrow('INVALID_PRESENTATION_DOCUMENT');
   });
 
   it('rejects an asset pointing at a lesson this revision lacks', () => {
@@ -355,16 +351,14 @@ describe('published presentation contract', () => {
           component: 'CodeWalkthrough',
           language: 'python',
           code: 'x = 1',
-          annotations: [{ line: 0, explanation: 'x' }],
+          annotations: [{ line: 0, explanation: 'x' }]
         },
         label: 'Instructor-authored material',
         fallback: 'CodeViewer',
-        disclosure: 'Walkthrough.',
-      },
+        disclosure: 'Walkthrough.'
+      }
     ];
-    expect(() => parsePublishedPresentation(withAssets)).toThrow(
-      'INVALID_PRESENTATION_DOCUMENT',
-    );
+    expect(() => parsePublishedPresentation(withAssets)).toThrow('INVALID_PRESENTATION_DOCUMENT');
   });
 
   it('rejects an asset whose label misstates its provenance', () => {
@@ -383,17 +377,15 @@ describe('published presentation contract', () => {
           component: 'CodeWalkthrough',
           language: 'python',
           code: 'x = 1',
-          annotations: [{ line: 0, explanation: 'x' }],
+          annotations: [{ line: 0, explanation: 'x' }]
         },
         // Claims to be instructor work while the provenance says demo.
         label: 'Instructor-authored material',
         fallback: 'CodeViewer',
-        disclosure: 'Walkthrough.',
-      },
+        disclosure: 'Walkthrough.'
+      }
     ];
-    expect(() => parsePublishedPresentation(withAssets)).toThrow(
-      'INVALID_PRESENTATION_DOCUMENT',
-    );
+    expect(() => parsePublishedPresentation(withAssets)).toThrow('INVALID_PRESENTATION_DOCUMENT');
   });
 
   it('still accepts a 1.0.0 document that predates the plan', () => {

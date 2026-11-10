@@ -2,12 +2,12 @@ import { canReadCourse } from '../services/resourceAccess';
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response } from 'express';
 import type { ITaskProgressEntry } from '../models';
-import { errorDetails } from '@ednova/shared/errors';
+import { errorDetails } from '@noveris/shared/errors';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createContracts } = require('@ednova/shared/domainContracts');
+const { createContracts } = require('@noveris/shared/domainContracts');
 import crypto from 'crypto';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const moduleClient = require('@ednova/shared/moduleClient');
+const moduleClient = require('@noveris/shared/moduleClient');
 import { StudySession, Course } from '../models';
 import {
   DEFAULT_TASK_ESTIMATED_MINUTES,

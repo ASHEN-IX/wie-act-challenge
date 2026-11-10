@@ -41,6 +41,12 @@ def test_explicit_preference_and_script():
     assert "Response language: fr" in result and "arabic" in result
 
 
+def test_arabizi_input_asks_for_latin_darija():
+    result = language_instruction(LanguagePreference(), "Ya Nardouch, mafhemtech 3lech?")
+    assert "Response language: darija" in result
+    assert "arabizi writing" in result and "never Arabic script" in result
+
+
 @pytest.mark.parametrize("mode", ["explain", "socratic", "practice", "peer"])
 def test_real_retrieval_continuity_and_mode(artifacts, monkeypatch, mode):
     build, _ = artifacts
@@ -222,8 +228,17 @@ def test_model_identifier_environment_overrides(monkeypatch):
         llm_client.reload_config()
 
 
-def test_test_mock_configuration_cannot_leak_a_fake_production_answer(artifacts):
+def test_test_mock_configuration_cannot_leak_a_fake_production_answer(artifacts, monkeypatch):
+    monkeypatch.setenv("APP_ENV", "production")
     store, grounding, *_ = artifacts[0]()
-    # LLM_MOCK=1 is set by the fixture, but Nardouch provides no production mock.
     with pytest.raises(n.NardouchUnavailable):
         n.respond(request(grounding), store)
+
+
+def test_local_mock_is_labeled_and_uses_verified_sources(artifacts, monkeypatch):
+    monkeypatch.setenv("APP_ENV", "development")
+    store, grounding, *_ = artifacts[0]()
+    answer = n.respond(request(grounding), store)
+    assert answer.usage["executionMode"] == "MOCK_TEST"
+    assert answer.displayText.startswith("Mock tutor response.")
+    assert answer.citations and answer.citations[0].verified

@@ -11,7 +11,7 @@
  */
 jest.mock('../services/resourceAccess', () => ({
   canManageCourse: jest.fn(async () => true),
-  canAuthorCourse: jest.fn(async () => true),
+  canAuthorCourse: jest.fn(async () => true)
 }));
 
 import type { Request, Response } from 'express';
@@ -26,13 +26,13 @@ type Handler = (req: Request, res: Response, next?: () => void) => unknown;
 async function call(
   method: 'get' | 'post',
   path: string,
-  user: { userId: string; role: string } | null,
+  user: { userId: string; role: string } | null
 ): Promise<{ status: number; body: unknown; reached: boolean }> {
   const router = learningRouter as unknown as {
     operations: Array<{ method: string; path: string; handlers: Handler[] }>;
   };
   const operation = router.operations.find(
-    (entry) => entry.method === method && entry.path === path,
+    (entry) => entry.method === method && entry.path === path
   );
   if (!operation) throw new Error(`no operation ${method.toUpperCase()} ${path}`);
 
@@ -44,7 +44,7 @@ async function call(
           json(body: unknown) {
             sent = { status: code, body };
             resolve({ status: code, body, reached: true });
-          },
+          }
         };
       },
       setHeader() {
@@ -56,14 +56,14 @@ async function call(
       removeListener() {
         return res;
       },
-      headers: {},
+      headers: {}
     } as unknown as Response;
     const req = {
       user,
       params: {},
       query: {},
       body: {},
-      headers: {},
+      headers: {}
     } as unknown as Request;
 
     let index = 0;
@@ -96,7 +96,7 @@ describe('process metrics authorization', () => {
       operations: Array<{ method: string; path: string }>;
     };
     const courseScoped = router.operations.filter(
-      (entry) => entry.path.includes('metrics') && entry.path.includes(':courseId'),
+      (entry) => entry.path.includes('metrics') && entry.path.includes(':courseId')
     );
     expect(courseScoped).toEqual([]);
   });
@@ -134,7 +134,7 @@ describe('process metrics authorization', () => {
       'processUptimeSeconds',
       'scope',
       'scopeNote',
-      'since',
+      'since'
     ]);
     const serialized = JSON.stringify({ counters: body.counters, latency: body.latency });
     expect(serialized).not.toContain(courseA);

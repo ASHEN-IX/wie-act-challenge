@@ -5,7 +5,7 @@ import { ApiError, api, segment } from "@/lib/api";
 import type {
   NardouchConversation,
   NardouchInput,
-} from "@ednova/shared/ednova/nardouch";
+} from "@noveris/shared/ednova/nardouch";
 async function execute<T>(
   operation: () => Promise<T>,
 ): Promise<ActionResult<T>> {

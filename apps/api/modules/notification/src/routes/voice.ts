@@ -1,6 +1,6 @@
 import { verifySessionMembership, verifyVoiceConsent } from '../utils/session-access';
 import type { DomainRequest } from '../../../../src/framework/contracts';
-import { createContracts } from '@ednova/shared/domainContracts';
+import { createContracts } from '@noveris/shared/domainContracts';
 import Joi from 'joi';
 import type { Response, NextFunction } from 'express';
 import {

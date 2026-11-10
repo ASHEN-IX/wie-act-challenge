@@ -12,10 +12,16 @@ function operation(run: (req: DomainRequest) => Promise<unknown>) {
   return async (req: DomainRequest, res: Response) => {
     res.setHeader('Cache-Control', 'private, no-store');
     if (!req.user?.userId) return res.status(401).json({ error: 'Unauthorized' });
-    const teaching = req.user.role === 'instructor' || req.user.role === 'admin' || await InstitutionMembership.exists({
-      userId: req.user.userId, status: 'active', role: { $in: ['instructor', 'university_admin'] }
-    });
-    if (!teaching) return res.status(403).json({ error: 'Instructor course insight access denied' });
+    const teaching =
+      req.user.role === 'instructor' ||
+      req.user.role === 'admin' ||
+      (await InstitutionMembership.exists({
+        userId: req.user.userId,
+        status: 'active',
+        role: { $in: ['instructor', 'university_admin'] }
+      }));
+    if (!teaching)
+      return res.status(403).json({ error: 'Instructor course insight access denied' });
     if (Object.keys(req.query || {}).length)
       return res.status(400).json({ error: 'Insight filters and drill-down are unsupported' });
     try {

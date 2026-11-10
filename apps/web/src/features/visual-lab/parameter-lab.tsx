@@ -6,8 +6,8 @@ import {
   getParameterModel,
   parameterOutput,
   parseParameterScenario,
-} from "@ednova/shared/visualLab/parameter-models";
-import type { ParameterScenario } from "@ednova/shared/visualLab/types";
+} from "@noveris/shared/visualLab/parameter-models";
+import type { ParameterScenario } from "@noveris/shared/visualLab/types";
 
 const BAR_MAX = 200;
 const round = (value: number) => Math.round(value * 100) / 100;

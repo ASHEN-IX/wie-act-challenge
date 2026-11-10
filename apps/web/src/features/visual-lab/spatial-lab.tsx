@@ -9,8 +9,8 @@ import {
   parseSpatialScenario,
   projectileOutput,
   type ProjectileValues,
-} from "@ednova/shared/visualLab/spatial-models";
-import type { SpatialScenario } from "@ednova/shared/visualLab/types";
+} from "@noveris/shared/visualLab/spatial-models";
+import type { SpatialScenario } from "@noveris/shared/visualLab/types";
 
 // WebGL only exists in the browser; the readouts below work without it.
 const SpatialScene = dynamic(() => import("./spatial-scene"), {

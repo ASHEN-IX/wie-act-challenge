@@ -21,7 +21,7 @@
     "test:auth:e2e": "AUTH_E2E=1 playwright test e2e/better-auth.spec.ts e2e/smoke.spec.ts e2e/workspace.spec.ts --reporter=list"
   },
   "dependencies": {
-    "@ednova/shared": "workspace:*",
+    "@noveris/shared": "workspace:*",
     "@excalidraw/excalidraw": "0.18.1",
     "@gsap/react": "^2.1.2",
     "@react-three/drei": "10.0.1",

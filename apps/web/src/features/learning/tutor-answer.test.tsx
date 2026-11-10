@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
+  FormattedText,
   TutorThread,
   cleanExcerpt,
   segmentAnswer,
@@ -103,5 +104,21 @@ describe("TutorThread", () => {
         <TutorThread {...base} question={null} answer={null} />,
       ),
     ).toBe("");
+  });
+});
+
+describe("FormattedText", () => {
+  it("renders fenced code literally and headings as bold, without raw markdown", () => {
+    const html = renderToStaticMarkup(
+      <FormattedText
+        text={"### Solution\n```\nStudent(**ID**, Code)\n```\n- **Check:** one value per cell"}
+      />,
+    );
+    expect(html).toContain("<strong>Solution</strong>");
+    expect(html).toContain('<pre dir="ltr"');
+    expect(html).toContain("Student(**ID**, Code)");
+    expect(html).toContain("<li><strong>Check:</strong> one value per cell</li>");
+    expect(html).not.toContain("```");
+    expect(html).not.toContain("###");
   });
 });

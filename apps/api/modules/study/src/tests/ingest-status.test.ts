@@ -18,7 +18,7 @@ const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => 
 });
 afterAll(() => exitSpy.mockRestore());
 
-jest.mock('@ednova/shared/ai-messaging', () => ({
+jest.mock('@noveris/shared/ai-messaging', () => ({
   consumeAiProgress: jest.fn(),
   consumeIngestResults: jest.fn(),
   closeAiMessaging: jest.fn(),
@@ -82,7 +82,7 @@ import {
   buildIngestStatus
 } from '../services/ingestStatus';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { consumeAiProgress, consumeIngestResults } = require('@ednova/shared/ai-messaging');
+const { consumeAiProgress, consumeIngestResults } = require('@noveris/shared/ai-messaging');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { Course } = require('../models/index');
 
@@ -106,7 +106,7 @@ const fakeAuth = (req: DomainRequest, res: Response, next: NextFunction) => {
 app.use('/api/v1/study/courses', fakeAuth, courseRoutes);
 app.use('/api/v1/study/sessions', fakeAuth, sessionTaskRoutes);
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { errorHandler } = require('@ednova/shared/middleware');
+const { errorHandler } = require('@noveris/shared/middleware');
 app.use(errorHandler);
 
 function authHeader() {
@@ -229,7 +229,11 @@ describe('handleIngestResult (ingest result routing key)', () => {
     await handleIngestResult({
       ...BASE,
       status: 'completed',
-      payload: { courseId: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514', status: 'completed', course: WORKER_COURSE }
+      payload: {
+        courseId: '9fc0fd30-b00a-55fb-a19f-a23a3f1d5514',
+        status: 'completed',
+        course: WORKER_COURSE
+      }
     });
 
     expect(course.status).toBe('completed');
@@ -330,7 +334,7 @@ describe('startIngestStatusTracker (INGEST-07)', () => {
 
   test('stopIngestStatusTracker closes the shared ai-messaging connection', () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { closeAiMessaging } = require('@ednova/shared/ai-messaging');
+    const { closeAiMessaging } = require('@noveris/shared/ai-messaging');
     stopIngestStatusTracker();
     expect(closeAiMessaging).toHaveBeenCalled();
   });

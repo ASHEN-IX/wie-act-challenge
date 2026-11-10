@@ -3,11 +3,11 @@
  */
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const aiMessaging = require('@ednova/shared/ai-messaging');
+const aiMessaging = require('@noveris/shared/ai-messaging');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { validateJobPayload } = require('@ednova/shared/ai-messaging/payloadSchemas');
+const { validateJobPayload } = require('@noveris/shared/ai-messaging/payloadSchemas');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { logger } = require('@ednova/shared');
+const { logger } = require('@noveris/shared');
 
 const INGEST_JOB_TYPE = 'study.ingest.course';
 

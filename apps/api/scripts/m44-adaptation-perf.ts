@@ -8,12 +8,12 @@ import { performance } from 'node:perf_hooks';
 import {
   DEFAULT_PREFERENCES,
   parseLearningAdaptation,
-  type AdaptationEvidence,
+  type AdaptationEvidence
 } from '../shared/ednova/learningAdaptation';
 import {
   adaptationFingerprint,
   evaluateAdaptation,
-  type PolicyInput,
+  type PolicyInput
 } from '../shared/ednova/adaptationPolicy';
 import type { LearningMode } from '../shared/ednova/learningModes';
 
@@ -29,7 +29,7 @@ function evidence(count: number): AdaptationEvidence[] {
     revisionId,
     objectiveId: `obj_${index}`,
     mastered: index % 2 === 0,
-    evaluatorVersion: '1.0.0',
+    evaluatorVersion: '1.0.0'
   }));
 }
 
@@ -45,10 +45,10 @@ function policyInput(count: number): PolicyInput {
       availableModes: allModes,
       hasEligibleAsset: true,
       hasProofMaterial: true,
-      hasWorkedExamples: true,
+      hasWorkedExamples: true
     },
     evidenceFingerprint: 'fnv1a64:0123456789abcdef',
-    now: new Date('2026-11-07T10:00:00.000Z'),
+    now: new Date('2026-11-07T10:00:00.000Z')
   };
 }
 
@@ -65,7 +65,7 @@ function time(label: string, iterations: number, run: () => void) {
   console.log(
     `${label.padEnd(42)} mean=${mean.toFixed(4)}ms  ` +
       `p95=${samples[Math.floor(iterations * 0.95)].toFixed(4)}ms  ` +
-      `max=${samples[samples.length - 1].toFixed(4)}ms`,
+      `max=${samples[samples.length - 1].toFixed(4)}ms`
   );
 }
 
@@ -81,12 +81,12 @@ for (const count of [0, 10, 50, 200]) {
       lessonId,
       preferences: input.preferences,
       evidence: input.evidence,
-      availableModes: allModes,
-    }),
+      availableModes: allModes
+    })
   );
   const record = evaluateAdaptation(input, objectives);
   time('record parse', 2000, () =>
-    parseLearningAdaptation(record, { courseId, revisionId, lessonId }),
+    parseLearningAdaptation(record, { courseId, revisionId, lessonId })
   );
 }
 

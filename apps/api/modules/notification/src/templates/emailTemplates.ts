@@ -1,5 +1,5 @@
 /**
- * Email Templates for EdNova
+ * Email Templates for Noveris
  * Professional, branded email templates for various notification types
  */
 
@@ -17,11 +17,11 @@ export const templates = {
     verificationLink: string,
     name: string = 'User'
   ): EmailTemplateResult => ({
-    subject: '🎓 EdNova - Verify Your Email',
+    subject: '🎓 Noveris - Verify Your Email',
     html: `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px;">
         <div style="background: white; border-radius: 12px; padding: 40px; box-shadow: 0 10px 40px rgba(0,0,0,0.1);">
-          <h1 style="color: #333; font-size: 28px; margin: 0 0 10px 0; text-align: center;">Welcome to EdNova! 🎉</h1>
+          <h1 style="color: #333; font-size: 28px; margin: 0 0 10px 0; text-align: center;">Welcome to Noveris! 🎉</h1>
           <p style="color: #666; text-align: center; margin: 0 0 30px 0;">Hi ${name}, thanks for signing up!</p>
           
           <div style="background: #f5f5f5; border-radius: 8px; padding: 30px; margin: 30px 0; text-align: center;">
@@ -41,7 +41,7 @@ export const templates = {
               If you didn't create this account, you can safely ignore this email.
             </p>
             <p style="color: #999; font-size: 12px; margin: 10px 0 0 0; text-align: center;">
-              © 2026 EdNova. All rights reserved.
+              © 2026 Noveris. All rights reserved.
             </p>
           </div>
         </div>
@@ -57,7 +57,7 @@ export const templates = {
     name: string = 'User',
     expiresIn: string = '1 hour'
   ): EmailTemplateResult => ({
-    subject: '🔐 EdNova - Reset Your Password',
+    subject: '🔐 Noveris - Reset Your Password',
     html: `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px;">
         <div style="background: white; border-radius: 12px; padding: 40px; box-shadow: 0 10px 40px rgba(0,0,0,0.1);">
@@ -65,7 +65,7 @@ export const templates = {
           <p style="color: #666; text-align: center; margin: 0 0 30px 0;">Hi ${name},</p>
           
           <p style="color: #666; margin: 20px 0; line-height: 1.6;">
-            We received a request to reset the password for your EdNova account.
+            We received a request to reset the password for your Noveris account.
             If you made this request, click the button below to set a new password.
           </p>
           
@@ -81,7 +81,7 @@ export const templates = {
           
           <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; border-radius: 4px; margin: 20px 0;">
             <p style="color: #856404; margin: 0; font-size: 13px;">
-              <strong>⚠️ Security Tip:</strong> Never share this link with anyone. EdNova staff will never ask for your password.
+              <strong>⚠️ Security Tip:</strong> Never share this link with anyone. Noveris staff will never ask for your password.
             </p>
           </div>
           
@@ -90,7 +90,7 @@ export const templates = {
               If you didn't request a password reset, you can safely ignore this email.
             </p>
             <p style="color: #999; font-size: 12px; margin: 10px 0 0 0; text-align: center;">
-              © 2026 EdNova. All rights reserved.
+              © 2026 Noveris. All rights reserved.
             </p>
           </div>
         </div>
@@ -106,7 +106,7 @@ export const templates = {
     taskDueDate: string | Date,
     name: string = 'Student'
   ): EmailTemplateResult => ({
-    subject: '📚 EdNova - Time to Study!',
+    subject: '📚 Noveris - Time to Study!',
     html: `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px;">
         <div style="background: white; border-radius: 12px; padding: 40px; box-shadow: 0 10px 40px rgba(0,0,0,0.1);">
@@ -132,7 +132,7 @@ export const templates = {
           
           <div style="border-top: 1px solid #eee; margin-top: 30px; padding-top: 20px;">
             <p style="color: #999; font-size: 12px; margin: 0; text-align: center;">
-              © 2026 EdNova. All rights reserved.
+              © 2026 Noveris. All rights reserved.
             </p>
           </div>
         </div>
@@ -149,7 +149,7 @@ export const templates = {
     bonusXP: number = 0,
     name: string = 'Student'
   ): EmailTemplateResult => ({
-    subject: `🎉 EdNova - Level ${newLevel} Achieved!`,
+    subject: `🎉 Noveris - Level ${newLevel} Achieved!`,
     html: `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px;">
         <div style="background: white; border-radius: 12px; padding: 40px; box-shadow: 0 10px 40px rgba(0,0,0,0.1);">
@@ -174,7 +174,7 @@ export const templates = {
           
           <div style="border-top: 1px solid #eee; margin-top: 30px; padding-top: 20px;">
             <p style="color: #999; font-size: 12px; margin: 0; text-align: center;">
-              © 2026 EdNova. All rights reserved.
+              © 2026 Noveris. All rights reserved.
             </p>
           </div>
         </div>
@@ -190,7 +190,7 @@ export const templates = {
     planName: string = 'VIP',
     name: string = 'Student'
   ): EmailTemplateResult => ({
-    subject: `⏰ EdNova - Your ${planName} Plan Expires Soon`,
+    subject: `⏰ Noveris - Your ${planName} Plan Expires Soon`,
     html: `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px;">
         <div style="background: white; border-radius: 12px; padding: 40px; box-shadow: 0 10px 40px rgba(0,0,0,0.1);">
@@ -223,7 +223,7 @@ export const templates = {
           
           <div style="border-top: 1px solid #eee; margin-top: 30px; padding-top: 20px;">
             <p style="color: #999; font-size: 12px; margin: 0; text-align: center;">
-              © 2026 EdNova. All rights reserved.
+              © 2026 Noveris. All rights reserved.
             </p>
           </div>
         </div>
@@ -235,11 +235,11 @@ export const templates = {
    * Welcome email after verification
    */
   welcomeEmail: (name: string = 'Student'): EmailTemplateResult => ({
-    subject: '👋 Welcome to EdNova - Get Started!',
+    subject: '👋 Welcome to Noveris - Get Started!',
     html: `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px;">
         <div style="background: white; border-radius: 12px; padding: 40px; box-shadow: 0 10px 40px rgba(0,0,0,0.1);">
-          <h1 style="color: #333; font-size: 28px; margin: 0 0 10px 0; text-align: center;">Welcome to EdNova! 🎓</h1>
+          <h1 style="color: #333; font-size: 28px; margin: 0 0 10px 0; text-align: center;">Welcome to Noveris! 🎓</h1>
           <p style="color: #666; text-align: center; margin: 0 0 30px 0;">Hi ${name}, you're all set!</p>
           
           <p style="color: #666; margin: 20px 0; line-height: 1.6;">
@@ -273,7 +273,7 @@ export const templates = {
               Questions? Visit our <a href="https://ednova.com/help" style="color: #667eea; text-decoration: none;">Help Center</a> or contact <a href="mailto:support@ednova.com" style="color: #667eea; text-decoration: none;">support@ednova.com</a>
             </p>
             <p style="color: #999; font-size: 12px; margin: 10px 0 0 0; text-align: center;">
-              © 2026 EdNova. All rights reserved.
+              © 2026 Noveris. All rights reserved.
             </p>
           </div>
         </div>

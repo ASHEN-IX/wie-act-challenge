@@ -185,7 +185,7 @@
   }
 }
 
-/* Focus Mode: hide EdNova's own navigation chrome while a session is active.
+/* Focus Mode: hide Noveris's own navigation chrome while a session is active.
    The session bar and the learning content stay visible. */
 html[data-focus="on"] [data-focus-hide] {
   display: none !important;

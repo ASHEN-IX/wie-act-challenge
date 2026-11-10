@@ -1,5 +1,5 @@
 /** Test-only Server Action transport. Production never imports this file. */
-import { courseNardouchGrowth } from "@ednova/shared/ednova/nardouchGrowth";
+import { courseNardouchGrowth } from "@noveris/shared/ednova/nardouchGrowth";
 const lessons = Array.from({ length: 4 }, (_, i) => ({
   id: `lesson-${i}`,
   title: ["Recursion", "Binary search", "Stacks and queues", "Course review"][

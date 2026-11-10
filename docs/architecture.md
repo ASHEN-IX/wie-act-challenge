@@ -1,67 +1,77 @@
-# CURRENT architecture — verified source, 18 October 2026
+# Noveris implementation architecture
 
-This describes code present in this checkout, not certification of production behavior. Read [validation](audit/validation.md) for failures and [target architecture](target-architecture.md) for PLANNED EdNova adaptations.
+The application consists of a Next.js web experience, a NestJS control plane, a Python AI HTTP service and background workers. Product contexts and subscriptions are described separately in [product architecture](product-specification.md) and [business model](business-model.md).
 
-## Boundaries and technologies
+## Runtime entrypoints
 
-One Git repository contains a pnpm workspace: API shell, web, shared package and seven domain packages (11 packages total). Python is separately operated and uses Poetry; it is not a pnpm package. All maintained documentation lives under `docs/`. Manifests declare Next ^16.4, React ^19.3, Nest ^12.1, Prisma ^7.10, Better Auth ^1.7.7, Node >=24 and pnpm 11.3.0. Python supports >=3.11,<3.15; Compose uses PostgreSQL 17, Redis 7 and RabbitMQ 3 (MongoDB 7 remains only for the Python service's own collections).
+| Component | Entrypoint | Responsibility |
+| --- | --- | --- |
+| Web | `apps/web/src/app` and `src/proxy.ts` | App Router, server actions, page rendering, security headers and auth HTTP boundary |
+| API | `apps/api/src/main.ts` and `src/framework/bootstrap.ts` | Nest lifecycle, persistence, domain contracts, realtime and result consumers |
+| AI HTTP | `apps/ai/services/api/main.py` | FastAPI routers protected by service authentication |
+| Workers | `apps/ai/workers/*_worker.py` | Ingestion, planning, scheduling, coaching, evaluation and search jobs |
+| Local launcher | `scripts/run-ai.mjs` | HTTP service, a selected worker or all configured workers |
 
-```text
-Browser -> Next (:5173) -> /api/auth -> Better Auth -> Postgres auth_* tables
-        -> /api/v1 rewrite or nginx -> Nest (:3000) -> domain contracts -> Postgres (Prisma)
-        -> /ws/realtime, /ws/notifications -> notification module
-Browser <-> peer browser: WebRTC audio; WS carries signaling, not audio packets
-Nest -> independent FastAPI (:8000): authenticated HTTP
-Nest -> RabbitMQ -> separately launched Python worker -> result/progress -> Postgres (API schema via Prisma; AI-owned `ai` schema via psycopg)
-Redis: cache/rate state; optional Python idempotency and evaluation session state
+```mermaid
+flowchart TD
+    Browser[Browser client components] -->|Server actions and page requests| Web[Next.js server]
+    Web -->|Authenticated HTTP| API[NestJS domains]
+    Browser -. WebSocket .-> API
+    Web -->|Better Auth| Postgres[(PostgreSQL)]
+    API -->|Prisma| Postgres
+    API -->|Service-authenticated HTTP| AI[FastAPI and model workflows]
+    AI -->|Internal context and budget requests| API
+    AI -->|Exact approved model| Models[Inference providers]
+    API -->|Typed jobs| Broker[RabbitMQ]
+    Broker --> Workers[Python workers]
+    Workers -->|Progress and results| Broker
+    Broker --> API
+    AI --> Cache[(Redis)]
+    AI --> Artifacts[Shared source files and FAISS]
+    Workers --> Artifacts
+    AI -->|AI-owned repositories| Postgres
 ```
 
-## Application and domains
+## Frontend boundary
 
-`apps/api/src/main.ts` starts Nest through `framework/bootstrap.ts`, owns lifecycle, connects persistence, attaches realtime, starts result consumers and study pollers, and drains them on stop. `src/framework/app.module.ts` loads auth, users, study, AI, signals, analytics and notifications. Generated controllers call `DomainService`, which dispatches operations loaded from `src/domain-definitions.ts`. Existing route files export `createContracts()` operations; this is not a wholesale rewrite into independent Nest business services.
+Server Components load protected data through `src/lib/api.ts`. The adapter resolves identity, forwards the session and requests uncached responses. Feature-local server actions validate form input and issue mutations. Client components own interactive activities, lab controls, status, room sockets and form transitions. Better Auth web endpoints use the shared auth implementation and PostgreSQL session state.
 
-`shared/moduleClient.ts` routes `module://` requests in process with request context, identity and handler execution. Non-module URLs use `shared/aiClient.ts`; do not replace module calls with a service fleet. `src/app.ts` retains an Express-compatible application exercised by legacy tests; it is not the production entrypoint and is not proven dead.
+The source uses Next.js 16 and React 19. The landing page and application metadata use Noveris branding. Package and configuration identifiers may retain historical names.
 
-| Domain | Actual public surfaces | Main persistence / responsibilities |
-|---|---|---|
-| Auth | `/api/v1/auth`, `/api/v1/auth/admin`, `/api/v1/auth/stripe` | Domain User, payments/coupons, profile/account administration and entitlements; Better Auth HTTP engine is separate |
-| Users | `/api/v1/users/profile`, `/api/v1/users/availability`, `/api/v1/users/gamification`, `/api/v1/users/quests`, `/api/v1/users/friends` | Profiles, ranks, XP, quests, availability and friendships |
-| Study | `/api/v1/study/*`, `/api/v1/competencies`, `/api/v1/coach` | Tasks, subjects, courses, solo/team sessions, plans, objectives and competency updates |
-| AI | `/api/v1/ai/*`, `/api/v1/eval`, `/api/v1/search` | AI jobs, evaluation outputs, external AI requests and results |
-| Signals | `/api/v1/signals/focus` | Focus sessions and telemetry |
-| Analytics | `/api/v1/analytics` | Events/insights; not an institution-scoped instructor dashboard |
-| Notifications | `/api/v1/notifications`, `/api/v1/session-chat`, `/api/v1/voice`; `/ws/*` | Mail, notifications, search-style session chat and voice signaling |
+## Control-plane domains
 
-Authoritative endpoint registration is `src/domain-definitions.ts` and generated `src/framework/domains/*.module.ts`; old `.js` route maps are historical.
+NestJS loads generated domain adapters over the repository's existing route contracts. `src/domain-definitions.ts` and generated framework modules establish endpoint registration. `shared/moduleClient.ts` supports in-process module calls. These are domain boundaries inside the API process rather than an independent microservice fleet.
 
-## Frontend
+Study owns subjects, courses, publication, institution contexts, assignment/enrollment, activities, room commands, private attempts and evidence. Auth owns account/session integration, roles and account entitlement surfaces. Notifications attaches realtime transports and peer-message delivery. AI orchestration consumes job results and exposes actor-scoped jobs. Other existing domains cover profile, availability, signals and analytics.
 
-`src/app` owns native App Router pages/layouts and Better Auth routes. Server Components read through `src/lib/api.ts`; authenticated Server Actions live beside module features in `src/features`. The gateway forwards session cookies to Nest with no shared user-data cache. Small client components handle forms, job polling and room realtime. React 19, Tailwind 4 and shadcn/ui replace the legacy SPA shell, navigation adapter, Zustand/React Query stores and screen CSS. See [frontend guide](frontend-web.md) for route changes and retired legacy UI.
+## Domain versus inference authority
 
-`src/proxy.ts` adds CSP/nonce and headers. HTTP rewrites and WebSockets retain their existing boundaries. Backend voice/signaling is reusable, but voice controls are not part of the rebuilt UI yet.
+The API resolves the actor, current resource grant, source revision and authoritative application state. It sends a minimized request to Python. The AI service validates input, assembles task-specific context, resolves a model alias and requests budget reservation through authenticated internal API routes. A model proposes data or language. The application validates the projection before using it in a state change.
 
-## Identity, authorization and storage
+A facilitator proposal cannot independently advance a room. A lab plan cannot introduce an executable component. An answer cannot create learning evidence merely by being generated. The private assessment boundary decides eligible evidence using the stored activity and server evaluation.
 
-Better Auth uses `auth_users`, `auth_accounts`, `auth_sessions`, `auth_verifications` and `auth_rate_limits` alongside preserved domain `users`. Session identity is resolved from Postgres-backed cookies; bcrypt compatibility supports old passwords. API SessionGuard authenticates; domain roles and tier gates restrict operations. `operationPolicy.ts` scopes AI actor/resource references and namespaces evaluation conversation IDs. Existing global roles are student/admin; M04-A/M04-A.1 adds institution membership and invitation schemas, but no course enrollment or institutional course scope exists.
+## Persistence ownership
 
-Owner filters exist on personal course reads/downloads. Team creation's course lookup, session-chat/voice HTTP resource checks and generic static `/uploads` mounts require review: presence of authentication is not proof of content isolation. WebSocket connect and inbound messages check identity and team membership; session broadcast/heartbeat behavior must also be tested under revocation. See ED-02 and [roles](roles-and-permissions.md).
+Prisma manages application and auth records. Python repositories manage AI-owned tables in PostgreSQL's `ai` schema, including operational history and embedding storage. `AI_DATABASE_URL` may select the configured PostgreSQL deployment; schema ownership remains separate even when connection URLs match.
 
-PostgreSQL stores business and auth state through Prisma; the Python service keeps what it alone produces (coach history, pacing, schedules, signals, review schedule, embeddings, search history, formula dispatch markers) in the `ai` schema of PostgreSQL, and reads API-owned data over HTTP with `x-internal-secret`. FAISS indexes and embeddings are also stored on disk; uploads use local/Compose volumes. Multiple schema views of learning objectives/eval results are intentional read/write boundaries, not automatically duplicate dead models. [Data model](data-model.md) records relationships and unresolved ownership boundaries.
+The API owns the LLM approval ledger. Python calls its internal budget endpoints instead of independently writing application budget records. Shared originals and FAISS artifacts require filesystem access in both services. Course and revision identity plus hashes protect source association. Redis cache data is a reusable projection rather than the durable accepted-evidence record.
 
-## AI and background flow
+## Synchronous and asynchronous work
 
-Upload -> validated file staging -> course/job identifiers -> RabbitMQ ingestion worker -> parsing/OCR/enrichment/chunks/embeddings/objectives -> results/progress -> course status and topics. Planner retrieves course context, decomposes goals, adds reviews/buffers and generates task graphs; scheduler places tasks into availability. Evaluator supports individual multi-turn Socratic checks; competency pollers consume evaluation evidence. Coach uses signals/rules and optional LLM decisions. Search retrieves web sources and synthesizes answers; reflection aggregates learning metrics.
+HTTP supports bounded request/response paths such as tutor and lab planning. RabbitMQ handles background jobs and results with message/correlation identity, progress and failure classification. Worker retries and dead-lettering are a separate recovery mechanism from model-client retries. The shared LiteLLM router disables transparent model retries and provider fallbacks under exact-model approvals.
 
-Shared LiteLLM aliases are per agent; **no challenge compact/capable policy is implemented**. Missing credentials can trigger mocks. Provider fallbacks do not establish challenge-compliant degraded pedagogy. Broker contracts retain typed payloads, correlations, idempotency leases, retry TTL queues, DLQs and result consumers. Ingest/planner/coach/evaluator/search/schedule workers are separate entrypoints. FastAPI's Compose command starts HTTP only; workers need independent launch. See [AI specification](ai-specification.md) and [message contract](contracts/ai-message-contract.md).
+WebSockets deliver room state, presence and facilitator events. Persisted room command receipts and peer history recover accepted operations after delivery uncertainty. This design still needs multi-instance realtime and production-capacity validation.
 
-## Realtime and infrastructure
+## Consistency mechanisms
 
-Team sessions support invite codes, participant lists and task progress. Realtime handles `chat_query`, voice signaling, mute and speaking updates. SessionChat stores query/result/coach messages, not a full peer-discussion/facilitation model. Browser WebRTC uses STUN; no managed SFU/TURN service is supplied. No tested synchronized PDF/page/exercise protocol, group misconception state machine or private tutor channel exists.
+| Operation | Identity and guard | Durable outcome |
+| --- | --- | --- |
+| Draft edit/publication | Expected version, revision tag and source identity | Published or updated revision |
+| Room command | Stable command ID and expected room sequence | Command receipt and new room state |
+| Peer send | Stable submission ID and peer sequence | Bounded durable message journal |
+| Private attempt | Actor, attempt ID, activity pin and payload hash | Resumable receipt and eligible evidence |
+| AI request | Approval identity, task/model, expiry and limits | Conditional request reservation and usage |
 
-Main Compose defines API, Next web, nginx edge (:8080), PostgreSQL (:5433 published), Redis, RabbitMQ and Mailpit (:1025/:8025). Test Compose provides PostgreSQL (:5433) and Mailpit (:1026/:8026). AI Compose is separate and mounts an external upload volume; path/DB/broker/secret alignment requires explicit configuration. Production override plus `deploy/Caddyfile` and nginx config require validation; there is no evidence for zero-downtime or deployed-state claims.
+These are operation-specific boundaries. Authorization and final delivery can still occur across multiple steps. Existing tests exercise selected revocation, replay and isolation cases. They do not certify every deployment topology.
 
-Root CI declares Node checks, E2E and AI checks, but its AI install references absent `requirements.txt`. The nested Python workflow reflects former repository layout and is not automatically a root GitHub Actions workflow. Python Docker dependencies differ from Poetry, and the HTTP image does not constitute worker deployment. These remain ED-01 work, without changes to infrastructure in this audit.
-
-## v1.2 source verification addendum
-
-Rechecked ingestion/course routes, SocraticEvaluation, Gamification, reward route, awardService and RankEventLedger against the new brief. CURRENT extraction and XP/levels/achievements exist; TODO: reviewed editable Studio revisions, versioned trusted activity registry/selector, private attempts shared across solo/group and learning-evidence XP. The XP method adds totals/history; ranking's sparse unique eventKey and anti-farming KP logic are a separate path. Do not describe ranking replay protection as XP exactly-once protection. No runtime changes or tests were executed for this documentation update; prior validation results retain their original scope. See [v1.2 report](audit/ednova-v1-2-update.md) and [team implementation plan](team-delivery-plan.md).
+See [data model](data-model.md), [workflows](workflows.md), [AI specification](ai-specification.md) and [evidence](submission/evidence/EDNOVA-CLAIM-TRACEABILITY.md).

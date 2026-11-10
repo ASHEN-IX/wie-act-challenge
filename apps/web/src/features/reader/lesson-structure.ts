@@ -8,7 +8,7 @@
  * there so a learner can take it one concept at a time. Anything it hides as
  * page furniture is counted in `omitted` and stays in the original source.
  */
-import type { LessonBlockV2 } from "@ednova/shared/ednova/learningDocumentV2";
+import type { LessonBlockV2 } from "@noveris/shared/ednova/learningDocumentV2";
 
 type Paragraph = Extract<LessonBlockV2, { type: "paragraph" }>;
 type Callout = Extract<LessonBlockV2, { type: "callout" }>;

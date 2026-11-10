@@ -1,7 +1,7 @@
 "use client";
 import { useActionState, useState, type ReactNode } from "react";
 import { LoaderCircle } from "lucide-react";
-import type { LearningProfile } from "@ednova/shared/ednova/learningProfile";
+import type { LearningProfile } from "@noveris/shared/ednova/learningProfile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";

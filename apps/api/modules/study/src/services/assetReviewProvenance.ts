@@ -33,7 +33,9 @@ export function assetContentHash(asset: StructuredAssetV1): string {
         '{' +
         Object.keys(value)
           .sort()
-          .map((key) => JSON.stringify(key) + ':' + canonical((value as Record<string, unknown>)[key]))
+          .map(
+            (key) => JSON.stringify(key) + ':' + canonical((value as Record<string, unknown>)[key])
+          )
           .join(',') +
         '}'
       );
@@ -48,7 +50,7 @@ export function assetContentHash(asset: StructuredAssetV1): string {
     component: asset.component,
     payload: asset.payload,
     provenance: asset.provenance,
-    disclosure: asset.disclosure,
+    disclosure: asset.disclosure
   });
   return 'sha256:' + createHash('sha256').update(payload).digest('hex');
 }
@@ -82,7 +84,7 @@ export type ReviewProvenance = {
 const REVIEWABLE_PROVENANCE = new Set([
   'source_derived',
   'instructor_authored',
-  'reviewed_supplemental',
+  'reviewed_supplemental'
 ]);
 
 /**
@@ -94,7 +96,7 @@ const REVIEWABLE_PROVENANCE = new Set([
  */
 export async function verifyReviewProvenance(
   assets: readonly StructuredAssetV1[],
-  binding: { courseId: string; revisionId: string; lessonId: string },
+  binding: { courseId: string; revisionId: string; lessonId: string }
 ): Promise<Map<string, ReviewProvenance>> {
   const results = new Map<string, ReviewProvenance>();
   if (assets.length === 0) return results;
@@ -105,7 +107,7 @@ export async function verifyReviewProvenance(
   const rows = await StructuredAssetReview.find({
     courseId: binding.courseId,
     revisionId: binding.revisionId,
-    assetId: { $in: assets.map((asset) => asset.assetId) },
+    assetId: { $in: assets.map((asset) => asset.assetId) }
   })
     .limit(200)
     .lean();
@@ -128,14 +130,14 @@ export async function verifyReviewProvenance(
       contentHash,
       reviewId: null,
       reviewerUserId: null,
-      decidedAt: null,
+      decidedAt: null
     };
 
     if (!REVIEWABLE_PROVENANCE.has(asset.provenance)) {
       results.set(asset.assetId, {
         ...base,
         verified: false,
-        reason: 'provenance_not_reviewable',
+        reason: 'provenance_not_reviewable'
       });
       continue;
     }
@@ -149,7 +151,7 @@ export async function verifyReviewProvenance(
     const record = {
       reviewId: row.reviewId,
       reviewerUserId: row.reviewerUserId,
-      decidedAt: row.decidedAt.toISOString(),
+      decidedAt: row.decidedAt.toISOString()
     };
 
     if (row.decision !== 'approved') {
@@ -166,7 +168,7 @@ export async function verifyReviewProvenance(
         ...base,
         ...record,
         verified: false,
-        reason: 'version_mismatch',
+        reason: 'version_mismatch'
       });
       continue;
     }
@@ -175,7 +177,7 @@ export async function verifyReviewProvenance(
         ...base,
         ...record,
         verified: false,
-        reason: 'binding_mismatch',
+        reason: 'binding_mismatch'
       });
       continue;
     }
@@ -184,7 +186,7 @@ export async function verifyReviewProvenance(
         ...base,
         ...record,
         verified: false,
-        reason: 'reviewer_not_authorized',
+        reason: 'reviewer_not_authorized'
       });
       continue;
     }
@@ -221,7 +223,7 @@ export async function recordAssetReviewDecision(
     asset: StructuredAssetV1;
     decision: 'approved' | 'rejected';
     rationale?: string;
-  },
+  }
 ): Promise<{ reviewId: string; decision: string; contentHash: string }> {
   if (!(await canAuthorCourse(actor, input.courseId)))
     throw new ReviewDecisionError(403, 'REVIEWER_NOT_AUTHORIZED');
@@ -239,7 +241,7 @@ export async function recordAssetReviewDecision(
       courseId: input.courseId,
       revisionId: input.revisionId,
       assetId: input.assetId,
-      contentHash,
+      contentHash
     },
     {
       $set: {
@@ -253,11 +255,11 @@ export async function recordAssetReviewDecision(
         reviewerUserId: actor,
         reviewerRole: 'instructor',
         decidedAt: now,
-        ...(input.rationale ? { rationale: input.rationale.slice(0, 500) } : {}),
+        ...(input.rationale ? { rationale: input.rationale.slice(0, 500) } : {})
       },
-      $unset: { revokedAt: 1, revokedByUserId: 1 },
+      $unset: { revokedAt: 1, revokedByUserId: 1 }
     },
-    { upsert: true, new: true },
+    { upsert: true, new: true }
   );
 
   // A decision changes review eligibility, and plans may have been accepted
@@ -266,7 +268,7 @@ export async function recordAssetReviewDecision(
   await invalidateStoredPlans({
     courseId: input.courseId,
     revisionId: input.revisionId,
-    reason: `ASSET_REVIEW_${input.decision.toUpperCase()}`,
+    reason: `ASSET_REVIEW_${input.decision.toUpperCase()}`
   });
 
   return { reviewId, decision: input.decision, contentHash };

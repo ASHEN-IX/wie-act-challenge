@@ -390,7 +390,7 @@ export async function setVisibilityAction(
     return {
       success:
         visibility === "public"
-          ? "Saved. Anyone signed in to EdNova can now find and open this course."
+          ? "Saved. Anyone signed in to Noveris can now find and open this course."
           : visibility === "institution"
             ? "Saved. Only your institution's enrolled students can open this course."
             : "Saved. Only you can open this course.",

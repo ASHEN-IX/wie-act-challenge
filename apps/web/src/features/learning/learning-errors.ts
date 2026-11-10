@@ -31,7 +31,10 @@ export function learningErrorMessage(error: unknown): string {
   const message = messageOf(error);
   if (message.startsWith("Too many requests"))
     return "You are going a little fast. Wait a minute, then try the same thing again.";
-  return FRIENDLY[message] ?? (message || "Learning is unavailable right now.");
+  // Never print framework internals (e.g. minified React errors) to a learner.
+  if (!message || message.startsWith("Minified React error"))
+    return "Learning is unavailable right now. Your work is kept; try again in a moment.";
+  return FRIENDLY[message] ?? message;
 }
 
 export function isTransientLearningError(error: unknown): boolean {

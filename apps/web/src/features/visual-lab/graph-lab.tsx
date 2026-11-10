@@ -7,11 +7,11 @@ import { Label } from "@/components/ui/label";
 import {
   graphTrace,
   parseWeightedGraphScenario,
-} from "@ednova/shared/visualLab/graph";
+} from "@noveris/shared/visualLab/graph";
 import {
   VISUAL_LAB_LIMITS,
   type WeightedGraphScenario,
-} from "@ednova/shared/visualLab/types";
+} from "@noveris/shared/visualLab/types";
 import { GraphCanvas } from "./graph-canvas";
 
 const name = (scenario: WeightedGraphScenario, id: string) =>

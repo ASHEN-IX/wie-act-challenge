@@ -7,7 +7,7 @@ import type {
   LanguagePreference,
   LearningMode,
   NardouchConversation,
-} from "@ednova/shared/ednova/nardouch";
+} from "@noveris/shared/ednova/nardouch";
 import { sendNardouchTurn, loadNardouchConversation } from "./actions";
 import { ConversationPanel, SuggestedFollowups } from "./conversation-panel";
 import { VoiceRecorder } from "./voice-recorder";

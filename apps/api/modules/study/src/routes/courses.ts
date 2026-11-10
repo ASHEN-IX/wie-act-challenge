@@ -14,10 +14,10 @@ import type { Response, NextFunction, RequestHandler } from 'express';
 /** Prisma-shaped filter: a plain object of column predicates. */
 type FilterQuery = Record<string, unknown>;
 import type { ICourse, ICourseTopic, ISubtopic } from '../models';
-import { errorDetails } from '@ednova/shared/errors';
+import { errorDetails } from '@noveris/shared/errors';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createContracts } = require('@ednova/shared/domainContracts');
+const { createContracts } = require('@noveris/shared/domainContracts');
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
@@ -29,7 +29,7 @@ import * as formulaJobs from '../services/formulaJobs';
 import { activityDigest } from '../services/activityIdentity';
 import { FormulaProposal } from '../models/FormulaProposal';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const moduleClient = require('@ednova/shared/moduleClient');
+const moduleClient = require('@noveris/shared/moduleClient');
 import {
   Course,
   newCourseDocument,
@@ -95,9 +95,9 @@ import {
   EnrollmentError
 } from '../services/enrollments';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { tierGate } = require('@ednova/shared/tierGate');
+const { tierGate } = require('@noveris/shared/tierGate');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { requireMultipart } = require('@ednova/shared/middleware');
+const { requireMultipart } = require('@noveris/shared/middleware');
 import { deleteObjectivesForDocument } from '../services/objectives';
 import {
   enqueueCourseIngestionOperation,
@@ -107,7 +107,7 @@ import {
   IngestionConflictError
 } from '../services/ingestionControl';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { buildInternalHeaders } = require('@ednova/shared/auth');
+const { buildInternalHeaders } = require('@noveris/shared/auth');
 
 type CourseUpload = Pick<
   NonNullable<DomainRequest['file']>,
@@ -216,7 +216,7 @@ const {
   MAX_UPLOAD_BYTES,
   MAX_UPLOAD_MB,
   SNIFF_BYTES
-} = require('@ednova/shared/uploadValidation');
+} = require('@noveris/shared/uploadValidation');
 
 const upload = multer({
   storage: storage,
@@ -294,7 +294,7 @@ async function sniffUploadedFiles(req: DomainRequest, res: Response, next: NextF
       const header = await streamFileSlice(file.path, 0, SNIFF_BYTES - 1);
       if (header.length > 0) {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const { sniffMagicBytes } = require('@ednova/shared/uploadValidation');
+        const { sniffMagicBytes } = require('@noveris/shared/uploadValidation');
         if (sniffMagicBytes(header) === 'binary') {
           return next(
             rejectAndCleanup(
@@ -1241,7 +1241,9 @@ router.post(
         Object.keys(req.body || {}).some(
           (k) => !['documentId', 'regionId', 'draftVersion'].includes(k)
         ) ||
-        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(courseId) ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          courseId
+        ) ||
         !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(revisionId) ||
         typeof documentId !== 'string' ||
         !/^doc_[a-f0-9]{16}$/.test(documentId) ||
@@ -1533,7 +1535,14 @@ router.get(
         revisionId = String(req.params.revisionId),
         proposalId = String(req.params.proposalId);
       if (!req.user?.userId) return res.status(401).json({ error: 'UNAUTHENTICATED' });
-      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(courseId) || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(proposalId))
+      if (
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          courseId
+        ) ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          proposalId
+        )
+      )
         return res.status(422).json({ error: 'INVALID_REQUEST' });
       if (!(await canManageCourse(req.user.userId, courseId)))
         return res.status(403).json({ error: 'FORBIDDEN' });
@@ -1581,7 +1590,9 @@ router.get(
         documentId = String(req.params.documentId),
         regionId = String(req.params.regionId);
       if (
-        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(courseId) ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          courseId
+        ) ||
         !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(revisionId) ||
         !/^doc_[a-f0-9]{16}$/.test(documentId) ||
         !/^region_[a-f0-9]{20}$/.test(regionId)

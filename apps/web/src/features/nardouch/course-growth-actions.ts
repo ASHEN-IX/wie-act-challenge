@@ -2,7 +2,7 @@
 
 import { api, segment } from "@/lib/api";
 import { requireIdentity } from "@/server/identity";
-import type { CourseNardouchJourney } from "@ednova/shared/ednova/nardouchGrowth";
+import type { CourseNardouchJourney } from "@noveris/shared/ednova/nardouchGrowth";
 
 export async function loadCourseNardouch(
   courseId: string,

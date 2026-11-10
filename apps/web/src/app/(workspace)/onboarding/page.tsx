@@ -7,7 +7,7 @@ import {
   defaultLearningProfile,
   normalizeLearningProfile,
   type LearningProfile,
-} from "@ednova/shared/ednova/learningProfile";
+} from "@noveris/shared/ednova/learningProfile";
 
 export const metadata = { title: "Set up your learning" };
 

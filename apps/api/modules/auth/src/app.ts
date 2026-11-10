@@ -11,8 +11,8 @@ import {
   rateLimiter,
   healthCheck,
   requireEnv
-} from '@ednova/shared';
-import { authenticate } from '@ednova/shared/auth';
+} from '@noveris/shared';
+import { authenticate } from '@noveris/shared/auth';
 
 // --- Environment validation (fail-fast on missing secrets) ---
 requireEnv(['DATABASE_URL'], { serviceName: 'auth' });

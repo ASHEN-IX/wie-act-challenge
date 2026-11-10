@@ -7,7 +7,12 @@ export type CourseAccessRole = 'owner' | 'instructor' | 'admin' | 'student';
  * Legacy institutions without an explicit active state fail closed (no implicit migration).
  */
 async function courseGrant(userId: string, courseId: unknown) {
-  if (!userId || typeof courseId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(courseId)) return null;
+  if (
+    !userId ||
+    typeof courseId !== 'string' ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(courseId)
+  )
+    return null;
   const course = await Course.findById(courseId).select(
     'scope visibility userId ownerUserId institutionId assignedInstructorIds activeRevisionId'
   );

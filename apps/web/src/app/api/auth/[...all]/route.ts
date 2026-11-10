@@ -1,5 +1,5 @@
 import { toNextJsHandler } from "better-auth/next-js";
-import { getAuth } from "@ednova/shared/betterAuth";
+import { getAuth } from "@noveris/shared/betterAuth";
 
 export const runtime = "nodejs";
 

@@ -15,7 +15,7 @@ import {
   projectileOutput,
   projectileTrajectory,
   type ProjectileValues,
-} from "@ednova/shared/visualLab/spatial-models";
+} from "@noveris/shared/visualLab/spatial-models";
 
 const HALF_SIZE = 8; // scene units from origin to the grid edge
 const FLIGHT_SECONDS = 3.2; // wall-clock length of one replay, independent of physics time

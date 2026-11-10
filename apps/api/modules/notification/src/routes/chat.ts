@@ -1,11 +1,11 @@
-import { createContracts } from '@ednova/shared/domainContracts';
+import { createContracts } from '@noveris/shared/domainContracts';
 import Joi from 'joi';
 import type { Response, NextFunction } from 'express';
 import { processSearchQuery, getHistory, deleteMessage } from '../services/chatService';
 import { acceptPeerText, peerHistory, PeerTextError } from '../services/peerText';
 import { broadcastToSession } from '../realtime';
 import type { DomainRequest } from '../../../../src/framework/contracts';
-import { logger } from '@ednova/shared';
+import { logger } from '@noveris/shared';
 import { verifySessionMembership } from '../utils/session-access';
 
 const router = createContracts();

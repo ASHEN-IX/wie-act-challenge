@@ -1,5 +1,5 @@
 import type { WebSocket } from 'ws';
-import { errorDetails } from '@ednova/shared/errors';
+import { errorDetails } from '@noveris/shared/errors';
 import { processSearchQuery } from '../services/chatService';
 
 export interface ChatHandlerContext {

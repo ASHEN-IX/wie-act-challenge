@@ -22,7 +22,7 @@ import {
   EXPERIENCE_PLAN_SCHEMA_VERSION,
   experienceContextFingerprint,
   type ProposedPlacement,
-  type UntrustedExperiencePlanProposal,
+  type UntrustedExperiencePlanProposal
 } from './experiencePlan';
 import { EXPERIENCE_PLAN_BINDINGS } from './experiencePlan';
 import { COMPONENT_CAPABILITIES, type ComponentType } from './componentRegistry';
@@ -56,7 +56,7 @@ export const MOCK_PLANNER_SCENARIOS = [
   'attack_script_component',
   // provider failure modes
   'provider_timeout',
-  'provider_malformed',
+  'provider_malformed'
 ] as const;
 
 export type MockPlannerScenario = (typeof MOCK_PLANNER_SCENARIOS)[number];
@@ -174,7 +174,7 @@ function canonicalPlacements(context: MockPlannerContext): ProposedPlacement[] {
       group: groupFor(block),
       disclosure: 'expanded' as const,
       ...(interactionFor(block) !== undefined ? { interaction: interactionFor(block) } : {}),
-      fallback: fallbackFor(component),
+      fallback: fallbackFor(component)
     };
   });
 }
@@ -186,11 +186,11 @@ function validProposal(
     placements?: ProposedPlacement[];
     supplemental?: ProposedPlacement[];
     plannerVersion?: string;
-  } = {},
+  } = {}
 ): UntrustedExperiencePlanProposal {
   const placements = [
     ...(adjustments.placements ?? canonicalPlacements(context)),
-    ...(adjustments.supplemental ?? []),
+    ...(adjustments.supplemental ?? [])
   ];
   return {
     schemaVersion: EXPERIENCE_PLAN_SCHEMA_VERSION,
@@ -209,17 +209,15 @@ function validProposal(
         contentHash: context.contentHash,
         lessonId: context.lessonId,
         mode: context.mode,
-        blockIds: context.blocks.map((block) => block.blockId),
-      }),
+        blockIds: context.blocks.map((block) => block.blockId)
+      })
     },
     planner: {
       implementation: MOCK_PLANNER_IMPLEMENTATION,
-      version: adjustments.plannerVersion ?? MOCK_PLANNER_VERSION,
+      version: adjustments.plannerVersion ?? MOCK_PLANNER_VERSION
     },
     placements,
-    notes: [
-      'Deterministic mock plan. No model inference was performed and no provider was called.',
-    ],
+    notes: ['Deterministic mock plan. No model inference was performed and no provider was called.']
   };
 }
 
@@ -237,8 +235,8 @@ function supplementalPlacements(context: MockPlannerContext): ProposedPlacement[
       assetId: asset.assetId,
       group: 'example',
       disclosure: 'expanded',
-      fallback: fallbackFor(asset.component),
-    },
+      fallback: fallbackFor(asset.component)
+    }
   ];
 }
 
@@ -252,7 +250,7 @@ function supplementalPlacements(context: MockPlannerContext): ProposedPlacement[
  */
 export function planMockExperience(
   scenario: MockPlannerScenario,
-  context: MockPlannerContext,
+  context: MockPlannerContext
 ): MockPlannerResult {
   const base = () => validProposal(context, `plan-${scenario}`);
 
@@ -263,7 +261,7 @@ export function planMockExperience(
     case 'valid_engineering':
     case 'valid_prose': {
       const proposal = validProposal(context, `plan-${scenario}`, {
-        supplemental: supplementalPlacements(context),
+        supplemental: supplementalPlacements(context)
       });
       return { ok: true, proposal };
     }
@@ -302,7 +300,7 @@ export function planMockExperience(
       if (proposal.placements.length > 1)
         [proposal.placements[0], proposal.placements[1]] = [
           proposal.placements[1],
-          proposal.placements[0],
+          proposal.placements[0]
         ];
       return { ok: true, proposal };
     }
@@ -311,7 +309,7 @@ export function planMockExperience(
       if (proposal.placements.length > 1)
         proposal.placements.push({
           ...proposal.placements[0],
-          placementId: 'p-duplicate',
+          placementId: 'p-duplicate'
         });
       return { ok: true, proposal };
     }
@@ -329,7 +327,7 @@ export function planMockExperience(
     case 'attack_unsafe_url': {
       const proposal = base();
       proposal.placements[0].interaction = {
-        href: 'javascript:alert(document.cookie)',
+        href: 'javascript:alert(document.cookie)'
       };
       return { ok: true, proposal };
     }
@@ -339,11 +337,11 @@ export function planMockExperience(
       // the prototype instead, which would never reach the validator as data.
       const serialized = JSON.stringify(base()).replace(
         '"placementId":"p-1"',
-        '"__proto__":{"validated":true},"placementId":"p-1"',
+        '"__proto__":{"validated":true},"placementId":"p-1"'
       );
       return {
         ok: true,
-        proposal: JSON.parse(serialized) as UntrustedExperiencePlanProposal,
+        proposal: JSON.parse(serialized) as UntrustedExperiencePlanProposal
       };
     }
 
@@ -359,7 +357,7 @@ export function planMockExperience(
         assetId: 'asset_that_was_never_stored',
         group: 'reference',
         disclosure: 'expanded',
-        fallback: 'SourceDiagram',
+        fallback: 'SourceDiagram'
       });
       return { ok: true, proposal };
     }
@@ -371,14 +369,14 @@ export function planMockExperience(
         kind: 'supplemental',
         block: {
           lessonId: context.lessonId,
-          blockId: generated?.blockId ?? context.blocks[0]?.blockId ?? 'missing',
+          blockId: generated?.blockId ?? context.blocks[0]?.blockId ?? 'missing'
         },
         component: generated?.component ?? 'NetworkTopology',
         componentVersion: '1.0.0',
         assetId: generated?.assetId ?? 'asset_generated_proposal_1',
         group: 'reference',
         disclosure: 'expanded',
-        fallback: 'SourceDiagram',
+        fallback: 'SourceDiagram'
       });
       return { ok: true, proposal };
     }
@@ -390,7 +388,7 @@ export function planMockExperience(
         status: 'instructor_reviewed',
         reviewedBy: 'attacker',
         reviewedAt: '2026-01-01T00:00:00Z',
-        scope: 'all',
+        scope: 'all'
       };
       return { ok: true, proposal };
     }
@@ -403,7 +401,7 @@ export function planMockExperience(
       // rather than a coverage rule that happens to trip first.
       proposal.placements = Array.from(
         { length: EXPERIENCE_PLAN_LIMITS.maxPlacements + 1 },
-        (_, index) => ({ ...template, placementId: `p-${index}` }),
+        (_, index) => ({ ...template, placementId: `p-${index}` })
       );
       return { ok: true, proposal };
     }
@@ -431,7 +429,7 @@ export function planMockExperience(
  * provider response crosses, not through a pre-built object. */
 export function mockPlannerResponseText(
   scenario: MockPlannerScenario,
-  context: MockPlannerContext,
+  context: MockPlannerContext
 ): string | null {
   const result = planMockExperience(scenario, context);
   if (!result.ok) return null;

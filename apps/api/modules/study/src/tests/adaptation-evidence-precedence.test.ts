@@ -14,7 +14,7 @@
 import {
   DEFAULT_PREFERENCES,
   type AdaptationEvidence,
-  type LessonSupport,
+  type LessonSupport
 } from '../../../../shared/ednova/learningAdaptation';
 import { evaluateAdaptation, type PolicyInput } from '../../../../shared/ednova/adaptationPolicy';
 import type { LearningMode } from '../../../../shared/ednova/learningModes';
@@ -30,13 +30,13 @@ function support(overrides: Partial<LessonSupport> = {}): LessonSupport {
     hasEligibleAsset: false,
     hasProofMaterial: false,
     hasWorkedExamples: false,
-    ...overrides,
+    ...overrides
   };
 }
 
 function record(
   mastered: boolean,
-  overrides: Partial<AdaptationEvidence> = {},
+  overrides: Partial<AdaptationEvidence> = {}
 ): AdaptationEvidence {
   return {
     evidenceClass: 'accepted_assessment',
@@ -45,13 +45,13 @@ function record(
     objectiveId: 'obj-1',
     mastered,
     evaluatorVersion: '1.0.0',
-    ...overrides,
+    ...overrides
   };
 }
 
 function evaluate(
   evidence: AdaptationEvidence[],
-  lessonObjectiveIds: readonly string[] = ['obj-1'],
+  lessonObjectiveIds: readonly string[] = ['obj-1']
 ) {
   const input: PolicyInput = {
     courseId,
@@ -62,7 +62,7 @@ function evaluate(
     evidence,
     support: support(),
     evidenceFingerprint: 'fnv1a64:0123456789abcdef',
-    now: new Date('2026-11-07T10:00:00.000Z'),
+    now: new Date('2026-11-07T10:00:00.000Z')
   };
   return evaluateAdaptation(input, lessonObjectiveIds);
 }
@@ -115,9 +115,9 @@ describe('multiple accepted records for one objective', () => {
       [
         record(true, { objectiveId: 'obj-1' }),
         record(false, { objectiveId: 'obj-2' }),
-        record(true, { objectiveId: 'obj-2' }),
+        record(true, { objectiveId: 'obj-2' })
       ],
-      ['obj-1', 'obj-2'],
+      ['obj-1', 'obj-2']
     );
     // obj-2 has a pass, so neither objective is pending.
     expect(result.recommendedMode).toBeNull();
@@ -125,11 +125,8 @@ describe('multiple accepted records for one objective', () => {
 
   it('names only the objective that is genuinely pending', () => {
     const result = evaluate(
-      [
-        record(true, { objectiveId: 'obj-1' }),
-        record(false, { objectiveId: 'obj-2' }),
-      ],
-      ['obj-1', 'obj-2'],
+      [record(true, { objectiveId: 'obj-1' }), record(false, { objectiveId: 'obj-2' })],
+      ['obj-1', 'obj-2']
     );
     expect(result.objectiveIds).toEqual(['obj-2']);
   });
@@ -138,10 +135,7 @@ describe('multiple accepted records for one objective', () => {
     // A pass in another revision is not evidence about this one. The service
     // filters it out before the policy runs; this asserts the policy's own
     // contract when such a row somehow arrives.
-    const result = evaluate([
-      record(true, { revisionId: 'rev_other' }),
-      record(false),
-    ]);
+    const result = evaluate([record(true, { revisionId: 'rev_other' }), record(false)]);
     // The policy treats accepted assessment records uniformly; the *service*
     // is what enforces revision scope. Documented here so the boundary is
     // explicit rather than assumed.
@@ -159,8 +153,8 @@ describe('non-assessment evidence never decides', () => {
         revisionId,
         objectiveId: 'obj-1',
         mastered: true,
-        evaluatorVersion: 'n/a',
-      },
+        evaluatorVersion: 'n/a'
+      }
     ]);
     expect(withInteraction.recommendedMode).toBe('guided');
   });
@@ -174,8 +168,8 @@ describe('non-assessment evidence never decides', () => {
         revisionId,
         objectiveId: 'obj-1',
         mastered: true,
-        evaluatorVersion: 'n/a',
-      },
+        evaluatorVersion: 'n/a'
+      }
     ]);
     expect(result.recommendedMode).toBe('guided');
   });

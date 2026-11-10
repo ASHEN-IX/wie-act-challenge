@@ -1,4 +1,4 @@
-import { errorDetails } from '@ednova/shared/errors';
+import { errorDetails } from '@noveris/shared/errors';
 /**
  * BLOOM-07 — CompetencyProfile estimator service.
  *

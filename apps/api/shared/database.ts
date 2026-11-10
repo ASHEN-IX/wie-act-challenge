@@ -15,8 +15,7 @@
  */
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma/client';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const logger = require('./logger');
+import logger from './logger';
 
 let client: PrismaClient | undefined;
 
@@ -43,7 +42,7 @@ export function prismaClient(): PrismaClient {
 /**
  * Prisma client for modules that import `prisma` directly.
  *
- * A lazy proxy keeps `import { prisma } from '@ednova/shared/database'` working
+ * A lazy proxy keeps `import { prisma } from '@noveris/shared/database'` working
  * at module-evaluation time, before DATABASE_URL is necessarily set.
  */
 export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
@@ -113,15 +112,3 @@ export function toDocuments<T>(rows: T[] | null | undefined): T[] | null {
 export function toDocumentOrNull<T>(row: T | null | undefined): T | null {
   return row ?? null;
 }
-
-module.exports = {
-  prisma,
-  prismaClient,
-  connectDatabase,
-  disconnectDatabase,
-  isConnectedToDatabase,
-  hasDatabaseClient,
-  toDocument,
-  toDocuments,
-  toDocumentOrNull
-};

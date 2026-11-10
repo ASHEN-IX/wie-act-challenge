@@ -1,7 +1,7 @@
 "use client";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { BadgeCheck, ImageOff, PencilRuler, ShieldQuestion } from "lucide-react";
-import type { LessonBlockV2 } from "@ednova/shared/ednova/learningDocumentV2";
+import type { LessonBlockV2 } from "@noveris/shared/ednova/learningDocumentV2";
 import { Badge } from "@/components/ui/badge";
 import { cropAspect } from "../crop-aspect";
 import { Button } from "@/components/ui/button";

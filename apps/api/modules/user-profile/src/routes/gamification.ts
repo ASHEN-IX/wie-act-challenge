@@ -1,11 +1,11 @@
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response } from 'express';
-import { createContracts } from '@ednova/shared/domainContracts';
+import { createContracts } from '@noveris/shared/domainContracts';
 import type { Prisma } from '../../../../src/generated/prisma/client';
 import Gamification from '../models/Gamification';
 import UserProfile from '../models/UserProfile';
 import Friendship from '../models/Friendship';
-import { requireInternal, isInternalRequest } from '@ednova/shared/auth';
+import { requireInternal, isInternalRequest } from '@noveris/shared/auth';
 
 const router = createContracts();
 
@@ -50,7 +50,7 @@ router.post('/award-xp', requireInternal, async (_req: DomainRequest, res: Respo
 // Get leaderboard
 router.get('/leaderboard', async (req: DomainRequest, res: Response) => {
   try {
-    const limit = require('@ednova/shared/pagination').boundedInteger(req.query.limit, 10, 100);
+    const limit = require('@noveris/shared/pagination').boundedInteger(req.query.limit, 10, 100);
     const type = req.query.type || 'friends'; // 'all' or 'friends' (default friends)
     const userId = req.user!.userId;
     const where: Prisma.GamificationWhereInput = {};

@@ -1,17 +1,17 @@
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Prisma } from '../../../../src/generated/prisma/client';
 import type { IAnalyticsEvent } from '../models/AnalyticsEvent';
-import { boundedInteger, activityRangeFilter } from '@ednova/shared/pagination';
+import { boundedInteger, activityRangeFilter } from '@noveris/shared/pagination';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createContracts } = require('@ednova/shared/domainContracts');
+const { createContracts } = require('@noveris/shared/domainContracts');
 import Joi from 'joi';
 import type { Response } from 'express';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const AnalyticsEvent: typeof import('../models/AnalyticsEvent').default = require('../models/AnalyticsEvent');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { getCacheClient } = require('@ednova/shared');
+const { getCacheClient } = require('@noveris/shared');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { asyncHandler } = require('@ednova/shared/middleware');
+const { asyncHandler } = require('@noveris/shared/middleware');
 
 const router = createContracts();
 const cache = getCacheClient();

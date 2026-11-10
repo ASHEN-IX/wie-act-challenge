@@ -337,7 +337,7 @@ export function FocusMode({ suggestedMinutes = 25 }: { suggestedMinutes?: number
               />
             </label>
             <p className="mt-3 text-xs text-muted-foreground">
-              This hides EdNova&apos;s own menus and keeps a timer. It cannot
+              This hides Noveris&apos;s own menus and keeps a timer. It cannot
               block other tabs or apps.
             </p>
             {isAuto(pathname) && (

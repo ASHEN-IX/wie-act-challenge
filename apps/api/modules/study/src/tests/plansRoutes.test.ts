@@ -56,12 +56,12 @@ jest.mock('../../../ai-orchestrator/src/models/AiJob', () => ({
   default: { findOne: (...args: unknown[]) => mockAiJobFindOne(...args) }
 }));
 
-jest.mock('@ednova/shared/moduleClient', () => ({
+jest.mock('@noveris/shared/moduleClient', () => ({
   post: jest.fn()
 }));
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const moduleClient = require('@ednova/shared/moduleClient');
+const moduleClient = require('@noveris/shared/moduleClient');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { StudyPlan, Task } = require('../models/index');
 import { getWeakCompetenciesForCourse } from '../services/competencyQueries';

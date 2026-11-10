@@ -43,7 +43,7 @@ interface WeakCompetency {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { BLOOM_LEVELS, UNLOCK_THRESHOLD } = require('@ednova/shared/bloom/taxonomy');
+const { BLOOM_LEVELS, UNLOCK_THRESHOLD } = require('@noveris/shared/bloom/taxonomy');
 
 const BLOOM_ORDER = ['REMEMBER', 'UNDERSTAND', 'APPLY', 'ANALYSE', 'EVALUATE', 'CREATE'];
 
@@ -236,7 +236,9 @@ async function getUserCompetencyMap(
   // Resolve subject names. Courses may carry either a Subject ObjectId or a slug,
   // so only well-formed ids are sent to an ObjectId query.
   const subjectIds = [...subjects.keys()];
-  const objectIds = subjectIds.filter((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id));
+  const objectIds = subjectIds.filter((id) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)
+  );
   // Subjects are authored by whoever created the course, not by the learner
   // reading their progress, so scope the lookup to the ids the learner can reach.
   const subjectDocs = objectIds.length

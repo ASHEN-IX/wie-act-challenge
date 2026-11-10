@@ -4,7 +4,7 @@ import {
   binarySearchTrace,
   parseBinarySearchState,
   DEFAULT_BINARY_SEARCH,
-} from "@ednova/shared/visualization";
+} from "@noveris/shared/visualization";
 import { BinarySearchVisualizer } from "./binary-search";
 
 describe("Deterministic binary search illustration", () => {

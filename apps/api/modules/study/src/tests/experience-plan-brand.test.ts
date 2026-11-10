@@ -13,13 +13,16 @@ import {
   finalizeExperiencePlan,
   isValidatedExperiencePlan,
   experienceContextFingerprint,
-  type ExperiencePlanValidationContext,
+  type ExperiencePlanValidationContext
 } from '../../../../shared/ednova/experiencePlan';
 import {
   validateExperiencePlan,
-  tryValidateExperiencePlan,
+  tryValidateExperiencePlan
 } from '../../../../shared/ednova/experiencePlanValidator';
-import { planMockExperience, type MockPlannerContext } from '../../../../shared/ednova/mockExperiencePlanner';
+import {
+  planMockExperience,
+  type MockPlannerContext
+} from '../../../../shared/ednova/mockExperiencePlanner';
 import { parsePublishedExperiencePlan } from '../../../../shared/ednova/publishedExperiencePlan';
 import { projectExperiencePlan } from '../services/experiencePlanning';
 import { verifyAssetBindings } from '../services/experiencePlanning';
@@ -37,7 +40,7 @@ const facts: ExperiencePlanValidationContext['blocks'] = [
     hasEvidence: true,
     hasSourceRegion: false,
     isReviewedFormula: false,
-    hasStructuredFixture: false,
+    hasStructuredFixture: false
   },
   {
     blockId: 'p1',
@@ -46,8 +49,8 @@ const facts: ExperiencePlanValidationContext['blocks'] = [
     hasEvidence: true,
     hasSourceRegion: false,
     isReviewedFormula: false,
-    hasStructuredFixture: false,
-  },
+    hasStructuredFixture: false
+  }
 ];
 
 function context(): ExperiencePlanValidationContext {
@@ -63,11 +66,11 @@ function context(): ExperiencePlanValidationContext {
       contentHash,
       lessonId: 'lesson-1',
       mode: 'read',
-      blockIds: facts.map((block) => block.blockId),
+      blockIds: facts.map((block) => block.blockId)
     }),
     allowedPlanners: [{ implementation: 'mock_experience_planner', version: '1.0.0' }],
     blocks: facts,
-    assets: [],
+    assets: []
   };
 }
 
@@ -85,9 +88,9 @@ function plannerContext(ctx: ExperiencePlanValidationContext): MockPlannerContex
       hasEvidence: block.hasEvidence,
       hasSourceRegion: block.hasSourceRegion,
       isReviewedFormula: block.isReviewedFormula,
-      hasStructuredFixture: block.hasStructuredFixture,
+      hasStructuredFixture: block.hasStructuredFixture
     })),
-    assets: [],
+    assets: []
   };
 }
 
@@ -166,9 +169,9 @@ describe('validation brand across a serialization boundary', () => {
         contextFingerprint: 'fnv1a64:0000000000000000',
         planner: { implementation: 'mock_experience_planner', version: '1.0.0' },
         canonical: [],
-        supplemental: [],
+        supplemental: []
       },
-      'fnv1a64:0000000000000000',
+      'fnv1a64:0000000000000000'
     );
     expect(Object.isFrozen(plan)).toBe(true);
     expect(() => {
@@ -186,7 +189,7 @@ describe('governance is re-derived per call, not carried by the brand', () => {
     // context on every validation, never inherited from a previous run.
     const stale = {
       ...result.proposal,
-      claims: { ...result.proposal.claims, revisionId: 'rev_other' },
+      claims: { ...result.proposal.claims, revisionId: 'rev_other' }
     };
     const outcome = tryValidateExperiencePlan(stale, ctx);
     expect(outcome.ok).toBe(false);
@@ -205,14 +208,14 @@ describe('governance is re-derived per call, not carried by the brand', () => {
       lessonId: 'lesson-1',
       component: 'CodeWalkthrough',
       provenance: 'instructor_authored',
-      review: { status: 'instructor_reviewed', reviewedBy: 'x', reviewedAt: '2026-01-01T00:00:00Z' },
+      review: { status: 'instructor_reviewed', reviewedBy: 'x', reviewedAt: '2026-01-01T00:00:00Z' }
     } as unknown as StructuredAssetV1;
 
     const [verified] = verifyAssetBindings([claimed], {
       courseId,
       revisionId,
       lessonId: 'lesson-1',
-      authorizedDocumentIds: new Set(),
+      authorizedDocumentIds: new Set()
     });
     expect(verified.reviewVerified).toBe(false);
   });
@@ -225,13 +228,13 @@ describe('governance is re-derived per call, not carried by the brand', () => {
       lessonId: 'lesson-1',
       component: 'CodeWalkthrough',
       provenance: 'generated_proposal',
-      review: { status: 'unreviewed' },
+      review: { status: 'unreviewed' }
     } as unknown as StructuredAssetV1;
     const [verified] = verifyAssetBindings([generated], {
       courseId,
       revisionId,
       lessonId: 'lesson-1',
-      authorizedDocumentIds: new Set(),
+      authorizedDocumentIds: new Set()
     });
     // Never review-verified, and the asset projection would hide it anyway.
     expect(verified.reviewVerified).toBe(false);

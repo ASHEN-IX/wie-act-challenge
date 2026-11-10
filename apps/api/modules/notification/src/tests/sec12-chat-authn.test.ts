@@ -22,8 +22,8 @@ import { verifySessionMembership } from '../utils/session-access';
 const jwt = { sign: createSession };
 jest.mock('../utils/session-access', () => ({ verifySessionMembership: jest.fn() }));
 import request from 'supertest';
-import { authenticate } from '@ednova/shared/auth';
-import { errorHandler } from '@ednova/shared/middleware';
+import { authenticate } from '@noveris/shared/auth';
+import { errorHandler } from '@noveris/shared/middleware';
 
 import chatRouter from '../routes/chat';
 
@@ -32,7 +32,7 @@ jest.mock('../services/chatService', () => ({
   getHistory: jest.fn().mockResolvedValue([{ messageId: 'm-1', sender: 'user-alice', text: 'hi' }]),
   deleteMessage: jest.fn()
 }));
-jest.mock('@ednova/shared', () => ({
+jest.mock('@noveris/shared', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() }
 }));
 

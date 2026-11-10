@@ -101,8 +101,9 @@ function Prose({
 }) {
   // Blocks are split on blank lines; list lines are grouped. Citation chips
   // stay attached to the text that precedes them.
-  const blocks: Array<{ kind: "p" | "ul" | "ol"; items: Segment[][] }> = [];
+  const blocks: Array<{ kind: "p" | "ul" | "ol" | "pre"; items: Segment[][] }> = [];
   let current: Segment[] = [];
+  let fenced = false;
   const flush = () => {
     if (current.length) blocks.push({ kind: "p", items: [current] });
     current = [];
@@ -114,7 +115,21 @@ function Prose({
     }
     const lines = segment.text.split("\n");
     lines.forEach((line, i) => {
+      // ``` fences become a code block; their content stays literal.
+      if (/^\s*```/.test(line)) {
+        flush();
+        fenced = !fenced;
+        if (fenced) blocks.push({ kind: "pre", items: [[{ text: "" }]] });
+        return;
+      }
+      if (fenced) {
+        const code = blocks[blocks.length - 1].items[0][0] as { text: string };
+        code.text += (code.text ? "\n" : "") + line;
+        return;
+      }
       if (i > 0 && line.trim() === "" && lines[i - 1].trim() === "") return;
+      const heading = /^\s*#{1,6}\s+(.*)$/.exec(line);
+      if (heading) line = `**${heading[1].replace(/\*\*/g, "")}**`;
       const bullet = /^\s*[-*•]\s+(.*)$/.exec(line);
       const numbered = /^\s*\d+[.)]\s+(.*)$/.exec(line);
       if (bullet || numbered) {
@@ -155,6 +170,14 @@ function Prose({
       {blocks.map((block, b) =>
         block.kind === "p" ? (
           <p key={b}>{render(block.items[0], `b${b}`)}</p>
+        ) : block.kind === "pre" ? (
+          <pre
+            key={b}
+            dir="ltr"
+            className="overflow-x-auto rounded-md bg-muted px-3 py-2 font-mono text-[13px] leading-6"
+          >
+            {(block.items[0][0] as { text: string }).text}
+          </pre>
         ) : block.kind === "ul" ? (
           <ul key={b} className="list-disc space-y-1 pl-5">
             {block.items.map((item, i) => (
@@ -171,6 +194,11 @@ function Prose({
       )}
     </div>
   );
+}
+
+/** Model text with the same light formatting as tutor answers (bold, code, lists, fences). */
+export function FormattedText({ text }: { text: string }) {
+  return <Prose segments={segmentAnswer(text, [])} onCite={() => {}} />;
 }
 
 function SourceCard({

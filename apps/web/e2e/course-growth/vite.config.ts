@@ -7,7 +7,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.join(web, "src"),
-      "@ednova/shared": path.resolve(web, "../api/shared"),
+      "@noveris/shared": path.resolve(web, "../api/shared"),
       "next/image": path.join(import.meta.dirname, "image.fixture.tsx"),
       "next/link": path.join(import.meta.dirname, "link.fixture.tsx"),
     },

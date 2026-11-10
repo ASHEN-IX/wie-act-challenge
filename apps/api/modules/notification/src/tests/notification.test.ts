@@ -45,9 +45,9 @@ jest.mock('../models/Notification', () => ({
   }
 }));
 
-jest.mock('@ednova/shared', () => ({
+jest.mock('@noveris/shared', () => ({
   requireInternal:
-    jest.requireActual<typeof import('@ednova/shared')>('@ednova/shared').requireInternal,
+    jest.requireActual<typeof import('@noveris/shared')>('@noveris/shared').requireInternal,
   corsMiddleware: jest.fn(
     () => (req: DomainRequest & { userTier?: string }, res: Response, next: NextFunction) => next()
   ),
@@ -77,9 +77,10 @@ jest.mock('@ednova/shared', () => ({
   }
 }));
 
-jest.mock('@ednova/shared/auth', () => ({
+jest.mock('@noveris/shared/auth', () => ({
   requireInternal:
-    jest.requireActual<typeof import('@ednova/shared/auth')>('@ednova/shared/auth').requireInternal,
+    jest.requireActual<typeof import('@noveris/shared/auth')>('@noveris/shared/auth')
+      .requireInternal,
   authenticate: jest.fn(
     (req: DomainRequest & { userTier?: string }, res: Response, next: NextFunction) => {
       req.user = { userId: 'user-123', role: 'student' };
@@ -94,9 +95,9 @@ import request from 'supertest';
 
 const app = express();
 app.use(express.json());
-app.use((require('@ednova/shared/auth') as typeof import('@ednova/shared/auth')).authenticate);
+app.use((require('@noveris/shared/auth') as typeof import('@noveris/shared/auth')).authenticate);
 app.use('/api/v1/notifications', notifRoutes);
-app.use((require('@ednova/shared') as typeof import('@ednova/shared')).errorHandler);
+app.use((require('@noveris/shared') as typeof import('@noveris/shared')).errorHandler);
 
 describe('Notification Service', () => {
   beforeEach(() => jest.clearAllMocks());

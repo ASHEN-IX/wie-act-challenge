@@ -30,7 +30,7 @@ import {
   type AdaptationPreferences,
   type AdaptationReason,
   type LearningAdaptationV1,
-  type LessonSupport,
+  type LessonSupport
 } from './learningAdaptation';
 import type { LearningMode } from './learningModes';
 
@@ -58,13 +58,13 @@ export type PolicyInput = {
  * for objectives this lesson actually teaches. */
 function unmasteredObjectivesForLesson(
   input: PolicyInput,
-  lessonObjectiveIds: readonly string[],
+  lessonObjectiveIds: readonly string[]
 ): string[] {
   const mastered = new Set(
     input.evidence
       .filter((entry) => entry.evidenceClass === 'accepted_assessment' && entry.mastered)
       .map((entry) => entry.objectiveId)
-      .filter((id): id is string => Boolean(id)),
+      .filter((id): id is string => Boolean(id))
   );
   // Only an objective the lesson teaches can be met by *this* lesson, and only
   // an objective with accepted evidence that it is not yet mastered is a
@@ -88,7 +88,7 @@ function build(
   input: PolicyInput,
   recommendedMode: LearningMode | null,
   reason: AdaptationReason | null,
-  objectiveIds: string[],
+  objectiveIds: string[]
 ): LearningAdaptationV1 {
   const now = input.now ?? new Date();
   const eligibleModes = ['read', ...input.support.availableModes.filter((mode) => mode !== 'read')];
@@ -105,7 +105,7 @@ function build(
     reason,
     objectiveIds,
     generatedAt: now.toISOString(),
-    expiresAt: new Date(now.getTime() + ADAPTATION_TTL_MS).toISOString(),
+    expiresAt: new Date(now.getTime() + ADAPTATION_TTL_MS).toISOString()
   };
 }
 
@@ -119,7 +119,7 @@ function build(
  */
 export function evaluateAdaptation(
   input: PolicyInput,
-  lessonObjectiveIds: readonly string[],
+  lessonObjectiveIds: readonly string[]
 ): LearningAdaptationV1 {
   const preferences = { ...DEFAULT_PREFERENCES, ...input.preferences };
   const available = new Set(input.support.availableModes);
@@ -139,16 +139,28 @@ export function evaluateAdaptation(
   // Rule 3 — an explicit request for more explanation. Guided needs no special
   // content beyond what the lesson already has, so it is offered whenever a
   // validated Guided plan exists.
-  if (preferences.preferWorkedExamples && input.support.hasWorkedExamples && available.has('guided'))
+  if (
+    preferences.preferWorkedExamples &&
+    input.support.hasWorkedExamples &&
+    available.has('guided')
+  )
     return build(input, 'guided', 'guided_requested', []);
 
   // Rule 4 — a request for detailed proofs, when the lesson has them.
-  if (preferences.preferDetailedProofs && input.support.hasProofMaterial && available.has('deep_dive'))
+  if (
+    preferences.preferDetailedProofs &&
+    input.support.hasProofMaterial &&
+    available.has('deep_dive')
+  )
     return build(input, 'deep_dive', 'proof_material_requested', []);
 
   // Rule 5 — a request for visual exploration, when an eligible asset exists.
   // Without the asset, Explore would render exactly Read, so it is not offered.
-  if (preferences.preferVisualExploration && input.support.hasEligibleAsset && available.has('explore'))
+  if (
+    preferences.preferVisualExploration &&
+    input.support.hasEligibleAsset &&
+    available.has('explore')
+  )
     return build(input, 'explore', 'visual_asset_available', []);
 
   // Rule 6 — accepted assessment evidence for an objective this lesson teaches
@@ -160,7 +172,8 @@ export function evaluateAdaptation(
     if (pending.length > 0) {
       // Prefer a source-backed explanation. Guided is that arrangement; fall
       // back to staying put when no plan exists.
-      if (available.has('guided')) return build(input, 'guided', 'objective_not_yet_mastered', pending);
+      if (available.has('guided'))
+        return build(input, 'guided', 'objective_not_yet_mastered', pending);
       return build(input, null, 'neutral_default', pending);
     }
   }
@@ -178,7 +191,7 @@ export function evaluateAdaptation(
  */
 export function shouldSurface(
   adaptation: LearningAdaptationV1,
-  currentMode: LearningMode,
+  currentMode: LearningMode
 ): boolean {
   if (!adaptation.recommendedMode) return false;
   if (adaptation.recommendedMode === currentMode) return false;
@@ -205,12 +218,17 @@ export function adaptationFingerprint(input: {
       input.preferences.preferredMode,
       input.preferences.preferWorkedExamples,
       input.preferences.preferVisualExploration,
-      input.preferences.preferDetailedProofs,
+      input.preferences.preferDetailedProofs
     ],
     input.evidence
-      .map((entry) => [entry.evidenceClass, entry.objectiveId, entry.mastered, entry.evaluatorVersion])
+      .map((entry) => [
+        entry.evidenceClass,
+        entry.objectiveId,
+        entry.mastered,
+        entry.evaluatorVersion
+      ])
       .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
-    [...input.availableModes].sort(),
+    [...input.availableModes].sort()
   ]);
   let state = 14695981039346656037n;
   const prime = 1099511628211n;

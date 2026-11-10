@@ -120,3 +120,20 @@ export function applyRoomSnapshot(
   };
   return applyPresence(next, event);
 }
+
+/** A facilitator intervention only increments the room sequence on the server.
+ * Follow it when it is exactly the next sequence; any larger jump waits for the
+ * authoritative ROOM_STATE_SYNC so missed state changes are never skipped.
+ */
+export function applyInterventionSeq(
+  previous: RoomSnapshotState,
+  event: { roomId?: unknown; seq?: unknown },
+): RoomSnapshotState {
+  if (
+    event.roomId !== previous.room.roomId ||
+    !Number.isSafeInteger(event.seq) ||
+    event.seq !== previous.room.seq + 1
+  )
+    return previous;
+  return { ...previous, room: { ...previous.room, seq: event.seq as number } };
+}

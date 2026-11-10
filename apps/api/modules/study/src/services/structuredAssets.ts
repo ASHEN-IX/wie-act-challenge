@@ -13,7 +13,7 @@
 
 import {
   parseStructuredAsset,
-  type StructuredAssetV1,
+  type StructuredAssetV1
 } from '../../../../shared/ednova/structuredAsset';
 import { StructuredAsset } from '../models/StructuredAsset';
 import { CourseRevision } from '../models/CourseRevision';
@@ -49,7 +49,7 @@ export async function attachStructuredAsset(
   actor: string,
   courseId: string,
   revisionId: string,
-  input: Record<string, unknown>,
+  input: Record<string, unknown>
 ): Promise<StructuredAssetV1> {
   if (!(await canAuthorCourse(actor, courseId)))
     throw new StructuredAssetForbiddenError('Not permitted to author this course');
@@ -59,7 +59,7 @@ export async function attachStructuredAsset(
   const revision = await CourseRevision.findOne({
     courseId,
     revisionTag: revisionId,
-    revokedAt: { $exists: false },
+    revokedAt: { $exists: false }
   })
     .select({ id: 1, status: 1 })
     .lean();
@@ -69,7 +69,7 @@ export async function attachStructuredAsset(
     ...input,
     courseId,
     revisionId,
-    audience: 'course',
+    audience: 'course'
   };
 
   let asset: StructuredAssetV1;
@@ -77,14 +77,14 @@ export async function attachStructuredAsset(
     asset = parseStructuredAsset(candidate);
   } catch (error) {
     throw new StructuredAssetInvalidError(
-      (error as { code?: string }).code ?? 'INVALID_STRUCTURED_ASSET',
+      (error as { code?: string }).code ?? 'INVALID_STRUCTURED_ASSET'
     );
   }
 
   const existing = await StructuredAsset.findOne({
     courseId,
     revisionId,
-    assetId: asset.assetId,
+    assetId: asset.assetId
   })
     .select({ id: 1 })
     .lean();
@@ -104,17 +104,13 @@ export async function attachStructuredAsset(
     payload: asset.payload,
     provenance: asset.provenance,
     reviewStatus: asset.review.status,
-    ...(asset.review.reviewedBy !== undefined
-      ? { reviewedBy: asset.review.reviewedBy }
-      : {}),
+    ...(asset.review.reviewedBy !== undefined ? { reviewedBy: asset.review.reviewedBy } : {}),
     ...(asset.review.reviewedAt !== undefined ? { reviewedAt: asset.review.reviewedAt } : {}),
-    ...(asset.sourceReferences !== undefined
-      ? { sourceReferences: asset.sourceReferences }
-      : {}),
+    ...(asset.sourceReferences !== undefined ? { sourceReferences: asset.sourceReferences } : {}),
     audience: asset.audience,
     fallback: asset.fallback,
     disclosure: asset.disclosure,
-    createdByUserId: actor,
+    createdByUserId: actor
   });
 
   // A new eligible supplement can change which modes a lesson supports, so any
@@ -124,7 +120,7 @@ export async function attachStructuredAsset(
   await invalidateStoredPlans({
     courseId: asset.courseId,
     revisionId: asset.revisionId,
-    reason: 'STRUCTURED_ASSET_ADDED',
+    reason: 'STRUCTURED_ASSET_ADDED'
   });
 
   return asset;

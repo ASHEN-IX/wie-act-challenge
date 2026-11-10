@@ -6,12 +6,12 @@
 
 import {
   buildPublishedPresentation,
-  type PublishedPresentationV1,
+  type PublishedPresentationV1
 } from '../../../../shared/ednova/presentationDocument';
 import {
   parseStructuredAsset,
   projectStructuredAssets,
-  type PublishedStructuredAssetV1,
+  type PublishedStructuredAssetV1
 } from '../../../../shared/ednova/structuredAsset';
 import { StructuredAsset } from '../models/StructuredAsset';
 import { canonicalBlocks, loadPublishedReading } from './courseReader';
@@ -38,7 +38,7 @@ function compact(value: unknown, max: number): string {
  */
 async function loadStructuredAssets(
   courseId: string,
-  revisionId: string,
+  revisionId: string
 ): Promise<PublishedStructuredAssetV1[]> {
   const rows = await StructuredAsset.find({ courseId, revisionId })
     .sort({ assetId: 1 })
@@ -62,15 +62,13 @@ async function loadStructuredAssets(
           review: {
             status: row.reviewStatus,
             ...(row.reviewedBy !== undefined ? { reviewedBy: row.reviewedBy } : {}),
-            ...(row.reviewedAt !== undefined ? { reviewedAt: row.reviewedAt } : {}),
+            ...(row.reviewedAt !== undefined ? { reviewedAt: row.reviewedAt } : {})
           },
-          ...(row.sourceReferences !== undefined
-            ? { sourceReferences: row.sourceReferences }
-            : {}),
+          ...(row.sourceReferences !== undefined ? { sourceReferences: row.sourceReferences } : {}),
           audience: row.audience,
           fallback: row.fallback,
-          disclosure: row.disclosure,
-        }),
+          disclosure: row.disclosure
+        })
       );
     } catch {
       // Skipped deliberately: see the note above.
@@ -82,16 +80,16 @@ async function loadStructuredAssets(
 export async function getPublishedPresentation(
   actor: string,
   courseId: string,
-  revisionId?: string,
+  revisionId?: string
 ): Promise<PublishedPresentationV1> {
   const { context, revision, artifact, canonical } = await loadPublishedReading(
     actor,
     courseId,
-    revisionId,
+    revisionId
   );
   if (!canonical)
     throw new PresentationUnavailableError(
-      'This revision has no canonical presentation. Use the deterministic source-faithful reader.',
+      'This revision has no canonical presentation. Use the deterministic source-faithful reader.'
     );
 
   const mediaContext = { courseId, revisionId: context.revisionId };
@@ -103,20 +101,17 @@ export async function getPublishedPresentation(
       id: lesson.id,
       title: lesson.title,
       summary: compact(lesson.summary, 2000),
-      blocks: canonicalBlocks(
-        lesson.blocks as Array<Record<string, unknown>>,
-        mediaContext,
-      ),
-    })),
+      blocks: canonicalBlocks(lesson.blocks as Array<Record<string, unknown>>, mediaContext)
+    }))
   }));
 
   const warnings = [
     'Source provenance is bound to the preserved document. Extraction fidelity, including symbols and layout, is unverified.',
     ...(canonical.quality?.publicationState === 'review_required'
       ? [
-          'Extraction fidelity needs review. Source linkage does not establish mathematical correctness.',
+          'Extraction fidelity needs review. Source linkage does not establish mathematical correctness.'
         ]
-      : []),
+      : [])
   ];
 
   return buildPublishedPresentation({
@@ -127,7 +122,7 @@ export async function getPublishedPresentation(
     title: context.title,
     summary: compact(
       revision.summary || canonical.chapters.map((chapter) => chapter.title).join(' · '),
-      2000,
+      2000
     ),
     objectives: context.topics
       .flatMap((topic) => topic.objectives)
@@ -135,16 +130,16 @@ export async function getPublishedPresentation(
       .map((objective) => ({
         objectiveId: compact(objective.objectiveId, 128) || 'objective',
         statement: compact(objective.statement, 2000) || 'Objective',
-        bloomLevel: compact(objective.bloomLevel, 40) || 'understand',
+        bloomLevel: compact(objective.bloomLevel, 40) || 'understand'
       })),
     chapters,
     sources: artifact.metadata.documents.map((source) => ({
       documentId: source.documentId,
       contentHash: source.contentHash,
       pageNumber: null,
-      href: `/api/v1/study/courses/${encodeURIComponent(courseId)}/revisions/${encodeURIComponent(context.revisionId)}/sources/${encodeURIComponent(source.documentId)}`,
+      href: `/api/v1/study/courses/${encodeURIComponent(courseId)}/revisions/${encodeURIComponent(context.revisionId)}/sources/${encodeURIComponent(source.documentId)}`
     })),
-    warnings,
+    warnings
   });
 }
 
@@ -159,7 +154,7 @@ export async function getPublishedPresentation(
 export async function getPublishedPresentationWithAssets(
   actor: string,
   courseId: string,
-  revisionId?: string,
+  revisionId?: string
 ): Promise<{
   presentation: PublishedPresentationV1;
   assets: PublishedStructuredAssetV1[];

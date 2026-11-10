@@ -14,9 +14,9 @@ const { createSession } = require('../../../../tests/sessionFixtures');
 const jwt = { sign: createSession };
 import request from 'supertest';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { authenticate } = require('@ednova/shared/auth');
+const { authenticate } = require('@noveris/shared/auth');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { errorHandler } = require('@ednova/shared/middleware');
+const { errorHandler } = require('@noveris/shared/middleware');
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const tasksRouter = require('../routes/tasks');
@@ -43,7 +43,7 @@ jest.mock('../../../ai-orchestrator/src/models/AiJob', () => ({
   __esModule: true,
   default: { findOne: (...args: unknown[]) => mockAiJobFindOne(...args) }
 }));
-jest.mock('@ednova/shared/moduleClient', () => ({
+jest.mock('@noveris/shared/moduleClient', () => ({
   post: jest.fn().mockResolvedValue({ data: {} })
 }));
 jest.mock('../utils/gamificationService', () => ({
@@ -53,17 +53,17 @@ jest.mock('../utils/gamificationService', () => ({
 jest.mock('../services/competencyQueries', () => ({
   getWeakCompetenciesForCourse: jest.fn().mockResolvedValue([])
 }));
-jest.mock('@ednova/shared/tierGate', () => ({
+jest.mock('@noveris/shared/tierGate', () => ({
   tierGate: () => (req: DomainRequest, res: Response, next: NextFunction) => next()
 }));
-jest.mock('@ednova/shared', () => ({
+jest.mock('@noveris/shared', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() }
 }));
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { Task, Topic, StudySession, StudyPlan } = require('../models');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const moduleClient = require('@ednova/shared/moduleClient');
+const moduleClient = require('@noveris/shared/moduleClient');
 
 const app = express();
 app.use(express.json());

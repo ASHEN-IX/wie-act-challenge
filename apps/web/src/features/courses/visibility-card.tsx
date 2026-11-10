@@ -14,7 +14,7 @@ const COPY: Record<CourseVisibility, { title: string; detail: string }> = {
       "Students you enroll through your institution can open it. This is the default.",
   },
   public: {
-    title: "Anyone on EdNova",
+    title: "Anyone on Noveris",
     detail:
       "Any signed-in learner can find it in Explore and open it, even outside your institution. They cannot edit it or see other learners.",
   },

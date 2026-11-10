@@ -41,7 +41,7 @@ import {
 } from '../services/lessonAdaptation';
 import { isLearningMode } from '../../../../shared/ednova/learningModes';
 import { summarizeMetrics } from '../services/planningMetrics';
-const { requireRole } = require('@ednova/shared/auth');
+const { requireRole } = require('@noveris/shared/auth');
 import {
   resolvePlannerProvider,
   configuredPlannerModel

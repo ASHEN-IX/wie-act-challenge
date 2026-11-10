@@ -4,9 +4,9 @@ import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response } from 'express';
 /** Prisma-shaped filter: a plain object of column predicates. */
 type FilterQuery = Record<string, unknown>;
-import type { AxiosResponse } from '@ednova/shared/moduleClient';
+import type { AxiosResponse } from '@noveris/shared/moduleClient';
 import type { ICourse, IStudyPlanTask } from '../models';
-import { errorDetails } from '@ednova/shared/errors';
+import { errorDetails } from '@noveris/shared/errors';
 interface SchedulerSession {
   taskId?: string;
   task_id?: string;
@@ -40,16 +40,16 @@ function schedulerDetail(error: unknown): unknown {
   return data && typeof data === 'object' && 'detail' in data ? data.detail : undefined;
 }
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createContracts } = require('@ednova/shared/domainContracts');
+const { createContracts } = require('@noveris/shared/domainContracts');
 import Joi from 'joi';
 import { StudyPlan, Task, Course } from '../models';
 import { CalendarEntry } from '../models/CalendarEntry';
 import AiJob from '../../../ai-orchestrator/src/models/AiJob';
 import { getWeakCompetenciesForCourse } from '../services/competencyQueries';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { tierGate } = require('@ednova/shared/tierGate');
+const { tierGate } = require('@noveris/shared/tierGate');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { logger } = require('@ednova/shared');
+const { logger } = require('@noveris/shared');
 
 const router = createContracts();
 
@@ -112,7 +112,7 @@ router.post(
       // Call the orchestrator's POST /jobs route — it creates the AiJob
       // (for result correlation) AND publishes to the bus in one shot.
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const moduleClient = require('@ednova/shared/moduleClient');
+      const moduleClient = require('@noveris/shared/moduleClient');
       const orchestratorUrl = 'module://ai';
 
       let jobResponse: AxiosResponse<{ jobId: string; correlationId: string }>;
@@ -319,7 +319,12 @@ router.get('/calendar', async (req: DomainRequest, res: Response) => {
     for (const entry of entries) {
       if (typeof entry.planId === 'string' && !(await canReadPlanContext(userId, entry.planId)))
         continue;
-      if (typeof entry.taskId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(entry.taskId)) {
+      if (
+        typeof entry.taskId === 'string' &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          entry.taskId
+        )
+      ) {
         const task = await Task.findOne({ id: entry.taskId, userId }).select('studyPlanId').lean();
         if (!task || (task.studyPlanId && !(await canReadPlanContext(userId, task.studyPlanId))))
           continue;
@@ -334,41 +339,44 @@ router.get('/calendar', async (req: DomainRequest, res: Response) => {
 });
 
 // Get specific study plan by ID
-router.get('/:planId([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})', async (req: DomainRequest, res: Response) => {
-  try {
-    const userId = req.user!.userId;
-    const { planId } = req.params;
+router.get(
+  '/:planId([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})',
+  async (req: DomainRequest, res: Response) => {
+    try {
+      const userId = req.user!.userId;
+      const { planId } = req.params;
 
-    const plan = await StudyPlan.findOne({ id: planId, userId });
+      const plan = await StudyPlan.findOne({ id: planId, userId });
 
-    if (!plan || !(await canReadPlanSource(userId, plan))) {
-      return res.status(404).json({ error: 'Study plan not found' });
+      if (!plan || !(await canReadPlanSource(userId, plan))) {
+        return res.status(404).json({ error: 'Study plan not found' });
+      }
+
+      const tasks = await Task.find({ studyPlanId: planId, userId }).lean();
+
+      res.json({
+        plan: {
+          id: plan.id.toString(),
+          userId: plan.userId,
+          courseId: plan.courseId,
+          goal: plan.goal,
+          availableTimeMinutes: plan.availableTimeMinutes,
+          totalEstimatedMinutes: plan.totalEstimatedMinutes,
+          tasksCount: plan.taskGraph?.tasks?.length || 0,
+          status: plan.status,
+          warning: plan.warning,
+          createdAt: plan.createdAt,
+          scheduledAt: plan.scheduledAt,
+          taskGraph: plan.taskGraph
+        },
+        tasks
+      });
+    } catch (error) {
+      logger.error('plan_fetch_failed', { error: errorDetails(error).message });
+      res.status(500).json({ error: 'Failed to fetch study plan' });
     }
-
-    const tasks = await Task.find({ studyPlanId: planId, userId }).lean();
-
-    res.json({
-      plan: {
-        id: plan.id.toString(),
-        userId: plan.userId,
-        courseId: plan.courseId,
-        goal: plan.goal,
-        availableTimeMinutes: plan.availableTimeMinutes,
-        totalEstimatedMinutes: plan.totalEstimatedMinutes,
-        tasksCount: plan.taskGraph?.tasks?.length || 0,
-        status: plan.status,
-        warning: plan.warning,
-        createdAt: plan.createdAt,
-        scheduledAt: plan.scheduledAt,
-        taskGraph: plan.taskGraph
-      },
-      tasks
-    });
-  } catch (error) {
-    logger.error('plan_fetch_failed', { error: errorDetails(error).message });
-    res.status(500).json({ error: 'Failed to fetch study plan' });
   }
-});
+);
 
 // Schedule a study plan (call Python AI scheduler)
 router.post(
@@ -398,9 +406,9 @@ router.post(
       }
 
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const aiServiceUrl = require('@ednova/shared/aiClient').getBaseUrl();
+      const aiServiceUrl = require('@noveris/shared/aiClient').getBaseUrl();
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const moduleClient = require('@ednova/shared/moduleClient');
+      const moduleClient = require('@noveris/shared/moduleClient');
 
       try {
         const schedulerResponse = await moduleClient.post(
@@ -582,9 +590,9 @@ router.post(
       }
 
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const aiServiceUrl = require('@ednova/shared/aiClient').getBaseUrl();
+      const aiServiceUrl = require('@noveris/shared/aiClient').getBaseUrl();
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const moduleClient = require('@ednova/shared/moduleClient');
+      const moduleClient = require('@noveris/shared/moduleClient');
 
       try {
         const schedulerResponse = await moduleClient.post(

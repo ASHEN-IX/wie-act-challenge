@@ -161,7 +161,7 @@ export function VoiceRecorder({
           }}
         />
         I agree to process my own recording with the local speech service for
-        transcription. EdNova does not save raw audio. Record only yourself.
+        transcription. Noveris does not save raw audio. Record only yourself.
       </label>
       <div className="flex flex-wrap items-center gap-2">
         <label className="text-xs">

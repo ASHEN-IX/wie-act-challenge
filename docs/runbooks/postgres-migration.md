@@ -62,13 +62,15 @@ before moving on; `migration-report.json` holds the detail.
 DATABASE_URL=… MONGODB_URI=… pnpm migrate:data
 ```
 
-The script is idempotent: it upserts by primary key, so a partial run can simply
-be repeated. `--strict` aborts on the first document it cannot convert; without
-it, bad documents are reported and the rest of the run completes.
+The script converts legacy IDs to stable UUIDs and skips rows that already
+exist. A partial run can be repeated. With `--strict`, the importer stops at
+the first affected collection and writes a partial report. Otherwise it
+continues and reports every refused row.
 
-At the end it compares source and target counts per collection and checks the
-key relations (course → subject, enrollment → user, membership → institution).
-Any mismatch is printed and written to the report.
+The verification checks that each expected ID exists in PostgreSQL, then
+checks key relations (course → subject, enrollment → user, membership →
+institution). Refused rows, missing IDs and broken references are recorded in
+the report and cause a non-zero exit.
 
 ## 5. Verify before switching traffic
 

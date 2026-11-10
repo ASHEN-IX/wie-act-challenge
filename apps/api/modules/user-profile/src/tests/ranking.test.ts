@@ -12,7 +12,7 @@ const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => 
 afterAll(() => exitSpy.mockRestore());
 
 // Mock moduleClient
-jest.mock('@ednova/shared/moduleClient');
+jest.mock('@noveris/shared/moduleClient');
 
 // Mock database models
 jest.mock('../models/UserRankProfile', () => ({
@@ -36,14 +36,14 @@ jest.mock('../models/SeasonResultSnapshot', () => ({
   create: jest.fn()
 }));
 
-jest.mock('@ednova/shared/auth', () => ({
+jest.mock('@noveris/shared/auth', () => ({
   authenticate: jest.fn((req, res, next) => {
     req.user = { userId: 'test-user-123', role: 'student' };
     next();
   })
 }));
 
-jest.mock('@ednova/shared', () => ({
+jest.mock('@noveris/shared', () => ({
   corsMiddleware: jest.fn(
     () => (req: DomainRequest & { userTier?: string }, res: Response, next: NextFunction) => next()
   ),

@@ -25,7 +25,7 @@ import {
   isComponentType,
   type ComponentCapability,
   type ComponentType,
-  type SemanticRole,
+  type SemanticRole
 } from './componentRegistry';
 import {
   EXPERIENCE_PLAN_LIMITS,
@@ -40,7 +40,7 @@ import {
   type UntrustedExperiencePlanProposal,
   type ValidatedAssetBinding,
   type ValidatedLearningExperiencePlan,
-  type ValidatedPlacement,
+  type ValidatedPlacement
 } from './experiencePlan';
 import { EXPERIENCE_PLAN_BINDINGS } from './experiencePlan';
 
@@ -77,7 +77,7 @@ export const COMPONENT_INTERACTION_KEYS: Partial<Record<ComponentType, readonly 
   KeyValueTable: ['compact'],
   DataChart: ['showTable'],
   ConceptList: ['collapsed'],
-  LessonHeader: ['showObjectives'],
+  LessonHeader: ['showObjectives']
 };
 
 /** Components whose output is a *derivation of* the source rather than the
@@ -88,7 +88,7 @@ const DERIVATION_COMPONENTS: readonly ComponentType[] = Object.freeze([
   'ReviewedFormula',
   'FormulaBlock',
   'MathematicalDefinition',
-  'EquationGroup',
+  'EquationGroup'
 ]);
 
 /** Components that present a computed visual relationship. A plan may select
@@ -97,7 +97,7 @@ const COMPUTED_VISUAL_COMPONENTS: readonly ComponentType[] = Object.freeze([
   'DataChart',
   'NetworkTopology',
   'ArchitectureDiagram',
-  'AnnotatedDiagram',
+  'AnnotatedDiagram'
 ]);
 
 /** Version compatibility for a component capability. A proposal may name the
@@ -122,10 +122,9 @@ export function componentRejection(
   component: ComponentType,
   capability: ComponentCapability,
   block: BlockFact,
-  policy: 'primary' | 'source_faithful',
+  policy: 'primary' | 'source_faithful'
 ): ExperiencePlanRejectionCode | null {
-  if (!capability.accepts.includes(block.blockType))
-    return 'PLAN_COMPONENT_BLOCK_INCOMPATIBLE';
+  if (!capability.accepts.includes(block.blockType)) return 'PLAN_COMPONENT_BLOCK_INCOMPATIBLE';
   if (capability.roles && block.role && !capability.roles.includes(block.role as SemanticRole))
     return 'PLAN_COMPONENT_ROLE_INCOMPATIBLE';
   // A source-faithful block may only be rendered by a component that declares
@@ -167,9 +166,7 @@ export function componentRejection(
 /** Stage 4 interaction check: every configured key must be declared by the
  * component, and no interaction may be configured on a component that offers
  * none. */
-function interactionRejection(
-  placement: ProposedPlacement,
-): ExperiencePlanRejectionCode | null {
+function interactionRejection(placement: ProposedPlacement): ExperiencePlanRejectionCode | null {
   if (placement.interaction === undefined) return null;
   const allowed = COMPONENT_INTERACTION_KEYS[placement.component];
   if (!allowed) return 'PLAN_COMPONENT_INTERACTION_INVALID';
@@ -203,7 +200,7 @@ function planDigest(plan: {
       entry.component,
       entry.group,
       entry.disclosure,
-      entry.interaction ?? null,
+      entry.interaction ?? null
     ]),
     plan.supplemental.map((entry) => [
       entry.placementId,
@@ -211,8 +208,8 @@ function planDigest(plan: {
       entry.component,
       entry.assetId,
       entry.group,
-      entry.disclosure,
-    ]),
+      entry.disclosure
+    ])
   ]);
   let hash = 0n;
   const prime = 1099511628211n;
@@ -234,7 +231,7 @@ function planDigest(plan: {
  */
 export function validateExperiencePlan(
   rawProposal: unknown,
-  context: ExperiencePlanValidationContext,
+  context: ExperiencePlanValidationContext
 ): ValidatedLearningExperiencePlan {
   // -- Stage 1: schema ------------------------------------------------------
   const proposal: UntrustedExperiencePlanProposal = parseExperiencePlanProposal(rawProposal);
@@ -261,7 +258,7 @@ export function validateExperiencePlan(
     !context.allowedPlanners.some(
       (entry) =>
         entry.implementation === proposal.planner.implementation &&
-        entry.version === proposal.planner.version,
+        entry.version === proposal.planner.version
     )
   )
     return reject('PLAN_IDENTITY_PLANNER_UNKNOWN', 'identity');
@@ -269,9 +266,7 @@ export function validateExperiencePlan(
   // -- Stage 6 (pre-check): resource limits --------------------------------
   // Limits are checked before the expensive stages so a hostile payload is
   // bounded as early as possible. They are checked again after grouping.
-  const supplementalProposed = proposal.placements.filter(
-    (entry) => entry.kind === 'supplemental',
-  );
+  const supplementalProposed = proposal.placements.filter((entry) => entry.kind === 'supplemental');
   if (supplementalProposed.length > EXPERIENCE_PLAN_LIMITS.maxSupplemental)
     return reject('PLAN_LIMIT_TOO_MANY_SUPPLEMENTS', 'limits');
   const groups = new Set(proposal.placements.map((entry) => entry.group));
@@ -318,12 +313,7 @@ export function validateExperiencePlan(
     if (!versionCompatible(placement.componentVersion, capability.version))
       return reject('PLAN_COMPONENT_VERSION_UNSUPPORTED', 'component');
 
-    const rejection = componentRejection(
-      placement.component,
-      capability,
-      block,
-      block.render,
-    );
+    const rejection = componentRejection(placement.component, capability, block, block.render);
     // A source-faithful block may never be upgraded to a primary component,
     // even when the proposed component is otherwise compatible.
     if (rejection) return reject(rejection, 'component');
@@ -348,7 +338,7 @@ export function validateExperiencePlan(
       group: placement.group,
       disclosure: placement.disclosure,
       ...(placement.interaction !== undefined ? { interaction: placement.interaction } : {}),
-      fallback: placement.fallback,
+      fallback: placement.fallback
     };
   });
 
@@ -359,8 +349,7 @@ export function validateExperiencePlan(
       return reject('PLAN_COVERAGE_CROSS_LESSON', 'coverage');
     const asset = assetsById.get(placement.assetId!);
     if (!asset) return reject('PLAN_ASSET_UNKNOWN', 'asset');
-    if (asset.lessonId !== context.lessonId)
-      return reject('PLAN_ASSET_LESSON_MISMATCH', 'asset');
+    if (asset.lessonId !== context.lessonId) return reject('PLAN_ASSET_LESSON_MISMATCH', 'asset');
     if (asset.blockId !== placement.block.blockId)
       return reject('PLAN_ASSET_BLOCK_MISMATCH', 'asset');
     // An unreviewed generated proposal never becomes learner-visible because a
@@ -393,7 +382,7 @@ export function validateExperiencePlan(
       assetId: asset.assetId,
       group: placement.group,
       disclosure: placement.disclosure,
-      fallback: placement.fallback,
+      fallback: placement.fallback
     });
   }
 
@@ -409,7 +398,7 @@ export function validateExperiencePlan(
     lessonId: context.lessonId,
     mode: context.mode,
     canonical,
-    supplemental,
+    supplemental
   });
 
   return finalizeExperiencePlan(
@@ -426,9 +415,9 @@ export function validateExperiencePlan(
       contextFingerprint: context.contextFingerprint,
       planner: proposal.planner,
       canonical: Object.freeze(canonical),
-      supplemental: Object.freeze(supplemental),
+      supplemental: Object.freeze(supplemental)
     },
-    digest,
+    digest
   );
 }
 
@@ -440,7 +429,7 @@ export type ValidationOutcome =
 
 export function tryValidateExperiencePlan(
   rawProposal: unknown,
-  context: ExperiencePlanValidationContext,
+  context: ExperiencePlanValidationContext
 ): ValidationOutcome {
   try {
     return { ok: true, plan: validateExperiencePlan(rawProposal, context) };
@@ -457,9 +446,7 @@ export function tryValidateExperiencePlan(
  * the registry, never a second hand-maintained list. */
 export function eligibleComponents(): ComponentType[] {
   return Object.freeze(
-    Object.keys(COMPONENT_CAPABILITIES).filter((key) =>
-      isComponentType(key),
-    ) as ComponentType[],
+    Object.keys(COMPONENT_CAPABILITIES).filter((key) => isComponentType(key)) as ComponentType[]
   ) as ComponentType[];
 }
 
@@ -477,6 +464,6 @@ export function capabilityDigest(): Array<{
     version: capability.version,
     accepts: capability.accepts,
     evidence: capability.evidence,
-    interaction: capability.interaction,
+    interaction: capability.interaction
   }));
 }

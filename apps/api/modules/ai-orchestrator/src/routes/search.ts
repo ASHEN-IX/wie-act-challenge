@@ -12,11 +12,11 @@ import type { Prisma } from '../../../../src/generated/prisma/client';
  * userId comes from the authenticated context only, never the body.
  */
 
-import { createContracts } from '@ednova/shared/domainContracts';
+import { createContracts } from '@noveris/shared/domainContracts';
 import crypto from 'crypto';
-import { logger } from '@ednova/shared';
-import { publishAiJob } from '@ednova/shared/ai-messaging';
-import { validateJobPayload } from '@ednova/shared/ai-messaging/payloadSchemas';
+import { logger } from '@noveris/shared';
+import { publishAiJob } from '@noveris/shared/ai-messaging';
+import { validateJobPayload } from '@noveris/shared/ai-messaging/payloadSchemas';
 import AiJob from '../models/AiJob';
 
 const SEARCH_JOB_TYPE = 'study.search.query';

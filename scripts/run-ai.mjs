@@ -5,6 +5,7 @@ import path from 'node:path';
 const cwd = fileURLToPath(new URL('../apps/ai/', import.meta.url));
 const envFile = path.join(cwd, '.env');
 if (existsSync(envFile)) process.loadEnvFile(envFile);
+process.env.APP_ENV ??= 'development';
 const workers = ['ingestion', 'planner', 'schedule', 'coach', 'evaluator', 'search'];
 const [mode, worker] = process.argv.slice(2);
 if (mode && mode !== 'workers' && (mode !== 'worker' || !workers.includes(worker))) {

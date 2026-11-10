@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PostgreSQL restore script for EdNova
+# PostgreSQL restore script for Noveris
 # Usage: ./restore-postgres.sh <BACKUP_DIR> [DATABASE_URL]
 #
 # Args:

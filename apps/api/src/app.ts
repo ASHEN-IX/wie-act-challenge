@@ -10,23 +10,23 @@ const {
   securityMiddleware,
   loggingMiddleware,
   errorHandler
-} = require('@ednova/shared');
-const { registerModule } = require('@ednova/shared/moduleClient');
+} = require('@noveris/shared');
+const { registerModule } = require('@noveris/shared/moduleClient');
 
 export const moduleDefinitions: Array<[name: string, packageName: string, prefixes: string[]]> = [
-  ['auth', '@ednova/auth-service', ['/api/v1/auth']],
-  ['users', '@ednova/user-profile-service', ['/api/v1/users', '/uploads']],
+  ['auth', '@noveris/auth-service', ['/api/v1/auth']],
+  ['users', '@noveris/user-profile-service', ['/api/v1/users', '/uploads']],
   [
     'study',
-    '@ednova/study-service',
+    '@noveris/study-service',
     ['/api/v1/study', '/api/v1/competencies', '/api/v1/coach', '/uploads']
   ],
-  ['ai', '@ednova/ai-orchestrator-service', ['/api/v1/ai', '/api/v1/eval', '/api/v1/search']],
-  ['signals', '@ednova/signal-processing-service', ['/api/v1/signals']],
-  ['analytics', '@ednova/analytics-service', ['/api/v1/analytics']],
+  ['ai', '@noveris/ai-orchestrator-service', ['/api/v1/ai', '/api/v1/eval', '/api/v1/search']],
+  ['signals', '@noveris/signal-processing-service', ['/api/v1/signals']],
+  ['analytics', '@noveris/analytics-service', ['/api/v1/analytics']],
   [
     'notifications',
-    '@ednova/notification-service',
+    '@noveris/notification-service',
     ['/api/v1/notifications', '/api/v1/session-chat', '/api/v1/voice']
   ]
 ];
@@ -57,7 +57,7 @@ export function createApp(): Application {
     })
   );
   app.get('/api/v1/monitoring/health', async (_req: Request, res: Response) => {
-    const connected = await require('@ednova/shared/database').isConnectedToDatabase();
+    const connected = await require('@noveris/shared/database').isConnectedToDatabase();
     const services = Object.fromEntries(
       moduleDefinitions.map(([name]) => [
         name,
@@ -66,7 +66,7 @@ export function createApp(): Application {
     );
     let aiHealthy = false;
     try {
-      await require('@ednova/shared/aiClient').get('/health', { timeout: 2000 });
+      await require('@noveris/shared/aiClient').get('/health', { timeout: 2000 });
       aiHealthy = true;
     } catch {
       /* AI availability does not prevent non-AI workflows. */
@@ -85,7 +85,7 @@ export function createApp(): Application {
   app.get('/api/v1/docs', (_req: Request, res: Response) =>
     res
       .type('html')
-      .send('<h1>EdNova API</h1><a href="/api/v1/docs/openapi.json">OpenAPI specification</a>')
+      .send('<h1>Noveris API</h1><a href="/api/v1/docs/openapi.json">OpenAPI specification</a>')
   );
   app.post('/api/v1/study/courses', requireMultipart);
   app.post('/api/v1/study/courses/:courseId/files', requireMultipart);

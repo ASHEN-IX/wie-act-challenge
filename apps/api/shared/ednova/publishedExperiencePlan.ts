@@ -87,7 +87,7 @@ function placement(value: unknown, kind: 'canonical' | 'supplemental'): Publishe
     'disclosure',
     'interaction',
     'fallback',
-    ...(kind === 'supplemental' ? ['assetId'] : []),
+    ...(kind === 'supplemental' ? ['assetId'] : [])
   ];
   const v = exact(value, keys);
   if (!(PLACEMENT_GROUPS as readonly unknown[]).includes(v.group)) fail();
@@ -122,7 +122,7 @@ function placement(value: unknown, kind: 'canonical' | 'supplemental'): Publishe
     disclosure: v.disclosure as string,
     ...(interaction ? { interaction } : {}),
     fallback: component(v.fallback),
-    ...(kind === 'supplemental' ? { assetId: str(v.assetId, 128) } : {}),
+    ...(kind === 'supplemental' ? { assetId: str(v.assetId, 128) } : {})
   };
 }
 
@@ -135,7 +135,7 @@ function placement(value: unknown, kind: 'canonical' | 'supplemental'): Publishe
  */
 export function parsePublishedExperiencePlan(
   value: unknown,
-  canonicalBlockIds: readonly string[],
+  canonicalBlockIds: readonly string[]
 ): PublishedExperiencePlanV1 {
   const v = exact(value, [
     'schemaVersion',
@@ -151,7 +151,7 @@ export function parsePublishedExperiencePlan(
     'digest',
     'canonical',
     'supplemental',
-    'disclosure',
+    'disclosure'
   ]);
   if (v.schemaVersion !== PUBLISHED_EXPERIENCE_PLAN_VERSION) fail();
 
@@ -159,12 +159,12 @@ export function parsePublishedExperiencePlan(
   const canonical = list(
     v.canonical,
     (entry) => placement(entry, 'canonical'),
-    EXPERIENCE_PLAN_LIMITS.maxPlacements,
+    EXPERIENCE_PLAN_LIMITS.maxPlacements
   );
   const supplemental = list(
     v.supplemental,
     (entry) => placement(entry, 'supplemental'),
-    EXPERIENCE_PLAN_LIMITS.maxSupplemental,
+    EXPERIENCE_PLAN_LIMITS.maxSupplemental
   );
 
   if (canonical.length !== canonicalBlockIds.length) fail();
@@ -190,11 +190,11 @@ export function parsePublishedExperiencePlan(
     contextFingerprint: str(v.contextFingerprint, 71),
     planner: {
       implementation: str(planner.implementation, 64),
-      version: str(planner.version, 32),
+      version: str(planner.version, 32)
     },
     digest: str(v.digest, 71),
     canonical,
     supplemental,
-    disclosure: str(v.disclosure, 500),
+    disclosure: str(v.disclosure, 500)
   };
 }

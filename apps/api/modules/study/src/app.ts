@@ -1,4 +1,4 @@
-import { publicUploads } from '@ednova/shared/publicUploads';
+import { publicUploads } from '@noveris/shared/publicUploads';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import path from 'path';
@@ -12,7 +12,7 @@ const internalBudget = require('./routes/internalBudget');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const internalFormula = require('./routes/internalFormula');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { requireInternal } = require('@ednova/shared/auth');
+const { requireInternal } = require('@noveris/shared/auth');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const taskRoutes = require('./routes/tasks');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -48,9 +48,9 @@ const {
   rateLimiter,
   healthCheck,
   requireEnv
-} = require('@ednova/shared');
+} = require('@noveris/shared');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { authenticate } = require('@ednova/shared/auth');
+const { authenticate } = require('@noveris/shared/auth');
 
 // --- Environment validation (fail-fast on missing secrets) ---
 requireEnv(['DATABASE_URL', 'INTERNAL_API_SECRET', 'RABBITMQ_URL'], {
@@ -87,20 +87,48 @@ app.post('/api/v1/study/subjects', uploadLimiter);
 
 // Service-to-service reads for the Python worker and coach. Guarded by
 // `x-internal-secret`; the AI service never touches the database directly.
-app.get('/api/v1/study/internal/ingestion/revisions/:courseId/:revisionTag', requireInternal, internalIngestion.ingestionRevision);
-app.get('/api/v1/study/internal/ingestion/operations/:messageId', requireInternal, internalIngestion.ingestionOperation);
+app.get(
+  '/api/v1/study/internal/ingestion/revisions/:courseId/:revisionTag',
+  requireInternal,
+  internalIngestion.ingestionRevision
+);
+app.get(
+  '/api/v1/study/internal/ingestion/operations/:messageId',
+  requireInternal,
+  internalIngestion.ingestionOperation
+);
 app.get('/api/v1/study/internal/coach/catalog', requireInternal, internalCoach.coachCatalog);
-app.get('/api/v1/study/internal/coach/sessions/:sessionId/current-task', requireInternal, internalCoach.coachCurrentTask);
+app.get(
+  '/api/v1/study/internal/coach/sessions/:sessionId/current-task',
+  requireInternal,
+  internalCoach.coachCurrentTask
+);
 app.get('/api/v1/study/internal/planner/plans', requireInternal, internalCoach.plannerPlans);
 app.post('/api/v1/study/internal/budget/reserve', requireInternal, internalBudget.reserve);
-app.post('/api/v1/study/internal/budget/reserve-tokens', requireInternal, internalBudget.reserveTokens);
+app.post(
+  '/api/v1/study/internal/budget/reserve-tokens',
+  requireInternal,
+  internalBudget.reserveTokens
+);
 app.post('/api/v1/study/internal/budget/active', requireInternal, internalBudget.active);
 app.post('/api/v1/study/internal/budget/usage', requireInternal, internalBudget.usage);
 app.post('/api/v1/study/internal/budget/revoke', requireInternal, internalBudget.revoke);
 app.get('/api/v1/study/internal/budget/:approvalId', requireInternal, internalBudget.budgetStatus);
-app.get('/api/v1/study/internal/experience/requests/:requestId/reservation', requireInternal, internalBudget.experienceReservation);
-app.post('/api/v1/study/internal/formula/recognition-context', requireInternal, internalFormula.recognitionContext);
-app.post('/api/v1/study/internal/formula/recognition-recheck', requireInternal, internalFormula.recognitionRecheck);
+app.get(
+  '/api/v1/study/internal/experience/requests/:requestId/reservation',
+  requireInternal,
+  internalBudget.experienceReservation
+);
+app.post(
+  '/api/v1/study/internal/formula/recognition-context',
+  requireInternal,
+  internalFormula.recognitionContext
+);
+app.post(
+  '/api/v1/study/internal/formula/recognition-recheck',
+  requireInternal,
+  internalFormula.recognitionRecheck
+);
 
 // Protected study routes (require authentication)
 app.use('/api/v1/study/tasks', authenticate, taskRoutes);

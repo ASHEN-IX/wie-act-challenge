@@ -165,7 +165,9 @@ test('owner-scopes retrieval and does not project locks, feedback or identity', 
   expect(C.findOne).toHaveBeenCalledWith(expect.objectContaining({ id: id, userId: 'stranger' }));
 });
 test('rejects mismatched course histories', async () => {
-  (C.findOne as jest.Mock).mockReturnValue(lean({ ...record, courseId: '78740652-c3d8-5a84-b2d0-36d6ac2c2f2b' }));
+  (C.findOne as jest.Mock).mockReturnValue(
+    lean({ ...record, courseId: '78740652-c3d8-5a84-b2d0-36d6ac2c2f2b' })
+  );
   await expect(submitTurn('owner', { ...input, conversationId: id })).rejects.toMatchObject({
     status: 409
   });

@@ -52,7 +52,7 @@ describe('brand asset coverage (Noveris)', () => {
     // keeps this test honest when a stage is added.
     const growth = fs.readFileSync(
       path.join(__dirname, '../../shared/ednova/nardouchGrowth.ts'),
-      'utf8',
+      'utf8'
     ) as string;
     const declared = growth.match(/export type NardouchStage =([^;]+);/);
     expect(declared).not.toBeNull();
@@ -63,7 +63,8 @@ describe('brand asset coverage (Noveris)', () => {
   });
 
   test.each([...stages.map((stage) => stage.id), 'hero'] as const)(
-    '%s resolves through the real mapping to shipped RGBA artwork', (stage) => {
+    '%s resolves through the real mapping to shipped RGBA artwork',
+    (stage) => {
       const url = nardouchImage(stage);
       expect(url).toBe(`/images/nardouch-${stage}-transparent.png`);
       const image = fs.readFileSync(path.join(webPublic, url));
@@ -72,7 +73,7 @@ describe('brand asset coverage (Noveris)', () => {
       expect(image.readUInt32BE(16)).toBe(1254);
       expect(image.readUInt32BE(20)).toBe(1254);
       expect(image[25]).toBe(6); // PNG color type 6: truecolor with alpha.
-    },
+    }
   );
 
   test('the Noveris brand marks are present', () => {
@@ -80,7 +81,7 @@ describe('brand asset coverage (Noveris)', () => {
       'brand/noveris-symbol.svg',
       'brand/noveris-lockup-light.svg',
       'brand/noveris-lockup-dark.svg',
-      'brand/favicon.svg',
+      'brand/favicon.svg'
     ].filter((file) => !fs.existsSync(path.join(webPublic, file)));
     expect(missing).toEqual([]);
   });
@@ -92,7 +93,7 @@ describe('brand asset coverage (Noveris)', () => {
     const roots = [
       path.join(__dirname, '../../modules'),
       path.join(__dirname, '../../shared'),
-      path.join(__dirname, '../../../web/src'),
+      path.join(__dirname, '../../../web/src')
     ];
     const offenders: string[] = [];
     const walk = (dir: string) => {

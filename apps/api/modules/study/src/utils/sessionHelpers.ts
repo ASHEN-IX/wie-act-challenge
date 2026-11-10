@@ -1,7 +1,7 @@
-import { errorDetails } from '@ednova/shared/errors';
+import { errorDetails } from '@noveris/shared/errors';
 import type { IStudySession } from '../models';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { buildInternalHeaders } = require('@ednova/shared/auth');
+const { buildInternalHeaders } = require('@noveris/shared/auth');
 
 const DEFAULT_TASK_ESTIMATED_MINUTES = 30;
 
@@ -28,7 +28,8 @@ const isTeamSessionMember = (
   return String(session.userId) === String(userId) && !session.participants?.length;
 };
 
-const isObjectId = (str: string): boolean => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
+const isObjectId = (str: string): boolean =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
 
 export {
   DEFAULT_TASK_ESTIMATED_MINUTES,

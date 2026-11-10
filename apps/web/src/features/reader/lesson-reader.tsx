@@ -16,12 +16,12 @@ import {
   ShieldAlert,
   X,
 } from "lucide-react";
-import type { LessonBlockV2 } from "@ednova/shared/ednova/learningDocumentV2";
-import type { PublishedPresentationV1 } from "@ednova/shared/ednova/presentationDocument";
-import type { ReaderMode } from "@ednova/shared/ednova/presentationPlan";
-import type { PublishedStructuredAssetV1 } from "@ednova/shared/ednova/structuredAsset";
-import type { PublishedExperiencePlanV1 } from "@ednova/shared/ednova/publishedExperiencePlan";
-import type { AdaptationReason } from "@ednova/shared/ednova/learningAdaptation";
+import type { LessonBlockV2 } from "@noveris/shared/ednova/learningDocumentV2";
+import type { PublishedPresentationV1 } from "@noveris/shared/ednova/presentationDocument";
+import type { ReaderMode } from "@noveris/shared/ednova/presentationPlan";
+import type { PublishedStructuredAssetV1 } from "@noveris/shared/ednova/structuredAsset";
+import type { PublishedExperiencePlanV1 } from "@noveris/shared/ednova/publishedExperiencePlan";
+import type { AdaptationReason } from "@noveris/shared/ednova/learningAdaptation";
 import { CourseNardouch } from "@/features/nardouch/course-growth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -132,18 +132,6 @@ function readerModeFor(mode: LearningModeView): ReaderMode {
   return "read";
 }
 
-const MODE_LABELS: Record<ReaderMode, string> = {
-  read: "Read",
-  explore: "Explore",
-  practice: "Practice",
-};
-
-const MODE_HINTS: Record<ReaderMode, string> = {
-  read: "Source-faithful reading with interactions collapsed.",
-  explore: "Trusted interactive components for this lesson.",
-  practice: "Open the lesson's exercises and practice tools.",
-};
-
 /**
  * Learning modes (Batch 4, M4.3).
  *
@@ -241,7 +229,7 @@ export function LessonReader({
   // A suggestion the learner dismissed in this session. The server records it
   // too; this keeps the UI honest without a round trip.
   const [dismissedMode, setDismissedMode] = useState<LearningModeView | null>(null);
-  const [preferenceVersion, setPreferenceVersion] = useState(initialPreferenceVersion ?? 0);
+  const [preferenceVersion] = useState(initialPreferenceVersion ?? 0);
   const [outlineOpen, setOutlineOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [query, setQuery] = useState("");

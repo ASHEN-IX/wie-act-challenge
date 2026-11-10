@@ -8,8 +8,8 @@
 import {
   edgeLabel,
   type GraphTrace,
-} from "@ednova/shared/visualLab/graph";
-import type { WeightedGraphScenario } from "@ednova/shared/visualLab/types";
+} from "@noveris/shared/visualLab/graph";
+import type { WeightedGraphScenario } from "@noveris/shared/visualLab/types";
 
 const SIZE = 360;
 const PADDING = 46;

@@ -78,24 +78,19 @@ caused them. Everything else — rooms, facilitation, instructor analytics,
 evidence, rewards, ingestion, institutions, the master evaluation scenario —
 passes.
 
-### Data migration result on the development dataset
+### Data migration result on a disposable development copy
 
-```
-users                    4 read  → 4 written (idempotent, re-run skips)
-subjects                 2 read  → 2 written
-courses                  8 read  → 8 written
-course_enrollments       5 read  → 5 written
-course_revisions        25 read  → 8 written, 12 skipped (already present), 5 refused
-notifications            5 read  → 5 written
-learning_objectives      4 read  → 4 written
-```
+The corrected importer wrote 118 rows, including all four user identities,
+eight courses and five enrollments. Twenty of 25 course revisions imported.
+The remaining five reference two missing courses in the MongoDB source.
+A second run skipped the previously imported rows and returned a failure status
+for the unresolved revisions. The MongoDB originals remain available for recovery.
 
-The 26 refused documents are **orphaned references that were already unreachable
-in MongoDB** — for example 5 revisions whose `courseId` names a course that no
-longer exists, and 14 auth sessions/accounts whose `userId` has no `auth_users`
-row. The script refuses them rather than inventing parents, reports each with its
-`_id` and a plain-language cause, and continues with the rest. `--strict` turns
-those into a non-zero exit for CI.
+The importer reads MongoDB's `_id` and maps legacy IDs to stable UUIDs.
+The report lists failed rows, broken references and collections outside the
+importer's scope. This run found 18 legacy `chunk_embeddings` documents.
+The AI service writes new embeddings to PostgreSQL, and the database import
+does not rewrite old FAISS files or their integrity manifests.
 
 One real conversion defect was found and fixed this way: legacy OCR text
 contained U+0000, which MongoDB stores but PostgreSQL `jsonb` rejects (SQLSTATE
@@ -142,9 +137,9 @@ See the [runbook](runbooks/postgres-migration.md) for the exact commands.
 
 ## 5. Remaining work
 
-- The Playwright browser run was not executed here. The harnesses are ported
-  (`tests/helpers/provision-test-database.ts` creates and migrates a throwaway
-  database per run, and the Playwright configs pass it through), but no browser
-  session was driven, so sign-in / upload / study-room flows are verified by
-  the API and integration suites plus a live boot, not by a browser.
+- The managed Chromium suite passed all nine auth and workspace tests against
+  disposable PostgreSQL. A separate browser run verified instructor upload,
+  background ingestion and publication, as well as learner practice, mock tutor
+  citations and room chat replay. The older standalone P0R3 browser runner
+  still uses MongoDB fixtures.
 - The two LiveKit media suites need an SFU server (see above).

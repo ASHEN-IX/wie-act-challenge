@@ -1,9 +1,9 @@
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response } from 'express';
 import crypto from 'crypto';
-import { errorDetails } from '@ednova/shared/errors';
-import moduleClient from '@ednova/shared/moduleClient';
-import { buildInternalHeaders } from '@ednova/shared/auth';
+import { errorDetails } from '@noveris/shared/errors';
+import moduleClient from '@noveris/shared/moduleClient';
+import { buildInternalHeaders } from '@noveris/shared/auth';
 import StudyGroup, {
   MAX_GROUP_INVITES,
   MAX_GROUP_MEMBERS,
@@ -19,7 +19,7 @@ interface GroupRequest extends DomainRequest {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createContracts } = require('@ednova/shared/domainContracts');
+const { createContracts } = require('@noveris/shared/domainContracts');
 const router = createContracts();
 const NOTIFICATION_URL = 'module://notifications';
 const STUDY_URL = 'module://study';

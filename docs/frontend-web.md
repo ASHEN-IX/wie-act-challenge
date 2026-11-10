@@ -1,4 +1,4 @@
-# Frontend — native App Router
+# Noveris frontend — native App Router
 
 Next.js 16, React 19, TypeScript and Tailwind CSS 4. The frontend now uses native App Router layouts/pages and shadcn/ui Radix primitives. The old SPA wrapper, navigation adapter, screens, global stores, CSS files and overlapping animation/client-fetch libraries have been removed.
 
@@ -46,4 +46,15 @@ Rebuilt working surfaces: authentication, overview, course/subject creation, PDF
 
 The simplification retires the old cosmetic wallpaper/video shops, billing/coupon management, standalone social/ranking dashboards and duplicated analytics/calendar/review screens. Their backend contracts/assets remain available; this rebuild does not delete user data. Voice controls/camera telemetry and the old elaborate planner/calendar UI are not carried into the new shell. Voice, richer scheduling, instructor Studio editing/publication, trusted quizzes/guided problems and peer facilitation remain explicit backlog work; do not mark those tasks DONE because this foundation exists.
 
-Run `pnpm --filter web build`, `typecheck`, `lint`, `test`; `pnpm test:e2e` covers auth, native workspace mutations, responsive layout and two-user room membership. See [preparation results](audit/cleanup.md) for exact executed coverage and limits. Browser testing uses Playwright because no Browser plugin skill is available in this session.
+Run `pnpm --filter web build`, `typecheck`, `lint`, `test`; `pnpm test:e2e` covers auth, native workspace mutations, responsive layout and two-user room membership.
+
+
+## Product contexts and current entrypoints
+
+The landing page, shared logo and application metadata use Noveris. One authenticated workspace supports personal resources and institution contexts. Institution administration, teaching surfaces and learner routes resolve their respective server policies. Global account role, institution membership and assigned course access remain separate.
+
+Course server actions live under `src/features/courses`, institution context under `src/features/institutions`, individual activity/tutor support under `src/features/learning` and Nardouch, and rooms under `src/features/collaboration`. `src/features/visual-lab` renders registered graph, parameter, spatial and function engines. The reader's trusted registry renders validated lesson blocks.
+
+`src/lib/api.ts` resolves the session and uses uncached protected API calls. Server actions validate forms and trigger route refreshes after mutations. Client components manage pending states, deterministic feedback and WebSocket recovery. The current source preview `/reader-preview` is development-only and uses a presentation fixture. Its captures demonstrate the rendered frontend rather than live ingestion or model execution.
+
+The proposed Free/Pro and institutional subscription packages need alignment with actual entitlement rules before public commercial claims. Read [product architecture](product-specification.md), [permissions](roles-and-permissions.md) and [business model](business-model.md) alongside feature UI code.

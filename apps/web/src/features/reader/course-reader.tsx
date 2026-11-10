@@ -4,7 +4,7 @@ import Link from "next/link";
 import type {
   LessonBlockV2,
   ReadingDocumentV2,
-} from "@ednova/shared/ednova/learningDocumentV2";
+} from "@noveris/shared/ednova/learningDocumentV2";
 import {
   ArrowLeft,
   ArrowRight,

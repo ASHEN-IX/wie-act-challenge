@@ -2,12 +2,12 @@ import http from 'http';
 import WebSocket from 'ws';
 import { createSession as generateToken } from '../sessionFixtures';
 
-jest.mock('@ednova/shared/moduleClient', () => ({
+jest.mock('@noveris/shared/moduleClient', () => ({
   put: jest.fn().mockResolvedValue({ data: {} })
 }));
 
-import client from '@ednova/shared/moduleClient';
-import { attachRealtime } from '@ednova/notification-service';
+import client from '@noveris/shared/moduleClient';
+import { attachRealtime } from '@noveris/notification-service';
 
 let server: http.Server;
 let closeRealtime: () => Promise<void>;

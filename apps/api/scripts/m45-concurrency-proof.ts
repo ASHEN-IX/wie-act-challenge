@@ -39,21 +39,30 @@ const rows: Row[] = [];
 let client: MongoClient;
 
 async function reset() {
-  await client.db(DB).dropDatabase().catch(() => undefined);
-  await client.db(DB).collection('llm_approval_budgets').insertOne({
-    id: APPROVAL as never,
-    task: 'experience_planning',
-    model: MODEL,
-    limit: 10,
-    maxTokens: MAX,
-    expiresAt: EXPIRES,
-    usedTokens: 0,
-    usedRequests: 0,
-  });
+  await client
+    .db(DB)
+    .dropDatabase()
+    .catch(() => undefined);
+  await client
+    .db(DB)
+    .collection('llm_approval_budgets')
+    .insertOne({
+      id: APPROVAL as never,
+      task: 'experience_planning',
+      model: MODEL,
+      limit: 10,
+      maxTokens: MAX,
+      expiresAt: EXPIRES,
+      usedTokens: 0,
+      usedRequests: 0
+    });
 }
 
 const used = async (): Promise<number> => {
-  const row = await client.db(DB).collection('llm_approval_budgets').findOne({ id: APPROVAL as never });
+  const row = await client
+    .db(DB)
+    .collection('llm_approval_budgets')
+    .findOne({ id: APPROVAL as never });
   return Number(row?.usedTokens ?? 0);
 };
 const requestRows = (): Promise<number> =>
@@ -72,9 +81,9 @@ function runWorker(identity: string): Promise<string> {
         M45_MONGO: URI,
         M45_DB: DB,
         M45_APPROVAL: APPROVAL,
-        M45_EXPIRES: String(EXPIRES),
+        M45_EXPIRES: String(EXPIRES)
       },
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['ignore', 'pipe', 'pipe']
     });
     let out = '';
     let err = '';
@@ -93,9 +102,7 @@ async function scenario(count: number) {
   await reset();
   const identity = `sha256:${crypto.randomBytes(32).toString('hex')}`;
   // Spawn every process before awaiting any — genuinely parallel.
-  const results = await Promise.all(
-    Array.from({ length: count }, () => runWorker(identity)),
-  );
+  const results = await Promise.all(Array.from({ length: count }, () => runWorker(identity)));
   const reserved = results.filter((entry) => entry === 'reserved').length;
   const duplicate = results.filter((entry) => entry === 'duplicate').length;
   const request_rows = await requestRows();
@@ -108,8 +115,7 @@ async function scenario(count: number) {
     request_rows,
     used_tokens,
     expected_used_tokens: RESERVED,
-    result:
-      reserved === 1 && request_rows === 1 && used_tokens === RESERVED ? 'PASS' : 'FAIL',
+    result: reserved === 1 && request_rows === 1 && used_tokens === RESERVED ? 'PASS' : 'FAIL'
   });
 }
 
@@ -120,7 +126,10 @@ async function main() {
     await scenario(2);
     await scenario(5);
   } finally {
-    await client.db(DB).dropDatabase().catch(() => undefined);
+    await client
+      .db(DB)
+      .dropDatabase()
+      .catch(() => undefined);
     await client.close();
   }
 
@@ -131,8 +140,8 @@ async function main() {
       run: RUN,
       scenarios: rows.length,
       passed: rows.length - failures.length,
-      failed: failures.length,
-    }),
+      failed: failures.length
+    })
   );
   process.exitCode = failures.length === 0 ? 0 : 1;
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { LessonBlockV2 } from "@ednova/shared/ednova/learningDocumentV2";
+import type { LessonBlockV2 } from "@noveris/shared/ednova/learningDocumentV2";
 import { tokenizeCode } from "../code-highlight";
 import { PlannedBlockView, type ReaderContext } from "./registry";
 

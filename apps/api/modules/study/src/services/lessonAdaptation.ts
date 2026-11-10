@@ -19,14 +19,17 @@ import {
   readPreferences,
   recommendForLesson,
   resetPreferences,
-  savePreferences,
+  savePreferences
 } from './learnerAdaptation';
 import { loadPublishedReading } from './courseReader';
 import { getPublishedPresentation } from './presentationReader';
 
 type RevisionTopic = {
   id?: string;
-  subtopics?: Array<{ id?: string; learning_objectives?: Array<{ id?: string; objectiveId?: string }> }>;
+  subtopics?: Array<{
+    id?: string;
+    learning_objectives?: Array<{ id?: string; objectiveId?: string }>;
+  }>;
 };
 
 /**
@@ -37,7 +40,7 @@ type RevisionTopic = {
  */
 export function lessonObjectiveIdsForRevision(
   topics: readonly RevisionTopic[],
-  lessonId: string,
+  lessonId: string
 ): string[] {
   for (const topic of topics) {
     for (const subtopic of topic.subtopics ?? []) {
@@ -61,11 +64,11 @@ export function lessonSupportSignals(blocks: readonly LessonBlockV2[]): {
     block.type === 'callout' ? block.kind : undefined;
   return {
     hasProofMaterial: blocks.some(
-      (block) => calloutRole(block) === 'proof' || (block.type === 'math' && Boolean(block.review)),
+      (block) => calloutRole(block) === 'proof' || (block.type === 'math' && Boolean(block.review))
     ),
     hasWorkedExamples: blocks.some((block) =>
-      ['example', 'solution'].includes(calloutRole(block) ?? ''),
-    ),
+      ['example', 'solution'].includes(calloutRole(block) ?? '')
+    )
   };
 }
 
@@ -87,7 +90,7 @@ export async function adaptationForLesson(
   courseId: string,
   lessonId: string,
   mode: LearningMode,
-  revisionId?: string,
+  revisionId?: string
 ): Promise<AdaptationEnvelope> {
   const presentation = await getPublishedPresentation(userId, courseId, revisionId);
   const lesson = presentation.chapters
@@ -100,7 +103,7 @@ export async function adaptationForLesson(
   const { revision } = await loadPublishedReading(userId, courseId, presentation.revisionId);
   const objectiveIds = lessonObjectiveIdsForRevision(
     (revision.topics || []) as RevisionTopic[],
-    lessonId,
+    lessonId
   );
   const signals = lessonSupportSignals(lesson.blocks.map((entry) => entry.block));
 
@@ -113,13 +116,13 @@ export async function adaptationForLesson(
     currentMode: mode,
     lessonObjectiveIds: objectiveIds,
     hasProofMaterial: signals.hasProofMaterial,
-    hasWorkedExamples: signals.hasWorkedExamples,
+    hasWorkedExamples: signals.hasWorkedExamples
   });
 
   return {
     adaptation: result.adaptation,
     surface: result.surface,
-    preferenceVersion: result.preferenceVersion,
+    preferenceVersion: result.preferenceVersion
   };
 }
 
@@ -128,5 +131,5 @@ export {
   dismissRecommendation,
   readPreferences,
   resetPreferences,
-  savePreferences,
+  savePreferences
 };

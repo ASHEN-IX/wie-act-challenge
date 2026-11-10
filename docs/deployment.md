@@ -1,6 +1,6 @@
 # Deployment — existing configuration and readiness limits
 
-This is a configuration guide, not evidence of a successful deployment. Current build/startup/test failures are documented in [validation](audit/validation.md); resolve ED-01/ED-02 before deployment. No deployment or image replacement was performed during this audit.
+This is a configuration guide for self-hosting the Noveris stack. No hosted production deployment is claimed.
 
 ## Main stack
 

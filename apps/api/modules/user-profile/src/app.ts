@@ -1,4 +1,4 @@
-import { publicUploads } from '@ednova/shared/publicUploads';
+import { publicUploads } from '@noveris/shared/publicUploads';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import profileRoutes from './routes/profile';
@@ -15,8 +15,8 @@ import {
   rateLimiter,
   healthCheck,
   requireEnv
-} from '@ednova/shared';
-import { authenticate } from '@ednova/shared/auth';
+} from '@noveris/shared';
+import { authenticate } from '@noveris/shared/auth';
 import path from 'path';
 
 // --- Environment validation (fail-fast on missing secrets) ---

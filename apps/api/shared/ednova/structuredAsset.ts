@@ -24,7 +24,7 @@
 import {
   COMPONENT_REGISTRY_VERSION,
   isComponentType,
-  type ComponentType,
+  type ComponentType
 } from './componentRegistry';
 
 export const STRUCTURED_ASSET_SCHEMA_VERSION = '1.0.0' as const;
@@ -34,7 +34,7 @@ export const ASSET_PROVENANCE = [
   'instructor_authored',
   'reviewed_supplemental',
   'generated_proposal',
-  'deterministic_demo',
+  'deterministic_demo'
 ] as const;
 export type AssetProvenance = (typeof ASSET_PROVENANCE)[number];
 
@@ -44,13 +44,13 @@ export const LEARNER_VISIBLE_PROVENANCE: readonly AssetProvenance[] = [
   'source_derived',
   'instructor_authored',
   'reviewed_supplemental',
-  'deterministic_demo',
+  'deterministic_demo'
 ];
 
 /** Provenance that requires a review record before it can claim review. */
 export const REVIEW_REQUIRED_PROVENANCE: readonly AssetProvenance[] = [
   'source_derived',
-  'reviewed_supplemental',
+  'reviewed_supplemental'
 ];
 
 export type AssetReviewStatus = 'unreviewed' | 'instructor_reviewed' | 'not_applicable';
@@ -82,7 +82,7 @@ export const ASSET_LIMITS = Object.freeze({
   maxCodeLength: 20_000,
   maxTextLength: 4_000,
   maxLabelLength: 200,
-  maxReferences: 32,
+  maxReferences: 32
 });
 
 // ---------------------------------------------------------------------------
@@ -264,8 +264,7 @@ const list = <T>(value: unknown, check: (v: unknown) => T, max: number, min = 0)
  * hostile asset from ever reaching the renderer. */
 const safeText = (value: unknown, max: number, min = 1): string => {
   const text = str(value, max, min);
-  if (/<\s*\/?\s*[a-zA-Z!]/.test(text))
-    return fail('STRUCTURED_ASSET_MARKUP_REJECTED');
+  if (/<\s*\/?\s*[a-zA-Z!]/.test(text)) return fail('STRUCTURED_ASSET_MARKUP_REJECTED');
   return text;
 };
 
@@ -282,7 +281,7 @@ const node = (value: unknown): TopologyNode => {
     x: num(v.x, 0, 100),
     y: num(v.y, 0, 100),
     ...(v.detail !== undefined ? { detail: safeText(v.detail, ASSET_LIMITS.maxTextLength) } : {}),
-    ...(v.kind !== undefined ? { kind: v.kind as TopologyNode['kind'] } : {}),
+    ...(v.kind !== undefined ? { kind: v.kind as TopologyNode['kind'] } : {})
   };
 };
 
@@ -291,13 +290,13 @@ const link = (value: unknown): { from: string; to: string; label?: string } => {
   return {
     from: str(v.from, 64),
     to: str(v.to, 64),
-    ...(v.label !== undefined ? { label: safeText(v.label, ASSET_LIMITS.maxLabelLength) } : {}),
+    ...(v.label !== undefined ? { label: safeText(v.label, ASSET_LIMITS.maxLabelLength) } : {})
   };
 };
 
 function parseGraphPayload(
   component: 'AnnotatedDiagram' | 'ArchitectureDiagram' | 'NetworkTopology',
-  value: unknown,
+  value: unknown
 ): AnnotatedDiagramPayload | ArchitecturePayload | NetworkTopologyPayload {
   const keys =
     component === 'AnnotatedDiagram'
@@ -340,19 +339,19 @@ function parsePayload(component: string, value: unknown): AssetPayload {
                     const s = exact(item, ['name', 'value']);
                     return {
                       name: safeText(s.name, 64),
-                      value: safeText(s.value, ASSET_LIMITS.maxLabelLength),
+                      value: safeText(s.value, ASSET_LIMITS.maxLabelLength)
                     };
                   },
-                  16,
+                  16
                 );
           return {
             line,
             explanation: safeText(a.explanation, ASSET_LIMITS.maxTextLength),
-            ...(state ? { state } : {}),
+            ...(state ? { state } : {})
           };
         },
         ASSET_LIMITS.maxAnnotations,
-        1,
+        1
       );
       // Annotations must advance: a walkthrough with duplicate lines cannot
       // step forward deterministically.
@@ -363,7 +362,7 @@ function parsePayload(component: string, value: unknown): AssetPayload {
         component: 'CodeWalkthrough',
         language: str(v.language, 24),
         code,
-        annotations,
+        annotations
       };
     }
     case 'CodeComparison': {
@@ -375,11 +374,11 @@ function parsePayload(component: string, value: unknown): AssetPayload {
           return {
             label: safeText(e.label, ASSET_LIMITS.maxLabelLength),
             code: str(e.code, ASSET_LIMITS.maxCodeLength),
-            ...(e.note !== undefined ? { note: safeText(e.note, ASSET_LIMITS.maxTextLength) } : {}),
+            ...(e.note !== undefined ? { note: safeText(e.note, ASSET_LIMITS.maxTextLength) } : {})
           };
         },
         4,
-        2,
+        2
       );
       return { component: 'CodeComparison', language: str(v.language, 24), entries };
     }
@@ -392,17 +391,17 @@ function parsePayload(component: string, value: unknown): AssetPayload {
           return {
             input: safeText(c.input, ASSET_LIMITS.maxTextLength),
             output: safeText(c.output, ASSET_LIMITS.maxTextLength),
-            ...(c.note !== undefined ? { note: safeText(c.note, ASSET_LIMITS.maxTextLength) } : {}),
+            ...(c.note !== undefined ? { note: safeText(c.note, ASSET_LIMITS.maxTextLength) } : {})
           };
         },
         16,
-        1,
+        1
       );
       return {
         component: 'InputOutputExample',
         language: str(v.language, 24),
         code: str(v.code, ASSET_LIMITS.maxCodeLength),
-        cases,
+        cases
       };
     }
     case 'Timeline': {
@@ -417,11 +416,11 @@ function parsePayload(component: string, value: unknown): AssetPayload {
             ...(e.detail !== undefined
               ? { detail: safeText(e.detail, ASSET_LIMITS.maxTextLength) }
               : {}),
-            ...(e.when !== undefined ? { when: safeText(e.when, 64) } : {}),
+            ...(e.when !== undefined ? { when: safeText(e.when, 64) } : {})
           };
         },
         ASSET_LIMITS.maxSteps,
-        1,
+        1
       );
       if (new Set(events.map((event) => event.id)).size !== events.length)
         return fail('STRUCTURED_ASSET_DUPLICATE_NODE');
@@ -437,8 +436,7 @@ function parsePayload(component: string, value: unknown): AssetPayload {
 }
 
 const provenance = (value: unknown): AssetProvenance => {
-  if (!ASSET_PROVENANCE.includes(value as AssetProvenance))
-    return fail('INVALID_STRUCTURED_ASSET');
+  if (!ASSET_PROVENANCE.includes(value as AssetProvenance)) return fail('INVALID_STRUCTURED_ASSET');
   return value as AssetProvenance;
 };
 
@@ -450,8 +448,7 @@ const review = (value: unknown): AssetReview => {
   if (status === 'instructor_reviewed') {
     const reviewedBy = safeText(v.reviewedBy, 128);
     const reviewedAt = str(v.reviewedAt, 40);
-    if (!Number.isFinite(Date.parse(reviewedAt)))
-      return fail('INVALID_STRUCTURED_ASSET');
+    if (!Number.isFinite(Date.parse(reviewedAt))) return fail('INVALID_STRUCTURED_ASSET');
     return { status, reviewedBy, reviewedAt };
   }
   // A non-reviewed status must not carry a reviewer: that would imply review.
@@ -471,7 +468,7 @@ const sourceReference = (value: unknown): AssetSourceReference => {
     pageNumber: v.pageNumber as number | null,
     lineStart,
     lineEnd,
-    ...(v.chunkId !== undefined ? { chunkId: str(v.chunkId, 128) } : {}),
+    ...(v.chunkId !== undefined ? { chunkId: str(v.chunkId, 128) } : {})
   };
 };
 
@@ -483,7 +480,7 @@ export const ASSET_COMPONENTS: readonly ComponentType[] = Object.freeze([
   'AnnotatedDiagram',
   'ArchitectureDiagram',
   'NetworkTopology',
-  'Timeline',
+  'Timeline'
 ]);
 
 /**
@@ -506,14 +503,15 @@ export function parseStructuredAsset(value: unknown): StructuredAssetV1 {
     'sourceReferences',
     'audience',
     'fallback',
-    'disclosure',
+    'disclosure'
   ]);
   if (v.schemaVersion !== STRUCTURED_ASSET_SCHEMA_VERSION)
     return fail('STRUCTURED_ASSET_VERSION_UNSUPPORTED');
   if (v.registryVersion !== COMPONENT_REGISTRY_VERSION)
     return fail('STRUCTURED_ASSET_VERSION_UNSUPPORTED');
   const courseId = str(v.courseId, 36);
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(courseId)) return fail('INVALID_STRUCTURED_ASSET');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(courseId))
+    return fail('INVALID_STRUCTURED_ASSET');
   const component = String(v.component);
   if (!ASSET_COMPONENTS.includes(component as ComponentType))
     return fail('STRUCTURED_ASSET_COMPONENT_UNSUPPORTED');
@@ -565,7 +563,7 @@ export function parseStructuredAsset(value: unknown): StructuredAssetV1 {
     ...(references ? { sourceReferences: references } : {}),
     audience: 'course',
     fallback: fallback as ComponentType,
-    disclosure: safeText(v.disclosure, 300),
+    disclosure: safeText(v.disclosure, 300)
   };
 }
 
@@ -574,7 +572,7 @@ const PROVENANCE_LABELS: Record<AssetProvenance, string> = {
   instructor_authored: 'Instructor-authored material',
   reviewed_supplemental: 'Instructor-authored and reviewed',
   generated_proposal: 'Unreviewed generated proposal',
-  deterministic_demo: 'Demonstration content',
+  deterministic_demo: 'Demonstration content'
 };
 
 /**
@@ -584,7 +582,7 @@ const PROVENANCE_LABELS: Record<AssetProvenance, string> = {
  */
 export function projectStructuredAsset(
   asset: StructuredAssetV1,
-  binding: { courseId: string; revisionId: string },
+  binding: { courseId: string; revisionId: string }
 ): PublishedStructuredAssetV1 | null {
   if (asset.courseId !== binding.courseId) return null;
   if (asset.revisionId !== binding.revisionId) return null;
@@ -602,14 +600,14 @@ export function projectStructuredAsset(
     payload: asset.payload,
     label: PROVENANCE_LABELS[asset.provenance],
     fallback: asset.fallback,
-    disclosure: asset.disclosure,
+    disclosure: asset.disclosure
   };
 }
 
 /** Bound a set of assets for one revision, keeping deterministic order. */
 export function projectStructuredAssets(
   assets: StructuredAssetV1[],
-  binding: { courseId: string; revisionId: string },
+  binding: { courseId: string; revisionId: string }
 ): PublishedStructuredAssetV1[] {
   return assets
     .slice(0, ASSET_LIMITS.maxAssetsPerRevision)

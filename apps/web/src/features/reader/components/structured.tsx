@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { Check, Copy, Image as ImageIcon, ImageOff, LineChart } from "lucide-react";
-import type { LessonBlockV2 } from "@ednova/shared/ednova/learningDocumentV2";
+import type { LessonBlockV2 } from "@noveris/shared/ednova/learningDocumentV2";
 import { tokenizeCode } from "../code-highlight";
 
 type CodeBlock = Extract<LessonBlockV2, { type: "code" }>;

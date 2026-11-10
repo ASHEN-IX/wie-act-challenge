@@ -24,23 +24,23 @@ afterAll(() => exitSpy.mockRestore());
 
 import request from 'supertest';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const moduleClient = require('@ednova/shared/moduleClient');
+const moduleClient = require('@noveris/shared/moduleClient');
 // Status uses the independent Python HTTP boundary, not moduleClient.
 // Never let a unit test probe whichever service happens to be running locally.
-jest.mock('@ednova/shared/aiClient', () => ({
-  ...jest.requireActual('@ednova/shared/aiClient'),
+jest.mock('@noveris/shared/aiClient', () => ({
+  ...jest.requireActual('@noveris/shared/aiClient'),
   getProviderStatus: jest.fn()
 }));
-const aiClient = require('@ednova/shared/aiClient');
+const aiClient = require('@noveris/shared/aiClient');
 
-jest.mock('@ednova/shared/auth', () => ({
+jest.mock('@noveris/shared/auth', () => ({
   authenticate: jest.fn((req, res, next) => {
     req.user = { userId: 'test-user-123' };
     next();
   })
 }));
 
-jest.mock('@ednova/shared/tierGate', () => ({
+jest.mock('@noveris/shared/tierGate', () => ({
   tierGate: jest.fn(() => (req: Request, res: Response, next: NextFunction) => next())
 }));
 
@@ -48,7 +48,7 @@ jest.mock('@ednova/shared/tierGate', () => ({
 const app = require('../app');
 
 // Mock moduleClient to prevent actual HTTP calls
-jest.mock('@ednova/shared/moduleClient');
+jest.mock('@noveris/shared/moduleClient');
 
 describe('POST /api/v1/ai/coach', () => {
   afterEach(() => {

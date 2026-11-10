@@ -11,7 +11,7 @@ import {
 } from "react";
 import type {
   LessonBlockV2,
-} from "@ednova/shared/ednova/learningDocumentV2";
+} from "@noveris/shared/ednova/learningDocumentV2";
 import { AlertCircle, ChevronDown, Image as ImageIcon, LineChart, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { tokenizeCode } from "./code-highlight";

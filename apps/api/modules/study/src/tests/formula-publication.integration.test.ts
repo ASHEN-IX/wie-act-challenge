@@ -257,7 +257,12 @@ it('freezes accepted/corrected expressions, leaves rejected/pending source, and 
   const projected = presentation.chapters
     .flatMap((chapter) => chapter.lessons)
     .flatMap((lesson) => lesson.blocks);
-  expect(projected.map((entry) => entry.block.id)).toEqual(['block0', 'block1', 'block2', 'block3']);
+  expect(projected.map((entry) => entry.block.id)).toEqual([
+    'block0',
+    'block1',
+    'block2',
+    'block3'
+  ]);
   expect(projected.map((entry) => entry.reason)).toEqual([
     'reviewed_formula',
     'reviewed_formula',
@@ -377,11 +382,7 @@ it('fresh drafts do not inherit old formula approvals and old published content/
   expect(JSON.stringify(older.contentDocument)).toBe(oldCanonical);
   expect((await fs.readFile(indexPath + '.faiss')).equals(oldIndex)).toBe(true);
   expect((await fs.readFile(indexPath + '.meta.json')).equals(oldMeta)).toBe(true);
-  const reader = await getLearningDocument(
-    'owner',
-    String(course.id),
-    second.publishedRevisionTag
-  );
+  const reader = await getLearningDocument('owner', String(course.id), second.publishedRevisionTag);
   expect(
     reader.sections
       .flatMap((s) => s.blocks)
@@ -395,9 +396,7 @@ it('concurrent publish commands cannot create two publication snapshots for the 
     publishCourseRevision('owner', String(course.id), 'rev_source')
   ]);
   expect(results.some((r) => r.status === 'fulfilled')).toBe(true);
-  expect(await CourseRevision.countDocuments({ courseId: course.id, status: 'published' })).toBe(
-    1
-  );
+  expect(await CourseRevision.countDocuments({ courseId: course.id, status: 'published' })).toBe(1);
 });
 
 it('recovers exact publication receipt after indexing fails without changing source or selecting later proposals', async () => {
@@ -405,19 +404,32 @@ it('recovers exact publication receipt after indexing fails without changing sou
   const original = post.getMockImplementation()!;
   let failIndex = true;
   post.mockImplementation(async (url: string, body: any, ...rest: any[]) => {
-    if (failIndex && url.endsWith('/index')) { failIndex = false; throw new Error('isolated index outage'); }
+    if (failIndex && url.endsWith('/index')) {
+      failIndex = false;
+      throw new Error('isolated index outage');
+    }
     return original(url, body, ...rest);
   });
-  await expect(publishCourseRevision('owner', String(course.id), 'rev_source')).rejects.toBeDefined();
+  await expect(
+    publishCourseRevision('owner', String(course.id), 'rev_source')
+  ).rejects.toBeDefined();
   const frozen: any = await CourseRevision.findById(draft.id).lean();
   expect(frozen.activationState).toBe('prepared');
   expect(frozen.contentDocument).toEqual(draft.contentDocument);
   const targetTag = frozen.formulaPublication.targetTag;
   // Later mutable records cannot replace the already captured review set.
-  await FormulaProposal.updateMany({ courseId: course.id }, { $set: { reviewedLatex: 'late mutation' } });
+  await FormulaProposal.updateMany(
+    { courseId: course.id },
+    { $set: { reviewedLatex: 'late mutation' } }
+  );
   const result = await publishCourseRevision('owner', String(course.id), 'rev_source');
   expect(result.publishedRevisionTag).toBe(targetTag);
-  const published: any = await CourseRevision.findOne({ courseId: course.id, revisionTag: targetTag }).lean();
-  expect(published.contentDocument.chapters[0].lessons[0].blocks[1].reviewedFormula.expression).toBe('s_1');
+  const published: any = await CourseRevision.findOne({
+    courseId: course.id,
+    revisionTag: targetTag
+  }).lean();
+  expect(
+    published.contentDocument.chapters[0].lessons[0].blocks[1].reviewedFormula.expression
+  ).toBe('s_1');
   expect((await verifyRevisionArtifact(published)).metadata.revisionId).toBe(targetTag);
 });

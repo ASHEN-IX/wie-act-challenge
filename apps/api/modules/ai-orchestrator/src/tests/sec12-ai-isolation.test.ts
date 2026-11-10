@@ -25,20 +25,20 @@ const jwt = { sign: require('../../../../tests/sessionFixtures').createSession }
 import request from 'supertest';
 import { Writable } from 'stream';
 import fileUpload from 'express-fileupload';
-import { authenticate } from '@ednova/shared/auth';
+import { authenticate } from '@noveris/shared/auth';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const aiRouter = require('../routes/ai');
 
-jest.mock('@ednova/shared', () => ({
+jest.mock('@noveris/shared', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() }
 }));
-jest.mock('@ednova/shared/tierGate', () => ({
+jest.mock('@noveris/shared/tierGate', () => ({
   tierGate: () => (req: Request, res: Response, next: NextFunction) => next()
 }));
-jest.mock('@ednova/shared/moduleClient');
+jest.mock('@noveris/shared/moduleClient');
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const moduleClient = require('@ednova/shared/moduleClient');
+const moduleClient = require('@noveris/shared/moduleClient');
 
 const app = express();
 app.use(express.json());

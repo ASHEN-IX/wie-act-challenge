@@ -22,26 +22,29 @@ import { ExperiencePlanRequest } from '../models/ExperiencePlanRequest';
 /** States that mean another dispatch is genuinely in progress. `requested` is
  * excluded: it is the row this call just created. */
 const IN_FLIGHT_STATES: readonly string[] = ['authorized', 'reserved', 'dispatched', 'validating'];
-import type { ExperiencePlannerProvider, ProviderOutcome } from '../../../../shared/ednova/experiencePlannerProvider';
+import type {
+  ExperiencePlannerProvider,
+  ProviderOutcome
+} from '../../../../shared/ednova/experiencePlannerProvider';
 import { failureClass } from '../../../../shared/ednova/experiencePlannerProvider';
 import {
   tryValidateExperiencePlan,
-  type ValidationOutcome,
+  type ValidationOutcome
 } from '../../../../shared/ednova/experiencePlanValidator';
 import type {
   ExperiencePlanValidationContext,
-  ValidatedLearningExperiencePlan,
+  ValidatedLearningExperiencePlan
 } from '../../../../shared/ednova/experiencePlan';
 import {
   assertPlanningAuthorized,
   PlanningGovernanceError,
-  type PlanningRefusal,
+  type PlanningRefusal
 } from './planningGovernance';
 import {
   reconcilePlanningBudget,
   releaseUndispatchedReservation,
   reservePlanningBudget,
-  PlanningBudgetError,
+  PlanningBudgetError
 } from './planningBudget';
 import { loadAcceptedPlan, peekStoredPlan, storeAcceptedPlan } from './experiencePlanStore';
 import { recordEvent } from './planningMetrics';
@@ -52,7 +55,7 @@ import {
   plannerTask,
   PlanningContextError,
   PLANNER_SYSTEM_POLICY,
-  type PlanningContextInput,
+  type PlanningContextInput
 } from '../../../../shared/ednova/planningContext';
 
 export const PLANNING_TASK = 'experience_planning';
@@ -94,8 +97,8 @@ export function planningIdentity(input: {
           input.mode,
           input.contextFingerprint,
           input.provider,
-          input.model,
-        ]),
+          input.model
+        ])
       )
       .digest('hex')
   );
@@ -136,8 +139,7 @@ export async function generateExperiencePlan(input: {
     schema = plannerOutputSchema(context);
     task = plannerTask(context, input.contextInput);
   } catch (error) {
-    const code =
-      error instanceof PlanningContextError ? error.code : 'CONTEXT_TOO_LARGE';
+    const code = error instanceof PlanningContextError ? error.code : 'CONTEXT_TOO_LARGE';
     return { status: 'refused', code, requestId: null };
   }
 
@@ -150,11 +152,10 @@ export async function generateExperiencePlan(input: {
       revisionId: input.revisionId,
       provider: providerIdentity.provider,
       model: providerIdentity.model,
-      keySha256: input.keySha256,
+      keySha256: input.keySha256
     });
   } catch (error) {
-    const code =
-      error instanceof PlanningGovernanceError ? error.code : 'PLANNING_FORBIDDEN';
+    const code = error instanceof PlanningGovernanceError ? error.code : 'PLANNING_FORBIDDEN';
     return { status: 'refused', code, requestId: null };
   }
 
@@ -165,7 +166,7 @@ export async function generateExperiencePlan(input: {
     mode: input.mode,
     contextFingerprint: context.fingerprint,
     provider: providerIdentity.provider,
-    model: providerIdentity.model,
+    model: providerIdentity.model
   });
 
   // ---- release expired in-flight attempts ---------------------------------
@@ -196,10 +197,10 @@ export async function generateExperiencePlan(input: {
           contextFingerprint: context.fingerprint,
           state: 'requested',
           reservedTokens: 0,
-          usageReported: false,
-        },
+          usageReported: false
+        }
       },
-      { upsert: true, new: true },
+      { upsert: true, new: true }
     ).lean();
   } catch (error) {
     // A unique-index race means another attempt created the row first.
@@ -220,7 +221,7 @@ export async function generateExperiencePlan(input: {
     const claimed = await ExperiencePlanRequest.findOneAndUpdate(
       { id: row.id, state: 'requested' },
       { $set: { state: 'authorized' } },
-      { new: true },
+      { new: true }
     ).lean();
     if (!claimed) {
       // Another process won the claim. Re-read to report its state honestly.
@@ -245,7 +246,7 @@ export async function generateExperiencePlan(input: {
       courseId: input.courseId,
       revisionId: input.revisionId,
       lessonId: input.lessonId,
-      mode: input.mode,
+      mode: input.mode
     });
     // The accepted plan is already stored; this call must not produce a second
     // one. `already_accepted` tells the caller to read the store instead.
@@ -281,7 +282,7 @@ export async function generateExperiencePlan(input: {
     const adopted = await adoptDurablePlan({
       validationContext: input.validationContext,
       lessonId: input.lessonId,
-      mode: input.mode,
+      mode: input.mode
     });
     if (adopted) {
       // Single-winner promotion: two callers may both see `uncertain`, but only
@@ -290,9 +291,9 @@ export async function generateExperiencePlan(input: {
         { id: row.id, state: 'uncertain' },
         {
           $set: { state: 'validated', planDigest: adopted.digest, finishedAt: new Date() },
-          $unset: { code: 1 },
+          $unset: { code: 1 }
         },
-        { new: true },
+        { new: true }
       ).lean();
       const current = promoted ?? (await ExperiencePlanRequest.findOne({ id: row.id }).lean());
       if (String(current?.state) === 'validated') {
@@ -312,17 +313,17 @@ export async function generateExperiencePlan(input: {
       model: providerIdentity.model,
       maxTokens: authorization.maxTokens,
       maxRequests: 1,
-      expiresAt: Math.floor(Date.now() / 1000) + 3600,
+      expiresAt: Math.floor(Date.now() / 1000) + 3600
     });
   } catch (error) {
     await ExperiencePlanRequest.updateOne(
       { id: row.id },
-      { $set: { state: 'failed', code: 'BUDGET_UNAVAILABLE', finishedAt: new Date() } },
+      { $set: { state: 'failed', code: 'BUDGET_UNAVAILABLE', finishedAt: new Date() } }
     );
     return {
       status: 'refused',
       code: error instanceof PlanningBudgetError ? 'BUDGET_UNAVAILABLE' : 'BUDGET_UNAVAILABLE',
-      requestId,
+      requestId
     };
   }
 
@@ -335,14 +336,14 @@ export async function generateExperiencePlan(input: {
       $set: {
         state: 'reserved',
         approvalId: authorization.approvalId,
-        reservedTokens: reservation.reservedTokens,
-      },
-    },
+        reservedTokens: reservation.reservedTokens
+      }
+    }
   );
 
   await ExperiencePlanRequest.updateOne(
     { id: row.id },
-    { $set: { state: 'dispatched', dispatchAt: new Date() } },
+    { $set: { state: 'dispatched', dispatchAt: new Date() } }
   );
 
   // ---- dispatch ----------------------------------------------------------
@@ -357,8 +358,8 @@ export async function generateExperiencePlan(input: {
       limits: {
         maxInputCharacters: task.length + PLANNER_SYSTEM_POLICY.length,
         maxOutputTokens: 2048,
-        timeoutMs: 30_000,
-      },
+        timeoutMs: 30_000
+      }
     });
   } catch {
     // An adapter that threw is not proof that nothing was dispatched.
@@ -366,7 +367,7 @@ export async function generateExperiencePlan(input: {
       ok: false,
       code: 'PROVIDER_UNAVAILABLE',
       failure: 'uncertain',
-      usage: null,
+      usage: null
     };
   }
 
@@ -374,8 +375,12 @@ export async function generateExperiencePlan(input: {
   const accounting = await (input.reconcile ?? reconcilePlanningBudget)({
     approvalId: reservation.approvalId,
     reservedTokens: reservation.reservedTokens,
-    usage: outcome.ok ? outcome.usage : outcome.usage,
-  }).catch(() => ({ chargedTokens: reservation.reservedTokens, refunded: 0, usageReported: false }));
+    usage: outcome.ok ? outcome.usage : outcome.usage
+  }).catch(() => ({
+    chargedTokens: reservation.reservedTokens,
+    refunded: 0,
+    usageReported: false
+  }));
 
   await ExperiencePlanRequest.updateOne(
     { id: row.id },
@@ -388,9 +393,9 @@ export async function generateExperiencePlan(input: {
           : {}),
         ...(outcome.ok && outcome.usage.modelVersion
           ? { modelVersion: outcome.usage.modelVersion }
-          : {}),
-      },
-    },
+          : {})
+      }
+    }
   );
 
   if (!outcome.ok) {
@@ -402,9 +407,9 @@ export async function generateExperiencePlan(input: {
         $set: {
           state: uncertain ? 'uncertain' : 'failed',
           code: outcome.code,
-          finishedAt: new Date(),
-        },
-      },
+          finishedAt: new Date()
+        }
+      }
     );
     return { status: 'failed', code: outcome.code, requestId, uncertain };
   }
@@ -413,7 +418,7 @@ export async function generateExperiencePlan(input: {
   await ExperiencePlanRequest.updateOne({ id: row.id }, { $set: { state: 'validating' } });
   const validation: ValidationOutcome = tryValidateExperiencePlan(
     outcome.proposal,
-    input.validationContext,
+    input.validationContext
   );
 
   if (!validation.ok) {
@@ -425,9 +430,9 @@ export async function generateExperiencePlan(input: {
           state: 'rejected',
           code: validation.code,
           stage: validation.stage,
-          finishedAt: new Date(),
-        },
-      },
+          finishedAt: new Date()
+        }
+      }
     );
     return { status: 'rejected', code: validation.code, stage: validation.stage, requestId };
   }
@@ -450,7 +455,7 @@ export async function generateExperiencePlan(input: {
     plan: validation.plan,
     generatedBy: input.actor,
     contextFingerprint: context.fingerprint,
-    mode: isLearningMode(input.mode) ? input.mode : 'read',
+    mode: isLearningMode(input.mode) ? input.mode : 'read'
   });
   if (!stored.stored) {
     // A plan that validated but cannot be stored is not usable to a learner.
@@ -462,15 +467,15 @@ export async function generateExperiencePlan(input: {
           state: 'failed',
           code: 'PLAN_NOT_STORED',
           planDigest: validation.plan.digest,
-          finishedAt: new Date(),
-        },
-      },
+          finishedAt: new Date()
+        }
+      }
     );
     return {
       status: 'failed',
       code: 'PLAN_NOT_STORED',
       requestId,
-      uncertain: false,
+      uncertain: false
     };
   }
 
@@ -480,10 +485,10 @@ export async function generateExperiencePlan(input: {
       $set: {
         state: 'validated',
         planDigest: validation.plan.digest,
-        finishedAt: new Date(),
+        finishedAt: new Date()
       },
-      $unset: { code: 1, stage: 1 },
-    },
+      $unset: { code: 1, stage: 1 }
+    }
   );
 
   return {
@@ -491,7 +496,7 @@ export async function generateExperiencePlan(input: {
     plan: validation.plan,
     planDigest: validation.plan.digest,
     requestId,
-    usageReported: accounting.usageReported,
+    usageReported: accounting.usageReported
   };
 }
 
@@ -520,7 +525,7 @@ async function adoptDurablePlan(input: {
     mode: input.mode as LearningMode,
     contentHash: input.validationContext.contentHash,
     contextFingerprint: input.validationContext.contextFingerprint,
-    validationContext: input.validationContext,
+    validationContext: input.validationContext
   });
   if (outcome.status !== 'available') {
     if (process.env.EXPERIENCE_PLAN_DEBUG)
@@ -538,7 +543,7 @@ async function adoptDurablePlan(input: {
  */
 export async function recoverStalePlanningRequests(
   olderThanMs = 120_000,
-  release: typeof releaseUndispatchedReservation = releaseUndispatchedReservation,
+  release: typeof releaseUndispatchedReservation = releaseUndispatchedReservation
 ): Promise<number> {
   const cutoff = new Date(Date.now() - olderThanMs);
 
@@ -548,11 +553,11 @@ export async function recoverStalePlanningRequests(
     {
       state: { $in: ['dispatched', 'validating'] },
       $or: [{ dispatchAt: { $lt: cutoff } }, { dispatchAt: { $exists: false } }],
-      updatedAt: { $lt: cutoff },
+      updatedAt: { $lt: cutoff }
     },
     {
-      $set: { state: 'uncertain', code: 'WORKER_INTERRUPTED', finishedAt: new Date() },
-    },
+      $set: { state: 'uncertain', code: 'WORKER_INTERRUPTED', finishedAt: new Date() }
+    }
   );
 
   // `authorized` and `reserved` are provably pre-dispatch: the provider was
@@ -562,7 +567,7 @@ export async function recoverStalePlanningRequests(
   // silently consumed budget for zero inference.
   const stale = await ExperiencePlanRequest.find({
     state: { $in: ['authorized', 'reserved'] },
-    updatedAt: { $lt: cutoff },
+    updatedAt: { $lt: cutoff }
   })
     .select({ id: 1, requestId: 1, approvalId: 1, reservedTokens: 1 })
     .limit(50)
@@ -574,7 +579,7 @@ export async function recoverStalePlanningRequests(
     const claimed = await ExperiencePlanRequest.findOneAndUpdate(
       { id: row.id, state: { $in: ['authorized', 'reserved'] } },
       { $set: { state: 'failed', code: 'PRE_DISPATCH_INTERRUPTED', finishedAt: new Date() } },
-      { new: true },
+      { new: true }
     ).lean();
     if (!claimed) continue;
     released += 1;
@@ -585,7 +590,7 @@ export async function recoverStalePlanningRequests(
       await release({
         approvalId: row.approvalId,
         reservedTokens: row.reservedTokens,
-        releaseToken: `recover:${String(row.requestId)}`,
+        releaseToken: `recover:${String(row.requestId)}`
       }).catch(() => undefined);
   }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { LessonBlockV2 } from "@ednova/shared/ednova/learningDocumentV2";
+import type { LessonBlockV2 } from "@noveris/shared/ednova/learningDocumentV2";
 import { parseExpression, sampleFunction } from "./math/expression";
 import {
   EXPLORATIONS,

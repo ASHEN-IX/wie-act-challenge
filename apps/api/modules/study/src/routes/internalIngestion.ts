@@ -61,8 +61,7 @@ export async function ingestionOperation(req: DomainRequest, res: Response) {
   const revisionId = typeof req.query.revisionId === 'string' ? req.query.revisionId : '';
   const userId = typeof req.query.userId === 'string' ? req.query.userId : '';
   const jobId = typeof req.query.jobId === 'string' ? req.query.jobId : '';
-  const correlationId =
-    typeof req.query.correlationId === 'string' ? req.query.correlationId : '';
+  const correlationId = typeof req.query.correlationId === 'string' ? req.query.correlationId : '';
   if (!messageId) return res.status(400).json({ error: 'messageId is required' });
 
   try {

@@ -6,7 +6,7 @@ import {
   normalizeLearningProfile,
   suggestFocusMinutes,
   type LearningProfile,
-} from "@ednova/shared/ednova/learningProfile";
+} from "@noveris/shared/ednova/learningProfile";
 export default async function WorkspaceLayout({
   children,
 }: {

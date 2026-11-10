@@ -30,7 +30,7 @@ export const PLANNING_EVENT = [
   'plan_invalidated',
   'reader_fallback',
   'adaptation_recommended',
-  'adaptation_neutral',
+  'adaptation_neutral'
 ] as const;
 
 export type PlanningEvent = (typeof PLANNING_EVENT)[number];
@@ -118,11 +118,11 @@ export function snapshotMetrics(): Snapshot {
         {
           buckets: [...histogram.buckets],
           total: histogram.total,
-          sum: histogram.sum,
-        },
-      ]),
+          sum: histogram.sum
+        }
+      ])
     ),
-    since: since.toISOString(),
+    since: since.toISOString()
   };
 }
 
@@ -135,7 +135,7 @@ export function summarizeMetrics(): Record<string, unknown> {
       count: histogram.total,
       p50: percentile(histogram, 50),
       p95: percentile(histogram, 95),
-      p99: percentile(histogram, 99),
+      p99: percentile(histogram, 99)
     };
   return { counters: countersOut, latency: latencyOut, since: since.toISOString() };
 }

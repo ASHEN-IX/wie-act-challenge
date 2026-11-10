@@ -15,8 +15,7 @@ type RedisCommand = Extract<
   ConstructorParameters<typeof RateRedisStore>[0],
   { sendCommand: unknown }
 >['sendCommand'];
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const logger = require('./logger');
+import logger from './logger';
 import { v4 as uuidv4 } from 'uuid';
 
 /**

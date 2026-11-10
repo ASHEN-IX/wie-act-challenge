@@ -19,7 +19,7 @@ The AI workers and the API share two folders: uploads and the FAISS index.
 Two things surprise people:
 
 - **The web app talks to PostgreSQL.** It hosts the sign-in endpoints (`apps/web/src/app/api/auth/[...all]`, Better Auth through `apps/api/shared/betterAuth.ts`). Sessions are stored in the same database the API reads, and the API verifies them with the same secret. That is why `apps/web/.env.local` has `DATABASE_URL`, `BETTER_AUTH_SECRET`, `AUTH_TRUSTED_ORIGINS` and SMTP settings. Everything else the web app does goes through the API (`BACKEND_URL`).
-- **There are two databases with different owners.** API and web share one PostgreSQL database (`ednova`) through Prisma. The Python AI service keeps the tables only it owns in the `ai` schema (`AI_DATABASE_URL`); it never reads the application tables and instead calls the API's internal endpoints (`API_SERVICE_URL`, `INTERNAL_API_SECRET`).
+- **There are two persistence owners.** API and web share one PostgreSQL database (`ednova`) through Prisma. The Python AI service keeps the tables only it owns in the `ai` schema (`AI_DATABASE_URL`); it never reads the application tables and instead calls the API's internal endpoints (`API_SERVICE_URL`, `INTERNAL_API_SECRET`).
 
 ## Which file for which app
 
@@ -46,7 +46,7 @@ Real env files are git-ignored; only `*.example` files are committed.
 | `RABBITMQ_URL` (and `RABBITMQ_USER/PASS/VHOST` for Compose) | api, ai | Same broker and credentials. |
 | `INGEST_UPLOADS_DIR`, `FAISS_INDEX_DIR` | api, ai | Same host folders; Compose bind-mounts them into the containers. |
 
-`INTERNAL_API_SECRET` (API only) lets trusted services call the API without a user session.
+`INTERNAL_API_SECRET` (shared with trusted internal callers) lets trusted services call the API without a user session.
 
 ## The "web address" variables
 
@@ -64,7 +64,7 @@ They are kept for compatibility; collapsing them into one variable is a code cha
 
 ## Local ports
 
-web 3000, API 3001, AI 8000, PostgreSQL 5433 (host) → 5432 (container), Redis 6379, RabbitMQ 5672 (UI 15672), Mailpit 1025 (UI 8025).
+Development Compose uses web 3000, API 3001, AI 8000, PostgreSQL 5433 (host) → 5432 (container), Redis 6381, RabbitMQ 5673 (UI 15673), Mailpit 1025 (UI 8025).
 
 ## Tests
 

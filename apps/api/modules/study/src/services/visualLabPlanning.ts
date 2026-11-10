@@ -116,7 +116,10 @@ export function parsePlanInput(value: unknown): PlanLabInput {
     return { mode: 'topic', concept, language };
   }
 
-  if (typeof raw.courseId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(raw.courseId))
+  if (
+    typeof raw.courseId !== 'string' ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(raw.courseId)
+  )
     throw new VisualLabValidationError('INVALID_INPUT', 'A valid course is required');
   if (raw.revisionId !== undefined && typeof raw.revisionId !== 'string')
     throw new VisualLabValidationError('INVALID_INPUT', 'Invalid revision');
@@ -683,7 +686,10 @@ export async function discoverVisualConcepts(
   rawCourseId: unknown,
   rawRevisionId?: unknown
 ) {
-  if (typeof rawCourseId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(rawCourseId))
+  if (
+    typeof rawCourseId !== 'string' ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(rawCourseId)
+  )
     throw new VisualLabValidationError('INVALID_INPUT', 'A valid course is required');
   const courseId = rawCourseId;
   if (

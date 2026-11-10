@@ -4,7 +4,7 @@ import {
   COMPONENT_TYPES,
   isComponentType,
   resolveComponent,
-  semanticRole,
+  semanticRole
 } from '../../../../shared/ednova/componentRegistry';
 
 describe('trusted educational component registry', () => {
@@ -58,8 +58,8 @@ describe('trusted educational component registry', () => {
         hasEvidence: true,
         hasSourceRegion: true,
         isReviewedFormula: true,
-        hasStructuredFixture: false,
-      }).ok,
+        hasStructuredFixture: false
+      }).ok
     ).toBe(true);
     const refused = resolveComponent({
       component: 'ReviewedFormula',
@@ -68,7 +68,7 @@ describe('trusted educational component registry', () => {
       hasEvidence: true,
       hasSourceRegion: true,
       isReviewedFormula: false,
-      hasStructuredFixture: false,
+      hasStructuredFixture: false
     });
     expect(refused.ok).toBe(false);
     expect(refused.ok === false && refused.reason).toBe('unreviewed_formula');
@@ -83,7 +83,7 @@ describe('trusted educational component registry', () => {
       hasEvidence: true,
       hasSourceRegion: true,
       isReviewedFormula: false,
-      hasStructuredFixture: false,
+      hasStructuredFixture: false
     });
     expect(result.ok).toBe(false);
     expect(result.ok === false && result.reason).toBe('incompatible_policy');
@@ -98,7 +98,7 @@ describe('trusted educational component registry', () => {
       hasEvidence: true,
       hasSourceRegion: false,
       isReviewedFormula: false,
-      hasStructuredFixture: false,
+      hasStructuredFixture: false
     });
     expect(result.ok).toBe(false);
     expect(result.ok === false && result.reason).toBe('incompatible_role');
@@ -114,7 +114,7 @@ describe('trusted educational component registry', () => {
       hasEvidence: true,
       hasSourceRegion: false,
       isReviewedFormula: false,
-      hasStructuredFixture: false,
+      hasStructuredFixture: false
     });
     expect(result.ok).toBe(false);
     expect(result.ok === false && result.reason).toBe('unknown_component');
@@ -144,7 +144,7 @@ describe('trusted educational component registry', () => {
       'media',
       'diagram',
       'callout',
-      'chart',
+      'chart'
     ])
       expect(covered.has(blockType)).toBe(true);
   });

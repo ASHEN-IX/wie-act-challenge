@@ -2,9 +2,9 @@ import type { Response, NextFunction } from 'express';
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import Joi from 'joi';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createContracts } = require('@ednova/shared/domainContracts');
+const { createContracts } = require('@noveris/shared/domainContracts');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { requireRole } = require('@ednova/shared/auth');
+const { requireRole } = require('@noveris/shared/auth');
 import {
   acceptInstitutionInvitation,
   bootstrapInstitution,

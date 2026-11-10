@@ -8,7 +8,7 @@
  * budget ledger, formula-recognition controls).
  */
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { requireInternal } = require('@ednova/shared/auth');
+const { requireInternal } = require('@noveris/shared/auth');
 import * as ingestion from './internalIngestion';
 import * as coach from './internalCoach';
 import * as budget from './internalBudget';
@@ -17,16 +17,22 @@ import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response } from 'express';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createContracts } = require('@ednova/shared/domainContracts');
+const { createContracts } = require('@noveris/shared/domainContracts');
 const router = createContracts();
 
 // The AI client expects a plain 200; Nest would otherwise answer a POST with 201.
-const ok = (handler: (req: DomainRequest, res: Response) => unknown) => (req: DomainRequest, res: Response) => {
-  res.status(200);
-  return handler(req, res);
-};
+const ok =
+  (handler: (req: DomainRequest, res: Response) => unknown) =>
+  (req: DomainRequest, res: Response) => {
+    res.status(200);
+    return handler(req, res);
+  };
 
-router.get('/ingestion/revisions/:courseId/:revisionTag', requireInternal, ingestion.ingestionRevision);
+router.get(
+  '/ingestion/revisions/:courseId/:revisionTag',
+  requireInternal,
+  ingestion.ingestionRevision
+);
 router.get('/ingestion/operations/:messageId', requireInternal, ingestion.ingestionOperation);
 router.get('/coach/catalog', requireInternal, coach.coachCatalog);
 router.get('/coach/sessions/:sessionId/current-task', requireInternal, coach.coachCurrentTask);
@@ -37,7 +43,11 @@ router.post('/budget/active', requireInternal, ok(budget.active));
 router.post('/budget/usage', requireInternal, ok(budget.usage));
 router.post('/budget/revoke', requireInternal, ok(budget.revoke));
 router.get('/budget/:approvalId', requireInternal, budget.budgetStatus);
-router.get('/experience/requests/:requestId/reservation', requireInternal, budget.experienceReservation);
+router.get(
+  '/experience/requests/:requestId/reservation',
+  requireInternal,
+  budget.experienceReservation
+);
 router.post('/formula/recognition-context', requireInternal, ok(formula.recognitionContext));
 router.post('/formula/recognition-recheck', requireInternal, ok(formula.recognitionRecheck));
 

@@ -126,21 +126,21 @@ const fakeAuth = (req: DomainRequest, res: Response, next: NextFunction) => {
   next();
 };
 
-jest.mock('@ednova/shared/uploadValidation', () => {
-  const actual = jest.requireActual('@ednova/shared/uploadValidation');
+jest.mock('@noveris/shared/uploadValidation', () => {
+  const actual = jest.requireActual('@noveris/shared/uploadValidation');
   return { ...actual };
 });
 
-jest.mock('@ednova/shared/ai-messaging', () => ({
+jest.mock('@noveris/shared/ai-messaging', () => ({
   publishAiJob: jest.fn()
 }));
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { publishAiJob } = require('@ednova/shared/ai-messaging');
+const { publishAiJob } = require('@noveris/shared/ai-messaging');
 
 app.use('/api/v1/study/courses', fakeAuth, courseRoutes);
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { errorHandler } = require('@ednova/shared/middleware');
+const { errorHandler } = require('@noveris/shared/middleware');
 app.use(errorHandler);
 
 function authHeader(userId = 'user-123') {
@@ -303,7 +303,7 @@ describe('INGEST-01 POST /api/v1/study/courses (file validation)', () => {
 
 describe('INGEST-02 POST /api/v1/study/courses (size limits → 413)', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { MAX_UPLOAD_MB } = require('@ednova/shared/uploadValidation');
+  const { MAX_UPLOAD_MB } = require('@noveris/shared/uploadValidation');
 
   beforeEach(() => {
     jest.clearAllMocks();

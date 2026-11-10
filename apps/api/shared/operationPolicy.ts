@@ -66,7 +66,13 @@ export async function operationPolicy(req: Request, res: Response, next: NextFun
         req.query[snake]
       ].filter((value) => value !== undefined && value !== null && value !== '');
       if (!candidates.length) continue;
-      if (candidates.some((id) => typeof id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))) {
+      if (
+        candidates.some(
+          (id) =>
+            typeof id !== 'string' ||
+            !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)
+        )
+      ) {
         return res.status(422).json({ error: `Invalid ${camel}` });
       }
       if (new Set(candidates).size !== 1)

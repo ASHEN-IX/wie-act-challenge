@@ -115,12 +115,12 @@ export async function createAuth({
           : undefined
       });
       await transport.sendMail({
-        from: process.env.EMAIL_FROM || 'EdNova <noreply@ednova.app>',
+        from: process.env.EMAIL_FROM || 'Noveris <noreply@noveris.app>',
         ...message
       });
     });
   return betterAuth({
-    appName: 'EdNova',
+    appName: 'Noveris',
     disabledPaths: ['/sign-in/email-otp'],
     baseURL,
     basePath: '/api/auth',
@@ -162,7 +162,7 @@ export async function createAuth({
       sendResetPassword: async ({ user, url }) =>
         deliver({
           to: user.email,
-          subject: 'Reset your EdNova password',
+          subject: 'Reset your Noveris password',
           text: `Reset your password: ${url}`
         })
     },
@@ -172,7 +172,7 @@ export async function createAuth({
       sendVerificationEmail: async ({ user, url }) =>
         deliver({
           to: user.email,
-          subject: 'Verify your EdNova email',
+          subject: 'Verify your Noveris email',
           text: `Verify your email: ${url}`
         }),
       afterEmailVerification: async (user): Promise<void> => {
@@ -188,7 +188,7 @@ export async function createAuth({
         sendVerificationOTP: async ({ email, otp }: { email: string; otp: string }) =>
           deliver({
             to: email,
-            subject: 'Your EdNova verification code',
+            subject: 'Your Noveris verification code',
             text: `Verification code: ${otp}. Expires in 10 minutes.`
           })
       })

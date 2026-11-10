@@ -16,7 +16,7 @@ export class InfrastructureController {
   docs(@Res() res: Response): void {
     res
       .type('html')
-      .send('<h1>EdNova API</h1><a href="/api/v1/docs/openapi.json">OpenAPI specification</a>');
+      .send('<h1>Noveris API</h1><a href="/api/v1/docs/openapi.json">OpenAPI specification</a>');
   }
   @Get('monitoring/metrics')
   @UseGuards(SessionGuard)

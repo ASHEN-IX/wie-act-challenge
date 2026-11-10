@@ -13,7 +13,7 @@ import {
   resetMetrics,
   snapshotMetrics,
   summarizeMetrics,
-  timed,
+  timed
 } from '../services/planningMetrics';
 
 beforeEach(() => resetMetrics());
@@ -87,7 +87,7 @@ describe('latency histograms', () => {
     await expect(
       timed('planning', async () => {
         throw new Error('boom');
-      }),
+      })
     ).rejects.toThrow('boom');
     expect(snapshotMetrics().latencies.planning.total).toBe(1);
   });
@@ -111,7 +111,7 @@ describe('privacy', () => {
       'token',
       'apiKey',
       'prompt',
-      'answer',
+      'answer'
     ])
       expect(serialized).not.toContain(forbidden);
   });

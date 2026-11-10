@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { LessonBlockV2 } from "@ednova/shared/ednova/learningDocumentV2";
+import type { LessonBlockV2 } from "@noveris/shared/ednova/learningDocumentV2";
 import { structureLesson, clean, splitConceptTitle } from "./lesson-structure";
 
 let n = 0;

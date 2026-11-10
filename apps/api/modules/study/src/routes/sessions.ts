@@ -4,7 +4,7 @@ import { StudySession } from '../models';
 import { canReadCourse } from '../services/resourceAccess';
 import { isTeamSessionMember } from '../utils/sessionHelpers';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createContracts } = require('@ednova/shared/domainContracts');
+const { createContracts } = require('@noveris/shared/domainContracts');
 const router = createContracts();
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports

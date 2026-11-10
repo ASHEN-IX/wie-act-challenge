@@ -10,10 +10,10 @@ import {
 
 config({ path: path.resolve(__dirname, '../.env') });
 const accounts = [
-  { email: 'admin@ednova.test', name: 'EdNova Demo Admin', role: 'university_admin' },
-  { email: 'instructor@ednova.test', name: 'EdNova Demo Instructor', role: 'instructor' },
-  { email: 'learner@ednova.test', name: 'EdNova Demo Learner', role: 'university_student' },
-  { email: 'peer@ednova.test', name: 'EdNova Demo Peer', role: 'university_student' }
+  { email: 'admin@ednova.test', name: 'Noveris Demo Admin', role: 'university_admin' },
+  { email: 'instructor@ednova.test', name: 'Noveris Demo Instructor', role: 'instructor' },
+  { email: 'learner@ednova.test', name: 'Noveris Demo Learner', role: 'university_student' },
+  { email: 'peer@ednova.test', name: 'Noveris Demo Peer', role: 'university_student' }
 ] as const;
 
 const ONBOARDING_DRAFT = {
@@ -89,7 +89,7 @@ async function main() {
     if (!institution) {
       const created = await bootstrapInstitution({
         actorUserId: adminId,
-        name: 'EdNova Learning Demo',
+        name: 'Noveris Learning Demo',
         slug: 'ednova-learning-demo'
       });
       institution = await prisma.institution.findUnique({ where: { id: created.institution.id } });

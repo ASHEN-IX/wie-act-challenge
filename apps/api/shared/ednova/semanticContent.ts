@@ -151,14 +151,14 @@ const mediaExtension = /\.(png|jpe?g|gif|webp|svg|mp3|wav|ogg|mp4|webm)(?:[?#].*
 function evidence(
   passage: SemanticPassage,
   lineStart: number,
-  lineEnd = lineStart,
+  lineEnd = lineStart
 ): SemanticEvidence {
   return {
     chunkId: passage.chunkId,
     documentId: passage.documentId,
     pageNumber: passage.pageNumber,
     lineStart,
-    lineEnd,
+    lineEnd
   };
 }
 
@@ -179,7 +179,7 @@ function isTableDivider(line: string): boolean {
 }
 
 function mediaReference(
-  line: string,
+  line: string
 ): { sourceRef: string; alt: string; mediaType: 'image' | 'audio' | 'video' } | null {
   const markdown = line.match(/^!\[([^\]]{0,500})\]\(([^)\s]{1,2048})\)$/);
   if (markdown && mediaExtension.test(markdown[2]))
@@ -192,7 +192,7 @@ function mediaReference(
 
 function mediaCaption(line: string): string | null {
   const match = line.match(
-    /^(?:\*\*(?:Image|Figure|Table|Diagram):\s*(.{1,500})\*\*|(?:Image|Figure|Table|Diagram):\s*(.{1,500}))$/i,
+    /^(?:\*\*(?:Image|Figure|Table|Diagram):\s*(.{1,500})\*\*|(?:Image|Figure|Table|Diagram):\s*(.{1,500}))$/i
   );
   return (match?.[1] || match?.[2])?.trim() || null;
 }
@@ -201,7 +201,10 @@ function splitDiagramStep(value: string): { label: string; detail?: string } | n
   const separator = value.indexOf(':');
   if (separator < 1) return null;
   const label = value.slice(0, separator).trim().slice(0, 300);
-  const detail = value.slice(separator + 1).trim().slice(0, 1000);
+  const detail = value
+    .slice(separator + 1)
+    .trim()
+    .slice(0, 1000);
   return label ? { label, ...(detail ? { detail } : {}) } : null;
 }
 
@@ -216,19 +219,23 @@ function parseDiagram(source: string): SemanticDiagramBlock | null {
     if (!directive) return null;
     const [, name, value] = directive;
     if (name.toLowerCase() === 'title') title = value.trim().slice(0, 500);
-    else if (name.toLowerCase() === 'description')
-      description = value.trim().slice(0, 2000);
+    else if (name.toLowerCase() === 'description') description = value.trim().slice(0, 2000);
     else {
       const step = splitDiagramStep(value);
       if (!step || steps.length >= 60) return null;
       steps.push({ id: `step-${steps.length + 1}`, ...step });
     }
   }
-  return title && description && steps.length ? { type: 'diagram', title, description, steps } : null;
+  return title && description && steps.length
+    ? { type: 'diagram', title, description, steps }
+    : null;
 }
 
 function parseChart(source: string): SemanticChartBlock | null {
-  const lines = source.split('\n').map((line) => line.trim()).filter(Boolean);
+  const lines = source
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
   if (lines.length < 4) return null;
   const header = /^columns:\s*(.+)$/i.exec(lines[0]);
   const title = /^title:\s*(.+)$/i.exec(lines[1]);
@@ -255,8 +262,8 @@ function parseChart(source: string): SemanticChartBlock | null {
     series: columns.slice(1).map((label, index) => ({
       label: label.slice(0, 120),
       values: values[index],
-      ...(index === 0 ? { color: 'primary' as const } : {}),
-    })),
+      ...(index === 0 ? { color: 'primary' as const } : {})
+    }))
   };
 }
 
@@ -271,17 +278,13 @@ export function extractSemanticBlocks(passage: SemanticPassage): SemanticBlock[]
   const sourceText = declaration ? passage.text.replace(/^\uFEFF?[^\n]*/, '') : passage.text;
   const lines = sourceText.replace(/\r\n?/g, '\n').split('\n');
   const blocks: SemanticBlock[] = [];
-  const push = (
-    block: BlockInput<SemanticBlock>,
-    lineStart: number,
-    lineEnd = lineStart,
-  ) => {
+  const push = (block: BlockInput<SemanticBlock>, lineStart: number, lineEnd = lineStart) => {
     const order = blocks.length + 1;
     blocks.push({
       ...block,
       id: `${passage.chunkId}-block-${order}`,
       order,
-      evidence: evidence(passage, lineStart, lineEnd),
+      evidence: evidence(passage, lineStart, lineEnd)
     } as SemanticBlock);
   };
   let paragraph: Array<{ text: string; line: number }> = [];
@@ -293,9 +296,17 @@ export function extractSemanticBlocks(passage: SemanticPassage): SemanticBlock[]
   const flushParagraph = () => {
     if (!paragraph.length) return;
     push(
-      { type: 'paragraph', text: paragraph.map((line) => line.text).join(' ').replace(/\s+/g, ' ').trim().slice(0, 8000) },
+      {
+        type: 'paragraph',
+        text: paragraph
+          .map((line) => line.text)
+          .join(' ')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 8000)
+      },
       paragraph[0].line,
-      paragraph.at(-1)!.line,
+      paragraph.at(-1)!.line
     );
     paragraph = [];
   };
@@ -304,16 +315,22 @@ export function extractSemanticBlocks(passage: SemanticPassage): SemanticBlock[]
       push(
         { type: 'list', ordered, items: list.map((item) => item.text.slice(0, 1200)) },
         list[0].line,
-        list.at(-1)!.line,
+        list.at(-1)!.line
       );
     list = [];
   };
   const flushQuote = () => {
     if (quote.length)
       push(
-        { type: 'quote', text: quote.map((line) => line.text).join('\n').slice(0, 4000) },
+        {
+          type: 'quote',
+          text: quote
+            .map((line) => line.text)
+            .join('\n')
+            .slice(0, 4000)
+        },
         quote[0].line,
-        quote.at(-1)!.line,
+        quote.at(-1)!.line
       );
     quote = [];
   };
@@ -326,13 +343,12 @@ export function extractSemanticBlocks(passage: SemanticPassage): SemanticBlock[]
           : code.language === 'ednova-chart'
             ? parseChart(value)
             : null;
-      if (structured)
-        push(structured, code.start, code.start + code.lines.length + 1);
+      if (structured) push(structured, code.start, code.start + code.lines.length + 1);
       else if (value)
         push(
           { type: 'code', language: code.language, code: value },
           code.start,
-          code.start + code.lines.length + 1,
+          code.start + code.lines.length + 1
         );
     }
     code = null;
@@ -365,9 +381,9 @@ export function extractSemanticBlocks(passage: SemanticPassage): SemanticBlock[]
         {
           type: 'heading',
           level: Math.min(4, heading[1].length) as 1 | 2 | 3 | 4,
-          text: heading[2].trim().slice(0, 500),
+          text: heading[2].trim().slice(0, 500)
         },
-        line,
+        line
       );
       continue;
     }
@@ -379,10 +395,7 @@ export function extractSemanticBlocks(passage: SemanticPassage): SemanticBlock[]
     }
     const columns = tableCells(raw);
     const divider = index + 1 < lines.length && isTableDivider(lines[index + 1]);
-    if (
-      columns &&
-      divider
-    ) {
+    if (columns && divider) {
       flush();
       const start = line;
       const rows: string[][] = [];
@@ -394,16 +407,20 @@ export function extractSemanticBlocks(passage: SemanticPassage): SemanticBlock[]
         rows.push(cells);
         index += 1;
       }
-      if (rows.length > 0 && rows.every((row) => row.length === columns.length) && columns.length <= 20) {
+      if (
+        rows.length > 0 &&
+        rows.every((row) => row.length === columns.length) &&
+        columns.length <= 20
+      ) {
         push(
           {
             type: 'table',
             caption: 'Table from source',
             columns: columns.map((cell) => cell.slice(0, 300)),
-            rows: rows.slice(0, 100).map((row) => row.map((cell) => cell.slice(0, 1200))),
+            rows: rows.slice(0, 100).map((row) => row.map((cell) => cell.slice(0, 1200)))
           },
           start,
-          index,
+          index
         );
       } else {
         // Malformed widths remain readable and are never silently dropped.
@@ -433,7 +450,11 @@ export function extractSemanticBlocks(passage: SemanticPassage): SemanticBlock[]
       continue;
     }
     const media = mediaReference(trimmed);
-    if (media && !/^(?:https?:)?\/\//i.test(media.sourceRef) && !media.sourceRef.startsWith('data:')) {
+    if (
+      media &&
+      !/^(?:https?:)?\/\//i.test(media.sourceRef) &&
+      !media.sourceRef.startsWith('data:')
+    ) {
       flush();
       const previousLine = lines[index - 1]?.trim() || '';
       const caption = mediaCaption(previousLine);
@@ -443,8 +464,14 @@ export function extractSemanticBlocks(passage: SemanticPassage): SemanticBlock[]
         if (last?.type === 'paragraph' && last.text === caption) blocks.pop();
       }
       push(
-        { type: 'media', mediaType: media.mediaType, sourceRef: media.sourceRef, alt: media.alt.slice(0, 500), ...(caption ? { caption } : {}) },
-        line,
+        {
+          type: 'media',
+          mediaType: media.mediaType,
+          sourceRef: media.sourceRef,
+          alt: media.alt.slice(0, 500),
+          ...(caption ? { caption } : {})
+        },
+        line
       );
       continue;
     }
@@ -462,7 +489,12 @@ export function extractSemanticBlocks(passage: SemanticPassage): SemanticBlock[]
 }
 
 function markerKey(value: string): string {
-  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 96);
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 96);
 }
 
 /** A source marker is an explicit first-line declaration such as
@@ -473,13 +505,18 @@ export function sourceMappingMarker(text: string): {
   topicId: string | null;
   subtopicId: string | null;
 } | null {
-  const first = text.replace(/^\uFEFF/, '').split(/\r?\n/, 1)[0]?.trim();
-  const match = first?.match(/^\[\[ednova:topic=([^\]/\s]{1,96})(?:\/subtopic=([^\]\s]{1,96}))?\]\]$/);
+  const first = text
+    .replace(/^\uFEFF/, '')
+    .split(/\r?\n/, 1)[0]
+    ?.trim();
+  const match = first?.match(
+    /^\[\[ednova:topic=([^\]/\s]{1,96})(?:\/subtopic=([^\]\s]{1,96}))?\]\]$/
+  );
   if (!match) return null;
   return {
     chapter: match[2] ? `${match[1]} / ${match[2]}` : match[1],
     topicId: match[1],
-    subtopicId: match[2] || null,
+    subtopicId: match[2] || null
   };
 }
 
@@ -491,12 +528,12 @@ export function withoutSourceMarker(text: string): string {
 
 export function projectSemanticContent(
   passages: SemanticPassage[],
-  explicitMappings: ExplicitPassageMapping[] = [],
+  explicitMappings: ExplicitPassageMapping[] = []
 ): SemanticProjection {
   const explicit = new Map(explicitMappings.map((mapping) => [mapping.chunkId, mapping]));
   const projected = passages.map((passage) => ({
     ...passage,
-    blocks: extractSemanticBlocks({ ...passage, text: withoutSourceMarker(passage.text) }),
+    blocks: extractSemanticBlocks({ ...passage, text: withoutSourceMarker(passage.text) })
   }));
   const mappings: SemanticMapping[] = passages.map((passage) => {
     const supplied = explicit.get(passage.chunkId);
@@ -513,7 +550,7 @@ export function projectSemanticContent(
         subtopicId: valid ? supplied.subtopicId : null,
         status: valid && supplied.topicId ? 'exact' : 'inferred_review_required',
         method: 'artifact_metadata',
-        ...(!valid ? { note: 'Explicit mapping did not match the verified passage.' } : {}),
+        ...(!valid ? { note: 'Explicit mapping did not match the verified passage.' } : {})
       };
     }
     const marker = sourceMappingMarker(passage.text);
@@ -525,7 +562,7 @@ export function projectSemanticContent(
         topicId: marker.topicId,
         subtopicId: marker.subtopicId,
         status: 'exact',
-        method: 'source_marker',
+        method: 'source_marker'
       };
     return {
       chunkId: passage.chunkId,
@@ -535,7 +572,7 @@ export function projectSemanticContent(
       subtopicId: null,
       status: 'unmapped',
       method: 'legacy_unmapped',
-      note: 'No exact topic association is recorded in the verified artifact.',
+      note: 'No exact topic association is recorded in the verified artifact.'
     };
   });
   const byChapter = new Map<string, SemanticBlock[]>();
@@ -547,19 +584,32 @@ export function projectSemanticContent(
     const existing = byChapter.get(marker.chapter) || [];
     // The marker is explanatory metadata; keep it visible in the source passage
     // but omit it from the composed lesson block stream.
-    existing.push(...projected[index].blocks.filter((block) => !(block.type === 'paragraph' && block.evidence.lineStart === 1 && block.text.startsWith('[[ednova:'))));
+    existing.push(
+      ...projected[index].blocks.filter(
+        (block) =>
+          !(
+            block.type === 'paragraph' &&
+            block.evidence.lineStart === 1 &&
+            block.text.startsWith('[[ednova:')
+          )
+      )
+    );
     byChapter.set(marker.chapter, existing);
   }
   const uncertainties = [
     ...(mappings.some((mapping) => mapping.status === 'unmapped')
-      ? ['Some verified passages have no explicit topic association. They remain available in source order and are not assigned to a lesson.']
+      ? [
+          'Some verified passages have no explicit topic association. They remain available in source order and are not assigned to a lesson.'
+        ]
       : []),
     ...(mappings.some((mapping) => mapping.status === 'inferred_review_required')
       ? ['A proposed source mapping needs instructor review and is not presented as exact.']
       : []),
     ...(projected.some((passage) => passage.blocks.some((block) => block.type === 'media'))
-      ? ['Source media references are recorded without being fetched; only approved server media can be rendered.']
-      : []),
+      ? [
+          'Source media references are recorded without being fetched; only approved server media can be rendered.'
+        ]
+      : [])
   ];
   return {
     schemaVersion: SEMANTIC_PROJECTION_VERSION,
@@ -568,9 +618,9 @@ export function projectSemanticContent(
     chapters: [...byChapter.entries()].map(([title, blocks]) => ({
       id: `chapter-${markerKey(title)}`,
       title,
-      blocks,
+      blocks
     })),
     mappings,
-    uncertainties,
+    uncertainties
   };
 }

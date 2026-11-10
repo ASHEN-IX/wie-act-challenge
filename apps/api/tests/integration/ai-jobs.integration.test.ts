@@ -17,7 +17,7 @@ process.env.DATABASE_URL =
   process.env.DATABASE_URL || 'postgresql://ednova:ednova@127.0.0.1:5433/ednova_test';
 process.env.NODE_ENV = 'test';
 
-jest.mock('@ednova/shared/ai-messaging', () => {
+jest.mock('@noveris/shared/ai-messaging', () => {
   const actual = jest.requireActual('../../shared/ai-messaging/envelope');
   const topology = jest.requireActual('../../shared/ai-messaging/topology');
   return {
@@ -37,7 +37,7 @@ const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => 
 });
 afterAll(() => exitSpy.mockRestore());
 
-const { publishAiJob } = require('@ednova/shared/ai-messaging');
+const { publishAiJob } = require('@noveris/shared/ai-messaging');
 const app = require('../../modules/ai-orchestrator/src/app');
 const AiJob = require('../../modules/ai-orchestrator/src/models/AiJob');
 const { createSession: generateToken } = require('../sessionFixtures');

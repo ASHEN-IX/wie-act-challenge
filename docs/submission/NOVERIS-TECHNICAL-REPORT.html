@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Noveris — Technical Report (EdNova Challenge, WIE ACT 5.0)</title>
+<style>
+  @page { size: A4; margin: 14mm 15mm 14mm 15mm; }
+  :root { --ink:#172033; --muted:#52607a; --accent:#6d3df0; --pale:#f3effd; --line:#d9d4ee; }
+  * { box-sizing: border-box; }
+  body { font: 9.4pt/1.42 "Liberation Sans", Arial, sans-serif; color: var(--ink); margin: 0; }
+  h1 { font-size: 22pt; margin: 0; letter-spacing: -.5px; }
+  h2 { font-size: 12pt; color: var(--accent); margin: 11px 0 4px; border-bottom: 1px solid var(--line); padding-bottom: 2px; }
+  h3 { font-size: 9.8pt; margin: 8px 0 2px; }
+  p { margin: 3px 0 5px; }
+  ul { margin: 2px 0 5px; padding-left: 16px; } li { margin: 1px 0; }
+  .tag { color: var(--muted); font-size: 9pt; }
+  .hero { display:flex; justify-content:space-between; align-items:flex-end; border-bottom: 3px solid var(--accent); padding-bottom: 6px; margin-bottom: 6px; }
+  .page { page-break-after: always; } .page:last-child { page-break-after: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 4px 0 7px; font-size: 8.3pt; }
+  th { background: var(--accent); color: #fff; text-align: left; padding: 3px 5px; font-weight: 600; }
+  td { border: 1px solid var(--line); padding: 3px 5px; vertical-align: top; }
+  tr:nth-child(even) td { background: var(--pale); }
+  .cols { display:flex; gap: 12px; } .cols > div { flex:1; }
+  figure { margin: 4px 0; } figcaption { font-size: 7.8pt; color: var(--muted); margin-top: 2px; }
+  img { max-width: 100%; border: 1px solid var(--line); border-radius: 3px; }
+  .box { background: var(--pale); border: 1px solid var(--line); border-radius: 4px; padding: 5px 8px; margin: 5px 0; }
+  code { font-family: "Liberation Mono", monospace; font-size: 8.3pt; background: #f1f1f6; padding: 0 2px; border-radius: 2px; }
+  .foot { position: fixed; bottom: 0; }
+</style>
+</head>
+<body>
+
+<!-- PAGE 1 -->
+<section class="page">
+  <div class="hero">
+    <div><h1>Noveris</h1><div class="tag">Learn Together. Grow Further. — a GenAI peer-learning companion</div></div>
+    <div class="tag" style="text-align:right">EdNova Challenge · WIE ACT 5.0<br>Technical report · Phase 1 · 10 November 2026</div>
+  </div>
+
+  <h2>1. Project objective</h2>
+  <p>Peer learning works when people explain, question and correct each other, but real study groups are unbalanced: one voice dominates, others hesitate to ask, wrong explanations go unchallenged, and a single explanation style does not fit everyone. <b>Noveris</b> is a working end-to-end learning companion that turns a course document into guided individual practice and structured peer study. The AI acts as <b>tutor</b> (hints before answers, level- and style-adapted explanations), <b>facilitator</b> (peer-first prompts in a shared room) and <b>planner</b> (next step), while every claim it makes is grounded in the course source and every access decision is made by deterministic server code, not by a model.</p>
+
+  <h2>2. What Noveris does — mapped to the challenge goals</h2>
+  <table>
+    <tr><th style="width:24%">Challenge goal</th><th>Implemented in Noveris</th></tr>
+    <tr><td>Smart peer learning support</td><td><b>Study Together</b> rooms (up to six peers, join by code, host/presenter roles, shared activity, private checks then group debrief). A <b>peer-first facilitator</b> proposes a question or hint that invites a peer explanation before any answer is revealed. Ordinary chat is never monitored; facilitation is invoked by an explicit ask/hint action.</td></tr>
+    <tr><td>Explain simply, guiding questions, hints before answers, confusion detection, next step</td><td><b>Nardouch</b> course tutor with modes (explain, Socratic, peer) and one-tap “Explain simply / Another example / Step by step / Go deeper”. Practice support enforces a <b>graduated hint before the full explanation</b>. Wrong attempts and hint escalation raise tentative <b>confusion signals</b>. Progress and a planner suggest the next step.</td></tr>
+    <tr><td>Diagnostic + personalisation</td><td>A 6-question self-report <b>learning-style probe</b> (visual, analogy, step-by-step, example, repetition, problem-solving; each style offered equally) selects how explanations are phrased. It is explicitly provisional: it never grades and is visible only to the learner.</td></tr>
+    <tr><td>Multilingual (Arabic, Darija, French, English)</td><td>Nardouch language policy: Darija in <i>Arabizi</i> or Arabic script, French, English and code-switching, with a terminology glossary and a Tunisian-Darija evaluation set (<code>nardouch/evaluation/cases.json</code>). Course content may itself be French (see Fig. 1).</td></tr>
+    <tr><td>Open innovation</td><td><b>Visual Learning Lab</b> (model proposes a scenario, trusted code simulates it), versioned <b>Course Studio</b> (upload → OCR/extraction → instructor review → publish), instructor insights dashboard, XP/badges and progress, optional voice input.</td></tr>
+    <tr><td>Entrepreneurship angle</td><td>Hybrid institutional + independent model (§12).</td></tr>
+  </table>
+
+  <div class="cols">
+    <figure><img src="screenshots/course-learn-desktop.png" alt="Course reader with tutor"><figcaption><b>Fig. 1.</b> Course reader (seeded demo course): guided tutor shortcuts, progress, source-grounded lesson.</figcaption></figure>
+    <figure><img src="screenshots/visual-lab-desktop.png" alt="Visual Lab"><figcaption><b>Fig. 2.</b> Visual Lab: AI proposes, the app computes; labs never count as mastery.</figcaption></figure>
+  </div>
+  <p class="tag">Screenshots were captured from the running application on a freshly migrated and seeded database (synthetic demo data only).</p>
+</section>
+
+<!-- PAGE 2 -->
+<section class="page">
+  <h2>3. System architecture</h2>
+  <div class="cols">
+    <div>
+      <img src="evidence/NOVERIS-ARCHITECTURE.png" alt="Architecture diagram">
+      <p class="tag"><b>Fig. 3.</b> Runtime architecture. Solid: synchronous HTTP; dashed: broker jobs; dotted: WebSocket.</p>
+    </div>
+    <div>
+      <table>
+        <tr><th>Layer</th><th>Technology and responsibility</th></tr>
+        <tr><td>Web</td><td>Next.js 16 / React 19 / Tailwind; server actions; Better Auth sessions; WCAG-minded semantics (skip link, labelled controls, keyboard focus, RTL-capable text).</td></tr>
+        <tr><td>API (control plane)</td><td>NestJS domains on Node 24, Prisma 7 + <b>PostgreSQL</b>. Owns identity, course/room access grants, published revisions, attempts, evidence and the <b>inference budget ledger</b>.</td></tr>
+        <tr><td>AI service</td><td>Python FastAPI + LiteLLM. Agents: tutor, coach, planner, evaluator, facilitator, Visual Lab selector/planner, course ingestion. Schema-validated outputs.</td></tr>
+        <tr><td>Workers</td><td>RabbitMQ jobs with progress events: ingestion (text, OCR, chunking, embeddings), evaluation, planning.</td></tr>
+        <tr><td>Retrieval</td><td>all-MiniLM-L6-v2 (384-d, normalised) + FAISS <code>IndexFlatIP</code>, 200-word chunks with 50-word overlap, <b>pinned to a course revision</b>.</td></tr>
+        <tr><td>Cache / realtime</td><td>Redis for eligible response reuse and rate state; WebSocket for room state, presence and facilitator events.</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <h3>Core design decisions</h3>
+  <ul>
+    <li><b>Models never hold authority.</b> NestJS decides who can read, join, submit and publish; the model only produces text or a structured proposal that the API validates (shape, recipient, room sequence, citation provenance) before delivery.</li>
+    <li><b>Versioned sources.</b> A <code>CourseRevision</code> records the source manifest and index hashes. Activities and rooms pin a reviewed revision, so retrieval and citations stay stable when a draft changes.</li>
+    <li><b>Two access models, one engine.</b> One identity can hold institution memberships (instructor assignment, student enrolment) and personal courses. Membership, enrolment, source grant and room membership are separate checks; a join code never grants document access.</li>
+    <li><b>Idempotent learning evidence.</b> A submission is bound to learner, attempt ID, activity revision and payload hash; replays reuse the stored receipt, conflicting payloads are rejected, and the server (not the browser) evaluates against stored criteria.</li>
+  </ul>
+
+  <h3>Typical flow</h3>
+  <p>Instructor uploads a PDF → worker extracts/OCRs and chunks it → AI proposes objectives and activities → instructor reviews and publishes a revision → learners read, request graduated hints and ask the grounded tutor → a peer opens a room pinned to that revision → each member submits a <i>private</i> check → the debrief shows the shared summary while each learner keeps their own evidence.</p>
+</section>
+
+<!-- PAGE 3 -->
+<section class="page">
+  <h2>4. AI model strategy: combining the two categories</h2>
+  <p>The challenge asks for a deliberate split between compact/fast and larger/capable models. Noveris classifies every AI task by a fixed alias in <code>apps/ai/litellm/config.yaml</code>; the choice is configuration, not an ad-hoc per-request guess. No fine-tuning is used: all behaviour comes from prompts, supplied context, routing and architecture.</p>
+  <table>
+    <tr><th style="width:12%">Category</th><th style="width:30%">Tasks (alias)</th><th>Why this category</th></tr>
+    <tr><td><b>Compact</b><br>gpt-oss-20b</td><td>coach nudges; course-ingestion classification/extraction; Visual Lab <i>selector</i> (pick one of four registered engines); short tutor clarifications (<code>nardouch_compact</code>)</td><td>Short, well-defined, high-frequency steps: intent/engine classification, formatting, brief rewrites. Low latency, cheap to repeat.</td></tr>
+    <tr><td><b>Capable</b><br>gpt-oss-120b (search/reflection: llama-3.3-70b)</td><td>tutor explanations, maths/code and misconception turns (<code>nardouch_capable</code>); Visual Lab <i>planner</i>; evaluator; peer facilitator proposal; course review</td><td>Multi-source synthesis against retrieved passages, structured planning and polished pedagogy where quality matters and a few extra seconds are acceptable.</td></tr>
+    <tr><td><b>No model</b></td><td>hint ladder, source-support lookup, confusion cues, common facilitation cases, grading of quizzes, Visual Lab numerics</td><td>Deterministic code is exact, instant and free. Rules run <i>first</i>; a model is called only if they cannot answer.</td></tr>
+  </table>
+  <div class="box"><b>Routing rule (tutor).</b> Only a short clarification request in explain mode goes to the compact model. Message length alone never downgrades maths, code, misconceptions or follow-ups to the compact tier, to avoid quality loss on hard questions.<br>
+  <b>Declared external service.</b> Development and the live probe used Groq-hosted open-weight models as stand-ins for the compact and capable categories. The aliases and <code>NARDOUCH_*_MODEL</code> variables point to the organiser-provided service by configuration only; no code change is needed. The mapping to the organiser platform has not been tested by us.</div>
+
+  <h2>5. Retrieval-augmented generation (RAG) and output control</h2>
+  <ul>
+    <li><b>Ingest:</b> native text or bounded local OCR → structure (chapters/lessons) → 200/50-word chunks → local embeddings → revision-pinned FAISS index and source manifest. Embeddings run locally: no learner text leaves the service for retrieval.</li>
+    <li><b>Retrieve:</b> the API resolves the learner's current authorisation and passes course, revision and manifest identity; the AI service returns only bounded excerpts from that pin.</li>
+    <li><b>Generate:</b> the prompt separates system instructions from learner text and passages; the model must return JSON (<code>displayText, sourceIds, followups</code>) and say explicitly when course evidence is missing.</li>
+    <li><b>Verify:</b> the API checks response shape, pin and citation markers against the authorised evidence; unsupported citations fail the request. A valid citation proves provenance, not that every sentence is correct — the UI states when material was machine-read.</li>
+  </ul>
+
+  <h2>6. Personalisation loop</h2>
+  <p>Self-reported style (probe) + observed interaction (wrong attempts, hint escalation, “explain simply” requests) → a provisional adaptation preference that changes <i>wording</i> (analogy, step-by-step, example, diagram) and hint depth. It is never presented as a validated learning-style classification and never affects grades.</p>
+</section>
+
+<!-- PAGE 4 -->
+<section class="page">
+  <h2>7. Efficient use and limited-capacity behaviour</h2>
+  <p>Inference runs without accelerators, responses arrive whole, and team access is limited and shared. Noveris is built around that as a design budget.</p>
+  <h3>Spending fewer, better requests</h3>
+  <ul>
+    <li><b>Budget ledger.</b> Every real call needs an unexpired operator approval bound to the task, the <i>exact</i> model, a request allowance and optional token cap. The API reserves a request <i>before</i> dispatch (atomic conditional update) and records usage afterwards. With no approval or no credential the call fails closed instead of silently consuming quota.</li>
+    <li><b>No hidden amplification.</b> Router retries and transparent cross-model fallback chains are disabled, so one user action cannot spend several requests or a model the approval did not cover. Retries are explicit and re-reserve.</li>
+    <li><b>Reuse.</b> Eligible course-only calls (e.g. planning, review) are cached in Redis keyed by model, prompt and settings, with expiry; a changed source or prompt yields a new key. A hit still passes the approval gate. Private learner dialogue is excluded from the cache. Visual Labs are stored per learner so reopening never regenerates them.</li>
+    <li><b>One well-built request.</b> The tutor sends one request with retrieved passages and history instead of a chain of small calls; deterministic rules absorb the frequent cases (hints, common facilitator situations, quiz feedback).</li>
+    <li><b>Bounded concurrency.</b> The tutor limits in-flight turns per instance and answers “busy, retry shortly” rather than queuing unbounded work.</li>
+  </ul>
+  <h3>When capacity is limited or unavailable</h3>
+  <table>
+    <tr><th style="width:24%">Situation</th><th>Behaviour the user sees</th></tr>
+    <tr><td>Normal latency (several seconds)</td><td>Staged status and loading states while the whole response is awaited; long jobs (ingestion, review) show progress events from the worker queue; the input is kept if a request fails.</td></tr>
+    <tr><td>Approval exhausted/expired or provider unavailable</td><td>Explicit <code>UNAVAILABLE</code> state with a clear message; the tutor preserves the learner's question for retry; Visual Lab offers a labelled built-in example; the facilitator returns labelled local peer-first guidance.</td></tr>
+    <tr><td>Capable model slow or down</td><td>Deterministic paths (hints, quiz grading, rules-based facilitation, lab numerics) keep working. Every response carries an execution mode (<code>REAL_APPROVED</code>, <code>MOCK_TEST</code>, <code>DETERMINISTIC_FALLBACK</code>, <code>UNAVAILABLE</code>) surfaced in the interface.</td></tr>
+    <tr><td>Background worker failure</td><td>Retryable vs terminal classification; delayed jobs never block the UI.</td></tr>
+  </table>
+  <div class="box"><b>Honest limitation.</b> Automatic <i>fallback from the capable to the compact model</i> is not enabled: our approvals are bound to an exact model, so a silent switch would break the budget guarantee. Recovery is therefore a visible retry plus deterministic guidance. Pre-authorising a compact fallback approval for each capable task is the planned next step. A real quota-exhaustion response from the organiser platform has not been observed.</div>
+
+  <h3>Measured latency (live probe, synthetic topic, 9 Nov 2026)</h3>
+  <table>
+    <tr><th>Call</th><th>Model / category</th><th>Latency</th><th>Tokens</th><th>Mode</th></tr>
+    <tr><td>Visual Lab selector</td><td>gpt-oss-20b · compact</td><td>4.95 s (includes cold start)</td><td>936</td><td>REAL_APPROVED</td></tr>
+    <tr><td>Visual Lab planner</td><td>gpt-oss-120b · capable</td><td>2.08 s</td><td>1,747</td><td>REAL_APPROVED</td></tr>
+    <tr><td>Planner after approval expiry</td><td>—</td><td>0 ms, no provider call</td><td>0</td><td>UNAVAILABLE</td></tr>
+  </table>
+  <p class="tag">Single observations, not a benchmark; raw data in <code>docs/submission/evidence/LIVE-INFERENCE-EVALUATION.json</code>.</p>
+</section>
+
+<!-- PAGE 5 -->
+<section class="page">
+  <h2>8. Peer collaboration</h2>
+  <ul>
+    <li><b>Room commands</b> carry an expected sequence and a stable command ID: stale actions are rejected and replays are idempotent. Peer chat has its own durable, sequence-numbered journal, so a missed WebSocket broadcast is repaired by fetching ordered history after reconnect.</li>
+    <li><b>Facilitation proposes, the room decides.</b> Rules first; an unmatched, eligible request passes bounded room context to the capable model for a structured proposal. NestJS validates shape, recipient and current room sequence before delivering it, and records whether it came from the model or from local rules.</li>
+    <li><b>Group vs private.</b> Learners discuss a shared activity, then submit private checks; the debrief separates the shared summary from each learner's own outcome. Another learner's score and evidence are never returned to a peer.</li>
+  </ul>
+
+  <h2>9. Privacy, ethics and accessibility</h2>
+  <table>
+    <tr><th style="width:22%">Safeguard</th><th>Implementation</th></tr>
+    <tr><td>Data minimisation</td><td>Demo, seed and test data are synthetic (fictional accounts, generated course text). Only the data needed for the feature is stored; voice input is transcribed without saving raw audio; no photos, addresses or national IDs are collected.</td></tr>
+    <tr><td>What reaches the model</td><td>Only bounded course excerpts, the learner's current question and short history, via service-authenticated calls. Retrieval embeddings are computed locally. Operators must still ensure that only public, synthetic or anonymised material is uploaded: there is no automatic PII detector.</td></tr>
+    <tr><td>Access control &amp; isolation</td><td>Resource grants are re-checked on every read, command and delayed result; private attempts are scoped to their owner; secrets live only in untracked <code>.env</code> files (templates: <code>.env.example</code>). No credentials in code, logs or screenshots.</td></tr>
+    <tr><td>Fairness &amp; role</td><td>Adaptation is based on interaction and self-report, never on gender, region, language level or background. The AI supports learning: instructors review and publish content, and AI-extracted material is labelled as such. Labs never count as mastery; learning-style output is provisional.</td></tr>
+    <tr><td>Accessibility</td><td>Four-language support (§2), reading modes (Read/Guided/Explore/Practice), semantic landmarks and skip link, keyboard-reachable controls, light/dark themes, responsive layout and sourced-text fallback for formulas.</td></tr>
+  </table>
+
+  <h2>10. Testing strategy and results</h2>
+  <table>
+    <tr><th style="width:30%">Check (run 10 Nov 2026 on the submission tree)</th><th>Result</th></tr>
+    <tr><td>TypeScript typecheck (API + web)</td><td>pass</td></tr>
+    <tr><td>Production build (NestJS + Next.js)</td><td>pass</td></tr>
+    <tr><td>Lint (API + web)</td><td>0 errors (3 hook-dependency warnings)</td></tr>
+    <tr><td>API unit/service tests (Jest)</td><td>1,351 passed, 101 suites</td></tr>
+    <tr><td>Web component tests (Vitest)</td><td>286 passed, 42 files</td></tr>
+    <tr><td>AI service (pytest)</td><td>1,294 passed, 54 skipped, 15 failed — the 15 need a private reference PDF that is deliberately not distributed (see <code>benchmarks/README.md</code>); LLM tests use test doubles</td></tr>
+    <tr><td>Fresh-database setup</td><td>migrate + demo seed + login + course reader, Visual Lab and Study Together pages verified in a browser</td></tr>
+    <tr><td>Browser e2e (Playwright, recorded 9 Nov)</td><td>9 passed: auth, password reset, protected workspace, two-user room join</td></tr>
+    <tr><td>Integration (PostgreSQL, recorded 9 Nov)</td><td>20 passed: private checks/debrief, learning rooms, facilitator + WebSocket; 17 membership/enrolment, 12 public-policy</td></tr>
+  </table>
+  <p><b>Not yet done:</b> user testing with real learners or teachers (listed as a bonus criterion), quality evaluation of Darija output by native speakers (the evaluation set exists, scoring has not been run), and multi-instance realtime load testing.</p>
+</section>
+
+<!-- PAGE 6 -->
+<section class="page">
+  <h2>11. Innovation</h2>
+  <ul>
+    <li><b>Peer-first facilitation</b> instead of an answer machine: the AI's default move is to ask, hint and invite a peer explanation, and it is forbidden from exposing private profiles or fabricating peers (covered by evaluation cases).</li>
+    <li><b>Trusted-component generation.</b> Models choose and parameterise one of four registered, validated engines (weighted graph, parameter model, 3-D geometry, function plot); trusted code computes all numbers. This keeps interactive visuals correct and removes arbitrary-code risk.</li>
+    <li><b>Capacity-aware architecture</b> as a product feature: budget ledger, explicit execution modes, deterministic-first design and honest UI states, rather than an app that only works when the model does.</li>
+    <li><b>Institution and individual in one identity</b>, with separately enforced grants — the same engine serves a university course and a self-learner's own notes.</li>
+  </ul>
+
+  <h2>12. Business-model note</h2>
+  <table>
+    <tr><th style="width:18%"></th><th>Institutions (B2B2C)</th><th>Independent learners (B2C)</th></tr>
+    <tr><td><b>Target users</b></td><td>Universities, training centres and bootcamps in Tunisia and the wider MENA/francophone region; instructors and students.</td><td>Self-learners, exam-prep students, study communities.</td></tr>
+    <tr><td><b>Value proposition</b></td><td>Turn existing course material into guided practice and structured peer study in French/Arabic/Darija, with instructor control, private evidence and an insights dashboard — without replacing teachers.</td><td>A personal tutor and study-room companion that adapts to how they learn, free to start.</td></tr>
+    <tr><td><b>Adoption path</b></td><td>Free single-course pilot with one instructor and a voluntary cohort → measure activation, instructor prep time, cost per active learner → annual/cohort licence → add cohorts and departments.</td><td>Free tier with bounded AI use → upgrade to Pro for higher allowance and premium features → study-group referrals.</td></tr>
+    <tr><td><b>Revenue</b></td><td>Per-cohort or annual licence with an included AI allowance and support.</td><td>Monthly Pro subscription.</td></tr>
+  </table>
+  <h3>Sustainability beyond the hackathon</h3>
+  <ul>
+    <li><b>Unit economics are driven by inference.</b> The architecture already limits it: compact-first routing, deterministic-first logic, revision-pinned caching and per-approval budgets. Pricing will be set from pilot data (requests and tokens per active learner, cache hit rate, instructor effort), not guessed.</li>
+    <li><b>Low operating footprint:</b> open-weight models, local embeddings and a single container stack (PostgreSQL, Redis, RabbitMQ, API, web, AI service) that a department can host.</li>
+    <li><b>Existing foundations:</b> accounts, institution/enrolment model, subscription tiers and Stripe routes exist; mapping institutional allowances onto the inference ledger is the main integration task.</li>
+    <li><b>Risks:</b> model quality and quota dependence (mitigated by deterministic paths and provider-agnostic aliases), instructor workload (mitigated by AI-drafted, human-reviewed content), data protection in institutions (mitigated by synthetic-data policy, scoped access and self-hosting).</li>
+  </ul>
+  <p class="tag">No paying customer, partnership, price or demand validation is claimed; the model above is a plan to be validated by the pilot.</p>
+
+  <h2>13. Roadmap and reproducibility</h2>
+  <ul>
+    <li>Next: capable→compact fallback approvals, collaborative quizzes, auto-generated revision notes, teacher-facing usage/cost view, real-learner pilot and Darija quality scoring.</li>
+    <li><b>Repository:</b> https://github.com/ASHEN-IX/wie-act-challenge — source, setup instructions (<code>README.md</code>), <code>.env.example</code> templates with no credentials, screenshots and this report. Run locally in mock mode with no keys, or add <code>GROQ_API_KEY</code> and an approval (<code>docs/llm-config.md</code>) for real inference.</li>
+  </ul>
+</section>
+</body>
+</html>

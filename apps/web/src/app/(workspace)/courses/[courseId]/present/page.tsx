@@ -8,8 +8,8 @@ import {
 import { LessonReader } from "@/features/reader/lesson-reader";
 import { CourseReader } from "@/features/reader/course-reader";
 import { DataError } from "@/components/shared/states";
-import { isReaderMode, type ReaderMode } from "@ednova/shared/ednova/presentationPlan";
-import { isLearningMode } from "@ednova/shared/ednova/learningModes";
+import { isReaderMode, type ReaderMode } from "@noveris/shared/ednova/presentationPlan";
+import { isLearningMode } from "@noveris/shared/ednova/learningModes";
 
 /**
  * Published-course lesson reader. The presentation contract is preferred; if

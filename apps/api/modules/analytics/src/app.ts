@@ -11,9 +11,9 @@ const {
   rateLimiter,
   healthCheck,
   requireEnv
-} = require('@ednova/shared');
+} = require('@noveris/shared');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { authenticate } = require('@ednova/shared/auth');
+const { authenticate } = require('@noveris/shared/auth');
 
 // --- Environment validation (fail-fast on missing secrets) ---
 requireEnv(['DATABASE_URL'], { serviceName: 'analytics' });

@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { resolveIdentity } from "@ednova/shared/betterAuth";
+import { resolveIdentity } from "@noveris/shared/betterAuth";
 
 export type Identity = NonNullable<
   Awaited<ReturnType<typeof resolveIdentity>>

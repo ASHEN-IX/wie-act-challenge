@@ -24,7 +24,8 @@ function upstreamObject(value: unknown, keys: string[]) {
   }
 }
 function identifier(id: string) {
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new NardouchError(404, 'Conversation not found');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))
+    throw new NardouchError(404, 'Conversation not found');
 }
 export async function getConversation(userId: string, id: string) {
   identifier(id);
@@ -211,7 +212,9 @@ export async function transcribeSpeech(userId: string, raw: unknown) {
   const body = exactObject(raw, ['courseId', 'revisionId', 'audioBase64', 'locale', 'consent']);
   if (
     typeof body.courseId !== 'string' ||
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.courseId) ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      body.courseId
+    ) ||
     typeof body.revisionId !== 'string' ||
     body.revisionId.length > 128 ||
     typeof body.audioBase64 !== 'string' ||

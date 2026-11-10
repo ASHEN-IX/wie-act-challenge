@@ -10,10 +10,10 @@ import type { Prisma } from '../../../../src/generated/prisma/client';
  * GET  /api/v1/ai/jobs          → list own jobs (optional ?status=&limit=)
  */
 
-import { createContracts } from '@ednova/shared/domainContracts';
-import { logger } from '@ednova/shared';
-import { publishAiJob, AI_JOB_TYPES } from '@ednova/shared/ai-messaging';
-import { validateJobPayload } from '@ednova/shared/ai-messaging/payloadSchemas';
+import { createContracts } from '@noveris/shared/domainContracts';
+import { logger } from '@noveris/shared';
+import { publishAiJob, AI_JOB_TYPES } from '@noveris/shared/ai-messaging';
+import { validateJobPayload } from '@noveris/shared/ai-messaging/payloadSchemas';
 import AiJob from '../models/AiJob';
 import crypto from 'crypto';
 

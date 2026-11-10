@@ -1,12 +1,12 @@
 jest.mock('../services/courseReader', () => ({
   loadPublishedReading: jest.fn(),
-  canonicalBlocks: jest.fn(() => []),
+  canonicalBlocks: jest.fn(() => [])
 }));
 
 import { loadPublishedReading } from '../services/courseReader';
 import {
   PresentationUnavailableError,
-  getPublishedPresentation,
+  getPublishedPresentation
 } from '../services/presentationReader';
 
 const load = loadPublishedReading as jest.MockedFunction<typeof loadPublishedReading>;
@@ -19,29 +19,32 @@ describe('published presentation projection', () => {
         revisionId: 'rev_source',
         contentHash: 'sha256:' + 'a'.repeat(64),
         title: 'Math',
-        topics: [],
+        topics: []
       },
       revision: {},
       artifact: { metadata: { documents: [] } },
-      canonical: null,
+      canonical: null
     } as never);
     await expect(
-      getPublishedPresentation('owner', 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d', 'rev_source'),
+      getPublishedPresentation('owner', 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d', 'rev_source')
     ).rejects.toBeInstanceOf(PresentationUnavailableError);
     await expect(
-      getPublishedPresentation('owner', 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d', 'rev_source'),
+      getPublishedPresentation('owner', 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d', 'rev_source')
     ).rejects.toMatchObject({ status: 409 });
-    expect(load).toHaveBeenCalledWith('owner', 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d', 'rev_source');
+    expect(load).toHaveBeenCalledWith(
+      'owner',
+      'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d',
+      'rev_source'
+    );
   });
 
   it('projects a deterministic read-mode plan from canonical content', async () => {
     const { canonicalBlocks } = jest.requireMock('../services/courseReader');
-    (canonicalBlocks as jest.Mock).mockImplementation(
-      (blocks: Array<Record<string, unknown>>) =>
-        blocks.map((block, index) => ({
-          ...block,
-          id: block.id ?? `b${index}`,
-        })),
+    (canonicalBlocks as jest.Mock).mockImplementation((blocks: Array<Record<string, unknown>>) =>
+      blocks.map((block, index) => ({
+        ...block,
+        id: block.id ?? `b${index}`
+      }))
     );
     load.mockResolvedValue({
       context: {
@@ -49,7 +52,7 @@ describe('published presentation projection', () => {
         revisionId: 'rev_plan',
         contentHash: 'sha256:' + 'b'.repeat(64),
         title: 'Séries',
-        topics: [],
+        topics: []
       },
       revision: { contentDocumentHash: 'sha256:' + 'c'.repeat(64), summary: '' },
       artifact: { metadata: { documents: [] } },
@@ -70,27 +73,27 @@ describe('published presentation projection', () => {
                     id: 'd1',
                     kind: 'definition',
                     text: 'Definition body.',
-                    evidence: ['c1'],
+                    evidence: ['c1']
                   },
                   {
                     type: 'math',
                     id: 'm1',
                     expression: 'S_n = sum u_p',
-                    notation: 'plain',
-                  },
-                ],
-              },
-            ],
-          },
+                    notation: 'plain'
+                  }
+                ]
+              }
+            ]
+          }
         ],
-        quality: undefined,
-      },
+        quality: undefined
+      }
     } as never);
 
     const presentation = await getPublishedPresentation(
       'owner',
       'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d',
-      'rev_plan',
+      'rev_plan'
     );
     const plan = presentation.plan;
     expect(plan).toBeDefined();
@@ -98,7 +101,7 @@ describe('published presentation projection', () => {
     expect(plan!.lessons[0].instances.map((entry) => entry.component)).toEqual([
       'ConceptExplanation',
       'DefinitionCard',
-      'SourceMathFallback',
+      'SourceMathFallback'
     ]);
     // Read mode is a reading projection: nothing is interactive.
     expect(plan!.lessons[0].counts.interactive).toBe(0);

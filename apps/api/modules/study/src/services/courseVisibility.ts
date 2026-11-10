@@ -132,7 +132,8 @@ export async function listPublicCourses(
 }
 
 async function requirePublicCourse(courseId: string) {
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(courseId)) throw new VisibilityError(404, 'Course not found');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(courseId))
+    throw new VisibilityError(404, 'Course not found');
   const course = await Course.findOne({
     id: courseId,
     visibility: 'public',
@@ -163,7 +164,8 @@ export async function joinPublicCourse(userId: string, courseId: string) {
 }
 
 export async function leavePublicCourse(userId: string, courseId: string) {
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(courseId)) throw new VisibilityError(404, 'Course not found');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(courseId))
+    throw new VisibilityError(404, 'Course not found');
   await PublicCourseJoin.deleteOne({ userId, courseId });
   return { joined: false };
 }

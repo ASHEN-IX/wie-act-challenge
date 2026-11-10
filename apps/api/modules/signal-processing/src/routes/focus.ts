@@ -1,21 +1,21 @@
-import { errorDetails } from '@ednova/shared/errors';
+import { errorDetails } from '@noveris/shared/errors';
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Prisma } from '../../../../src/generated/prisma/client';
 import type { IFocusSession } from '../models/FocusSession';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createContracts } = require('@ednova/shared/domainContracts');
+const { createContracts } = require('@noveris/shared/domainContracts');
 import Joi from 'joi';
 import type { Response } from 'express';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const moduleClient = require('@ednova/shared/moduleClient');
+const moduleClient = require('@noveris/shared/moduleClient');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const FocusSession: typeof import('../models/FocusSession').default = require('../models/FocusSession');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { tierGate } = require('@ednova/shared/tierGate');
+const { tierGate } = require('@noveris/shared/tierGate');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { asyncHandler } = require('@ednova/shared/middleware');
+const { asyncHandler } = require('@noveris/shared/middleware');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { buildInternalHeaders } = require('@ednova/shared/auth');
+const { buildInternalHeaders } = require('@noveris/shared/auth');
 
 const router = createContracts();
 

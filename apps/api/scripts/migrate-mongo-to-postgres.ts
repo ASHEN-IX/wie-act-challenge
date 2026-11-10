@@ -315,8 +315,7 @@ function coerceScalar(value: unknown, field: FieldInfo): CoerceResult {
     case 'string':
     default:
       const text = sanitizeText(idOf(value) ?? '');
-      const isLegacyReference =
-        /(?:^id$|Ids?$)/.test(field.name) && /^[0-9a-f]{24}$/i.test(text);
+      const isLegacyReference = /(?:^id$|Ids?$)/.test(field.name) && /^[0-9a-f]{24}$/i.test(text);
       return { ok: true, value: field.isUuid || isLegacyReference ? migratedId(text) : text };
   }
 }
@@ -725,7 +724,13 @@ async function main(): Promise<void> {
       strippedNullBytes: number;
     };
     verification: {
-      counts: Array<{ table: string; source: number; target: number; mismatch: boolean }>;
+      counts: Array<{
+        table: string;
+        source: number;
+        target: number;
+        missingIds: number;
+        mismatch: boolean;
+      }>;
       relations: Array<{ label: string; checked: number; violations: number; sample: string[] }>;
     };
   } = {
@@ -787,6 +792,7 @@ async function main(): Promise<void> {
     // ── Convert and write, one mapping at a time, in dependency order ────────
     const docsByCollection = new Map<string, Array<Record<string, unknown>>>();
     const ordered = [...MAPPINGS].sort((a, b) => a.order - b.order);
+    const expectedIds = new Map<Mapping, string[]>();
 
     for (const mapping of ordered) {
       const model = models.get(mapping.model);
@@ -850,6 +856,11 @@ async function main(): Promise<void> {
         }
       }
 
+      expectedIds.set(
+        mapping,
+        rows.map((row) => String(row.id))
+      );
+      report.collections.push(stats);
       report.failures.push(...failureIds);
       if (failureIds.length && opts.strict)
         throw new Error(
@@ -913,7 +924,6 @@ async function main(): Promise<void> {
             `${mapping.collection}: ${stats.failed} row(s) failed to insert (--strict)`
           );
       }
-      report.collections.push(stats);
     }
 
     // ── Verification: source vs target counts ────────────────────────────────
@@ -923,15 +933,19 @@ async function main(): Promise<void> {
         if (!model) continue;
         const delegate = client[model.delegate];
         const target = delegate ? await delegate.count() : 0;
-        const stats = report.collections.find(
-          (entry) => entry.collection === mapping.collection && entry.model === mapping.model
-        );
-        const source = stats ? stats.read : 0;
+        const ids = [...new Set(expectedIds.get(mapping) ?? [])];
+        let matched = 0;
+        for (let offset = 0; offset < ids.length; offset += 1000) {
+          matched += await delegate.count({
+            where: { id: { in: ids.slice(offset, offset + 1000) } }
+          });
+        }
         report.verification.counts.push({
           table: model.table,
-          source,
+          source: ids.length,
           target,
-          mismatch: mapping.derived ? false : target < source
+          missingIds: ids.length - matched,
+          mismatch: matched !== ids.length
         });
       }
 
@@ -996,7 +1010,7 @@ async function main(): Promise<void> {
       console.log('\n==> Verification (source count vs target count)');
       for (const entry of report.verification.counts)
         console.log(
-          `    ${entry.table}: source ${entry.source}, target ${entry.target}${entry.mismatch ? '  MISMATCH' : ''}`
+          `    ${entry.table}: source ${entry.source}, target ${entry.target}${entry.mismatch ? `  MISMATCH (${entry.missingIds} missing IDs)` : ''}`
         );
       console.log('\n==> Referential integrity');
       for (const entry of report.verification.relations)
@@ -1033,7 +1047,14 @@ async function main(): Promise<void> {
       failed ||
       report.verification.counts.some((entry) => entry.mismatch) ||
       report.verification.relations.some((entry) => entry.violations)
-    ) process.exitCode = 1;
+    )
+      process.exitCode = 1;
+  } catch (error) {
+    if (!report.finishedAt) {
+      report.finishedAt = new Date().toISOString();
+      writeFileSync(opts.reportPath, JSON.stringify(report, null, 2));
+    }
+    throw error;
   } finally {
     await mongo.close();
     await disconnectDatabase();

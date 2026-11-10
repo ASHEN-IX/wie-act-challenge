@@ -53,9 +53,7 @@ const union =
     }
   };
 const object =
-  <S extends Record<string, Check<unknown>>>(
-    shape: S,
-  ): Check<{ [K in keyof S]: Output<S[K]> }> =>
+  <S extends Record<string, Check<unknown>>>(shape: S): Check<{ [K in keyof S]: Output<S[K]> }> =>
   (value) => {
     if (
       !value ||
@@ -65,48 +63,51 @@ const object =
     )
       return fail();
     const data = value as Record<string, unknown>;
-    if (Object.keys(data).some((key) => !Object.hasOwn(shape, key)))
-      return fail();
+    if (Object.keys(data).some((key) => !Object.hasOwn(shape, key))) return fail();
     return Object.fromEntries(
       Object.entries(shape).flatMap(([key, check]) => {
         const value = check(data[key]);
         return value === undefined ? [] : [[key, value]];
-      }),
+      })
     ) as { [K in keyof S]: Output<S[K]> };
   };
 
 const id = text(128, 1);
 const courseId = (value: unknown) =>
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(text(36, 36)(value)) ? (value as string) : fail();
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    text(36, 36)(value)
+  )
+    ? (value as string)
+    : fail();
 const hash = (value: unknown) =>
   /^sha256:[a-f0-9]{64}$/.test(text(71, 71)(value)) ? (value as string) : fail();
 const evidenceIds = array(id, 0, 128);
 const sourceEvidence = object({
   chunkId: id,
   documentId: id,
-  pageNumber: nullable(integer(1, 100000)),
+  pageNumber: nullable(integer(1, 100000))
 });
 const sourceReference = object({
   documentId: id,
   contentHash: hash,
   pageNumber: nullable(integer(1, 100000)),
-  href: text(2048, 1),
+  href: text(2048, 1)
 });
 const objective = object({
   objectiveId: id,
   statement: text(2000, 1),
-  bloomLevel: text(40, 1),
+  bloomLevel: text(40, 1)
 });
 const textMark = object({
   type: oneOf('bold', 'italic', 'code'),
   start: integer(0, 8000),
-  end: integer(0, 8000),
+  end: integer(0, 8000)
 });
 const linkMark = object({
   type: oneOf('link'),
   start: integer(0, 8000),
   end: integer(0, 8000),
-  href: text(2048, 1),
+  href: text(2048, 1)
 });
 const marks = union(textMark, linkMark);
 
@@ -117,14 +118,14 @@ const blockShapes: Record<string, Check<unknown>> = {
     id,
     text: text(8000, 1),
     evidence: evidenceIds,
-    marks: optionalArray(marks, 50),
+    marks: optionalArray(marks, 50)
   }),
   list: object({
     type: oneOf('list'),
     id,
     ordered: (value) => (typeof value === 'boolean' ? value : fail()),
     items: array(text(1200, 1), 1, 80),
-    evidence: evidenceIds,
+    evidence: evidenceIds
   }),
   quote: object({ type: oneOf('quote'), id, text: text(4000, 1), evidence: evidenceIds }),
   code: object({
@@ -132,14 +133,14 @@ const blockShapes: Record<string, Check<unknown>> = {
     id,
     language: text(24),
     code: text(20000, 1),
-    caption: optionalText(500),
+    caption: optionalText(500)
   }),
   math: object({
     type: oneOf('math'),
     id,
     expression: text(600, 1),
     notation: oneOf('latex', 'plain'),
-    caption: optionalText(500),
+    caption: optionalText(500)
   }),
   table: object({
     type: oneOf('table'),
@@ -147,7 +148,7 @@ const blockShapes: Record<string, Check<unknown>> = {
     caption: optionalText(500),
     columns: array(text(300, 1), 1, 20),
     rows: array(array(text(1200), 0, 20), 0, 100),
-    evidence: evidenceIds,
+    evidence: evidenceIds
   }),
   media: object({
     type: oneOf('media'),
@@ -155,14 +156,14 @@ const blockShapes: Record<string, Check<unknown>> = {
     mediaType: oneOf('image', 'audio', 'video'),
     src: optionalText(2048),
     alt: text(500),
-    caption: optionalText(500),
+    caption: optionalText(500)
   }),
   diagram: object({
     type: oneOf('diagram'),
     id,
     title: text(500, 1),
     description: text(2000),
-    steps: array(object({ id, label: text(300, 1), detail: optionalText(1000) }), 1, 60),
+    steps: array(object({ id, label: text(300, 1), detail: optionalText(1000) }), 1, 60)
   }),
   callout: object({
     type: oneOf('callout'),
@@ -170,8 +171,8 @@ const blockShapes: Record<string, Check<unknown>> = {
     kind: oneOf('definition', 'theorem', 'example', 'proof', 'exercise', 'note'),
     title: optionalText(500),
     text: text(4000, 1),
-    evidence: evidenceIds,
-  }),
+    evidence: evidenceIds
+  })
 };
 export type LearningBlockShape =
   | { type: 'heading'; id: string; level: 1 | 2 | 3 | 4; text: string }
@@ -242,11 +243,11 @@ export const learningDocument = object({
         id,
         title: text(500, 1),
         summary: text(2000),
-        objectives: array(objective, 0, 100),
+        objectives: array(objective, 0, 100)
       }),
       0,
-      100,
-    ),
+      100
+    )
   }),
   sections: array(
     object({
@@ -254,13 +255,13 @@ export const learningDocument = object({
       title: text(500, 1),
       summary: text(700),
       blocks: array(block, 1, 400),
-      evidence: array(sourceEvidence, 0, 128),
+      evidence: array(sourceEvidence, 0, 128)
     }),
     1,
-    500,
+    500
   ),
   sources: array(sourceReference, 0, 32),
-  warnings: array(text(2000), 0, 20),
+  warnings: array(text(2000), 0, 20)
 });
 
 export type LearningDocument = Output<typeof learningDocument>;

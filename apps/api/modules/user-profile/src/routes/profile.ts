@@ -1,14 +1,14 @@
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response, NextFunction, RequestHandler } from 'express';
 import type { IUserProfile } from '../models/UserProfile';
-import { errorDetails } from '@ednova/shared/errors';
-import { createContracts } from '@ednova/shared/domainContracts';
+import { errorDetails } from '@noveris/shared/errors';
+import { createContracts } from '@noveris/shared/domainContracts';
 import Joi from 'joi';
 import multer from 'multer';
 import path from 'path';
 import crypto from 'crypto';
 import fs from 'node:fs';
-import { logger } from '@ednova/shared';
+import { logger } from '@noveris/shared';
 import UserProfile from '../models/UserProfile';
 import Gamification from '../models/Gamification';
 import { jsonOrNull } from '../models/_helpers';

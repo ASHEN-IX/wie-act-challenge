@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import type { BinarySearchState } from "@ednova/shared/visualization";
+import type { BinarySearchState } from "@noveris/shared/visualization";
 import { BinarySearchVisualizer } from "./binary-search";
 import { loadRoomVisualization, updateRoomVisualization } from "./room-actions";
 import { Button } from "@/components/ui/button";

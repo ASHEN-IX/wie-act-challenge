@@ -19,7 +19,8 @@ export default async function InstructorInsightsPage({
   }>("/api/v1/study/insights/courses");
   const choices = courses.data?.courses || [];
   const selected = query.courseId || choices[0]?.courseId;
-  const valid = selected && /^[a-f\d]{24}$/i.test(selected);
+  // Only courses the API listed for this instructor can be requested.
+  const valid = choices.some((course) => course.courseId === selected);
   const insights = valid
     ? await load<InstructorInsights>(
         `/api/v1/study/insights/courses/${segment(selected)}`,

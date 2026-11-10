@@ -29,7 +29,7 @@ export const MODE_LABELS: Record<LearningMode, string> = {
   guided: 'Guided',
   explore: 'Explore',
   practice: 'Practice',
-  deep_dive: 'Deep Dive',
+  deep_dive: 'Deep Dive'
 };
 
 /**
@@ -73,10 +73,10 @@ export const MODE_POLICIES: Readonly<Record<LearningMode, ModePolicy>> = Object.
       interaction: false,
       proofs: false,
       examples: false,
-      sourceReferences: true,
+      sourceReferences: true
     }),
     requiresAsset: false,
-    usesPlanner: false,
+    usesPlanner: false
   }),
 
   guided: Object.freeze({
@@ -92,17 +92,17 @@ export const MODE_POLICIES: Readonly<Record<LearningMode, ModePolicy>> = Object.
       'ExampleBlock',
       'ProofBlock',
       'ConceptExplanation',
-      'StepSequence',
+      'StepSequence'
     ] as ComponentType[]),
     prefers: Object.freeze({
       disclosure: 'collapsed' as const,
       interaction: true,
       proofs: true,
       examples: true,
-      sourceReferences: false,
+      sourceReferences: false
     }),
     requiresAsset: false,
-    usesPlanner: true,
+    usesPlanner: true
   }),
 
   explore: Object.freeze({
@@ -119,17 +119,17 @@ export const MODE_POLICIES: Readonly<Record<LearningMode, ModePolicy>> = Object.
       'NetworkTopology',
       'ProcessDiagram',
       'DataChart',
-      'StepSequence',
+      'StepSequence'
     ] as ComponentType[]),
     prefers: Object.freeze({
       disclosure: 'expanded' as const,
       interaction: true,
       proofs: false,
       examples: false,
-      sourceReferences: true,
+      sourceReferences: true
     }),
     requiresAsset: true,
-    usesPlanner: true,
+    usesPlanner: true
   }),
 
   practice: Object.freeze({
@@ -142,17 +142,17 @@ export const MODE_POLICIES: Readonly<Record<LearningMode, ModePolicy>> = Object.
       'ExerciseBlock',
       'ExampleBlock',
       'ProofBlock',
-      'ConceptExplanation',
+      'ConceptExplanation'
     ] as ComponentType[]),
     prefers: Object.freeze({
       disclosure: 'collapsed' as const,
       interaction: false,
       proofs: true,
       examples: true,
-      sourceReferences: false,
+      sourceReferences: false
     }),
     requiresAsset: false,
-    usesPlanner: true,
+    usesPlanner: true
   }),
 
   deep_dive: Object.freeze({
@@ -168,18 +168,18 @@ export const MODE_POLICIES: Readonly<Record<LearningMode, ModePolicy>> = Object.
       'SourceMathFallback',
       'ConceptExplanation',
       'SourceReference',
-      'EducationalTable',
+      'EducationalTable'
     ] as ComponentType[]),
     prefers: Object.freeze({
       disclosure: 'expanded' as const,
       interaction: false,
       proofs: true,
       examples: true,
-      sourceReferences: true,
+      sourceReferences: true
     }),
     requiresAsset: false,
-    usesPlanner: true,
-  }),
+    usesPlanner: true
+  })
 });
 
 export function modePolicy(mode: LearningMode): ModePolicy {
@@ -199,9 +199,8 @@ export const MODE_DISCLOSURES: Record<LearningMode, string> = {
     'A progressive arrangement of this lesson. Content is unchanged; only the presentation order and disclosure are arranged.',
   explore:
     'Source-grounded interactive material where this lesson has it. Blocks without suitable data stay static.',
-  practice:
-    'The exercises and worked examples this lesson contains. Nothing is graded here.',
-  deep_dive: 'The fullest presentation of this lesson, with proofs and source references expanded.',
+  practice: 'The exercises and worked examples this lesson contains. Nothing is graded here.',
+  deep_dive: 'The fullest presentation of this lesson, with proofs and source references expanded.'
 };
 
 /**
@@ -213,9 +212,10 @@ export const MODE_DISCLOSURES: Record<LearningMode, string> = {
  */
 export function indistinguishableFromRead(
   mode: LearningMode,
-  signals: { hasStructuredAsset: boolean; hasInteractiveBlock: boolean },
+  signals: { hasStructuredAsset: boolean; hasInteractiveBlock: boolean }
 ): boolean {
   if (mode === 'read') return false;
-  if (modePolicy(mode).requiresAsset) return !signals.hasStructuredAsset && !signals.hasInteractiveBlock;
+  if (modePolicy(mode).requiresAsset)
+    return !signals.hasStructuredAsset && !signals.hasInteractiveBlock;
   return false;
 }

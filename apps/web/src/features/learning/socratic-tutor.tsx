@@ -16,8 +16,6 @@ export interface SocraticMessage {
 
 export function SocraticTutor({
   topicTitle = "First Normal Form (1NF) & Relational Integrity",
-  courseId,
-  revisionId,
 }: {
   topicTitle?: string;
   courseId?: string;

@@ -13,7 +13,7 @@ import {
   LEARNING_MODES,
   MODE_POLICIES,
   indistinguishableFromRead,
-  modePolicy,
+  modePolicy
 } from '../../../../shared/ednova/learningModes';
 import { COMPONENT_CAPABILITIES } from '../../../../shared/ednova/componentRegistry';
 import type { LessonBlockV2 } from '../../../../shared/ednova/learningDocumentV2';
@@ -22,20 +22,57 @@ import type { LessonBlockV2 } from '../../../../shared/ednova/learningDocumentV2
  * unreviewed formula, proof, code, exercise. */
 const lessonBlocks: LessonBlockV2[] = [
   { type: 'heading', id: 'h1', level: 2, text: 'Summation identities' },
-  { type: 'paragraph', id: 'p1', text: 'A series is the limit of its partial sums.', evidence: ['c1'] },
-  { type: 'callout', id: 'd1', kind: 'definition', title: 'Convergent series', text: 'A series converges…', evidence: ['c1'] },
+  {
+    type: 'paragraph',
+    id: 'p1',
+    text: 'A series is the limit of its partial sums.',
+    evidence: ['c1']
+  },
+  {
+    type: 'callout',
+    id: 'd1',
+    kind: 'definition',
+    title: 'Convergent series',
+    text: 'A series converges…',
+    evidence: ['c1']
+  },
   {
     type: 'math',
     id: 'm1',
     expression: '\\sum_{k=1}^{n} k',
     notation: 'latex',
     evidence: ['c1'],
-    review: { state: 'accepted', originalExpression: 'sum k', modelExpression: '\\sum k', reviewer: 'r' },
+    review: {
+      state: 'accepted',
+      originalExpression: 'sum k',
+      modelExpression: '\\sum k',
+      reviewer: 'r'
+    }
   },
   { type: 'math', id: 'm2', expression: 'S_n = \\sum u_p', notation: 'plain', evidence: ['c1'] },
-  { type: 'callout', id: 'pr1', kind: 'proof', title: 'Proof', text: 'By induction.', evidence: ['c1'] },
-  { type: 'code', id: 'code1', language: 'python', code: 'def total(n):\n    return n', evidence: ['c1'] },
-  { type: 'callout', id: 'ex1', kind: 'exercise', title: 'Exercise 1', text: 'Prove it.', evidence: ['c1'] },
+  {
+    type: 'callout',
+    id: 'pr1',
+    kind: 'proof',
+    title: 'Proof',
+    text: 'By induction.',
+    evidence: ['c1']
+  },
+  {
+    type: 'code',
+    id: 'code1',
+    language: 'python',
+    code: 'def total(n):\n    return n',
+    evidence: ['c1']
+  },
+  {
+    type: 'callout',
+    id: 'ex1',
+    kind: 'exercise',
+    title: 'Exercise 1',
+    text: 'Prove it.',
+    evidence: ['c1']
+  }
 ];
 
 describe('mode quality on a realistic lesson', () => {
@@ -58,7 +95,7 @@ describe('mode quality on a realistic lesson', () => {
 
   it('Practice prefers exercises, and the lesson has one to surface', () => {
     const exercises = lessonBlocks.filter(
-      (block) => block.type === 'callout' && block.kind === 'exercise',
+      (block) => block.type === 'callout' && block.kind === 'exercise'
     );
     expect(exercises).toHaveLength(1);
     expect(modePolicy('practice').preferredComponents[0]).toBe('ExerciseBlock');
@@ -66,7 +103,7 @@ describe('mode quality on a realistic lesson', () => {
 
   it('Deep Dive prefers proofs and source references, both present in this lesson', () => {
     const proves = lessonBlocks.filter(
-      (block) => block.type === 'callout' && block.kind === 'proof',
+      (block) => block.type === 'callout' && block.kind === 'proof'
     );
     expect(proves).toHaveLength(1);
     const policy = modePolicy('deep_dive');
@@ -77,7 +114,7 @@ describe('mode quality on a realistic lesson', () => {
 
   it('Deep Dive cannot promote an unreviewed formula: the fallback is preferred', () => {
     const unreviewed = lessonBlocks.find(
-      (block) => block.type === 'math' && !('review' in block && block.review),
+      (block) => block.type === 'math' && !('review' in block && block.review)
     );
     expect(unreviewed).toBeDefined();
     // The mode prefers the source-faithful component over anything that would
@@ -92,7 +129,7 @@ describe('mode quality on a realistic lesson', () => {
     const hasInteractiveBlock = lessonBlocks.some((block) => block.type === 'diagram');
     expect(hasInteractiveBlock).toBe(false);
     expect(indistinguishableFromRead('explore', { hasStructuredAsset, hasInteractiveBlock })).toBe(
-      true,
+      true
     );
   });
 
@@ -100,14 +137,14 @@ describe('mode quality on a realistic lesson', () => {
     expect(
       indistinguishableFromRead('explore', {
         hasStructuredAsset: true,
-        hasInteractiveBlock: false,
-      }),
+        hasInteractiveBlock: false
+      })
     ).toBe(false);
   });
 
   it('Read is never indistinguishable-from-Read, and never plans', () => {
     expect(
-      indistinguishableFromRead('read', { hasStructuredAsset: false, hasInteractiveBlock: false }),
+      indistinguishableFromRead('read', { hasStructuredAsset: false, hasInteractiveBlock: false })
     ).toBe(false);
     expect(modePolicy('read').usesPlanner).toBe(false);
     expect(modePolicy('read').preferredComponents).toHaveLength(0);
@@ -120,13 +157,15 @@ describe('mode quality on a realistic lesson', () => {
       expect(
         indistinguishableFromRead(mode, {
           hasStructuredAsset: false,
-          hasInteractiveBlock: false,
-        }),
+          hasInteractiveBlock: false
+        })
       ).toBe(false);
   });
 
   it('each mode has a distinct preferred-component signature', () => {
-    const signatures = LEARNING_MODES.map((mode) => MODE_POLICIES[mode].preferredComponents.join('|'));
+    const signatures = LEARNING_MODES.map((mode) =>
+      MODE_POLICIES[mode].preferredComponents.join('|')
+    );
     // Read is empty by design; the four planned modes must not be identical to
     // each other, or the selector would offer duplicate experiences.
     const planned = signatures.slice(1);

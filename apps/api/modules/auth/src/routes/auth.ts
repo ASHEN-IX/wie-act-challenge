@@ -1,15 +1,15 @@
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { IUser } from '../models/User';
 import { reserveCoupon } from '../services/couponRedemption';
-import { createContracts } from '@ednova/shared/domainContracts';
+import { createContracts } from '@noveris/shared/domainContracts';
 import Joi from 'joi';
 import type { Response } from 'express';
 import User from '../models/User';
 import Coupon from '../models/Coupon';
 import { prisma } from '../../../../shared/database';
 import { sendSubscriptionExpiryNotice } from '../services/emailService';
-import { authenticate } from '@ednova/shared/auth';
-import { asyncHandler } from '@ednova/shared/middleware';
+import { authenticate } from '@noveris/shared/auth';
+import { asyncHandler } from '@noveris/shared/middleware';
 
 const router = createContracts();
 

@@ -1,0 +1,6 @@
+# Regenerable recording artefacts; only the finished videos in output/ are kept.
+/output/logs/
+/output/takes/
+/output/work/
+/output/*.png
+/output/*.webm

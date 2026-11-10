@@ -22,17 +22,29 @@ import { createMissingRankBadges } from './rank-badges.seed';
 
 config({ path: path.resolve(__dirname, '../.env') });
 
-const accounts = [
-  { email: 'admin@ednova.test', name: 'EdNova Admin', role: 'university_admin' },
-  { email: 'instructor@ednova.test', name: 'Dr. Habib (Instructor)', role: 'instructor' },
-  { email: 'learner@ednova.test', name: 'Tasnim (Learner)', role: 'university_student' },
-  { email: 'peer@ednova.test', name: 'Aziz (Peer Student)', role: 'university_student' }
-] as const;
+type DemoRole = 'university_admin' | 'instructor' | 'university_student';
+
+/** Optional synthetic class (DEMO_COHORT_SIZE, max 30) so privacy-thresholded
+ * instructor insights have a cohort to summarise. Off by default. */
+const cohortSize = Math.min(Math.max(Number(process.env.DEMO_COHORT_SIZE) || 0, 0), 30);
+const cohort = Array.from({ length: cohortSize }, (_, i) => ({
+  email: `class${String(i + 1).padStart(2, '0')}@ednova.test`,
+  name: `Class learner ${String(i + 1).padStart(2, '0')}`,
+  role: 'university_student' as DemoRole
+}));
+
+const accounts: ReadonlyArray<{ email: string; name: string; role: DemoRole }> = [
+  { email: 'admin@ednova.test', name: 'Noveris Demo Admin', role: 'university_admin' },
+  { email: 'instructor@ednova.test', name: 'Demo Instructor', role: 'instructor' },
+  { email: 'learner@ednova.test', name: 'Tasnim', role: 'university_student' },
+  { email: 'peer@ednova.test', name: 'Aziz', role: 'university_student' },
+  ...cohort
+];
 
 /** Synthetic source text backing the demo course. Kept in-repo so the seeded
  * revision can carry a real content hash and a verifiable provenance artifact. */
 const DEMO_SOURCE_TEXT = [
-  'EdNova demo source: Relational Database Design & Normalization',
+  'Noveris demo source: Relational Database Design & Normalization',
   '',
   'First Normal Form (1NF) requires every attribute value to be atomic: a column',
   'must not hold repeating groups or comma-separated lists. A relation such as',
@@ -49,7 +61,7 @@ const DEMO_SOURCE_TEXT = [
  * graph and shortest paths so the Visual Lab can discover a concept that its
  * registered engine really supports. Labelled as demo content everywhere. */
 const DEMO_GRAPH_TEXT = [
-  'EdNova demo source: Shortest paths in weighted graphs',
+  'Noveris demo source: Shortest paths in weighted graphs',
   '',
   'A weighted graph is a set of nodes joined by edges, and each edge carries a',
   'weight such as a distance or a cost. The shortest path between a source node',
@@ -76,6 +88,8 @@ async function materializeSourceArtifact(
 ): Promise<SourceDocument> {
   const roots = sourceRoots();
   const hash = contentHash(sourceText);
+  const pinHash = 'sha256:' + storedContentHash.replace(/^sha256:/, '');
+  if (pinHash !== hash) throw new Error('Existing demo revision has different source content');
   const document: SourceDocument = {
     documentId: 'doc_' + hash.slice(7, 23),
     filename,
@@ -85,20 +99,28 @@ async function materializeSourceArtifact(
     provenance: 'extracted'
   };
   await fs.mkdir(path.join(roots.uploads, 'originals'), { recursive: true });
-  // Blobs are written read-only so they behave like immutable originals; clear a
-  // stale copy from an earlier run before rewriting it.
   const blobPath = path.join(roots.uploads, document.storageRef);
-  await fs.rm(blobPath, { force: true });
-  await fs.writeFile(blobPath, sourceText, { mode: 0o444 });
-  const pinHash = 'sha256:' + storedContentHash.replace(/^sha256:/, '');
+  try {
+    await fs.writeFile(blobPath, sourceText, { mode: 0o444, flag: 'wx' });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    if (contentHash(await fs.readFile(blobPath)) !== hash)
+      throw new Error('Existing demo source does not match its content hash');
+  }
   const digest = manifestDigest(courseId, revisionTag, pinHash, [document]);
 
   const base = path.join(roots.indexes, courseId, revisionTag);
   await fs.mkdir(path.dirname(base), { recursive: true });
-  // Artifacts are read-only like production originals, so a re-run over an
-  // existing database must clear the previous copies before rewriting them.
-  await fs.rm(base + '.faiss', { force: true });
-  await fs.rm(base + '.meta.json', { force: true });
+  const placeholder = Buffer.from('FAISS_DEMO_INDEX_V1\x00' + courseId + '\x00' + revisionTag);
+  const existingIndex = await fs.readFile(base + '.faiss').catch((error: NodeJS.ErrnoException) => {
+    if (error.code !== 'ENOENT') throw error;
+    return null;
+  });
+  // Only a placeholder created by this seed may be replaced.
+  if (existingIndex?.equals(placeholder)) {
+    await fs.rm(base + '.faiss', { force: true });
+    await fs.rm(base + '.meta.json', { force: true });
+  }
 
   // Prefer a real index built by the AI service through the same endpoint the
   // ingestion worker uses, so the grounded tutor can actually retrieve from the
@@ -121,6 +143,10 @@ async function materializeSourceArtifact(
     realIndex = true;
     console.log('  ✓ Built a real source index through the AI service');
   } catch (error) {
+    if (existingIndex && !existingIndex.equals(placeholder)) {
+      console.log('  ✓ Kept the existing demo source index');
+      return document;
+    }
     console.warn(
       '  ! AI service could not index the demo source (' +
         (error instanceof Error ? error.message : String(error)) +
@@ -131,8 +157,7 @@ async function materializeSourceArtifact(
   if (!realIndex) {
     // Placeholder so the revision still passes local integrity checks; it cannot
     // serve semantic search.
-    const index = Buffer.from('FAISS_DEMO_INDEX_V1\x00' + courseId + '\x00' + revisionTag, 'utf8');
-    await fs.writeFile(base + '.faiss', index, { mode: 0o444 });
+    await fs.writeFile(base + '.faiss', placeholder, { mode: 0o444, flag: 'wx' });
     await fs.writeFile(
       base + '.meta.json',
       JSON.stringify({
@@ -142,7 +167,7 @@ async function materializeSourceArtifact(
         contentHash: pinHash,
         documents: [document],
         manifestDigest: digest,
-        indexHash: contentHash(index),
+        indexHash: contentHash(placeholder),
         chunks: [sourceText],
         metas: [
           {
@@ -184,7 +209,7 @@ async function main() {
   if (process.env.NODE_ENV === 'production') throw new Error('Demo seeding is development only');
   const password = process.env.DEMO_USER_PASSWORD || 'EdNovaDemo!2026';
 
-  console.log('🌱 Starting Complete EdNova Demo Seeder...');
+  console.log('🌱 Starting Noveris demo seeder...');
   console.log('Connecting to: configured PostgreSQL target (credentials redacted)');
 
   await connectDatabase();
@@ -252,13 +277,13 @@ async function main() {
     if (!institution) {
       const created = await bootstrapInstitution({
         actorUserId: adminId,
-        name: 'EdNova Learning Demo University',
+        name: 'Noveris Demo University',
         slug: 'ednova-learning-demo'
       });
       institution = await prisma.institution.findUnique({
         where: { id: created.institution.id }
       });
-      console.log('  ✓ Created Institution: EdNova Learning Demo University');
+      console.log('  ✓ Created Institution: Noveris Demo University');
     } else {
       console.log('  ✓ Institution already exists');
     }
@@ -653,11 +678,13 @@ async function main() {
 
     // 5. Enroll Learner and Seed Tasks & Progress
     console.log('\n[5/6] Enrolling Learner & Creating Study Tasks...');
-    const enrollment = await prisma.courseEnrollment.findFirst({
-      where: { courseId, userId: learnerId },
-      select: { id: true }
-    });
-    if (!enrollment) {
+    for (const email of ['learner@ednova.test', 'peer@ednova.test', ...cohort.map((c) => c.email)]) {
+      const userId = userIds.get(email)!;
+      const enrollment = await prisma.courseEnrollment.findFirst({
+        where: { courseId, userId },
+        select: { id: true }
+      });
+      if (enrollment) continue;
       await prisma.courseEnrollment.create({
         data: {
           id: newId(),
@@ -665,12 +692,12 @@ async function main() {
           // Institutional course access requires the enrollment to carry the same
           // institution as the course; see courseGrant in resourceAccess.ts.
           institutionId: course.institutionId,
-          userId: learnerId,
+          userId,
           enrolledAt: new Date(),
           status: 'active'
         }
       });
-      console.log('  ✓ Enrolled Tasnim in Database Normalization course');
+      console.log(`  ✓ Enrolled ${email} in the Database Normalization course`);
     }
 
     const task = await prisma.taskRecord.findFirst({
@@ -789,14 +816,14 @@ async function main() {
         data: { activeRevisionId: graphRevision.revisionTag }
       });
     }
+    const graphSource = await materializeSourceArtifact(
+      graphCourseId,
+      graphRevision.revisionTag,
+      graphRevision.contentHash,
+      DEMO_GRAPH_TEXT,
+      'shortest-paths.txt'
+    );
     if (!graphRevisionExists) {
-      const graphSource = await materializeSourceArtifact(
-        graphCourseId,
-        graphRevision.revisionTag,
-        graphRevision.contentHash,
-        DEMO_GRAPH_TEXT,
-        'shortest-paths.txt'
-      );
       const graphPin = 'sha256:' + graphRevision.contentHash.replace(/^sha256:/, '');
       const graphActivityBase = {
         schemaVersion: '1.0.0',

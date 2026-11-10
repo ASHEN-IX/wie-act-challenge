@@ -2,7 +2,7 @@ import type { Prisma } from '../../../../src/generated/prisma/client';
 import { prisma } from '../../../../shared/database';
 import { table } from './_table';
 import type { PublishIngestionParams } from '../services/ingestionJob';
-import type { AiResultEnvelope } from '@ednova/shared/ai-messaging/envelope';
+import type { AiResultEnvelope } from '@noveris/shared/ai-messaging/envelope';
 
 export type IngestionOperationState =
   'prepared' | 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'superseded';

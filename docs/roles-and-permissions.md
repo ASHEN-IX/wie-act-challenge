@@ -1,91 +1,55 @@
-# Roles, membership and permissions
+# Noveris roles and resource authorization
 
-**CURRENT** describes checked source; **TARGET** is proposed behavior; **PLANNED** means no implementation claim. See [product](product-specification.md), [data model](data-model.md) and ED-02/ED-04 in the [backlog](sprint-backlog.md).
+The account, institution, course and room scopes are independent authorization layers. The current source of truth for course access is `apps/api/modules/study/src/services/resourceAccess.ts`. Membership and enrollment services add operation-specific checks. The application does not derive every capability from a global role.
 
-## CURRENT enforcement
+## Identity and scoped roles
 
-`apps/api/modules/auth/src/models/User.ts` and `shared/auth.ts` define global `student` and `admin`. Better Auth resolves a PostgreSQL session and domain user; `SessionGuard` authenticates, then domain handlers/tier policy apply. Admin/internal checks grant some privileged operations. AI operations enforce actor/resource ownership through `shared/operationPolicy.ts`. Paid/trial tiers affect access and expiry; independent signup is not unrestricted free AI access.
+| Layer | Records | Responsibility |
+| --- | --- | --- |
+| Global account | Better Auth records and domain User | Authentication, active account state and global student/admin role |
+| Institution | InstitutionMembership | university_admin, instructor or university_student context in one institution |
+| Course | Course owner, assignedInstructorIds, CourseEnrollment | Separate personal, teaching, administrative and student grants |
+| Room | StudyRoom.participants, hostUserId, presenterUserId | Participant access and permitted control operations |
+| Private result | StudentAttempt, LearningEvidence, owned lab and help records | Recipient-scoped access |
 
-The frontend `src/utils/permissions.ts` includes `teacher`, but neither its presence nor a visible screen implements an instructor role. Course routes generally use `{_id, userId}`; M04-A adds Institution, InstitutionMembership and invitation context, but no CourseEnrollment model or course-scoped grant exists. Team membership grants session participation, not a defined license to another user's course. Session-chat/voice HTTP handlers need explicit resource checks; static upload routes and team creation course lookup need isolation tests. Do not claim all retained legacy paths satisfy the TARGET matrix.
+One account may hold multiple institution memberships and personal resources. Institution suspension affects institutional context without turning another user's private data into shared material.
 
-## TARGET responsibilities
+## Course policy
 
-- **Platform administrator:** operate service, manage synthetic demo setup and resolve incidents. No automatic right to read private learning conversations/materials; exceptional support access would need a separately approved, audited policy. Existing global admin powers need review before this boundary is claimed.
-- **University administrator:** establish institution, invite instructors and manage course enrollment/access metadata. Cannot approve AI correctness, inspect private room content or read personal libraries.
-- **Instructor:** own assigned institutional courses, define objectives, upload/review/publish official materials, manage course invitations, optionally see privacy-preserving aggregate insight. Cannot silently republish learner files or inspect private questions.
-- **University student:** access enrolled published courses, use own personal courses, participate in authorized private rooms, obtain private assessment/next steps.
-- **Independent learner:** own private courses/resources and use individual/group learning without an institution. Official course access requires membership/enrollment. Student and independent learner are contexts of one learner account, not separate global roles/apps.
+`courseGrant` first attempts a scoped member grant, then checks explicitly public access. Institutional membership checks require an active institution and active membership. Older records are not automatically promoted into a grant.
 
-## TARGET permission matrix (M04-A implements only the membership/invitation subset; other institutional rows remain PLANNED)
+| Context | Resolved role | Permitted boundary |
+| --- | --- | --- |
+| Personal Course.userId or ownerUserId matches actor | owner | Read, author, review, publish and manage personal course |
+| Active instructor membership plus assignment | instructor | Read and manage content on the assigned institutional course |
+| Active institution-admin membership | admin | Course administration and enrollment policy |
+| Active student membership plus active CourseEnrollment | student | Read authorized institutional course material |
+| Public course with active published revision | student | Signed-in read access; active institution also required if institutional |
 
-| Action / scope | Platform admin | University admin | Instructor | University student | Independent learner |
-|---|---|---|---|---|---|
-| Operate platform / demo fixtures | Yes | No | No | No | No |
-| Manage institution membership | Explicit setup only | Own institution | No | No | No |
-| Create official course | Demo setup only | Assign owner | Assigned institution | No | No |
-| Edit objectives / publish official content | No by default | No by default | Owned course | No | No |
-| Manage enrollment | Setup only | Own institution | Owned course if delegated | Accept invitation | Accept invitation |
-| Read official course material | Explicit access only | Metadata only | Assigned course | Enrolled + published | Only if separately enrolled |
-| Create/upload personal courses | Not core | Optional learner context | Optional learner context | Own | Own |
-| Use tutor / own assessment | Optional learner context | Optional learner context | Preview or learner context | Own | Own |
-| Start/join room | Explicit participant context | No default access | Explicit participant context | Authorized sources + room invite | Explicitly shared personal sources + room invite |
-| Share personal resource to room | Own only | Own only | Own only | Own, explicit action | Own, explicit action |
-| Share official material | No bypass | No bypass | Only authorized course participants | Enrolled room participants only | Cannot bypass enrollment |
-| View course aggregates | Operational metadata only | Suppressed aggregates if enabled | Owned course aggregates if enabled | No | No |
-| Read other's private uploads/questions/results | No default access | No | No | No | No |
+`canReadCourse` accepts owner, instructor and student roles. `canAuthorCourse`, `canReviewCourse`, `canPublishCourse` and `canManageCourse` accept owner or instructor. `canAdministerCourse` accepts the institution-admin grant. `canManageEnrollments` accepts admin or instructor. Institution administration therefore has its own metadata/access purpose rather than a blanket content-read permission.
 
-Membership belongs to an institution and can have an institution role; course ownership is separate. A learner can have multiple memberships, personal courses and rooms. Invite codes are scoped, expirable capabilities; they cannot promote a learner to instructor or grant official-source access without enrollment. The room participant set and allowed-source set are both checked at retrieval, download, join, message and result-delivery boundaries. Revocation must close/restrict existing streams and invalidate scoped cached content.
+The public fallback is a read grant. It does not add an instructor assignment or CourseEnrollment. Public joins use separate records and do not populate institutional rosters.
 
-Official means instructor-approved source document, not automatic endorsement of generated text. Personal is private by default; room-shared means a deliberate grant to a named room, never publication to an institution or the public. Individual check outcomes stay recipient-only; group recaps contain no private questions or identifiable diagnostic profiles. Proposed support/retention policy and aggregation thresholds remain team decisions.
+## Institution and invitation operations
 
-## v1.2 role capabilities — TARGET / TODO
+Platform-admin bootstrap creates an institution and its initial administrator. Active institution administrators manage metadata, issue instructor/student invitations and suspend supported memberships. Administrator membership changes require the explicit setup policy.
 
-Institution/university membership and current student/admin limitations above are unchanged. None of these rights is implemented by merely adding a frontend control.
+Institution invitation records retain a token hash and state. Acceptance claims a pending, unexpired invitation conditionally and completes membership for the claiming actor. A retry can recover the actor's incomplete acceptance. An unrelated actor cannot complete that claim. Recipient binding and email delivery rules must be evaluated separately from possession of the invitation token.
 
-| Capability | Platform administrator | University administrator | Assigned instructor | University student | Independent learner |
-|---|---|---|---|---|---|
-| Review platform health/abuse metadata | Yes, operational | Own permitted metadata | Own permitted metadata | Own status | Own status |
-| Assign course instructor/enrollment | Explicit setup only | Own institution | Delegated owned course only | Accept learner invitation | Accept invitation if eligible |
-| Edit extracted official section hierarchy/objectives | No default | Assign owner only | Own assigned course draft | No | No |
-| Configure/review/approve official activity/rubric | No default | No default | Assigned course draft | No | No |
-| Publish approved revision / create replacement draft | No default | No default | Assigned course | No | No |
-| Digitize/edit personal course | Explicit learner context | Explicit learner context | Own personal context | Own | Own |
-| Open published trusted quiz/guided problem | Explicit authorized learner/preview | No blanket access | Authorized preview | Enrolled + published | Own/shared personal; official only if enrolled |
-| Change shared activity presenter view | Only if participant/controller | No default | Only explicit participant/controller | Room-selected presenter | Room-selected presenter |
-| Submit/check private activity answer | Own authorized attempt | No default | Own preview/learner attempt | Own | Own |
-| Request own XP/achievement history | Own learner context | Own learner context | Own learner context | Own | Own |
-| Award XP or approve own evidence from browser | No | No | No | No | No |
-| Inspect learner private answers/help/reward evidence | No default | No | No default; aggregates only | Own only | Own only |
+Course invitations are handled by the enrollment service and establish a course relationship. Instructor invitations require instructor eligibility in the same institution. Student enrollment requires the supported institutional student context. Assignment and enrollment do not create a second identity system.
 
-Only trusted server processing can accept evidence and derive rewards from the approved policy; admin/internal legacy endpoints are not a public activity-award API. Instructor preview may reveal instructor-owned answer keys only after authorization; learner/public activity projection must not include them. A correct public contribution is not permission to expose another student's private check. Official active revision cannot be edited in place by the room presenter. Personal editing uses the same Studio/activity engine with private ownership, never an official-publication privilege.
+## Room and private-data policy
 
-## M02 current implementation boundary — 23 October 2026
+A join code identifies a room. Active participant membership is required for protected room state and commands. A course-backed room additionally checks source access. Presenter and host authority control permitted room operations but do not grant editing of the active course revision or access to a peer's private attempt.
 
-The running personal-source grant is `Course.userId === authenticated actor`, checked by Study's `services/resourceAccess.ts`. Admin identity, team invitations and presenter authority do not grant access to another learner's private source, job or result. Institutional enrollment and published-revision grants remain later missions. A source-backed team member must independently hold the current source grant; source-free teams retain their active-membership flow. Explicit leave remains possible after source revocation.
+The debrief returns a shared recap and a recipient-specific private result. A learner who has not attempted the activity stays untested. Another learner's successful result cannot populate that recipient's score or evidence ID. Delayed model output is subject to current membership and room-state checks before acceptance.
 
-Private jobs and materialized plans/tasks retain source provenance and recheck the current grant when delivered. Legacy records without provenance fail closed and require resubmission; no backfill guesses their source. New explicitly source-free records retain an empty scope. Protected HTTP responses use `private, no-store`. Revocation checks run at request/delivery boundaries, not as one atomic transaction across auth, PostgreSQL and socket writes. Already delivered content cannot be recalled. See the [M02 verification](../reports/EDNOVA-M02-RESOURCE-ISOLATION-VERIFICATION.md).
+## Subscription versus authorization
 
-## M04-A.1 current implementation boundary — 23 October 2026
+The proposed institutional capacity and individual Pro plans belong to the commercial entitlement layer. Purchasing capacity must not create a course assignment, enrollment or private-source grant by itself. Existing user tiers and provider approval budgets are implemented primitives. Customer-specific institutional entitlements and allowance allocation remain planned integration.
 
-The repository now has one Better Auth identity plus Study-owned `institutions`, `institution_memberships` and single-use `institution_invitations`. These records provide display context and membership administration only. They are not a second login system and they are not a source grant.
+## Verification
 
-- Synthetic institution setup is an explicit platform-admin bootstrap. The item is unverified and the setup creates the first `university_admin` membership. No self-service institution creation exists.
-- An active `university_admin` of that institution may update metadata, issue or revoke membership invitations, and suspend an instructor/student membership. A platform role alone cannot manage another institution's membership; foreign institution IDs return 404.
-- Invitations can grant only `instructor` or `university_student`. They cannot grant `university_admin` or platform admin. The raw token is returned once, only its SHA-256 hash is stored, acceptance is conditional and single-use, and expiry is capped at 720 hours. Multiple independent pending invitations may exist for the same institution/role.
-- Acceptance claims the pending token before writing membership. The claim is not rolled back after a later failure: the same actor can retry to complete the missing membership, while a different actor gets `409`. A suspended membership is not reactivated by accepting a new invitation, and it remains pending. No recipient/email binding exists, so duplicate issuance to the same person is not detectable; that product policy remains unresolved.
-- Suspending or revoking a membership removes the institutional display context. It does not revoke personal data, and it cannot grant access. Membership acceptance, retry recovery, suspension, expiry and invitation revocation are tested against real NestJS/PostgreSQL. The real profile acceptance flow is also covered with two browser users and two synthetic institutions.
-- `Course.userId` remains the only course-read grant. No `course_enrollments`, institutional course scope, assigned-instructor grant or published-source authorization exists yet. No global-admin or membership bypass was added. A member still receives 404 for another user's personal course.
-- The profile page shows only active memberships and provides an invitation-token acceptance form. Course enrollment, instructor assignment, material scoping and publication remain later missions gated by ED-26/Contract 03 review.
+Seventeen PostgreSQL institution and enrollment checks passed in the recorded audit. They cover scoped metadata, invitation acceptance, isolation, assignment, enrollment, withdrawal and revocation. Twelve public-access/visibility unit tests passed. The evidence dossier identifies these runs and their fixture scope. These checks are narrower than a complete institution onboarding browser acceptance run.
 
-See the [M04-A verification](../reports/EDNOVA-M04A-INSTITUTION-FOUNDATION-VERIFICATION.md) and the [M04-A.1 invitation reliability verification](../reports/EDNOVA-M04A1-INVITATION-RELIABILITY-VERIFICATION.md).
-
-## Learning engagement (whiteboard, connections, groups) — implemented
-Whiteboard access follows the study room (active participants edit, host locks). Connections and study groups are personal and never grant course, institution or progress access. Details: `learning-engagement-plan.md`.
-
-## Course visibility (public courses) — implemented
-`Course.visibility` is `private` (personal courses: owner only), `institution` (institutional courses: enrolled members, the default) or `public` (any signed-in user, read only). Courses created before the field existed keep their meaning: personal → private, institutional → institution.
-- A public course is read through a `student` grant only when it has a published revision and, for an institutional course, the institution is active. It never grants authoring, enrollment, roster or analytics access. Making it private again removes access at the next request; the learner's progress is kept.
-- Who may change it: the course owner, an institution admin, or the instructor who created the course. Another assigned instructor may not. Going public additionally needs a published revision.
-- Learners add a public course to "My learning" with `POST /api/v1/study/courses/:courseId/join` (`DELETE` to remove). That writes `public_course_joins`, not a `CourseEnrollment`, so public learners do not appear in institution rosters or instructor analytics.
-- Routes: `GET /courses/public` (search `?q=`, paged), `PUT /courses/:courseId/visibility`, `POST|DELETE /courses/:courseId/join`. Web: the "Who can open this course" card in the Studio and `/explore`.
-- Not covered yet: reporting or removing abusive public courses by a platform admin, per-learner analytics for the author of a public course, and rate limiting of the catalog.
+See [product architecture](product-specification.md) and [privacy and safety](security.md).

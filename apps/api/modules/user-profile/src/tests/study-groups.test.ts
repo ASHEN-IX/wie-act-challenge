@@ -37,7 +37,7 @@ jest.mock('../../../../shared/database', () => ({
   },
   toDocument: (row: unknown) => row
 }));
-jest.mock('@ednova/shared/moduleClient', () => ({
+jest.mock('@noveris/shared/moduleClient', () => ({
   __esModule: true,
   default: { get: jest.fn(), post: jest.fn().mockResolvedValue({}) }
 }));
@@ -46,7 +46,7 @@ jest.mock('@ednova/shared/moduleClient', () => ({
 const StudyGroup = require('../models/StudyGroup').default;
 const Friendship = require('../models/Friendship').default;
 const UserProfile = require('../models/UserProfile').default;
-const moduleClient = require('@ednova/shared/moduleClient').default;
+const moduleClient = require('@noveris/shared/moduleClient').default;
 const groupRoutes = require('../routes/groups');
 /* eslint-enable @typescript-eslint/no-require-imports */
 

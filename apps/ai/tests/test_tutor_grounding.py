@@ -261,3 +261,28 @@ def test_style_is_optional_and_does_not_change_grounding(artifacts):
     styled_result = answer_grounded_question(styled, store)
     assert styled_result.status == plain_result.status == "verified"
     assert styled_result.citations == plain_result.citations
+
+
+def test_unverifiable_model_citation_falls_back_to_verified_passage(artifacts, monkeypatch):
+    """A model answer with a malformed citation must not fail the request or be shown."""
+    from agents.tutor import grounding
+    from utils.llm_client import LLMResult
+
+    build, _ = artifacts
+    store, req, _, _ = build()
+    monkeypatch.setattr(
+        grounding,
+        "ask",
+        lambda **kwargs: LLMResult(
+            text="Addition combines quantities [doc:made-up, chunk:nope]",
+            execution_mode="REAL_APPROVED",
+            model="m",
+            tier="compact",
+            agent="coach",
+        ),
+    )
+    result = grounding.answer_grounded_question(req, store)
+    assert result.status == "verified" and result.citationsValid
+    assert result.executionMode == "DETERMINISTIC_FALLBACK"
+    assert "made-up" not in result.answer
+    assert result.citations and result.citations[0].verified

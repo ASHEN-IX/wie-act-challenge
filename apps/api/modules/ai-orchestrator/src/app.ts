@@ -1,6 +1,6 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
-import { authenticate } from '@ednova/shared/auth';
+import { authenticate } from '@noveris/shared/auth';
 import {
   corsMiddleware,
   securityMiddleware,
@@ -8,7 +8,7 @@ import {
   errorHandler,
   rateLimiter,
   requireEnv
-} from '@ednova/shared';
+} from '@noveris/shared';
 import aiRoutes from './routes/ai';
 import jobsRoutes from './routes/jobs';
 import evalRoutes from './routes/eval';

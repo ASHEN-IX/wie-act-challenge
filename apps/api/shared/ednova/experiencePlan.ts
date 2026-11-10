@@ -26,7 +26,7 @@ import type { LessonBlockV2 } from './learningDocumentV2';
 import {
   COMPONENT_REGISTRY_VERSION,
   isComponentType,
-  type ComponentType,
+  type ComponentType
 } from './componentRegistry';
 
 export const EXPERIENCE_PLAN_SCHEMA_VERSION = '1.0.0' as const;
@@ -35,7 +35,7 @@ export const EXPERIENCE_PLAN_SCHEMA_VERSION = '1.0.0' as const;
  * registry or presentation schema is stale by definition. */
 export const EXPERIENCE_PLAN_BINDINGS = Object.freeze({
   presentationSchemaVersion: '1.0.0',
-  registryVersion: COMPONENT_REGISTRY_VERSION,
+  registryVersion: COMPONENT_REGISTRY_VERSION
 });
 
 // ---------------------------------------------------------------------------
@@ -82,7 +82,7 @@ export const EXPERIENCE_PLAN_LIMITS = Object.freeze({
   maxInteractionDepth: 3,
   /** Characters allowed in any planner-authored string. Bounded alphabet keeps
    * a hostile model from smuggling markup through a label. */
-  maxTextLength: 2_000,
+  maxTextLength: 2_000
 });
 
 // ---------------------------------------------------------------------------
@@ -202,7 +202,7 @@ export type ValidatedLearningExperiencePlan = {
 
 /** Type guard. Only values minted by `finalizeExperiencePlan` pass. */
 export function isValidatedExperiencePlan(
-  value: unknown,
+  value: unknown
 ): value is ValidatedLearningExperiencePlan {
   return (
     typeof value === 'object' &&
@@ -215,12 +215,12 @@ export function isValidatedExperiencePlan(
  * brand symbol never leaves it; the validator imports this function. */
 export function finalizeExperiencePlan(
   plan: Omit<ValidatedLearningExperiencePlan, typeof VALIDATED | 'digest'>,
-  digest: string,
+  digest: string
 ): ValidatedLearningExperiencePlan {
   return Object.freeze({
     ...plan,
     digest,
-    [VALIDATED]: true as const,
+    [VALIDATED]: true as const
   }) as ValidatedLearningExperiencePlan;
 }
 
@@ -287,7 +287,7 @@ export const EXPERIENCE_PLAN_REJECTIONS = [
   'PLAN_LIMIT_TOO_MANY_GROUPS',
   'PLAN_LIMIT_TEXT_TOO_LONG',
   // Stage 7 — finalization
-  'PLAN_FINALIZATION_INCOMPLETE',
+  'PLAN_FINALIZATION_INCOMPLETE'
 ] as const;
 
 export type ExperiencePlanRejectionCode = (typeof EXPERIENCE_PLAN_REJECTIONS)[number];
@@ -314,7 +314,7 @@ export const EXPERIENCE_PLAN_STAGES = [
   'component',
   'asset',
   'limits',
-  'finalization',
+  'finalization'
 ] as const;
 export type ExperiencePlanStage = (typeof EXPERIENCE_PLAN_STAGES)[number];
 
@@ -328,7 +328,7 @@ const PROPOSAL_KEYS = [
   'claims',
   'planner',
   'placements',
-  'notes',
+  'notes'
 ] as const;
 const CLAIM_KEYS = [
   'courseId',
@@ -338,7 +338,7 @@ const CLAIM_KEYS = [
   'mode',
   'registryVersion',
   'presentationSchemaVersion',
-  'contextFingerprint',
+  'contextFingerprint'
 ] as const;
 const PLANNER_KEYS = ['implementation', 'version'] as const;
 const PLACEMENT_KEYS = [
@@ -351,7 +351,7 @@ const PLACEMENT_KEYS = [
   'group',
   'disclosure',
   'interaction',
-  'fallback',
+  'fallback'
 ] as const;
 const BLOCK_KEYS = ['lessonId', 'blockId'] as const;
 
@@ -382,7 +382,7 @@ const UNSAFE_PROP_KEYS = [
   'query',
   'collection',
   'sql',
-  'path',
+  'path'
 ] as const;
 
 const reject = (code: ExperiencePlanRejectionCode, stage: ExperiencePlanStage): never => {
@@ -404,7 +404,7 @@ function safeString(
   max: number,
   code: ExperiencePlanRejectionCode = 'PLAN_SCHEMA_INVALID',
   stage: ExperiencePlanStage = 'schema',
-  min = 1,
+  min = 1
 ): string {
   if (typeof value !== 'string' || value.length < min || value.length > max)
     return reject(code, stage);
@@ -417,7 +417,7 @@ function safeString(
 function exactKeys(
   value: Record<string, unknown>,
   allowed: readonly string[],
-  code: ExperiencePlanRejectionCode = 'PLAN_SCHEMA_UNKNOWN_FIELD',
+  code: ExperiencePlanRejectionCode = 'PLAN_SCHEMA_UNKNOWN_FIELD'
 ): void {
   for (const key of Object.keys(value)) {
     if ((POLLUTION_KEYS as readonly string[]).includes(key))
@@ -459,9 +459,7 @@ function boundedBytes(value: unknown): void {
     reject('PLAN_SCHEMA_OVERSIZED', 'schema');
 }
 
-function parseInteraction(
-  value: unknown,
-): Record<string, string | number | boolean> | undefined {
+function parseInteraction(value: unknown): Record<string, string | number | boolean> | undefined {
   if (value === undefined) return undefined;
   if (!isPlainObject(value)) return reject('PLAN_COMPONENT_INTERACTION_INVALID', 'component');
   const keys = Object.keys(value);
@@ -494,20 +492,19 @@ function parsePlacement(value: unknown): ProposedPlacement {
   exactKeys(value.block, BLOCK_KEYS);
   const block: BlockReference = {
     lessonId: safeString(value.block.lessonId, 128, 'PLAN_SCHEMA_INVALID', 'schema'),
-    blockId: safeString(value.block.blockId, 128, 'PLAN_SCHEMA_INVALID', 'schema'),
+    blockId: safeString(value.block.blockId, 128, 'PLAN_SCHEMA_INVALID', 'schema')
   };
 
   // An unknown component name is a rejection, not a fallback: the proposal is
   // out of contract, and silently degrading would hide a broken planner.
-  if (!isComponentType(value.component))
-    return reject('PLAN_COMPONENT_UNKNOWN', 'component');
+  if (!isComponentType(value.component)) return reject('PLAN_COMPONENT_UNKNOWN', 'component');
   const component = value.component;
 
   const componentVersion = safeString(
     value.componentVersion,
     32,
     'PLAN_COMPONENT_VERSION_UNSUPPORTED',
-    'component',
+    'component'
   );
 
   if (!(PLACEMENT_GROUPS as readonly unknown[]).includes(value.group))
@@ -542,7 +539,7 @@ function parsePlacement(value: unknown): ProposedPlacement {
     group: value.group as PlacementGroup,
     disclosure: value.disclosure as DisclosureMode,
     ...(interaction !== undefined ? { interaction } : {}),
-    fallback: value.fallback,
+    fallback: value.fallback
   };
 }
 
@@ -576,21 +573,21 @@ export function parseExperiencePlanProposal(value: unknown): UntrustedExperience
       value.claims.presentationSchemaVersion,
       32,
       'PLAN_SCHEMA_INVALID',
-      'schema',
+      'schema'
     ),
     contextFingerprint: safeString(
       value.claims.contextFingerprint,
       71,
       'PLAN_SCHEMA_INVALID',
-      'schema',
-    ),
+      'schema'
+    )
   };
 
   if (!isPlainObject(value.planner)) return reject('PLAN_SCHEMA_INVALID', 'schema');
   exactKeys(value.planner, PLANNER_KEYS);
   const planner = {
     implementation: safeString(value.planner.implementation, 64, 'PLAN_SCHEMA_INVALID', 'schema'),
-    version: safeString(value.planner.version, 32, 'PLAN_SCHEMA_INVALID', 'schema'),
+    version: safeString(value.planner.version, 32, 'PLAN_SCHEMA_INVALID', 'schema')
   };
 
   if (!Array.isArray(value.placements)) return reject('PLAN_SCHEMA_INVALID', 'schema');
@@ -602,8 +599,7 @@ export function parseExperiencePlanProposal(value: unknown): UntrustedExperience
   // renderer. They are rejected, never de-duplicated.
   const ids = new Set<string>();
   for (const placement of placements) {
-    if (ids.has(placement.placementId))
-      return reject('PLAN_SCHEMA_DUPLICATE_ID', 'schema');
+    if (ids.has(placement.placementId)) return reject('PLAN_SCHEMA_DUPLICATE_ID', 'schema');
     ids.add(placement.placementId);
   }
 
@@ -612,7 +608,13 @@ export function parseExperiencePlanProposal(value: unknown): UntrustedExperience
     if (!Array.isArray(value.notes) || value.notes.length > 16)
       return reject('PLAN_SCHEMA_INVALID', 'schema');
     notes = value.notes.map((note) =>
-      safeString(note, EXPERIENCE_PLAN_LIMITS.maxTextLength, 'PLAN_LIMIT_TEXT_TOO_LONG', 'limits', 0),
+      safeString(
+        note,
+        EXPERIENCE_PLAN_LIMITS.maxTextLength,
+        'PLAN_LIMIT_TEXT_TOO_LONG',
+        'limits',
+        0
+      )
     );
   }
 
@@ -622,7 +624,7 @@ export function parseExperiencePlanProposal(value: unknown): UntrustedExperience
     claims,
     planner,
     placements,
-    ...(notes !== undefined ? { notes } : {}),
+    ...(notes !== undefined ? { notes } : {})
   };
 }
 
@@ -691,7 +693,7 @@ export function experienceContextFingerprint(input: {
     input.contentHash,
     input.lessonId,
     input.mode,
-    input.blockIds,
+    input.blockIds
   ]);
   let hash = 0n;
   const prime = 1099511628211n;

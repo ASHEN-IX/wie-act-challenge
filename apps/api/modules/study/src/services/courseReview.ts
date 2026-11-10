@@ -1,10 +1,6 @@
 import { CourseRevision } from '../models';
 import aiClient from '../../../../shared/aiClient';
-import {
-  DraftForbiddenError,
-  canonicalHasReviewableRegions,
-  getCourseDraft
-} from './courseDraft';
+import { DraftForbiddenError, canonicalHasReviewableRegions, getCourseDraft } from './courseDraft';
 
 /**
  * Automated review of an extracted course draft.
@@ -75,7 +71,22 @@ export interface DraftReview {
 const PLACEHOLDER_OBJECTIVE = /^explain the main ideas and methods in\b/i;
 const TITLE_PREFIX = /^(course|chapter|section|lesson|unit)\s*\d*\s*[:\-–.]\s*/i;
 const TRAILING_STOPWORDS = new Set([
-  'a', 'an', 'the', 'of', 'and', 'or', 'to', 'in', 'on', 'for', 'then', 'with', 'is', 'are', 'that', 'which'
+  'a',
+  'an',
+  'the',
+  'of',
+  'and',
+  'or',
+  'to',
+  'in',
+  'on',
+  'for',
+  'then',
+  'with',
+  'is',
+  'are',
+  'that',
+  'which'
 ]);
 
 function lessonTitleLooksCutOff(title: string): boolean {
@@ -194,7 +205,11 @@ export function analyzeDraft(input: {
     : findings.some((f) => f.severity === 'warning')
       ? 'needs_attention'
       : 'ready';
-  return { findings, verdict, counts: { chapters: topics.length, lessons: lessons.length, objectives } };
+  return {
+    findings,
+    verdict,
+    counts: { chapters: topics.length, lessons: lessons.length, objectives }
+  };
 }
 
 const VERB_LEVEL: Array<[RegExp, string]> = [
@@ -304,7 +319,8 @@ export async function reviewCourseDraft(
     .select({ contentDocument: 1 })
     .lean();
   if (!revision) throw new DraftForbiddenError('Draft not found');
-  const canonical = revision.contentDocument as { extractionReview?: { acknowledged?: boolean } } | undefined;
+  const canonical = revision.contentDocument as
+    { extractionReview?: { acknowledged?: boolean } } | undefined;
   const sourceReviewPending =
     canonicalHasReviewableRegions(canonical) && canonical?.extractionReview?.acknowledged !== true;
 
@@ -312,7 +328,10 @@ export async function reviewCourseDraft(
   const analysis = analyzeDraft({ topics, summary: draft.summary, sourceReviewPending });
   const ai =
     options.useAi && aiAvailable()
-      ? await requestAiProposal(String((draft as { title?: string }).title || draft.summary || ''), topics)
+      ? await requestAiProposal(
+          String((draft as { title?: string }).title || draft.summary || ''),
+          topics
+        )
       : ({ status: 'skipped' } as DraftReview['ai']);
 
   return { revisionTag: draft.revisionTag, ...analysis, ai };

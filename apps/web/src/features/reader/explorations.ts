@@ -12,7 +12,7 @@
  * exploration — nothing is forced into a lesson that does not need it.
  */
 
-import type { LessonBlockV2 } from '@ednova/shared/ednova/learningDocumentV2';
+import type { LessonBlockV2 } from '@noveris/shared/ednova/learningDocumentV2';
 
 export type ExplorationProvenance = 'deterministic_demo';
 

@@ -18,7 +18,7 @@ type FilterQuery = Record<string, unknown>;
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { IStudyRoom, IStudyRoomParticipant, RoomPhase } from '../models/StudyRoom';
 import type { IFacilitatorIntervention } from '../models/FacilitatorIntervention';
-import { errorDetails } from '@ednova/shared/errors';
+import { errorDetails } from '@noveris/shared/errors';
 
 // Existing Python Contract 15 response and local-policy projection.
 interface FacilitatorProposal {
@@ -42,10 +42,10 @@ interface RoomRequest extends DomainRequest {
   studyRoom?: IStudyRoom;
 }
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createContracts } = require('@ednova/shared/domainContracts');
+const { createContracts } = require('@noveris/shared/domainContracts');
 import crypto from 'crypto';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const moduleClient = require('@ednova/shared/moduleClient');
+const moduleClient = require('@noveris/shared/moduleClient');
 import Joi from 'joi';
 import {
   StudyRoom,
@@ -56,7 +56,7 @@ import {
   mutateRoom
 } from '../models';
 import { buildInternalHeaders } from '../utils/sessionHelpers';
-import { logger } from '@ednova/shared';
+import { logger } from '@noveris/shared';
 import { runRoomCommand } from '../services/roomCommands';
 import { canReadCourse } from '../services/resourceAccess';
 import {
@@ -73,7 +73,7 @@ import { activeLearningRoom } from '../services/roomLearning';
 import { getAttemptResult } from '../services/activityAttempt';
 import type { DomainMiddleware } from '../../../../src/framework/contracts';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const aiClient = require('@ednova/shared/aiClient');
+const aiClient = require('@noveris/shared/aiClient');
 
 const router = createContracts();
 const NOTIFICATION_URL = 'module://notifications';
@@ -1510,7 +1510,12 @@ router.post(
         ),
         message: Joi.string().max(8000),
         messageText: Joi.string().max(8000),
-        executionMode: Joi.string().valid('REAL_APPROVED', 'MOCK_TEST', 'DETERMINISTIC_FALLBACK', 'UNAVAILABLE'),
+        executionMode: Joi.string().valid(
+          'REAL_APPROVED',
+          'MOCK_TEST',
+          'DETERMINISTIC_FALLBACK',
+          'UNAVAILABLE'
+        ),
         reasoning: Joi.string().max(2000),
         interventionId: Joi.string().max(128),
         roomId: Joi.string().max(128),
@@ -1696,7 +1701,12 @@ router.post(
         ),
         message: Joi.string().max(8000),
         messageText: Joi.string().max(8000),
-        executionMode: Joi.string().valid('REAL_APPROVED', 'MOCK_TEST', 'DETERMINISTIC_FALLBACK', 'UNAVAILABLE'),
+        executionMode: Joi.string().valid(
+          'REAL_APPROVED',
+          'MOCK_TEST',
+          'DETERMINISTIC_FALLBACK',
+          'UNAVAILABLE'
+        ),
         reasoning: Joi.string().max(2000),
         interventionId: Joi.string().max(128),
         roomId: Joi.string().max(128),

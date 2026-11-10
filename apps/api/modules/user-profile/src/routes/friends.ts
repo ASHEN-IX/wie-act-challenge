@@ -3,7 +3,7 @@ import type { Response } from 'express';
 import type { IUserProfile } from '../models/UserProfile';
 import type { FriendshipStatus } from '../models/Friendship';
 import type { Prisma } from '../../../../src/generated/prisma/client';
-import { errorDetails } from '@ednova/shared/errors';
+import { errorDetails } from '@noveris/shared/errors';
 
 interface FriendProfileProjection {
   userId: string;
@@ -16,12 +16,12 @@ interface FriendProfileProjection {
   isFriend: boolean;
   stats?: IUserProfile['stats'];
 }
-import { createContracts } from '@ednova/shared/domainContracts';
+import { createContracts } from '@noveris/shared/domainContracts';
 import Friendship from '../models/Friendship';
 import UserProfile from '../models/UserProfile';
 import Gamification from '../models/Gamification';
-import moduleClient from '@ednova/shared/moduleClient';
-import { buildInternalHeaders } from '@ednova/shared/auth';
+import moduleClient from '@noveris/shared/moduleClient';
+import { buildInternalHeaders } from '@noveris/shared/auth';
 
 const router = createContracts();
 

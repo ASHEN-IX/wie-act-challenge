@@ -8,17 +8,17 @@ import {
   parseExperiencePlanProposal,
   type ExperiencePlanValidationContext,
   type UntrustedExperiencePlanProposal,
-  type ValidatedAssetBinding,
+  type ValidatedAssetBinding
 } from '../../../../shared/ednova/experiencePlan';
 import {
   validateExperiencePlan,
-  tryValidateExperiencePlan,
+  tryValidateExperiencePlan
 } from '../../../../shared/ednova/experiencePlanValidator';
 import {
   MOCK_PLANNER_IMPLEMENTATION,
   MOCK_PLANNER_VERSION,
   planMockExperience,
-  type MockPlannerContext,
+  type MockPlannerContext
 } from '../../../../shared/ednova/mockExperiencePlanner';
 import { COMPONENT_REGISTRY_VERSION } from '../../../../shared/ednova/componentRegistry';
 
@@ -36,7 +36,7 @@ const fact = (overrides: Partial<Fact> & { blockId: string }): Fact => ({
   hasSourceRegion: false,
   isReviewedFormula: false,
   hasStructuredFixture: false,
-  ...overrides,
+  ...overrides
 });
 
 /** A small mathematics lesson: heading, prose, reviewed formula, unreviewed
@@ -47,20 +47,22 @@ const facts: Fact[] = [
   fact({
     blockId: 'm-reviewed',
     blockType: 'math',
-    isReviewedFormula: true,
+    isReviewedFormula: true
   }),
   fact({
     blockId: 'm-unreviewed',
     blockType: 'math',
     render: 'source_faithful',
-    hasSourceRegion: true,
+    hasSourceRegion: true
   }),
-  fact({ blockId: 'proof1', blockType: 'callout', role: 'proof' }),
+  fact({ blockId: 'proof1', blockType: 'callout', role: 'proof' })
 ];
 
 const assets: ValidatedAssetBinding[] = [];
 
-function context(overrides: Partial<ExperiencePlanValidationContext> = {}): ExperiencePlanValidationContext {
+function context(
+  overrides: Partial<ExperiencePlanValidationContext> = {}
+): ExperiencePlanValidationContext {
   const blocks = overrides.blocks ?? facts;
   return {
     courseId,
@@ -74,14 +76,14 @@ function context(overrides: Partial<ExperiencePlanValidationContext> = {}): Expe
       contentHash,
       lessonId,
       mode: 'read',
-      blockIds: blocks.map((block) => block.blockId),
+      blockIds: blocks.map((block) => block.blockId)
     }),
     allowedPlanners: [
-      { implementation: MOCK_PLANNER_IMPLEMENTATION, version: MOCK_PLANNER_VERSION },
+      { implementation: MOCK_PLANNER_IMPLEMENTATION, version: MOCK_PLANNER_VERSION }
     ],
     blocks,
     assets: overrides.assets ?? assets,
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -102,14 +104,14 @@ function plannerContext(ctx: ExperiencePlanValidationContext): MockPlannerContex
       hasEvidence: block.hasEvidence,
       hasSourceRegion: block.hasSourceRegion,
       isReviewedFormula: block.isReviewedFormula,
-      hasStructuredFixture: block.hasStructuredFixture,
+      hasStructuredFixture: block.hasStructuredFixture
     })),
     assets: ctx.assets.map((asset) => ({
       assetId: asset.assetId,
       blockId: asset.blockId,
       component: asset.component,
-      provenance: asset.provenance,
-    })),
+      provenance: asset.provenance
+    }))
   };
 }
 
@@ -150,7 +152,7 @@ describe('LearningExperiencePlanV1 contract', () => {
   it('rejects an unknown schema version', () => {
     expectCode(
       () => parseExperiencePlanProposal({ ...validProposal(), schemaVersion: '2.0.0' }),
-      'PLAN_SCHEMA_UNSUPPORTED_VERSION',
+      'PLAN_SCHEMA_UNSUPPORTED_VERSION'
     );
   });
 
@@ -168,13 +170,16 @@ describe('LearningExperiencePlanV1 contract', () => {
 
     const revision = validProposal();
     revision.claims.revisionId = 'rev_other';
-    expectCode(() => validateExperiencePlan(revision, context()), 'PLAN_IDENTITY_REVISION_MISMATCH');
+    expectCode(
+      () => validateExperiencePlan(revision, context()),
+      'PLAN_IDENTITY_REVISION_MISMATCH'
+    );
 
     const hash = validProposal();
     hash.claims.contentHash = 'sha256:' + 'f'.repeat(64);
     expectCode(
       () => validateExperiencePlan(hash, context()),
-      'PLAN_IDENTITY_CONTENT_HASH_MISMATCH',
+      'PLAN_IDENTITY_CONTENT_HASH_MISMATCH'
     );
 
     const lesson = validProposal();
@@ -185,7 +190,10 @@ describe('LearningExperiencePlanV1 contract', () => {
   it('rejects a stale component-registry version', () => {
     const proposal = validProposal();
     proposal.claims.registryVersion = '0.9.0';
-    expectCode(() => validateExperiencePlan(proposal, context()), 'PLAN_IDENTITY_REGISTRY_MISMATCH');
+    expectCode(
+      () => validateExperiencePlan(proposal, context()),
+      'PLAN_IDENTITY_REGISTRY_MISMATCH'
+    );
   });
 
   it('rejects a planner implementation the deployment did not allow', () => {
@@ -218,7 +226,7 @@ describe('canonical coverage', () => {
     const proposal = validProposal();
     [proposal.placements[0], proposal.placements[1]] = [
       proposal.placements[1],
-      proposal.placements[0],
+      proposal.placements[0]
     ];
     expectCode(() => validateExperiencePlan(proposal, context()), 'PLAN_COVERAGE_BLOCK_REORDERED');
   });
@@ -242,7 +250,7 @@ describe('component capability enforcement', () => {
     proposal.placements[0].componentVersion = '9.0.0';
     expectCode(
       () => validateExperiencePlan(proposal, context()),
-      'PLAN_COMPONENT_VERSION_UNSUPPORTED',
+      'PLAN_COMPONENT_VERSION_UNSUPPORTED'
     );
   });
 
@@ -254,7 +262,7 @@ describe('component capability enforcement', () => {
     proposal.placements[0].fallback = 'ConceptExplanation';
     expectCode(
       () => validateExperiencePlan(proposal, context()),
-      'PLAN_COMPONENT_BLOCK_INCOMPATIBLE',
+      'PLAN_COMPONENT_BLOCK_INCOMPATIBLE'
     );
   });
 
@@ -265,7 +273,7 @@ describe('component capability enforcement', () => {
     proposal.placements[index].componentVersion = '1.0.0';
     expectCode(
       () => validateExperiencePlan(proposal, context()),
-      'PLAN_COMPONENT_POLICY_INCOMPATIBLE',
+      'PLAN_COMPONENT_POLICY_INCOMPATIBLE'
     );
   });
 
@@ -274,7 +282,7 @@ describe('component capability enforcement', () => {
     // is the dangerous middle: DerivationBlock would render invented steps.
     const blocks = [
       fact({ blockId: 'h1', blockType: 'heading' }),
-      fact({ blockId: 'm-unreviewed', blockType: 'math', isReviewedFormula: false }),
+      fact({ blockId: 'm-unreviewed', blockType: 'math', isReviewedFormula: false })
     ];
     const ctx = context({ blocks });
     const proposal = validProposal(ctx);
@@ -282,26 +290,20 @@ describe('component capability enforcement', () => {
     proposal.placements[index].component = 'DerivationBlock';
     proposal.placements[index].componentVersion = '1.0.0';
     proposal.placements[index].interaction = undefined;
-    expectCode(
-      () => validateExperiencePlan(proposal, ctx),
-      'PLAN_COMPONENT_UNREVIEWED_FORMULA',
-    );
+    expectCode(() => validateExperiencePlan(proposal, ctx), 'PLAN_COMPONENT_UNREVIEWED_FORMULA');
   });
 
   it('rejects a topology without a structured fixture', () => {
     const blocks = [
       fact({ blockId: 'h1', blockType: 'heading' }),
-      fact({ blockId: 'd1', blockType: 'diagram' }),
+      fact({ blockId: 'd1', blockType: 'diagram' })
     ];
     const ctx = context({ blocks });
     const proposal = validProposal(ctx);
     proposal.placements[1].component = 'NetworkTopology';
     proposal.placements[1].componentVersion = '1.0.0';
     proposal.placements[1].fallback = 'ProcessDiagram';
-    expectCode(
-      () => validateExperiencePlan(proposal, ctx),
-      'PLAN_COMPONENT_FIXTURE_MISSING',
-    );
+    expectCode(() => validateExperiencePlan(proposal, ctx), 'PLAN_COMPONENT_FIXTURE_MISSING');
   });
 
   it('rejects a fallback the registry does not own', () => {
@@ -309,7 +311,7 @@ describe('component capability enforcement', () => {
     (proposal.placements[1] as { fallback: string }).fallback = 'RemoteScriptRunner';
     expectCode(
       () => validateExperiencePlan(proposal, context()),
-      'PLAN_COMPONENT_FALLBACK_UNTRUSTED',
+      'PLAN_COMPONENT_FALLBACK_UNTRUSTED'
     );
   });
 
@@ -318,7 +320,7 @@ describe('component capability enforcement', () => {
     proposal.placements[1].interaction = { executeScript: true };
     expectCode(
       () => validateExperiencePlan(proposal, context()),
-      'PLAN_COMPONENT_INTERACTION_INVALID',
+      'PLAN_COMPONENT_INTERACTION_INVALID'
     );
   });
 });
@@ -327,7 +329,7 @@ describe('structured-asset governance', () => {
   // A code lesson: the only shape where a walkthrough asset is legitimate.
   const codeBlocks: Fact[] = [
     fact({ blockId: 'h1', blockType: 'heading' }),
-    fact({ blockId: 'code1', blockType: 'code' }),
+    fact({ blockId: 'code1', blockType: 'code' })
   ];
 
   const asset: ValidatedAssetBinding = {
@@ -337,7 +339,7 @@ describe('structured-asset governance', () => {
     component: 'CodeWalkthrough',
     provenance: 'instructor_authored',
     reviewVerified: true,
-    sourceVerified: true,
+    sourceVerified: true
   };
 
   function withAsset(overrides: Partial<ValidatedAssetBinding> = {}) {
@@ -358,7 +360,7 @@ describe('structured-asset governance', () => {
       assetId: asset.assetId,
       group: 'example' as const,
       disclosure: 'expanded' as const,
-      fallback: 'CodeViewer' as const,
+      fallback: 'CodeViewer' as const
     };
   }
 
@@ -381,16 +383,13 @@ describe('structured-asset governance', () => {
   it('rejects an unreviewed generated proposal even when a plan names it', () => {
     const { ctx, proposal } = withAsset({
       provenance: 'generated_proposal',
-      reviewVerified: false,
+      reviewVerified: false
     });
     // The mock planner will not propose a generated asset, so the reference is
     // forced here: this is the attack — a planner naming an asset it was never
     // allowed to show.
     proposal.placements.push(supplemental(proposal));
-    expectCode(
-      () => validateExperiencePlan(proposal, ctx),
-      'PLAN_ASSET_GENERATED_PROPOSAL',
-    );
+    expectCode(() => validateExperiencePlan(proposal, ctx), 'PLAN_ASSET_GENERATED_PROPOSAL');
   });
 
   it('rejects an asset whose review claim has no trusted record', () => {
@@ -401,7 +400,7 @@ describe('structured-asset governance', () => {
   it('rejects a source-derived asset whose references do not resolve', () => {
     const { ctx, proposal } = withAsset({
       provenance: 'source_derived',
-      sourceVerified: false,
+      sourceVerified: false
     });
     expectCode(() => validateExperiencePlan(proposal, ctx), 'PLAN_ASSET_SOURCE_UNVERIFIED');
   });
@@ -425,7 +424,7 @@ describe('structured-asset governance', () => {
       ...asset,
       assetId: 'asset_generated_1',
       provenance: 'generated_proposal',
-      reviewVerified: false,
+      reviewVerified: false
     };
     const ctx = context({ blocks: codeBlocks, assets: [generated] });
     const result = planMockExperience('valid_programming', plannerContext(ctx));
@@ -440,7 +439,7 @@ describe('structured-asset governance', () => {
     const { ctx, proposal } = withAsset({ reviewVerified: false });
     (proposal as unknown as Record<string, unknown>).review = {
       status: 'instructor_reviewed',
-      reviewedBy: 'attacker',
+      reviewedBy: 'attacker'
     };
     // The unknown top-level key fails the schema, and the review claim would be
     // ignored anyway: review state comes from trusted records only.
@@ -452,10 +451,13 @@ describe('resource limits and hostile structure', () => {
   it('rejects an oversized placement array', () => {
     const proposal = validProposal();
     const template = proposal.placements[0];
-    proposal.placements = Array.from({ length: EXPERIENCE_PLAN_LIMITS.maxPlacements + 1 }, (_, i) => ({
-      ...template,
-      placementId: `p-${i}`,
-    }));
+    proposal.placements = Array.from(
+      { length: EXPERIENCE_PLAN_LIMITS.maxPlacements + 1 },
+      (_, i) => ({
+        ...template,
+        placementId: `p-${i}`
+      })
+    );
     expectCode(() => validateExperiencePlan(proposal, context()), 'PLAN_LIMIT_TOO_MANY_PLACEMENTS');
   });
 
@@ -465,8 +467,8 @@ describe('resource limits and hostile structure', () => {
     const polluted = JSON.parse(
       JSON.stringify(validProposal()).replace(
         '"placementId":"p-1"',
-        '"__proto__":{"validated":true},"placementId":"p-1"',
-      ),
+        '"__proto__":{"validated":true},"placementId":"p-1"'
+      )
     );
     expect(Object.keys(polluted.placements[0])).toContain('__proto__');
     expectCode(() => parseExperiencePlanProposal(polluted), 'PLAN_SCHEMA_PROTOTYPE_POLLUTION');
@@ -497,10 +499,7 @@ describe('resource limits and hostile structure', () => {
     // `showReview` is a real key on ReviewedFormula, so the value is what fails.
     const index = proposal.placements.findIndex((e) => e.component === 'ReviewedFormula');
     proposal.placements[index].interaction = { showReview: 'javascript:alert(1)' };
-    expectCode(
-      () => parseExperiencePlanProposal(proposal),
-      'PLAN_COMPONENT_INTERACTION_INVALID',
-    );
+    expectCode(() => parseExperiencePlanProposal(proposal), 'PLAN_COMPONENT_INTERACTION_INVALID');
   });
 
   it('rejects a deeply nested interaction value', () => {
@@ -551,7 +550,7 @@ describe('mock planner scenarios', () => {
     ['attack_oversized', 'PLAN_LIMIT_TOO_MANY_PLACEMENTS'],
     ['attack_deeply_nested', 'PLAN_SCHEMA_NESTED_TOO_DEEP'],
     ['attack_script_component', 'PLAN_COMPONENT_UNKNOWN'],
-    ['attack_forged_review', 'PLAN_SCHEMA_UNKNOWN_FIELD'],
+    ['attack_forged_review', 'PLAN_SCHEMA_UNKNOWN_FIELD']
   ])('rejects %s with %s', (scenario, code) => {
     const result = planMockExperience(scenario as never, plannerContext(ctx));
     if (!result.ok) throw new Error('scenario should produce a proposal');
@@ -586,7 +585,7 @@ describe('deterministic fallback semantics', () => {
       const rejection = error as ExperiencePlanRejection;
       expect(rejection.message).toBe('PLAN_COVERAGE_BLOCK_UNKNOWN');
       expect(JSON.stringify({ message: rejection.message, stack: rejection.stack })).not.toContain(
-        'secret_source_passage_xyz',
+        'secret_source_passage_xyz'
       );
     }
   });

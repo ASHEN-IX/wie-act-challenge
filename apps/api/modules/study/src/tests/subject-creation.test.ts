@@ -21,7 +21,7 @@ jest.mock('../models', () => ({
   }
 }));
 
-jest.mock('@ednova/shared/moduleClient', () => ({
+jest.mock('@noveris/shared/moduleClient', () => ({
   post: jest.fn().mockRejectedValue(new Error('reward service unavailable'))
 }));
 

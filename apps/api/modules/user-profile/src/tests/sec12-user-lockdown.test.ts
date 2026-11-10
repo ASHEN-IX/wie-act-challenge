@@ -16,10 +16,10 @@ import express from 'express';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const jwt = { sign: require('../../../../tests/sessionFixtures').createSession };
 import request from 'supertest';
-import { authenticate } from '@ednova/shared/auth';
-import { errorHandler } from '@ednova/shared/middleware';
+import { authenticate } from '@noveris/shared/auth';
+import { errorHandler } from '@noveris/shared/middleware';
 
-jest.mock('@ednova/shared', () => ({
+jest.mock('@noveris/shared', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() }
 }));
 jest.mock('../models/UserProfile', () => ({

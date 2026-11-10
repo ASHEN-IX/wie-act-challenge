@@ -10,7 +10,7 @@ import {
   ListChecks,
   Sigma,
 } from "lucide-react";
-import type { LessonBlockV2 } from "@ednova/shared/ednova/learningDocumentV2";
+import type { LessonBlockV2 } from "@noveris/shared/ednova/learningDocumentV2";
 import { Button } from "@/components/ui/button";
 
 type Callout = Extract<LessonBlockV2, { type: "callout" }>;

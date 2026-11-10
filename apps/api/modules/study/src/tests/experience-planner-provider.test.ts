@@ -7,7 +7,7 @@
  */
 jest.mock('../../../../shared/aiClient', () => ({
   __esModule: true,
-  default: { post: jest.fn() },
+  default: { post: jest.fn() }
 }));
 
 import aiClient from '../../../../shared/aiClient';
@@ -17,12 +17,12 @@ import {
   DEFAULT_PLANNER_MODEL,
   configuredPlannerModel,
   realPlanningEnabled,
-  resolvePlannerProvider,
+  resolvePlannerProvider
 } from '../services/experiencePlannerProviders';
 import {
   failureClass,
   NO_USAGE,
-  type BoundedPlanningRequest,
+  type BoundedPlanningRequest
 } from '../../../../shared/ednova/experiencePlannerProvider';
 import { parseExperiencePlanProposal } from '../../../../shared/ednova/experiencePlan';
 
@@ -34,7 +34,7 @@ const request: BoundedPlanningRequest = {
   systemPolicy: 'policy',
   task: 'task',
   outputSchema: { type: 'object' },
-  limits: { maxInputCharacters: 1000, maxOutputTokens: 512, timeoutMs: 5000 },
+  limits: { maxInputCharacters: 1000, maxOutputTokens: 512, timeoutMs: 5000 }
 };
 
 /** A minimal proposal the M4.1 parser accepts, so a "success" path is real. */
@@ -49,10 +49,10 @@ const validProposal = {
     mode: 'read',
     registryVersion: '1.0.0',
     presentationSchemaVersion: '1.0.0',
-    contextFingerprint: 'fnv1a64:0123456789abcdef',
+    contextFingerprint: 'fnv1a64:0123456789abcdef'
   },
   planner: { implementation: 'gemini', version: '1.0.0' },
-  placements: [],
+  placements: []
 };
 
 beforeEach(() => {
@@ -108,8 +108,8 @@ describe('Gemini adapter failure classification', () => {
       data: {
         refused: false,
         output: JSON.stringify(validProposal),
-        usage: { totalTokens: 1234, inputTokens: 1000, outputTokens: 234, modelVersion: 'v1' },
-      },
+        usage: { totalTokens: 1234, inputTokens: 1000, outputTokens: 234, modelVersion: 'v1' }
+      }
     } as never);
     const outcome = await provider().plan(request);
     expect(outcome.ok).toBe(true);
@@ -124,13 +124,13 @@ describe('Gemini adapter failure classification', () => {
 
   it('classifies a typed pre-dispatch refusal as known', async () => {
     post.mockResolvedValue({
-      data: { refused: true, code: 'PROVIDER_BUDGET_UNAVAILABLE' },
+      data: { refused: true, code: 'PROVIDER_BUDGET_UNAVAILABLE' }
     } as never);
     const outcome = await provider().plan(request);
     expect(outcome).toMatchObject({
       ok: false,
       code: 'PROVIDER_BUDGET_UNAVAILABLE',
-      failure: 'known',
+      failure: 'known'
     });
   });
 
@@ -140,7 +140,7 @@ describe('Gemini adapter failure classification', () => {
     expect(outcome).toMatchObject({
       ok: false,
       code: 'PROVIDER_TIMEOUT_AFTER_DISPATCH',
-      failure: 'uncertain',
+      failure: 'uncertain'
     });
   });
 
@@ -158,7 +158,7 @@ describe('Gemini adapter failure classification', () => {
 
   it('classifies malformed JSON as uncertain and keeps the usage it saw', async () => {
     post.mockResolvedValue({
-      data: { refused: false, output: '{"not":"a plan"', usage: { totalTokens: 99 } },
+      data: { refused: false, output: '{"not":"a plan"', usage: { totalTokens: 99 } }
     } as never);
     const outcome = await provider().plan(request);
     expect(outcome).toMatchObject({ ok: false, code: 'PROVIDER_MALFORMED_JSON' });
@@ -167,7 +167,7 @@ describe('Gemini adapter failure classification', () => {
 
   it('classifies schema-incompatible output as uncertain', async () => {
     post.mockResolvedValue({
-      data: { refused: false, output: JSON.stringify({ hello: 'world' }), usage: {} },
+      data: { refused: false, output: JSON.stringify({ hello: 'world' }), usage: {} }
     } as never);
     const outcome = await provider().plan(request);
     expect(outcome).toMatchObject({ code: 'PROVIDER_SCHEMA_INCOMPATIBLE', failure: 'uncertain' });
@@ -181,7 +181,7 @@ describe('Gemini adapter failure classification', () => {
 
   it('never reports cost when the provider did not report usage', async () => {
     post.mockResolvedValue({
-      data: { refused: false, output: JSON.stringify(validProposal), usage: {} },
+      data: { refused: false, output: JSON.stringify(validProposal), usage: {} }
     } as never);
     const outcome = await provider().plan(request);
     expect(outcome.ok).toBe(true);
@@ -194,7 +194,7 @@ describe('Gemini adapter failure classification', () => {
 
   it('never sends an Authorization header or browser cookie through the boundary', async () => {
     post.mockResolvedValue({
-      data: { refused: false, output: JSON.stringify(validProposal), usage: {} },
+      data: { refused: false, output: JSON.stringify(validProposal), usage: {} }
     } as never);
     await provider().plan(request);
     const [, payload, config] = post.mock.calls[0];
@@ -207,7 +207,10 @@ describe('Gemini adapter failure classification', () => {
 
 describe('mock adapter through the same contract', () => {
   it('is disabled unless the mock flag is set', async () => {
-    const mock = new MockExperiencePlannerProvider(async () => validProposal as never, () => false);
+    const mock = new MockExperiencePlannerProvider(
+      async () => validProposal as never,
+      () => false
+    );
     const outcome = await mock.plan(request);
     expect(outcome).toMatchObject({ code: 'PROVIDER_DISABLED', failure: 'known' });
   });
@@ -215,7 +218,7 @@ describe('mock adapter through the same contract', () => {
   it('reports no usage, which must not be read as zero cost', async () => {
     const mock = new MockExperiencePlannerProvider(
       async () => parseExperiencePlanProposal(validProposal),
-      () => true,
+      () => true
     );
     const outcome = await mock.plan(request);
     expect(outcome.ok).toBe(true);
@@ -237,7 +240,7 @@ describe('failure classification table', () => {
       'PROVIDER_BUDGET_UNAVAILABLE',
       'PROVIDER_APPROVAL_MISSING',
       'PROVIDER_CREDENTIAL_MISMATCH',
-      'PROVIDER_CANCELLED_BEFORE_DISPATCH',
+      'PROVIDER_CANCELLED_BEFORE_DISPATCH'
     ] as const)
       expect(failureClass(code)).toBe('known');
   });
@@ -250,7 +253,7 @@ describe('failure classification table', () => {
       'PROVIDER_MALFORMED_JSON',
       'PROVIDER_EMPTY_OUTPUT',
       'PROVIDER_TRUNCATED_OUTPUT',
-      'PROVIDER_CANCELLED_AFTER_DISPATCH',
+      'PROVIDER_CANCELLED_AFTER_DISPATCH'
     ] as const)
       expect(failureClass(code)).toBe('uncertain');
   });

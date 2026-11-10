@@ -1,4 +1,4 @@
-import moduleClient from '@ednova/shared/moduleClient';
+import moduleClient from '@noveris/shared/moduleClient';
 
 /** Reuse the owning study module's current membership/source decision. */
 export async function verifySessionMembership(

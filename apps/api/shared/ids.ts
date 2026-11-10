@@ -38,5 +38,3 @@ export function sameId(a: unknown, b: unknown): boolean {
   if (a === null || a === undefined || b === null || b === undefined) return a === b;
   return String(a).toLowerCase() === String(b).toLowerCase();
 }
-
-module.exports = { newId, deterministicId, isId, sameId };

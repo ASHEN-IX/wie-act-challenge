@@ -23,7 +23,7 @@ jest.mock('../models/AiJob', () => ({
   findOne: jest.fn(),
   deleteOne: jest.fn()
 }));
-jest.mock('@ednova/shared/ai-messaging', () => ({
+jest.mock('@noveris/shared/ai-messaging', () => ({
   publishAiJob: jest.fn(),
   AI_JOB_TYPES: [
     'study.plan.generate',
@@ -39,7 +39,7 @@ jest.mock('../services/objectiveContext', () => ({
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const AiJob = require('../models/AiJob');
-import { publishAiJob } from '@ednova/shared/ai-messaging';
+import { publishAiJob } from '@noveris/shared/ai-messaging';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { resolveObjectiveContext } = require('../services/objectiveContext');
 

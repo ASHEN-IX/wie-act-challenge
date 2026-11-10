@@ -1,11 +1,11 @@
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Prisma } from '../../../../src/generated/prisma/client';
-import { createContracts } from '@ednova/shared/domainContracts';
+import { createContracts } from '@noveris/shared/domainContracts';
 import Joi from 'joi';
 import type { Response, NextFunction } from 'express';
 import Notification from '../models/Notification';
 import { isEmailEnabled, sendNotificationEmail } from '../services/emailService';
-import { requireInternal } from '@ednova/shared/auth';
+import { requireInternal } from '@noveris/shared/auth';
 import {
   broadcastToSession as realtimeBroadcastToSession,
   broadcastToUser as realtimeBroadcastToUser
@@ -168,7 +168,7 @@ router.post(
       const payload = {
         type: req.body?.type || 'system',
         title: req.body?.title || 'Test Email Notification',
-        message: req.body?.message || 'This is a test email from EdNova.',
+        message: req.body?.message || 'This is a test email from Noveris.',
         metadata: req.body?.metadata || {}
       };
 

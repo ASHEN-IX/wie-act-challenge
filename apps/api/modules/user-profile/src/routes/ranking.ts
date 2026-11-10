@@ -1,7 +1,7 @@
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response, NextFunction } from 'express';
 import type { IUserRankProfile } from '../models/UserRankProfile';
-import { createContracts } from '@ednova/shared/domainContracts';
+import { createContracts } from '@noveris/shared/domainContracts';
 import Joi from 'joi';
 import {
   getOrCreateActiveSeason,
@@ -16,7 +16,7 @@ import {
   startSeason,
   closeSeasonAndStartNext
 } from '../services/rankingService';
-import { requireInternal } from '@ednova/shared/auth';
+import { requireInternal } from '@noveris/shared/auth';
 
 const router = createContracts();
 

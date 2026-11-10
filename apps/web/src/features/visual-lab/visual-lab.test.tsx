@@ -3,12 +3,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
   graphTrace,
   parseWeightedGraphScenario,
-} from "@ednova/shared/visualLab/graph";
+} from "@noveris/shared/visualLab/graph";
 import {
   fallbackCandidate,
   buildStoredLab,
   toPublicLab,
-} from "@ednova/shared/visualLab/definition";
+} from "@noveris/shared/visualLab/definition";
 import {
   decodeVisualLab,
   decodeCheckResult,

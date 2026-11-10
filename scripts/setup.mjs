@@ -54,6 +54,7 @@ create('apps/ai/.env', {
   RABBITMQ_URL: broker,
   REDIS_URL: redis, AI_SERVICE_API_KEY: serviceKey,
   INGEST_UPLOADS_DIR: uploads, FAISS_INDEX_DIR: indexes,
+  APP_ENV: 'development',
   LLM_MOCK: '1'
 });
 console.log('Local setup uses mock inference explicitly. Configure approved providers before real-model acceptance. Run pnpm dev:doctor next.');

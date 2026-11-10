@@ -26,7 +26,7 @@ jest.mock('../models/Gamification', () => ({
   __esModule: true,
   default: { findMany: jest.fn(), findOne: jest.fn() }
 }));
-jest.mock('@ednova/shared/moduleClient', () => ({
+jest.mock('@noveris/shared/moduleClient', () => ({
   __esModule: true,
   default: { get: jest.fn(), post: jest.fn().mockResolvedValue({}) }
 }));
@@ -35,7 +35,7 @@ jest.mock('@ednova/shared/moduleClient', () => ({
 const Friendship = require('../models/Friendship').default;
 const UserProfile = require('../models/UserProfile').default;
 const Gamification = require('../models/Gamification').default;
-const moduleClient = require('@ednova/shared/moduleClient').default;
+const moduleClient = require('@noveris/shared/moduleClient').default;
 const friendsRoutes = require('../routes/friends');
 /* eslint-enable @typescript-eslint/no-require-imports */
 

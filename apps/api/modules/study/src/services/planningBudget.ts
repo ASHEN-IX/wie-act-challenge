@@ -69,8 +69,7 @@ export async function reservePlanningBudget(input: {
   reservedTokens?: number;
 }): Promise<Reservation> {
   const reservedTokens = input.reservedTokens ?? PLANNING_RESERVED_TOKENS;
-  if (!Number.isSafeInteger(reservedTokens) || reservedTokens <= 0)
-    throw new PlanningBudgetError();
+  if (!Number.isSafeInteger(reservedTokens) || reservedTokens <= 0) throw new PlanningBudgetError();
 
   const updated = await withBudget(async () => {
     // The ledger row is created on first use; a concurrent creator is harmless.
@@ -145,8 +144,7 @@ export async function releaseUndispatchedReservation(input: {
 }): Promise<{ released: boolean; refunded: number }> {
   if (!Number.isSafeInteger(input.reservedTokens) || input.reservedTokens <= 0)
     return { released: false, refunded: 0 };
-  if (!/^[A-Za-z0-9_.:-]{8,128}$/.test(input.releaseToken))
-    return { released: false, refunded: 0 };
+  if (!/^[A-Za-z0-9_.:-]{8,128}$/.test(input.releaseToken)) return { released: false, refunded: 0 };
 
   // The release marker lives on the ledger row. Its uniqueness is what makes a
   // second concurrent release a no-op rather than a second refund.
@@ -194,7 +192,7 @@ async function reconcile(input: {
 
 /** Read the ledger for diagnostics. Never returns credentials. */
 export async function planningBudgetStatus(
-  approvalId: string,
+  approvalId: string
 ): Promise<{ usedTokens: number; maxTokens: number } | null> {
   const row = await withBudget(() =>
     prisma.llmApprovalBudget.findUnique({ where: { id: approvalId } })

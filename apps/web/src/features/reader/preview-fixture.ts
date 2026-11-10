@@ -6,13 +6,13 @@
  * reachable from the development-only preview route.
  */
 
-import type { LessonBlockV2 } from '@ednova/shared/ednova/learningDocumentV2';
-import type { PublishedStructuredAssetV1 } from '@ednova/shared/ednova/structuredAsset';
+import type { LessonBlockV2 } from '@noveris/shared/ednova/learningDocumentV2';
+import type { PublishedStructuredAssetV1 } from '@noveris/shared/ednova/structuredAsset';
 import {
   buildPublishedPresentation,
   type PublishedPresentationV1,
   type PresentationBuildInput,
-} from '@ednova/shared/ednova/presentationDocument';
+} from '@noveris/shared/ednova/presentationDocument';
 
 const courseId = 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d';
 const revisionId = 'rev_batch3_preview';

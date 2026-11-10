@@ -3,7 +3,7 @@ import {
   parseContract,
   parseRecipient,
   type Contract,
-} from "@ednova/shared/ednova/contracts";
+} from "@noveris/shared/ednova/contracts";
 export type ActivityDefinition = Contract<"ActivityDefinition">;
 export function decodeActivityDefinition(value: unknown): ActivityDefinition {
   return parseContract("ActivityDefinition", value);

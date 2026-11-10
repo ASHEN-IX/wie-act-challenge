@@ -86,7 +86,10 @@ const union =
   };
 const version = enumeration('1.0.0');
 const id = text(128, /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/);
-const courseId = text(36, /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+const courseId = text(
+  36,
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+);
 const uuid = text(36, /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
 const hash = text(71, /^sha256:[a-f0-9]{64}$/);
 const time = refine(

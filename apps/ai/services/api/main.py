@@ -25,7 +25,7 @@ from services.api.routers.nardouch import router as nardouch_router
 from services.api.routers.experience_planner import router as experience_planner_router
 from utils.llm_client import get_provider_status
 
-app = FastAPI(title="EdNova AI API", version="1.0.0")
+app = FastAPI(title="Noveris AI API", version="1.0.0")
 
 # CORS configuration
 app.add_middleware(

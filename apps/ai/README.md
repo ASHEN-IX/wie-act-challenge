@@ -1,8 +1,8 @@
-# EdNova AI — course ingestion and learning services
+# Noveris AI service — course ingestion and learning agents
 
 Independent Python FastAPI and RabbitMQ workers. See [AI operations](../docs/ai-service.md) for compatible Python/Poetry setup, separate HTTP/worker launch, secrets and uploads; [AI specification](../docs/ai-specification.md) distinguishes actual agents/models/fallback from the PLANNED peer facilitator.
 
-The audit implemented no AI features and did not change model configuration. Missing provider credentials may return mocks or deterministic fallbacks. See [executed validation](../docs/audit/validation.md) before relying on historical test/completion claims.
+Without provider credentials the service runs in explicit mock mode (`LLM_MOCK=1`); real calls require an operator-issued, bounded approval from the API ledger. See [model configuration](../docs/llm-config.md).
 
 ## Docker dependencies and build cache
 
@@ -73,5 +73,5 @@ The worker also requires `DEEPGRAM_API_KEY`, `CARTESIA_API_KEY`, and
 
 When the presenter requests moderation, the worker subscribes to authorized
 microphone tracks. Deepgram transcribes the audio and Cartesia speaks prompts
-selected by EdNova's peer-first policy. The worker keeps a bounded turn
+selected by Noveris's peer-first policy. The worker keeps a bounded turn
 transcript in memory and does not write room audio or transcripts to disk.

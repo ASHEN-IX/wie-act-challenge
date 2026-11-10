@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { CourseNardouchJourney } from "@ednova/shared/ednova/nardouchGrowth";
+import type { CourseNardouchJourney } from "@noveris/shared/ednova/nardouchGrowth";
 import { nardouchImage, stages } from "@/lib/brand";
 import { NardouchAvatar } from "@/components/brand/nardouch-avatar";
 vi.mock("./course-growth-actions", () => ({

@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Check, GraduationCap, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { nardouchImage, stages } from "@/lib/brand";
-import type { CourseNardouchJourney } from "@ednova/shared/ednova/nardouchGrowth";
+import type { CourseNardouchJourney } from "@noveris/shared/ednova/nardouchGrowth";
 import {
   finishNardouchLesson,
   loadCourseNardouch,

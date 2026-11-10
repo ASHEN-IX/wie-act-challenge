@@ -117,7 +117,7 @@ def _respond(req, vector_store):
         max_tokens=2400,
         trace_id=req.traceId,
         return_metadata=True,
-        mock_fn=mock_answer,
+        mock_fn=mock_answer if os.getenv("APP_ENV") in {"development", "test"} else None,
     )
     answer = GeneratedAnswer.model_validate_json(result.text)
     if not answer.displayText.strip() or any(

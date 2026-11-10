@@ -1,5 +1,5 @@
 """
-Structured logging utility for the EdNova AI service.
+Structured logging utility for the Noveris AI service.
 
 Replaces all print() calls with structured JSON logs compatible with
 Datadog, Loki, CloudWatch, or any JSON-aware log aggregator.

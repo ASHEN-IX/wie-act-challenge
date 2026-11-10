@@ -1,6 +1,6 @@
 import type { Response } from 'express';
 import type { DomainRequest } from '../../../../src/framework/contracts';
-import { createContracts } from '@ednova/shared/domainContracts';
+import { createContracts } from '@noveris/shared/domainContracts';
 import { awardAcceptedLearningEvidence, learningRewardSummary } from '../services/learningRewards';
 const router = createContracts();
 function failure(res: Response, error: unknown) {

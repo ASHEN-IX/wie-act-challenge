@@ -2,7 +2,7 @@
 
 import { useRef, useState, type ReactNode } from "react";
 import { Check, ChevronDown, Lightbulb, MessageCircleQuestion, Sparkles } from "lucide-react";
-import type { LessonBlockV2 } from "@ednova/shared/ednova/learningDocumentV2";
+import type { LessonBlockV2 } from "@noveris/shared/ednova/learningDocumentV2";
 import { Button } from "@/components/ui/button";
 import { askLearningTutor } from "@/features/learning/journey-actions";
 import { learningErrorMessage } from "@/features/learning/learning-errors";

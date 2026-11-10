@@ -1,5 +1,5 @@
 {
-  "name": "@ednova/study-service",
+  "name": "@noveris/study-service",
   "version": "1.0.0",
   "description": "Study Management Microservice - Sessions, Tasks, Topics",
   "main": "index.ts",
@@ -9,7 +9,7 @@
     "lint": "eslint src/**/*.ts"
   },
   "dependencies": {
-    "@ednova/shared": "workspace:*",
+    "@noveris/shared": "workspace:*",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "form-data": "^4.0.0",

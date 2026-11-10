@@ -12,14 +12,14 @@ import {
   parsePreferences,
   type AdaptationEvidence,
   type AdaptationPreferences,
-  type LessonSupport,
+  type LessonSupport
 } from '../../../../shared/ednova/learningAdaptation';
 import {
   evaluateAdaptation,
   shouldSurface,
   adaptationFingerprint,
   ADAPTATION_TTL_MS,
-  type PolicyInput,
+  type PolicyInput
 } from '../../../../shared/ednova/adaptationPolicy';
 import type { LearningMode } from '../../../../shared/ednova/learningModes';
 
@@ -36,7 +36,7 @@ function support(overrides: Partial<LessonSupport> = {}): LessonSupport {
     hasEligibleAsset: false,
     hasProofMaterial: false,
     hasWorkedExamples: false,
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -52,7 +52,7 @@ function evidence(overrides: Partial<AdaptationEvidence> = {}): AdaptationEviden
     objectiveId: 'obj-1',
     mastered: false,
     evaluatorVersion: '1.0.0',
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -67,13 +67,13 @@ function input(overrides: Partial<PolicyInput> = {}): PolicyInput {
     support: support(),
     evidenceFingerprint: 'fnv1a64:0123456789abcdef',
     now,
-    ...overrides,
+    ...overrides
   };
 }
 
 const evaluate = (
   overrides: Partial<PolicyInput> = {},
-  lessonObjectiveIds: readonly string[] = ['obj-1'],
+  lessonObjectiveIds: readonly string[] = ['obj-1']
 ) => evaluateAdaptation(input(overrides), lessonObjectiveIds);
 
 describe('rule 1 — recommendations disabled', () => {
@@ -81,7 +81,7 @@ describe('rule 1 — recommendations disabled', () => {
     const result = evaluate({
       preferences: prefs({ recommendationsEnabled: false, preferDetailedProofs: true }),
       support: support({ hasProofMaterial: true }),
-      evidence: [evidence()],
+      evidence: [evidence()]
     });
     expect(result.recommendedMode).toBeNull();
     expect(result.reason).toBeNull();
@@ -100,7 +100,7 @@ describe('rule 2 — explicit mode preference', () => {
     // Explore is not offered because no validated plan exists for it.
     const result = evaluate({
       preferences: prefs({ preferredMode: 'explore' }),
-      support: support({ availableModes: ['read', 'guided'] }),
+      support: support({ availableModes: ['read', 'guided'] })
     });
     expect(result.recommendedMode).toBeNull();
     expect(result.reason).toBe('preference_unavailable_for_lesson');
@@ -115,7 +115,7 @@ describe('rule 2 — explicit mode preference', () => {
     const result = evaluate({
       preferences: prefs({ preferredMode: 'deep_dive' }),
       support: support({ hasProofMaterial: true }),
-      evidence: [evidence({ mastered: false })],
+      evidence: [evidence({ mastered: false })]
     });
     expect(result.reason).toBe('explicit_preference');
     expect(result.objectiveIds).toEqual([]);
@@ -126,7 +126,7 @@ describe('rule 3 — guided explanation request', () => {
   it('offers Guided when the learner asked for explanation and examples exist', () => {
     const result = evaluate({
       preferences: prefs({ preferWorkedExamples: true }),
-      support: support({ hasWorkedExamples: true }),
+      support: support({ hasWorkedExamples: true })
     });
     expect(result.recommendedMode).toBe('guided');
     expect(result.reason).toBe('guided_requested');
@@ -135,7 +135,7 @@ describe('rule 3 — guided explanation request', () => {
   it('does not offer Guided when the lesson has no worked examples', () => {
     const result = evaluate({
       preferences: prefs({ preferWorkedExamples: true }),
-      support: support({ hasWorkedExamples: false }),
+      support: support({ hasWorkedExamples: false })
     });
     expect(result.recommendedMode).toBeNull();
     expect(result.reason).toBe('neutral_default');
@@ -146,7 +146,7 @@ describe('rule 4 — detailed proof request', () => {
   it('offers Deep Dive when proof material exists', () => {
     const result = evaluate({
       preferences: prefs({ preferDetailedProofs: true }),
-      support: support({ hasProofMaterial: true }),
+      support: support({ hasProofMaterial: true })
     });
     expect(result.recommendedMode).toBe('deep_dive');
     expect(result.reason).toBe('proof_material_requested');
@@ -155,7 +155,7 @@ describe('rule 4 — detailed proof request', () => {
   it('does not offer Deep Dive without proof material', () => {
     const result = evaluate({
       preferences: prefs({ preferDetailedProofs: true }),
-      support: support({ hasProofMaterial: false }),
+      support: support({ hasProofMaterial: false })
     });
     expect(result.recommendedMode).toBeNull();
   });
@@ -165,7 +165,7 @@ describe('rule 5 — visual exploration request', () => {
   it('offers Explore only when a review-verified asset exists', () => {
     const result = evaluate({
       preferences: prefs({ preferVisualExploration: true }),
-      support: support({ hasEligibleAsset: true }),
+      support: support({ hasEligibleAsset: true })
     });
     expect(result.recommendedMode).toBe('explore');
     expect(result.reason).toBe('visual_asset_available');
@@ -176,7 +176,7 @@ describe('rule 5 — visual exploration request', () => {
     // manufactured difference.
     const result = evaluate({
       preferences: prefs({ preferVisualExploration: true }),
-      support: support({ hasEligibleAsset: false }),
+      support: support({ hasEligibleAsset: false })
     });
     expect(result.recommendedMode).toBeNull();
     expect(result.reason).toBe('neutral_default');
@@ -206,7 +206,7 @@ describe('rule 6 — accepted assessment evidence', () => {
   it('ignores evidence when the learner disallowed assessment evidence', () => {
     const result = evaluate({
       preferences: prefs({ allowAssessmentEvidence: false }),
-      evidence: [evidence({ mastered: false })],
+      evidence: [evidence({ mastered: false })]
     });
     expect(result.recommendedMode).toBeNull();
     expect(result.reason).toBe('neutral_default');
@@ -216,20 +216,23 @@ describe('rule 6 — accepted assessment evidence', () => {
     const result = evaluate({
       evidence: [
         evidence({ evidenceClass: 'interaction_state' }),
-        evidence({ evidenceClass: 'inference' }),
-      ],
+        evidence({ evidenceClass: 'inference' })
+      ]
     });
     expect(result.recommendedMode).toBeNull();
     expect(result.reason).toBe('neutral_default');
   });
 
   it('names only objectives that genuinely lack mastery', () => {
-    const result = evaluate({
-      evidence: [
-        evidence({ objectiveId: 'obj-1', mastered: false }),
-        evidence({ objectiveId: 'obj-2', mastered: true }),
-      ],
-    }, ['obj-1', 'obj-2']);
+    const result = evaluate(
+      {
+        evidence: [
+          evidence({ objectiveId: 'obj-1', mastered: false }),
+          evidence({ objectiveId: 'obj-2', mastered: true })
+        ]
+      },
+      ['obj-1', 'obj-2']
+    );
     expect(result.objectiveIds).toEqual(['obj-1']);
   });
 });
@@ -256,7 +259,7 @@ describe('determinism and explainability', () => {
       revisionId,
       lessonId,
       preferences: prefs(),
-      availableModes: allModes,
+      availableModes: allModes
     };
     const a = adaptationFingerprint({ ...base, evidence: [evidence({ mastered: false })] });
     const b = adaptationFingerprint({ ...base, evidence: [evidence({ mastered: true })] });
@@ -287,22 +290,29 @@ describe('the record validates strictly', () => {
 
   it('rejects a record for another course or revision', () => {
     const record = evaluate();
-    expect(() => parseLearningAdaptation(record, { ...binding, courseId: '1b083a5b-c476-5351-93ed-34d5f0615103' })).toThrow();
-    expect(() => parseLearningAdaptation(record, { ...binding, revisionId: 'rev_other' })).toThrow();
+    expect(() =>
+      parseLearningAdaptation(record, {
+        ...binding,
+        courseId: '1b083a5b-c476-5351-93ed-34d5f0615103'
+      })
+    ).toThrow();
+    expect(() =>
+      parseLearningAdaptation(record, { ...binding, revisionId: 'rev_other' })
+    ).toThrow();
     expect(() => parseLearningAdaptation(record, { ...binding, lessonId: 'lesson-2' })).toThrow();
   });
 
   it('rejects an unknown field', () => {
     const record = evaluate();
     expect(() =>
-      parseLearningAdaptation({ ...record, inferredAbility: 'high' }, binding),
+      parseLearningAdaptation({ ...record, inferredAbility: 'high' }, binding)
     ).toThrow();
   });
 
   it('rejects a recommendation for a mode that is not eligible', () => {
     const record = evaluate({ preferences: prefs({ preferredMode: 'guided' }) });
     expect(() =>
-      parseLearningAdaptation({ ...record, eligibleModes: ['read'] }, binding),
+      parseLearningAdaptation({ ...record, eligibleModes: ['read'] }, binding)
     ).toThrow();
   });
 
@@ -327,14 +337,14 @@ describe('the record validates strictly', () => {
   it('rejects a recommendation carrying a neutral reason', () => {
     const record = evaluate({ preferences: prefs({ preferredMode: 'guided' }) });
     expect(() =>
-      parseLearningAdaptation({ ...record, reason: 'neutral_default' }, binding),
+      parseLearningAdaptation({ ...record, reason: 'neutral_default' }, binding)
     ).toThrow();
   });
 
   it('rejects an unknown reason code', () => {
     const record = evaluate({ preferences: prefs({ preferredMode: 'guided' }) });
     expect(() =>
-      parseLearningAdaptation({ ...record, reason: 'learner_is_struggling' }, binding),
+      parseLearningAdaptation({ ...record, reason: 'learner_is_struggling' }, binding)
     ).toThrow();
   });
 });
@@ -342,7 +352,7 @@ describe('the record validates strictly', () => {
 describe('preference parsing', () => {
   it('accepts a partial update', () => {
     expect(parsePreferences({ preferDetailedProofs: true })).toEqual({
-      preferDetailedProofs: true,
+      preferDetailedProofs: true
     });
   });
 

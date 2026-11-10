@@ -18,7 +18,8 @@ describe('learning style probe balance', () => {
   it('gives every style exactly three options across the probe', () => {
     const counts = new Map<string, number>(LEARNING_STYLES.map((s) => [s, 0]));
     for (const question of LEARNING_STYLE_PROBE)
-      for (const option of question.options) counts.set(option.style, (counts.get(option.style) ?? 0) + 1);
+      for (const option of question.options)
+        counts.set(option.style, (counts.get(option.style) ?? 0) + 1);
     for (const style of LEARNING_STYLES) expect(counts.get(style)).toBe(3);
   });
 

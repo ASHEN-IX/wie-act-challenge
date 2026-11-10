@@ -401,7 +401,11 @@ export function deterministicGuidance(
   }
   if (engine === 'function_plot') {
     const fp = state as
-      | { values?: { a: number; b: number; c: number }; vertex?: { x: number; y: number }; roots?: number[] }
+      | {
+          values?: { a: number; b: number; c: number };
+          vertex?: { x: number; y: number };
+          roots?: number[];
+        }
       | undefined;
     const now =
       fp?.values && fp.vertex

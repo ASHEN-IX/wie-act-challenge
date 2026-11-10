@@ -13,9 +13,9 @@ const exitSpy = jest.spyOn(process, 'exit').mockImplementation((code): never => 
 afterAll(() => exitSpy.mockRestore());
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const moduleClient = require('@ednova/shared/moduleClient');
+const moduleClient = require('@noveris/shared/moduleClient');
 
-jest.mock('@ednova/shared/moduleClient');
+jest.mock('@noveris/shared/moduleClient');
 
 jest.mock('../models/FocusSession', () => ({
   create: jest.fn(),
@@ -24,7 +24,7 @@ jest.mock('../models/FocusSession', () => ({
   updateOne: jest.fn()
 }));
 
-jest.mock('@ednova/shared/auth', () => ({
+jest.mock('@noveris/shared/auth', () => ({
   authenticate: jest.fn(
     (req: DomainRequest & { userTier?: string }, _res: Response, next: NextFunction) => {
       req.user = { userId: 'test-user-123', role: 'student' };
@@ -33,7 +33,7 @@ jest.mock('@ednova/shared/auth', () => ({
   )
 }));
 
-jest.mock('@ednova/shared', () => ({
+jest.mock('@noveris/shared', () => ({
   corsMiddleware: jest.fn(
     () => (_req: DomainRequest & { userTier?: string }, _res: Response, next: NextFunction) =>
       next()

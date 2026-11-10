@@ -10,11 +10,11 @@ import type {
   LabGuidance,
   LabSourceContext,
   PublicVisualLab,
-} from "@ednova/shared/visualLab/types";
-import { parseWeightedGraphScenario } from "@ednova/shared/visualLab/graph";
-import { parseParameterScenario } from "@ednova/shared/visualLab/parameter-models";
-import { parseFunctionScenario } from "@ednova/shared/visualLab/function-models";
-import { parseSpatialScenario } from "@ednova/shared/visualLab/spatial-models";
+} from "@noveris/shared/visualLab/types";
+import { parseWeightedGraphScenario } from "@noveris/shared/visualLab/graph";
+import { parseParameterScenario } from "@noveris/shared/visualLab/parameter-models";
+import { parseFunctionScenario } from "@noveris/shared/visualLab/function-models";
+import { parseSpatialScenario } from "@noveris/shared/visualLab/spatial-models";
 
 export type { PublicVisualLab };
 

@@ -44,7 +44,7 @@ jest.mock('../../../ai-orchestrator/src/models/AiJob', () => ({
   default: { findOne: mockAiJobFindOne }
 }));
 
-jest.mock('@ednova/shared/moduleClient', () => ({
+jest.mock('@noveris/shared/moduleClient', () => ({
   post: jest.fn(),
   get: jest.fn()
 }));
@@ -56,7 +56,7 @@ jest.mock('../utils/gamificationService', () => ({
 
 import request from 'supertest';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const moduleClient = require('@ednova/shared/moduleClient');
+const moduleClient = require('@noveris/shared/moduleClient');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { StudySession } = require('../models/index');
 import { fetchGamificationProfile } from '../utils/gamificationService';

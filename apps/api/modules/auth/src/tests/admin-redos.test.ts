@@ -45,7 +45,7 @@ jest.mock('../models/Payment', () => ({
   __esModule: true,
   default: { findMany: jest.fn(), findById: jest.fn(), countDocuments: jest.fn() }
 }));
-jest.mock('@ednova/shared/auth', () => ({
+jest.mock('@noveris/shared/auth', () => ({
   requireRole: () => (req: Request, res: Response, next: NextFunction) => next()
 }));
 

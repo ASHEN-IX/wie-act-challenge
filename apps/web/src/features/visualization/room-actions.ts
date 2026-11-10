@@ -4,7 +4,7 @@ import { requireIdentity } from "@/server/identity";
 import {
   parseBinarySearchState,
   type BinarySearchState,
-} from "@ednova/shared/visualization";
+} from "@noveris/shared/visualization";
 
 export async function loadRoomVisualization(roomId: string) {
   await requireIdentity();

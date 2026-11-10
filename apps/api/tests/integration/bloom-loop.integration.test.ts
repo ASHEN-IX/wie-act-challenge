@@ -257,7 +257,12 @@ describe('BLOOM-12 end-to-end loop (real Mongo + real services)', () => {
       // The identity is (user, topic, knowledgeType, bloomLevel); the row's own
       // fields belong to the write, not the filter, or the upsert creates nothing.
       await CompetencyProfile.updateOne(
-        { userId: USER, topicId: TOPIC_B, knowledgeType: row.knowledgeType, bloomLevel: row.bloomLevel },
+        {
+          userId: USER,
+          topicId: TOPIC_B,
+          knowledgeType: row.knowledgeType,
+          bloomLevel: row.bloomLevel
+        },
         { $set: { score: row.score, confidence: 0.4, evidence: [], updatedAt: new Date() } },
         { upsert: true }
       );

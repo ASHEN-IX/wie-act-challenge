@@ -3,7 +3,7 @@ import {
   buildPresentationPlan,
   isReaderMode,
   plansEqual,
-  type PlanLessonInput,
+  type PlanLessonInput
 } from '../../../../shared/ednova/presentationPlan';
 
 const sourceMeta = {
@@ -13,7 +13,7 @@ const sourceMeta = {
   extractionMethod: 'text' as const,
   confidence: 0.9,
   reviewRequired: false,
-  issues: [],
+  issues: []
 };
 
 const lesson = (blocks: LessonBlockV2[]): PlanLessonInput => ({
@@ -22,15 +22,13 @@ const lesson = (blocks: LessonBlockV2[]): PlanLessonInput => ({
   blocks: blocks.map((block) => ({
     id: block.id,
     render:
-      block.type === 'math' && !block.review
-        ? ('source_faithful' as const)
-        : ('primary' as const),
+      block.type === 'math' && !block.review ? ('source_faithful' as const) : ('primary' as const),
     reason:
       block.type === 'math' && !block.review
         ? ('unreviewed_formula' as const)
         : ('extracted_content' as const),
-    block,
-  })),
+    block
+  }))
 });
 
 const plan = (blocks: LessonBlockV2[], mode: 'read' | 'explore' | 'practice' = 'read') =>
@@ -39,14 +37,14 @@ const plan = (blocks: LessonBlockV2[], mode: 'read' | 'explore' | 'practice' = '
     revisionId: 'rev_1',
     contentHash: 'sha256:' + 'b'.repeat(64),
     mode,
-    lessons: [lesson(blocks)],
+    lessons: [lesson(blocks)]
   });
 
 describe('deterministic presentation plan', () => {
   it('is reproducible for identical inputs', () => {
     const blocks: LessonBlockV2[] = [
       { type: 'heading', id: 'h1', level: 2, text: 'Chapter' },
-      { type: 'paragraph', id: 'p1', text: 'Prose.', evidence: ['c1'] },
+      { type: 'paragraph', id: 'p1', text: 'Prose.', evidence: ['c1'] }
     ];
     expect(plansEqual(plan(blocks), plan(blocks))).toBe(true);
   });
@@ -56,7 +54,7 @@ describe('deterministic presentation plan', () => {
       { type: 'heading', id: 'a', level: 2, text: 'One' },
       { type: 'paragraph', id: 'b', text: 'Two', evidence: ['c1'] },
       { type: 'list', id: 'c', ordered: false, items: ['x'], evidence: ['c1'] },
-      { type: 'quote', id: 'd', text: 'Three', evidence: ['c1'] },
+      { type: 'quote', id: 'd', text: 'Three', evidence: ['c1'] }
     ];
     const result = plan(blocks);
     expect(result.lessons[0].instances.map((i) => i.blockId)).toEqual(['a', 'b', 'c', 'd']);
@@ -75,9 +73,9 @@ describe('deterministic presentation plan', () => {
           state: 'accepted',
           originalExpression: 'X un',
           modelExpression: '\\sum u_n',
-          reviewer: 'instructor',
-        },
-      },
+          reviewer: 'instructor'
+        }
+      }
     ]);
     expect(result.lessons[0].instances[0].component).toBe('ReviewedFormula');
     expect(result.lessons[0].instances[0].selection).toBe('reviewed_math');
@@ -85,7 +83,7 @@ describe('deterministic presentation plan', () => {
 
   it('never typesets unreviewed mathematics as primary', () => {
     const result = plan([
-      { type: 'math', id: 'm1', expression: '∫ f x dx', notation: 'plain', sourceMeta },
+      { type: 'math', id: 'm1', expression: '∫ f x dx', notation: 'plain', sourceMeta }
     ]);
     const instance = result.lessons[0].instances[0];
     expect(instance.component).toBe('SourceMathFallback');
@@ -105,9 +103,9 @@ describe('deterministic presentation plan', () => {
           state: 'corrected',
           originalExpression: 'a=b',
           modelExpression: '\\begin{aligned}a&=b\\end{aligned}',
-          reviewer: 'instructor',
-        },
-      },
+          reviewer: 'instructor'
+        }
+      }
     ]);
     expect(reviewed.lessons[0].instances[0].component).toBe('DerivationBlock');
     // The same text without review stays a source fallback.
@@ -116,8 +114,8 @@ describe('deterministic presentation plan', () => {
         type: 'math',
         id: 'd2',
         expression: '\\begin{aligned} a &= b \\\\ c &= d \\end{aligned}',
-        notation: 'latex',
-      },
+        notation: 'latex'
+      }
     ]);
     expect(unreviewed.lessons[0].instances[0].component).toBe('SourceMathFallback');
   });
@@ -133,11 +131,11 @@ describe('deterministic presentation plan', () => {
       ['example', 'ExampleBlock'],
       ['exercise', 'ExerciseBlock'],
       ['remark', 'ImportantNote'],
-      ['guidance', 'ImportantNote'],
+      ['guidance', 'ImportantNote']
     ] as const;
     for (const [kind, expected] of roles) {
       const result = plan([
-        { type: 'callout', id: `c-${kind}`, kind, text: 'Body', evidence: ['c1'] },
+        { type: 'callout', id: `c-${kind}`, kind, text: 'Body', evidence: ['c1'] }
       ]);
       expect(result.lessons[0].instances[0].component).toBe(expected);
     }
@@ -145,7 +143,7 @@ describe('deterministic presentation plan', () => {
 
   it('does not convert an exercise into a graded assessment', () => {
     const result = plan([
-      { type: 'callout', id: 'ex', kind: 'exercise', text: 'Prove that…', evidence: ['c1'] },
+      { type: 'callout', id: 'ex', kind: 'exercise', text: 'Prove that…', evidence: ['c1'] }
     ]);
     const instance = result.lessons[0].instances[0];
     expect(instance.component).toBe('ExerciseBlock');
@@ -168,8 +166,8 @@ describe('deterministic presentation plan', () => {
           state: 'accepted',
           originalExpression: 'x',
           modelExpression: 'x',
-          reviewer: 'r',
-        },
+          reviewer: 'r'
+        }
       },
       { type: 'table', id: 'b7', columns: ['a'], rows: [['1']], evidence: ['c'] },
       { type: 'media', id: 'b8', mediaType: 'image', alt: 'fig', src: '/api/v1/x' },
@@ -182,8 +180,8 @@ describe('deterministic presentation plan', () => {
         kind: 'bar',
         categories: ['x'],
         series: [{ label: 's', values: [1] }],
-        evidence: ['c'],
-      },
+        evidence: ['c']
+      }
     ];
     const result = plan(blocks);
     expect(result.lessons[0].counts.total).toBe(blocks.length);
@@ -193,7 +191,7 @@ describe('deterministic presentation plan', () => {
 
   it('degrades a media block with no source region to a trusted fallback', () => {
     const result = plan([
-      { type: 'media', id: 'm', mediaType: 'image', alt: 'missing', src: '/api/v1/x' },
+      { type: 'media', id: 'm', mediaType: 'image', alt: 'missing', src: '/api/v1/x' }
     ]);
     const instance = result.lessons[0].instances[0];
     // FigureViewer requires a source region; without one the engine degrades
@@ -210,8 +208,8 @@ describe('deterministic presentation plan', () => {
         id: 'dg',
         title: 'Process',
         description: 'd',
-        steps: [{ id: 's1', label: 'Step' }],
-      },
+        steps: [{ id: 's1', label: 'Step' }]
+      }
     ];
     expect(plan(blocks, 'read').lessons[0].counts.interactive).toBe(0);
     expect(plan(blocks, 'explore').lessons[0].counts.interactive).toBe(2);
@@ -221,7 +219,7 @@ describe('deterministic presentation plan', () => {
 
   it('never offers an interaction on unreviewed mathematics', () => {
     const blocks: LessonBlockV2[] = [
-      { type: 'math', id: 'm', expression: 'x', notation: 'plain', sourceMeta },
+      { type: 'math', id: 'm', expression: 'x', notation: 'plain', sourceMeta }
     ];
     expect(plan(blocks, 'explore').lessons[0].instances[0].interactive).toBe(false);
   });
@@ -237,7 +235,7 @@ describe('deterministic presentation plan', () => {
   it('counts primary and source-faithful instances for the disclosure', () => {
     const result = plan([
       { type: 'paragraph', id: 'p', text: 'Prose', evidence: ['c'] },
-      { type: 'math', id: 'm', expression: 'x', notation: 'plain', sourceMeta },
+      { type: 'math', id: 'm', expression: 'x', notation: 'plain', sourceMeta }
     ]);
     expect(result.lessons[0].counts.primary).toBe(1);
     expect(result.lessons[0].counts.sourceFallback).toBe(1);

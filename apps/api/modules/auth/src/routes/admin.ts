@@ -2,14 +2,14 @@ import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Prisma } from '../../../../src/generated/prisma/client';
 import type { IUser } from '../models/User';
 import { prisma } from '../../../../shared/database';
-import { createContracts } from '@ednova/shared/domainContracts';
+import { createContracts } from '@noveris/shared/domainContracts';
 import Joi from 'joi';
 import crypto from 'crypto';
 import type { Response } from 'express';
 import User from '../models/User';
 import Coupon from '../models/Coupon';
 import Payment from '../models/Payment';
-import { requireRole } from '@ednova/shared/auth';
+import { requireRole } from '@noveris/shared/auth';
 
 const router = createContracts();
 
@@ -57,7 +57,7 @@ router.get('/users', async (req: DomainRequest, res: Response) => {
       ];
     }
 
-    const { boundedInteger } = require('@ednova/shared/pagination');
+    const { boundedInteger } = require('@noveris/shared/pagination');
     const pageNumber = boundedInteger(page, 1, 10000);
     const pageSize = boundedInteger(limit, 50, 100);
     const skip = (pageNumber - 1) * pageSize;
@@ -320,7 +320,7 @@ router.get('/subscriptions', async (req: DomainRequest, res: Response) => {
       filter.tier = String(tier) as Prisma.PaymentWhereInput['tier'];
     }
 
-    const { boundedInteger } = require('@ednova/shared/pagination');
+    const { boundedInteger } = require('@noveris/shared/pagination');
     const pageNumber = boundedInteger(page, 1, 10000);
     const pageSize = boundedInteger(limit, 50, 100);
     const skip = (pageNumber - 1) * pageSize;

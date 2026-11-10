@@ -51,7 +51,7 @@ export const ADAPTATION_REASONS = [
   'neutral_default',
   /** The learner's preference could not be honoured because the lesson lacks
    * the material it needs. Explains a limitation rather than inventing one. */
-  'preference_unavailable_for_lesson',
+  'preference_unavailable_for_lesson'
 ] as const;
 
 export type AdaptationReason = (typeof ADAPTATION_REASONS)[number];
@@ -67,7 +67,7 @@ export const EVIDENCE_CLASSES = [
   'accepted_assessment',
   'explicit_preference',
   'interaction_state',
-  'inference',
+  'inference'
 ] as const;
 export type EvidenceClass = (typeof EVIDENCE_CLASSES)[number];
 
@@ -114,7 +114,7 @@ export const DEFAULT_PREFERENCES: AdaptationPreferences = Object.freeze({
   preferredMode: null,
   preferWorkedExamples: false,
   preferVisualExploration: false,
-  preferDetailedProofs: false,
+  preferDetailedProofs: false
 });
 
 /** What the lesson can actually support. Supplied by the caller from trusted
@@ -177,7 +177,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
  * invalid modes and cross-revision identities all fail. */
 export function parseLearningAdaptation(
   value: unknown,
-  binding: { courseId: string; revisionId: string; lessonId: string },
+  binding: { courseId: string; revisionId: string; lessonId: string }
 ): LearningAdaptationV1 {
   if (!isRecord(value)) return fail('INVALID_ADAPTATION');
   const allowed = [
@@ -193,13 +193,15 @@ export function parseLearningAdaptation(
     'reason',
     'objectiveIds',
     'generatedAt',
-    'expiresAt',
+    'expiresAt'
   ];
   if (Object.keys(value).some((key) => !allowed.includes(key))) return fail('INVALID_ADAPTATION');
-  if (value.schemaVersion !== LEARNING_ADAPTATION_SCHEMA_VERSION) fail('ADAPTATION_VERSION_UNSUPPORTED');
+  if (value.schemaVersion !== LEARNING_ADAPTATION_SCHEMA_VERSION)
+    fail('ADAPTATION_VERSION_UNSUPPORTED');
 
   const text = (input: unknown, max: number): string => {
-    if (typeof input !== 'string' || !input || input.length > max) return fail('INVALID_ADAPTATION');
+    if (typeof input !== 'string' || !input || input.length > max)
+      return fail('INVALID_ADAPTATION');
     return input;
   };
 
@@ -253,8 +255,7 @@ export function parseLearningAdaptation(
     reason !== 'preference_unavailable_for_lesson'
   )
     return fail('INVALID_ADAPTATION');
-  if (recommendedMode !== null && reason === 'neutral_default')
-    return fail('INVALID_ADAPTATION');
+  if (recommendedMode !== null && reason === 'neutral_default') return fail('INVALID_ADAPTATION');
 
   if (!Array.isArray(value.objectiveIds) || value.objectiveIds.length > 32)
     return fail('INVALID_ADAPTATION');
@@ -279,7 +280,7 @@ export function parseLearningAdaptation(
     reason,
     objectiveIds,
     generatedAt,
-    expiresAt,
+    expiresAt
   };
 }
 
@@ -293,7 +294,7 @@ export function parsePreferences(value: unknown): Partial<AdaptationPreferences>
     'preferredMode',
     'preferWorkedExamples',
     'preferVisualExploration',
-    'preferDetailedProofs',
+    'preferDetailedProofs'
   ];
   if (Object.keys(value).some((key) => !allowed.includes(key))) return fail('INVALID_PREFERENCES');
 

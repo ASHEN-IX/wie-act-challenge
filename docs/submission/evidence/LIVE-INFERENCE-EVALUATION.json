@@ -1,0 +1,122 @@
+{
+  "scope": "live Groq Visual Lab workflow, synthetic topic, Python planning entrypoint",
+  "result": {
+    "status": "planned",
+    "candidate": {
+      "engine": "weighted_graph",
+      "title": "Finding the Shortest Route from A to E",
+      "concept": "Shortest paths in a small positively weighted undirected graph",
+      "learningObjective": "Learners will be able to determine the minimum\u2011weight path between two specified nodes, justify why that path is shortest, and describe the step\u2011by\u2011step reasoning (e.g., Dijkstra\u2019s method) used to find it in similar networks.",
+      "scenario": {
+        "nodes": [
+          {
+            "id": "A",
+            "label": "A"
+          },
+          {
+            "id": "B",
+            "label": "B"
+          },
+          {
+            "id": "C",
+            "label": "C"
+          },
+          {
+            "id": "D",
+            "label": "D"
+          },
+          {
+            "id": "E",
+            "label": "E"
+          }
+        ],
+        "edges": [
+          {
+            "source": "A",
+            "target": "B",
+            "weight": 4
+          },
+          {
+            "source": "A",
+            "target": "C",
+            "weight": 2
+          },
+          {
+            "source": "B",
+            "target": "C",
+            "weight": 1
+          },
+          {
+            "source": "B",
+            "target": "D",
+            "weight": 5
+          },
+          {
+            "source": "C",
+            "target": "D",
+            "weight": 8
+          },
+          {
+            "source": "C",
+            "target": "E",
+            "weight": 10
+          },
+          {
+            "source": "D",
+            "target": "E",
+            "weight": 2
+          }
+        ],
+        "source": "A",
+        "target": "E"
+      },
+      "guidance": {
+        "instructions": "Explore the graph by tapping nodes and edges. The tool will let you highlight a path from the start node (A) to the goal node (E). Compare different routes and observe their total weights. Use the visual feedback to decide which route is shortest.",
+        "predictionPrompt": "Before you start, predict the total weight of the shortest possible path from node A to node E. Write down the number you think it will be.",
+        "hint": "Look first at the low\u2011weight edges (like B\u2011C = 1) and see how they can be combined to reach E. Sometimes a longer\u2011looking route with many small weights beats a direct edge with a large weight."
+      }
+    },
+    "reason": "Demonstrates weighted graph shortest path reasoning",
+    "executionMode": "REAL_APPROVED"
+  },
+  "calls": [
+    {
+      "agent": "visual_lab_selector",
+      "model": "openai/gpt-oss-20b",
+      "tier": "compact",
+      "executionMode": "REAL_APPROVED",
+      "latencyMs": 4951,
+      "usage": {
+        "prompt_tokens": 879,
+        "completion_tokens": 57,
+        "total_tokens": 936
+      },
+      "cacheHit": false
+    },
+    {
+      "agent": "visual_lab_planner",
+      "model": "openai/gpt-oss-120b",
+      "tier": "capable",
+      "executionMode": "REAL_APPROVED",
+      "latencyMs": 2077,
+      "usage": {
+        "prompt_tokens": 1041,
+        "completion_tokens": 706,
+        "total_tokens": 1747
+      },
+      "cacheHit": false
+    },
+    {
+      "agent": "visual_lab_selector",
+      "latencyMs": 0,
+      "errorType": "LLMUnavailableError"
+    }
+  ],
+  "approvedRequestLimitPerAgent": 3,
+  "expiredApprovalResult": {
+    "status": "unavailable",
+    "candidate": null,
+    "reason": "AI planning is unavailable right now; a supported example can still be used.",
+    "executionMode": "UNAVAILABLE"
+  }
+}

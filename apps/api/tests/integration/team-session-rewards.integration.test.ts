@@ -2,8 +2,8 @@ import type { Response, NextFunction } from 'express';
 import type { DomainRequest } from '../../src/framework/contracts';
 const express = require('express');
 const request = require('supertest');
-const axios = require('@ednova/shared/moduleClient');
-jest.mock('@ednova/shared/moduleClient');
+const axios = require('@noveris/shared/moduleClient');
+jest.mock('@noveris/shared/moduleClient');
 jest.mock('../../modules/study/src/models', () => ({
   StudySession: {
     findOne: jest.fn(),

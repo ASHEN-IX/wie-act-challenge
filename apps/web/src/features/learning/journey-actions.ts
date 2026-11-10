@@ -6,19 +6,18 @@ import {
   decodePrivateAssessmentResult,
   type ActivityDefinition,
 } from "@/lib/activity-contracts";
-import type { Contract } from "@ednova/shared/ednova/contracts";
+import type { Contract } from "@noveris/shared/ednova/contracts";
 import {
   parseLearningDocument,
-  type LearningDocument,
-} from "@ednova/shared/ednova/learningDocument";
+} from "@noveris/shared/ednova/learningDocument";
 import {
   parseReadingDocumentV2,
   migrateReadingDocumentV1,
-} from "@ednova/shared/ednova/learningDocumentV2";
-import { parsePublishedPresentation } from "@ednova/shared/ednova/presentationDocument";
-import { parsePublishedExperiencePlan } from "@ednova/shared/ednova/publishedExperiencePlan";
-import type { LearningMode } from "@ednova/shared/ednova/learningModes";
-import type { AdaptationReason } from "@ednova/shared/ednova/learningAdaptation";
+} from "@noveris/shared/ednova/learningDocumentV2";
+import { parsePublishedPresentation } from "@noveris/shared/ednova/presentationDocument";
+import { parsePublishedExperiencePlan } from "@noveris/shared/ednova/publishedExperiencePlan";
+import type { LearningMode } from "@noveris/shared/ednova/learningModes";
+import type { AdaptationReason } from "@noveris/shared/ednova/learningAdaptation";
 export async function learningCatalog(courseId: string, revisionId?: string) {
   await requireIdentity();
   const data = await api<{

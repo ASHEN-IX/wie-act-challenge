@@ -8,8 +8,8 @@ import {
   quadraticCurve,
   quadraticOutput,
   type QuadraticValues,
-} from "@ednova/shared/visualLab/function-models";
-import type { FunctionScenario } from "@ednova/shared/visualLab/types";
+} from "@noveris/shared/visualLab/function-models";
+import type { FunctionScenario } from "@noveris/shared/visualLab/types";
 
 const round = (value: number, digits = 2) => {
   const factor = 10 ** digits;

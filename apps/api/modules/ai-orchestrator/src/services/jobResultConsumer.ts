@@ -1,12 +1,12 @@
 import { canDeliverJob } from './jobAccess';
-import type { AiResultEnvelope } from '@ednova/shared/ai-messaging/envelope';
+import type { AiResultEnvelope } from '@noveris/shared/ai-messaging/envelope';
 /**
  * Consumes AI result events from RabbitMQ and correlates them to persisted
  * AiJobs via correlationId (F01 / AI-COM-07 + OPS-03).
  */
 
-import { consumeAiResults } from '@ednova/shared/ai-messaging';
-import { logger } from '@ednova/shared';
+import { consumeAiResults } from '@noveris/shared/ai-messaging';
+import { logger } from '@noveris/shared';
 import AiJob from '../models/AiJob';
 import { buildEvalResultRecord } from './evalResultBuilder';
 import { upsertByCorrelation } from './evalResultStore';

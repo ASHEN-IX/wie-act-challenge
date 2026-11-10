@@ -1,5 +1,5 @@
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const moduleClient = require('@ednova/shared/moduleClient');
+const moduleClient = require('@noveris/shared/moduleClient');
 import { StudySession } from '../models';
 import { toSafeInteger, getAxiosErrorDetails, buildInternalHeaders } from './sessionHelpers';
 

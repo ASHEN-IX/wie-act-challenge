@@ -38,9 +38,30 @@ export const QUADRATIC_FUNCTION = {
   objective:
     'Explain how the coefficients a, b and c move the parabola, its vertex and where it crosses the x-axis',
   parameters: [
-    { key: 'a', label: 'a (curvature)', min: -5, max: 5, step: 0.5, description: 'Sign sets the opening direction; size sets how narrow it is' },
-    { key: 'b', label: 'b (tilt)', min: -10, max: 10, step: 1, description: 'Shifts the vertex sideways together with a' },
-    { key: 'c', label: 'c (height)', min: -10, max: 10, step: 1, description: 'Where the curve crosses the y-axis' }
+    {
+      key: 'a',
+      label: 'a (curvature)',
+      min: -5,
+      max: 5,
+      step: 0.5,
+      description: 'Sign sets the opening direction; size sets how narrow it is'
+    },
+    {
+      key: 'b',
+      label: 'b (tilt)',
+      min: -10,
+      max: 10,
+      step: 1,
+      description: 'Shifts the vertex sideways together with a'
+    },
+    {
+      key: 'c',
+      label: 'c (height)',
+      min: -10,
+      max: 10,
+      step: 1,
+      description: 'Where the curve crosses the y-axis'
+    }
   ] as readonly FunctionParameterSpec[],
   defaults: { a: 1, b: -2, c: -3 } as QuadraticValues,
   guidance: {
@@ -98,7 +119,10 @@ export function parseFunctionValues(value: unknown): QuadraticValues {
   for (const spec of QUADRATIC_FUNCTION.parameters) {
     const v = raw[spec.key];
     if (typeof v !== 'number' || !Number.isFinite(v) || v < spec.min || v > spec.max)
-      throw visualLabError('INVALID_PARAMETER', `${spec.label} must be between ${spec.min} and ${spec.max}`);
+      throw visualLabError(
+        'INVALID_PARAMETER',
+        `${spec.label} must be between ${spec.min} and ${spec.max}`
+      );
     result[spec.key] = v;
   }
   // a = 0 is a line, not a parabola: the vertex formula would divide by zero.

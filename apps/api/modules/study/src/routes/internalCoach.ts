@@ -60,9 +60,7 @@ export async function coachCatalog(req: DomainRequest, res: Response) {
   try {
     const courses = await Course.find({ userId }).sort({ createdAt: -1 }).limit(COURSE_CATALOG_MAX);
     const subjectIds = [...new Set(courses.map((course) => course.subjectId).filter(Boolean))];
-    const subjects = subjectIds.length
-      ? await Subject.find({ id: { $in: subjectIds } })
-      : [];
+    const subjects = subjectIds.length ? await Subject.find({ id: { $in: subjectIds } }) : [];
     const nameById = new Map(subjects.map((subject) => [String(subject.id), subject.name]));
 
     return res.json({

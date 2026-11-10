@@ -144,10 +144,7 @@ export async function cancelIngestionOperation(
   );
   if (!stopped.matchedCount)
     throw new IngestionConflictError('Operation already completed or cancelled');
-  await CourseIngestionOperation.updateOne(
-    { id: expectedJobId },
-    { $set: { state: 'cancelled' } }
-  );
+  await CourseIngestionOperation.updateOne({ id: expectedJobId }, { $set: { state: 'cancelled' } });
   return { jobId: expectedJobId, status: 'cancelled', workerCancellation: 'at_stage_boundaries' };
 }
 

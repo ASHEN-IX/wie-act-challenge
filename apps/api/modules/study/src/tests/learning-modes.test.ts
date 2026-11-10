@@ -12,7 +12,7 @@ import {
   indistinguishableFromRead,
   isLearningMode,
   modeObjective,
-  modePolicy,
+  modePolicy
 } from '../../../../shared/ednova/learningModes';
 import { buildPlanningContext, plannerTask } from '../../../../shared/ednova/planningContext';
 import type { LessonBlockV2 } from '../../../../shared/ednova/learningDocumentV2';
@@ -24,7 +24,7 @@ function contextFor(mode: string) {
     type: 'paragraph',
     id: 'p1',
     text: 'Body.',
-    evidence: ['chunk-1'],
+    evidence: ['chunk-1']
   };
   const input = {
     courseTitle: 'Course',
@@ -40,11 +40,11 @@ function contextFor(mode: string) {
         render: 'primary' as const,
         hasSourceRegion: false,
         isReviewedFormula: false,
-        hasStructuredFixture: false,
-      },
+        hasStructuredFixture: false
+      }
     ],
     assets: [],
-    capabilities: [],
+    capabilities: []
   };
   return { input, context: buildPlanningContext(input) };
 }
@@ -98,17 +98,20 @@ describe('learning mode contract', () => {
   it('says a mode is indistinguishable only when it genuinely is', () => {
     // Explore with no asset and no interactive block cannot differ from Read.
     expect(
-      indistinguishableFromRead('explore', { hasStructuredAsset: false, hasInteractiveBlock: false }),
+      indistinguishableFromRead('explore', {
+        hasStructuredAsset: false,
+        hasInteractiveBlock: false
+      })
     ).toBe(true);
     expect(
-      indistinguishableFromRead('explore', { hasStructuredAsset: true, hasInteractiveBlock: false }),
+      indistinguishableFromRead('explore', { hasStructuredAsset: true, hasInteractiveBlock: false })
     ).toBe(false);
     // A reading mode is always distinguishable in arrangement.
     expect(
-      indistinguishableFromRead('guided', { hasStructuredAsset: false, hasInteractiveBlock: false }),
+      indistinguishableFromRead('guided', { hasStructuredAsset: false, hasInteractiveBlock: false })
     ).toBe(false);
     expect(
-      indistinguishableFromRead('read', { hasStructuredAsset: false, hasInteractiveBlock: false }),
+      indistinguishableFromRead('read', { hasStructuredAsset: false, hasInteractiveBlock: false })
     ).toBe(false);
   });
 
@@ -157,7 +160,7 @@ describe('mode reaches the planner as fixed application policy', () => {
       type: 'paragraph',
       id: 'p1',
       text: injection,
-      evidence: ['chunk-1'],
+      evidence: ['chunk-1']
     };
     const input = {
       courseTitle: 'Course',
@@ -173,11 +176,11 @@ describe('mode reaches the planner as fixed application policy', () => {
           render: 'primary' as const,
           hasSourceRegion: false,
           isReviewedFormula: false,
-          hasStructuredFixture: false,
-        },
+          hasStructuredFixture: false
+        }
       ],
       assets: [],
-      capabilities: [],
+      capabilities: []
     };
     const task = plannerTask(buildPlanningContext(input), input);
     const fence = task.indexOf('<<<BEGIN SOURCE DATA');

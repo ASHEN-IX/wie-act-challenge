@@ -18,12 +18,9 @@ import {
   semanticRole,
   type CanonicalBlockType,
   type ComponentType,
-  type SemanticRole,
+  type SemanticRole
 } from './componentRegistry';
-import type {
-  PresentationRenderPolicy,
-  PresentationRenderReason,
-} from './presentationDocument';
+import type { PresentationRenderPolicy, PresentationRenderReason } from './presentationDocument';
 
 export const PRESENTATION_PLAN_VERSION = '1.0.0' as const;
 
@@ -127,7 +124,7 @@ const DERIVATION_MARKERS = [
   '\\begin{gather}',
   '\\begin{cases}',
   '\\begin{array}',
-  '\\\\',
+  '\\\\'
 ];
 
 /** A reviewed display expression that is structurally a multiline derivation.
@@ -144,13 +141,14 @@ function isFigure(block: Extract<LessonBlockV2, { type: 'media' }>): boolean {
 
 function select(
   entry: PlanLessonInput['blocks'][number],
-  mode: ReaderMode,
+  mode: ReaderMode
 ): { component: ComponentType; selection: SelectionRule } {
   const block = entry.block;
   // A source-faithful policy always wins: unreviewed or unattributable content
   // is rendered from the source, never through a primary component.
   if (entry.render === 'source_faithful') {
-    if (block.type === 'math') return { component: 'SourceMathFallback', selection: 'unreviewed_math' };
+    if (block.type === 'math')
+      return { component: 'SourceMathFallback', selection: 'unreviewed_math' };
     if (block.type === 'media') return { component: 'SourceDiagram', selection: 'figure' };
     return { component: 'ConceptExplanation', selection: 'unsupported_block' };
   }
@@ -202,7 +200,7 @@ function select(
 function interactiveFor(
   component: ComponentType,
   selection: SelectionRule,
-  mode: ReaderMode,
+  mode: ReaderMode
 ): boolean {
   if (mode !== 'explore') return false;
   if (selection === 'unreviewed_math' || selection === 'unsupported_block') return false;
@@ -217,15 +215,14 @@ function interactiveFor(
 function planBlock(
   entry: PlanLessonInput['blocks'][number],
   lessonId: string,
-  mode: ReaderMode,
+  mode: ReaderMode
 ): PlannedInstance {
   const { component, selection } = select(entry, mode);
   const block = entry.block;
   const role: SemanticRole | undefined =
     block.type === 'callout' ? semanticRole(block.kind) : undefined;
   // Charts carry no source geometry; every other block may.
-  const hasSourceRegion =
-    block.type !== 'chart' && Boolean(block.sourceMeta?.regionId);
+  const hasSourceRegion = block.type !== 'chart' && Boolean(block.sourceMeta?.regionId);
   const hasEvidence =
     ('evidence' in block && Array.isArray(block.evidence) && block.evidence.length > 0) ||
     (block.provenance?.length ?? 0) > 0;
@@ -240,7 +237,7 @@ function planBlock(
     isReviewedFormula: block.type === 'math' && Boolean(block.review),
     // The canonical projection carries no trusted structured fixtures
     // (topologies, code annotations), so fixture-only components degrade.
-    hasStructuredFixture: false,
+    hasStructuredFixture: false
   });
 
   const resolvedComponent = resolution.ok ? resolution.capability.type : resolution.fallback.type;
@@ -253,10 +250,8 @@ function planBlock(
     render: entry.render,
     reason: entry.reason,
     interactive: interactiveFor(resolvedComponent, selection, mode),
-    ...(resolution.ok
-      ? {}
-      : { degraded: { from: component, failure: resolution.reason } }),
-    hasSourceRegion,
+    ...(resolution.ok ? {} : { degraded: { from: component, failure: resolution.reason } }),
+    hasSourceRegion
   };
 }
 
@@ -272,9 +267,10 @@ export function buildPresentationPlan(input: PlanInput): PresentationPlan {
       counts: {
         total: instances.length,
         primary: instances.filter((instance) => instance.render === 'primary').length,
-        sourceFallback: instances.filter((instance) => instance.render === 'source_faithful').length,
-        interactive: instances.filter((instance) => instance.interactive).length,
-      },
+        sourceFallback: instances.filter((instance) => instance.render === 'source_faithful')
+          .length,
+        interactive: instances.filter((instance) => instance.interactive).length
+      }
     };
   });
   return {
@@ -287,9 +283,10 @@ export function buildPresentationPlan(input: PlanInput): PresentationPlan {
     lessons,
     unclassified: lessons.reduce(
       (total, lesson) =>
-        total + lesson.instances.filter((instance) => instance.selection === 'unsupported_block').length,
-      0,
-    ),
+        total +
+        lesson.instances.filter((instance) => instance.selection === 'unsupported_block').length,
+      0
+    )
   };
 }
 

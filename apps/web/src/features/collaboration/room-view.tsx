@@ -14,7 +14,11 @@ import {
 import { PeerChat } from "./peer-chat";
 import { usePeerText } from "./use-peer-text";
 import { ActionForm } from "@/components/shared/action-form";
-import { type RoomSnapshotState, applyRoomSnapshot } from "./room-sync";
+import {
+  type RoomSnapshotState,
+  applyInterventionSeq,
+  applyRoomSnapshot,
+} from "./room-sync";
 
 import { PrivateHelpPanel } from "./private-help-panel";
 import { RoomLearningPanel } from "./room-learning-panel";
@@ -214,6 +218,7 @@ export function RoomView({
             data.intervention
           ) {
             setActiveIntervention(data.intervention);
+            setSnapshot((previous) => applyInterventionSeq(previous, data));
           }
 
           if (data.type === "FACILITATOR_DECLINED" && data.roomId === roomId) {

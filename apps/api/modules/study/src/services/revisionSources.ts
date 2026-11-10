@@ -274,7 +274,12 @@ export async function verifyRevisionArtifact(revision: {
   try {
     const courseId = String(revision.courseId),
       revisionId = revision.revisionTag;
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(courseId) || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(revisionId))
+    if (
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        courseId
+      ) ||
+      !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(revisionId)
+    )
       throw new Error();
     const documents = revision.sourceManifest as SourceDocument[];
     if (!documents?.length || documents.some((d) => !d.storageRef)) throw new Error();

@@ -8,7 +8,7 @@ const span = {
   documentId: 'doc_course',
   pageNumber: 1,
   lineStart: 3,
-  lineEnd: 6,
+  lineEnd: 6
 };
 
 function fixture() {
@@ -35,20 +35,20 @@ function fixture() {
                 text: 'First complete paragraph.\n\nSecond complete paragraph.',
                 evidence: [span],
                 provenance: 'extracted',
-                verification: 'source_backed',
+                verification: 'source_backed'
               },
               {
                 id: 'blk_table',
                 type: 'table',
                 columns: ['n', 'u_n'],
                 rows: [['1', '0.5']],
-                evidence: [span],
-              },
-            ],
-          },
-        ],
-      },
-    ],
+                evidence: [span]
+              }
+            ]
+          }
+        ]
+      }
+    ]
   };
 }
 
@@ -57,8 +57,13 @@ describe('canonical course document', () => {
     const document: any = fixture();
     const lesson = document.chapters[0].lessons[0];
     lesson.blocks = Array.from({ length: 464 }, (_, i) => ({
-      id: `blk_${i}`, type: 'paragraph', text: `Paragraph ${i}`, evidence: [span],
-      regionId: `region_${i}`, extractionMethod: 'text', confidence: 1,
+      id: `blk_${i}`,
+      type: 'paragraph',
+      text: `Paragraph ${i}`,
+      evidence: [span],
+      regionId: `region_${i}`,
+      extractionMethod: 'text',
+      confidence: 1
     }));
     lesson.source_spans = Array.from({ length: 544 }, () => span);
     expect(parseCanonicalDocument(document).chapters[0].lessons[0].blocks).toHaveLength(464);
@@ -67,7 +72,10 @@ describe('canonical course document', () => {
   test('still rejects a lesson beyond the hard block bound', () => {
     const document: any = fixture();
     document.chapters[0].lessons[0].blocks = Array.from({ length: 2001 }, (_, i) => ({
-      id: `blk_${i}`, type: 'paragraph', text: 'x', evidence: [span],
+      id: `blk_${i}`,
+      type: 'paragraph',
+      text: 'x',
+      evidence: [span]
     }));
     expect(() => parseCanonicalDocument(document)).toThrow('INVALID_CANONICAL_DOCUMENT');
   });
@@ -75,9 +83,17 @@ describe('canonical course document', () => {
   test('accepts real region paragraphs and extraction metadata while rejecting event handlers', () => {
     const document: any = fixture();
     document.chapters[0].lessons[0].blocks.push({
-      id: 'blk_region', type: 'paragraph', text: 'Source paragraph', evidence: [span],
-      regionId: 'region_text', extractionMethod: 'text', confidence: 1,
-      bbox: [72, 72, 400, 100], page: 1, reviewRequired: false, issues: [],
+      id: 'blk_region',
+      type: 'paragraph',
+      text: 'Source paragraph',
+      evidence: [span],
+      regionId: 'region_text',
+      extractionMethod: 'text',
+      confidence: 1,
+      bbox: [72, 72, 400, 100],
+      page: 1,
+      reviewRequired: false,
+      issues: []
     });
     expect(() => parseCanonicalDocument(document)).not.toThrow();
     document.chapters[0].lessons[0].blocks[2].onclick = 'alert(1)';
@@ -88,20 +104,18 @@ describe('canonical course document', () => {
     const lesson = document.chapters[0].lessons[0];
     expect(lesson.blocks[0]).toMatchObject({
       type: 'source_lesson',
-      text: 'First complete paragraph.\n\nSecond complete paragraph.',
+      text: 'First complete paragraph.\n\nSecond complete paragraph.'
     });
     expect(lesson.blocks[1]).toMatchObject({ type: 'table', rows: [['1', '0.5']] });
     expect(lesson.source_spans).toEqual([span]);
   });
 
   test('rejects unknown versions and executable source content', () => {
-    expect(() =>
-      parseCanonicalDocument({ ...fixture(), schemaVersion: '2.0.0' }),
-    ).toThrow();
+    expect(() => parseCanonicalDocument({ ...fixture(), schemaVersion: '2.0.0' })).toThrow();
     const invalid: any = fixture();
     invalid.chapters[0].lessons[0].blocks[0] = {
       ...invalid.chapters[0].lessons[0].blocks[0],
-      html: '<script>alert(1)</script>',
+      html: '<script>alert(1)</script>'
     };
     expect(() => parseCanonicalDocument(invalid)).toThrow();
   });
@@ -123,16 +137,14 @@ describe('canonical course document', () => {
         humanReview: 'required',
         publicationState: 'review_required',
         reviewRegionIds: ['region_math'],
-        counts: { regions: 1, reviewRequired: 1, types: { math: 1 } },
+        counts: { regions: 1, reviewRequired: 1, types: { math: 1 } }
       },
       extractionReview: {
         acknowledged: true,
-        acknowledgedAt: '2026-11-02T12:00:00.000Z',
-      },
+        acknowledgedAt: '2026-11-02T12:00:00.000Z'
+      }
     };
-    expect(parseCanonicalDocument(reviewed).extractionReview).toEqual(
-      reviewed.extractionReview,
-    );
+    expect(parseCanonicalDocument(reviewed).extractionReview).toEqual(reviewed.extractionReview);
     const invalid: any = fixture();
     invalid.chapters[0].lessons[0].blocks[1].rows = [['too', 'many', 'cells']];
     expect(() => parseCanonicalDocument(invalid)).toThrow();
@@ -150,13 +162,13 @@ describe('canonical course document', () => {
         humanReview: 'required',
         publicationState: 'review_required',
         reviewRegionIds: ['region_math'],
-        counts: { regions: 1, reviewRequired: 1, types: { math: 1 } },
-      },
+        counts: { regions: 1, reviewRequired: 1, types: { math: 1 } }
+      }
     };
     const acknowledged = withExtractionReview(canonical, new Date('2026-11-02T12:00:00.000Z'));
     expect(parseCanonicalDocument(acknowledged).extractionReview).toEqual({
       acknowledged: true,
-      acknowledgedAt: '2026-11-02T12:00:00.000Z',
+      acknowledgedAt: '2026-11-02T12:00:00.000Z'
     });
     expect(activityDigest(acknowledged)).not.toBe(activityDigest(canonical));
   });
@@ -164,7 +176,10 @@ describe('canonical course document', () => {
   test('derives review-stage retrieval units with canonical block links', () => {
     const document = fixture();
     const source = document.chapters[0].lessons[0].blocks[0];
-    source.text = Array.from({ length: 4 }, (_, index) => `Paragraph ${index + 1} ` + 'x'.repeat(700)).join('\n\n');
+    source.text = Array.from(
+      { length: 4 },
+      (_, index) => `Paragraph ${index + 1} ` + 'x'.repeat(700)
+    ).join('\n\n');
     const units = canonicalUnitsForIndex(document);
     expect(units).toHaveLength(2);
     expect(units.every((unit) => unit.blockIds[0] === 'blk_source')).toBe(true);

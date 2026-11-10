@@ -1,6 +1,6 @@
 import { canDeliverJob } from '../../../ai-orchestrator/src/services/jobAccess';
 import AiJob from '../../../ai-orchestrator/src/models/AiJob';
-import { errorDetails } from '@ednova/shared/errors';
+import { errorDetails } from '@noveris/shared/errors';
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response } from 'express';
 /**
@@ -11,20 +11,20 @@ import type { Response } from 'express';
  */
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createContracts } = require('@ednova/shared/domainContracts');
+const { createContracts } = require('@noveris/shared/domainContracts');
 import Joi from 'joi';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const moduleClient = require('@ednova/shared/moduleClient');
+const moduleClient = require('@noveris/shared/moduleClient');
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { logger } = require('@ednova/shared');
+const { logger } = require('@noveris/shared');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { tierGate } = require('@ednova/shared/tierGate');
+const { tierGate } = require('@noveris/shared/tierGate');
 import { StudySession } from '../models';
 import { resolveSessionStats } from '../utils/sessionStats';
 import { fetchGamificationProfile } from '../utils/gamificationService';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { validateCoachPayload } = require('@ednova/shared/ai-messaging/payloadSchemas');
+const { validateCoachPayload } = require('@noveris/shared/ai-messaging/payloadSchemas');
 const router = createContracts();
 
 // Mirrors COACH-02 limits (same bounds as validateCoachPayload).

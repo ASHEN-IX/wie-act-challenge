@@ -53,7 +53,7 @@ async function getTransporter(): Promise<MailTransport> {
   return transporter;
 }
 
-const FROM_ADDRESS = process.env.EMAIL_FROM || 'EdNova <noreply@ednova.app>';
+const FROM_ADDRESS = process.env.EMAIL_FROM || 'Noveris <noreply@noveris.app>';
 const APP_URL = process.env.APP_URL || 'http://localhost:3000';
 
 export interface SendSubscriptionExpiryNoticeOptions {
@@ -72,7 +72,7 @@ export async function sendSubscriptionExpiryNotice(
   const info = await t.sendMail({
     from: FROM_ADDRESS,
     to,
-    subject: 'Your EdNova subscription is ending soon',
+    subject: 'Your Noveris subscription is ending soon',
     html: `
       <div style="font-family:sans-serif;max-width:520px;margin:auto;padding:24px;">
         <h2 style="color:#7c3aed;">Subscription Reminder</h2>
@@ -93,7 +93,7 @@ export async function sendCourseInvitationEmail(to: string, courseTitle: string,
   await transport.sendMail({
     from: process.env.SMTP_FROM || FROM_ADDRESS,
     to,
-    subject: 'Your invitation to join an EdNova course',
+    subject: 'Your invitation to join an Noveris course',
     text:
       `You have been invited to join ${courseTitle}.
 

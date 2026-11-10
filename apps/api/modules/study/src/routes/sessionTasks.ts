@@ -1,11 +1,11 @@
 import type { IStudySession, ITaskProgressEntry } from '../models';
-import { errorDetails } from '@ednova/shared/errors';
+import { errorDetails } from '@noveris/shared/errors';
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response } from 'express';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createContracts } = require('@ednova/shared/domainContracts');
+const { createContracts } = require('@noveris/shared/domainContracts');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const moduleClient = require('@ednova/shared/moduleClient');
+const moduleClient = require('@noveris/shared/moduleClient');
 import { StudySession, Course, StudyPlan, Task } from '../models';
 import { buildInternalHeaders, getAxiosErrorDetails, isObjectId } from '../utils/sessionHelpers';
 import { trackAnalyticsEvent } from '../utils/gamificationService';

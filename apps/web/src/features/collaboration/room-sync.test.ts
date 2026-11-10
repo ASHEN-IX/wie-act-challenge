@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { applyRoomSnapshot, type RoomSnapshotState } from "./room-sync";
+import {
+  applyInterventionSeq,
+  applyRoomSnapshot,
+  type RoomSnapshotState,
+} from "./room-sync";
 
 const previous: RoomSnapshotState = {
   room: {
@@ -155,5 +159,20 @@ describe("ephemeral presence independent of durable sequence", () => {
         onlineUserIds: ["host"],
       }).participants[0].isOnline,
     ).toBe(true);
+  });
+});
+
+describe("facilitator intervention sequence", () => {
+  it("follows an intervention that is exactly the next room sequence", () => {
+    const next = applyInterventionSeq(previous, { roomId: "room_one", seq: 6 });
+    expect(next.room.seq).toBe(6);
+    expect(next.room.currentPhase).toBe(previous.room.currentPhase);
+  });
+
+  it("ignores gaps, repeats and foreign rooms so missed changes come from a full sync", () => {
+    expect(applyInterventionSeq(previous, { roomId: "room_one", seq: 8 })).toBe(previous);
+    expect(applyInterventionSeq(previous, { roomId: "room_one", seq: 5 })).toBe(previous);
+    expect(applyInterventionSeq(previous, { roomId: "room_two", seq: 6 })).toBe(previous);
+    expect(applyInterventionSeq(previous, { roomId: "room_one", seq: "6" })).toBe(previous);
   });
 });

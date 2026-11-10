@@ -1,6 +1,6 @@
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response } from 'express';
-import { createContracts } from '@ednova/shared/domainContracts';
+import { createContracts } from '@noveris/shared/domainContracts';
 import Quest, { IQuest } from '../models/Quest';
 import { newId } from '../../../../shared/ids';
 
@@ -8,7 +8,7 @@ type QuestTemplate = Pick<
   IQuest,
   'title' | 'description' | 'icon' | 'action' | 'targetCount' | 'xpReward'
 >;
-import { requireInternal } from '@ednova/shared/auth';
+import { requireInternal } from '@noveris/shared/auth';
 
 const router = createContracts();
 

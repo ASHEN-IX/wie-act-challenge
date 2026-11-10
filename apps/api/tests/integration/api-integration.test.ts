@@ -1,6 +1,6 @@
-const moduleClient = require('@ednova/shared/moduleClient');
+const moduleClient = require('@noveris/shared/moduleClient');
 
-jest.mock('@ednova/shared/moduleClient');
+jest.mock('@noveris/shared/moduleClient');
 
 describe('API Integration Tests', () => {
   let authToken: string;

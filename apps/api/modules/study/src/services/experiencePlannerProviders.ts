@@ -21,12 +21,9 @@ import type {
   ProviderFailureCode,
   ProviderIdentity,
   ProviderOutcome,
-  ProviderUsage,
+  ProviderUsage
 } from '../../../../shared/ednova/experiencePlannerProvider';
-import {
-  failureClass,
-  NO_USAGE,
-} from '../../../../shared/ednova/experiencePlannerProvider';
+import { failureClass, NO_USAGE } from '../../../../shared/ednova/experiencePlannerProvider';
 import type { UntrustedExperiencePlanProposal } from '../../../../shared/ednova/experiencePlan';
 import { parseExperiencePlanProposal } from '../../../../shared/ednova/experiencePlan';
 import aiClient from '../../../../shared/aiClient';
@@ -65,7 +62,8 @@ function usageFrom(raw: unknown, reservedTokens: number): ProviderUsage {
     totalTokens,
     reservedTokens,
     modelVersion: typeof value.modelVersion === 'string' ? value.modelVersion.slice(0, 256) : null,
-    costUsd: typeof value.costUsd === 'number' && Number.isFinite(value.costUsd) ? value.costUsd : null,
+    costUsd:
+      typeof value.costUsd === 'number' && Number.isFinite(value.costUsd) ? value.costUsd : null
   };
 }
 
@@ -78,15 +76,15 @@ function usageFrom(raw: unknown, reservedTokens: number): ProviderUsage {
 export class MockExperiencePlannerProvider implements ExperiencePlannerProvider {
   readonly identity: ProviderIdentity = {
     provider: 'mock',
-    model: 'mock_experience_planner',
+    model: 'mock_experience_planner'
   };
 
   constructor(
     private readonly delegate: (
-      request: BoundedPlanningRequest,
+      request: BoundedPlanningRequest
     ) => Promise<UntrustedExperiencePlanProposal>,
     private readonly enabled: () => boolean = () =>
-      process.env.EDNOVA_ENABLE_MOCK_EXPERIENCE_PLANNING === 'true',
+      process.env.EDNOVA_ENABLE_MOCK_EXPERIENCE_PLANNING === 'true'
   ) {}
 
   isEnabled(): boolean {
@@ -99,7 +97,7 @@ export class MockExperiencePlannerProvider implements ExperiencePlannerProvider 
         ok: false,
         code: 'PROVIDER_DISABLED',
         failure: 'known',
-        usage: NO_USAGE,
+        usage: NO_USAGE
       };
     try {
       const proposal = await this.delegate(request);
@@ -113,9 +111,9 @@ export class MockExperiencePlannerProvider implements ExperiencePlannerProvider 
           totalTokens: null,
           reservedTokens: 0,
           modelVersion: null,
-          costUsd: null,
+          costUsd: null
         },
-        identity: this.identity,
+        identity: this.identity
       };
     } catch {
       // A mock that throws produced no output; nothing was dispatched anywhere.
@@ -123,7 +121,7 @@ export class MockExperiencePlannerProvider implements ExperiencePlannerProvider 
         ok: false,
         code: 'PROVIDER_UNAVAILABLE',
         failure: 'known',
-        usage: NO_USAGE,
+        usage: NO_USAGE
       };
     }
   }
@@ -149,7 +147,7 @@ export class GeminiExperiencePlannerProvider implements ExperiencePlannerProvide
 
   constructor(
     private readonly model: string = configuredPlannerModel(),
-    private readonly enabled: () => boolean = realPlanningEnabled,
+    private readonly enabled: () => boolean = realPlanningEnabled
   ) {
     this.identity = { provider: 'gemini', model: this.model };
   }
@@ -173,9 +171,9 @@ export class GeminiExperiencePlannerProvider implements ExperiencePlannerProvide
           systemPolicy: request.systemPolicy,
           task: request.task,
           outputSchema: request.outputSchema,
-          limits: request.limits,
+          limits: request.limits
         },
-        { timeout: request.limits.timeoutMs, maxContentLength: 262_144 },
+        { timeout: request.limits.timeoutMs, maxContentLength: 262_144 }
       );
     } catch (error) {
       // Axios throws for timeouts, connection resets and non-2xx alike. None of
@@ -186,20 +184,20 @@ export class GeminiExperiencePlannerProvider implements ExperiencePlannerProvide
           ok: false,
           code: 'PROVIDER_AUTH_REJECTED',
           failure: 'uncertain',
-          usage: null,
+          usage: null
         };
       if (status === 429)
         return {
           ok: false,
           code: 'PROVIDER_QUOTA_EXCEEDED',
           failure: 'uncertain',
-          usage: null,
+          usage: null
         };
       return {
         ok: false,
         code: 'PROVIDER_TIMEOUT_AFTER_DISPATCH',
         failure: 'uncertain',
-        usage: null,
+        usage: null
       };
     }
 
@@ -235,7 +233,7 @@ export class GeminiExperiencePlannerProvider implements ExperiencePlannerProvide
         ok: false,
         code: 'PROVIDER_SCHEMA_INCOMPATIBLE',
         failure: 'uncertain',
-        usage,
+        usage
       };
     }
   }
@@ -244,7 +242,7 @@ export class GeminiExperiencePlannerProvider implements ExperiencePlannerProvide
 /** Resolve the provider this deployment is configured to use. Real Gemini wins
  * only when explicitly enabled; otherwise the mock, and otherwise nothing. */
 export function resolvePlannerProvider(
-  mockDelegate: (request: BoundedPlanningRequest) => Promise<UntrustedExperiencePlanProposal>,
+  mockDelegate: (request: BoundedPlanningRequest) => Promise<UntrustedExperiencePlanProposal>
 ): ExperiencePlannerProvider | null {
   if (realPlanningEnabled()) return new GeminiExperiencePlannerProvider();
   if (process.env.EDNOVA_ENABLE_MOCK_EXPERIENCE_PLANNING === 'true')

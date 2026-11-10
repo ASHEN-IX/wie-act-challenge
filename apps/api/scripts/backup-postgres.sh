@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PostgreSQL backup script for EdNova
+# PostgreSQL backup script for Noveris
 # Usage: ./backup-postgres.sh [DATABASE_URL] [BACKUP_DIR]
 #
 # Defaults:

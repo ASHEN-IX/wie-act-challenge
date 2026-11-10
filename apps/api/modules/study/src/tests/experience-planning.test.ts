@@ -1,18 +1,18 @@
 jest.mock('../services/presentationReader', () => ({
-  getPublishedPresentation: jest.fn(),
+  getPublishedPresentation: jest.fn()
 }));
 jest.mock('../models/StructuredAsset', () => ({
-  StructuredAsset: { find: jest.fn() },
+  StructuredAsset: { find: jest.fn() }
 }));
 // Review authority now comes from persisted decisions (C3). These workflow
 // tests exercise the mock-planner path, so the decision lookup returns an
 // approved row for the asset under test and nothing for the rest.
 jest.mock('../models/StructuredAssetReview', () => ({
-  StructuredAssetReview: { find: jest.fn(), findOneAndUpdate: jest.fn() },
+  StructuredAssetReview: { find: jest.fn(), findOneAndUpdate: jest.fn() }
 }));
 jest.mock('../services/resourceAccess', () => ({
   canAuthorCourse: jest.fn(),
-  canManageCourse: jest.fn(),
+  canManageCourse: jest.fn()
 }));
 
 import type { PublishedPresentationV1 } from '../../../../shared/ednova/presentationDocument';
@@ -28,14 +28,14 @@ import {
   ExperiencePlanningDisabledError,
   planLessonExperience,
   verifyAssetBindings,
-  projectExperiencePlan,
+  projectExperiencePlan
 } from '../services/experiencePlanning';
 import { validateExperiencePlan } from '../../../../shared/ednova/experiencePlanValidator';
 import { experienceContextFingerprint } from '../../../../shared/ednova/experiencePlan';
 import { planMockExperience } from '../../../../shared/ednova/mockExperiencePlanner';
 import {
   parseStructuredAsset,
-  type StructuredAssetV1,
+  type StructuredAssetV1
 } from '../../../../shared/ednova/structuredAsset';
 
 const courseId = 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d';
@@ -59,7 +59,7 @@ function approvedReview(asset: StructuredAssetV1) {
     decision: 'approved' as const,
     reviewerUserId: '04b3da2d-ec14-5643-bf49-e43f550168bf',
     reviewerRole: 'instructor' as const,
-    decidedAt: new Date('2026-11-01T10:00:00Z'),
+    decidedAt: new Date('2026-11-01T10:00:00Z')
   };
 }
 
@@ -71,7 +71,7 @@ function presentation(): PublishedPresentationV1 {
   const block = (
     id: string,
     type: 'heading' | 'paragraph' | 'math',
-    extra: Record<string, unknown> = {},
+    extra: Record<string, unknown> = {}
   ) =>
     ({
       id,
@@ -96,11 +96,11 @@ function presentation(): PublishedPresentationV1 {
                   extractionMethod: 'text',
                   confidence: 0.9,
                   reviewRequired: false,
-                  issues: [],
+                  issues: []
                 },
-                ...extra,
+                ...extra
               }
-            : { type, id, text: 'Source prose.', evidence: ['chunk-1'] },
+            : { type, id, text: 'Source prose.', evidence: ['chunk-1'] }
     }) as never;
 
   return {
@@ -115,12 +115,12 @@ function presentation(): PublishedPresentationV1 {
       policy: 'deterministic_source_faithful',
       canonicalSchemaVersion: '1.0.0',
       readerSchemaVersion: '2.0.0',
-      contentHashVerified: true,
+      contentHashVerified: true
     },
     verification: {
       status: 'partially_reviewed',
       math: { total: 2, reviewed: 1, sourceFallback: 1 },
-      disclosure: 'disclosure',
+      disclosure: 'disclosure'
     },
     objectives: [],
     chapters: [
@@ -141,8 +141,8 @@ function presentation(): PublishedPresentationV1 {
                   state: 'accepted',
                   originalExpression: 'x = 1',
                   modelExpression: 'x = 1',
-                  reviewer: 'teacher',
-                },
+                  reviewer: 'teacher'
+                }
               }),
               block('m-unreviewed', 'math'),
               {
@@ -154,28 +154,28 @@ function presentation(): PublishedPresentationV1 {
                   id: 'code1',
                   language: 'python',
                   code: 'a = 1',
-                  evidence: ['chunk-1'],
-                },
-              } as never,
-            ],
-          },
-        ],
-      },
+                  evidence: ['chunk-1']
+                }
+              } as never
+            ]
+          }
+        ]
+      }
     ],
     sources: [
       {
         documentId: 'doc-1',
         contentHash: 'sha256:' + 'e'.repeat(64),
         pageNumber: null,
-        href: `/api/v1/study/courses/${courseId}/revisions/${revisionId}/sources/doc-1`,
-      },
+        href: `/api/v1/study/courses/${courseId}/revisions/${revisionId}/sources/doc-1`
+      }
     ],
     fallback: {
       readerHref: `/courses/${courseId}/learn?revisionId=${revisionId}`,
       schemaVersion: '2.0.0',
-      deterministic: true,
+      deterministic: true
     },
-    warnings: [],
+    warnings: []
   };
 }
 
@@ -195,19 +195,19 @@ function storedAsset(overrides: Record<string, unknown> = {}) {
       code: 'a = 1\nb = 2',
       annotations: [
         { line: 0, explanation: 'First.' },
-        { line: 1, explanation: 'Second.' },
-      ],
+        { line: 1, explanation: 'Second.' }
+      ]
     },
     provenance: 'instructor_authored',
     review: {
       status: 'instructor_reviewed',
       reviewedBy: 'teacher',
-      reviewedAt: '2026-11-01T10:00:00Z',
+      reviewedAt: '2026-11-01T10:00:00Z'
     },
     audience: 'course',
     fallback: 'CodeViewer',
     disclosure: 'Instructor-authored walkthrough.',
-    ...overrides,
+    ...overrides
   });
   // Shape the row the way the Mongoose model stores it.
   return {
@@ -224,18 +224,16 @@ function storedAsset(overrides: Record<string, unknown> = {}) {
     reviewStatus: parsed.review.status,
     ...(parsed.review.reviewedBy !== undefined ? { reviewedBy: parsed.review.reviewedBy } : {}),
     ...(parsed.review.reviewedAt !== undefined ? { reviewedAt: parsed.review.reviewedAt } : {}),
-    ...(parsed.sourceReferences !== undefined
-      ? { sourceReferences: parsed.sourceReferences }
-      : {}),
+    ...(parsed.sourceReferences !== undefined ? { sourceReferences: parsed.sourceReferences } : {}),
     audience: parsed.audience,
     fallback: parsed.fallback,
-    disclosure: parsed.disclosure,
+    disclosure: parsed.disclosure
   };
 }
 
 function mockRows(rows: unknown[]) {
   find.mockReturnValue({
-    sort: () => ({ limit: () => ({ lean: async () => rows }) }),
+    sort: () => ({ limit: () => ({ lean: async () => rows }) })
   });
 }
 
@@ -261,14 +259,19 @@ describe('experience planning workflow', () => {
   it('is disabled unless the QA flag is explicitly set', async () => {
     delete process.env.EDNOVA_ENABLE_MOCK_EXPERIENCE_PLANNING;
     await expect(
-      planLessonExperience('student', courseId, 'lesson-1', 'valid_mathematics'),
+      planLessonExperience('student', courseId, 'lesson-1', 'valid_mathematics')
     ).rejects.toBeInstanceOf(ExperiencePlanningDisabledError);
     // A disabled planner must not even load the presentation.
     expect(load).not.toHaveBeenCalled();
   });
 
   it('plans a valid mathematics lesson through the real validator', async () => {
-    const outcome = await planLessonExperience('student', courseId, 'lesson-1', 'valid_mathematics');
+    const outcome = await planLessonExperience(
+      'student',
+      courseId,
+      'lesson-1',
+      'valid_mathematics'
+    );
     expect(outcome).toMatchObject({ status: 'planned' });
     if (outcome.status !== 'planned') return;
     expect(outcome.plan.canonical.map((entry) => entry.blockId)).toEqual([
@@ -276,7 +279,7 @@ describe('experience planning workflow', () => {
       'p1',
       'm-reviewed',
       'm-unreviewed',
-      'code1',
+      'code1'
     ]);
     expect(outcome.plan.planner.implementation).toBe('mock_experience_planner');
     expect(outcome.plan.disclosure).toBe(EXPERIENCE_PLAN_DISCLOSURE);
@@ -284,7 +287,12 @@ describe('experience planning workflow', () => {
   });
 
   it('keeps the unreviewed formula on its source-faithful component', async () => {
-    const outcome = await planLessonExperience('student', courseId, 'lesson-1', 'valid_mathematics');
+    const outcome = await planLessonExperience(
+      'student',
+      courseId,
+      'lesson-1',
+      'valid_mathematics'
+    );
     if (outcome.status !== 'planned') throw new Error('expected a plan');
     const unreviewed = outcome.plan.canonical.find((entry) => entry.blockId === 'm-unreviewed');
     expect(unreviewed?.component).toBe('SourceMathFallback');
@@ -295,7 +303,7 @@ describe('experience planning workflow', () => {
       'student',
       courseId,
       'lesson-1',
-      'attack_missing_block',
+      'attack_missing_block'
     );
     expect(outcome.status).toBe('rejected');
     if (outcome.status === 'rejected') {
@@ -311,13 +319,13 @@ describe('experience planning workflow', () => {
 
   it('refuses a lesson that is not in the revision', async () => {
     await expect(
-      planLessonExperience('student', courseId, 'lesson-missing', 'valid_mathematics'),
+      planLessonExperience('student', courseId, 'lesson-missing', 'valid_mathematics')
     ).rejects.toMatchObject({ status: 404 });
   });
 
   it('refuses an unknown scenario before loading anything', async () => {
     await expect(
-      planLessonExperience('student', courseId, 'lesson-1', 'not_a_scenario' as never),
+      planLessonExperience('student', courseId, 'lesson-1', 'not_a_scenario' as never)
     ).rejects.toMatchObject({ status: 400 });
     expect(load).not.toHaveBeenCalled();
   });
@@ -340,16 +348,23 @@ describe('experience planning workflow', () => {
       review: {
         status: row.reviewStatus,
         reviewedBy: row.reviewedBy,
-        reviewedAt: row.reviewedAt,
+        reviewedAt: row.reviewedAt
       },
       audience: row.audience,
       fallback: row.fallback,
-      disclosure: row.disclosure,
+      disclosure: row.disclosure
     });
     mockReviews([approvedReview(parsed)]);
-    const outcome = await planLessonExperience('student', courseId, 'lesson-1', 'valid_programming');
+    const outcome = await planLessonExperience(
+      'student',
+      courseId,
+      'lesson-1',
+      'valid_programming'
+    );
     if (outcome.status !== 'planned')
-      throw new Error(`expected a plan, got ${outcome.status} ${'code' in outcome ? outcome.code : ''}`);
+      throw new Error(
+        `expected a plan, got ${outcome.status} ${'code' in outcome ? outcome.code : ''}`
+      );
     expect(outcome.plan.supplemental).toHaveLength(1);
     expect(outcome.plan.supplemental[0].assetId).toBe('asset_walkthrough_1');
   });
@@ -359,10 +374,15 @@ describe('experience planning workflow', () => {
       storedAsset({
         assetId: 'asset_generated_1',
         provenance: 'generated_proposal',
-        review: { status: 'unreviewed' },
-      }),
+        review: { status: 'unreviewed' }
+      })
     ]);
-    const outcome = await planLessonExperience('student', courseId, 'lesson-1', 'valid_programming');
+    const outcome = await planLessonExperience(
+      'student',
+      courseId,
+      'lesson-1',
+      'valid_programming'
+    );
     if (outcome.status !== 'planned') throw new Error('expected a plan');
     expect(outcome.plan.supplemental).toHaveLength(0);
   });
@@ -384,25 +404,35 @@ describe('experience planning workflow', () => {
       review: { status: row.reviewStatus, reviewedBy: row.reviewedBy, reviewedAt: row.reviewedAt },
       audience: row.audience,
       fallback: row.fallback,
-      disclosure: row.disclosure,
+      disclosure: row.disclosure
     });
     mockReviews([approvedReview(parsed)]);
-    const outcome = await planLessonExperience('student', courseId, 'lesson-1', 'valid_programming');
+    const outcome = await planLessonExperience(
+      'student',
+      courseId,
+      'lesson-1',
+      'valid_programming'
+    );
     if (outcome.status !== 'planned') throw new Error('expected a plan');
     expect(outcome.plan.supplemental.map((entry) => entry.assetId)).toEqual([
-      'asset_walkthrough_1',
+      'asset_walkthrough_1'
     ]);
   });
 
   it('fails closed when a foreign-revision asset reaches the planner', async () => {
     mockRows([storedAsset({ revisionId: 'rev_other' })]);
-    const outcome = await planLessonExperience('student', courseId, 'lesson-1', 'valid_programming');
+    const outcome = await planLessonExperience(
+      'student',
+      courseId,
+      'lesson-1',
+      'valid_programming'
+    );
     // Production filters the row out in the query; this proves the second line
     // of defence. A supplement whose review cannot be verified is not silently
     // dropped — the plan is rejected and the deterministic reader takes over.
     expect(outcome).toMatchObject({
       status: 'rejected',
-      code: 'PLAN_ASSET_REVIEW_UNVERIFIED',
+      code: 'PLAN_ASSET_REVIEW_UNVERIFIED'
     });
   });
 });
@@ -412,7 +442,7 @@ describe('asset review verification', () => {
     courseId,
     revisionId,
     lessonId: 'lesson-1',
-    authorizedDocumentIds: new Set(['doc-1']),
+    authorizedDocumentIds: new Set(['doc-1'])
   };
 
   it('does not treat an internally consistent claim as review authority', () => {
@@ -430,17 +460,17 @@ describe('asset review verification', () => {
         component: 'CodeWalkthrough',
         language: 'python',
         code: 'a = 1',
-        annotations: [{ line: 0, explanation: 'Only line.' }],
+        annotations: [{ line: 0, explanation: 'Only line.' }]
       },
       provenance: 'instructor_authored',
       review: {
         status: 'instructor_reviewed',
         reviewedBy: 'teacher',
-        reviewedAt: '2026-11-01T10:00:00Z',
+        reviewedAt: '2026-11-01T10:00:00Z'
       },
       audience: 'course',
       fallback: 'CodeViewer',
-      disclosure: 'Instructor-authored.',
+      disclosure: 'Instructor-authored.'
     });
     const [verified] = verifyAssetBindings([asset], binding);
     expect(verified.reviewVerified).toBe(false);
@@ -457,8 +487,8 @@ describe('asset review verification', () => {
       review: {
         status: 'instructor_reviewed',
         reviewedBy: 'teacher',
-        reviewedAt: '2026-11-01T10:00:00Z',
-      },
+        reviewedAt: '2026-11-01T10:00:00Z'
+      }
     } as unknown as StructuredAssetV1;
     const [verified] = verifyAssetBindings([asset], binding);
     expect(verified.reviewVerified).toBe(false);
@@ -474,8 +504,8 @@ describe('asset review verification', () => {
       provenance: 'source_derived',
       review: { status: 'not_applicable' },
       sourceReferences: [
-        { documentId: 'doc-from-another-course', pageNumber: null, lineStart: 1, lineEnd: 2 },
-      ],
+        { documentId: 'doc-from-another-course', pageNumber: null, lineStart: 1, lineEnd: 2 }
+      ]
     } as unknown as StructuredAssetV1;
     const [verified] = verifyAssetBindings([asset], binding);
     expect(verified.sourceVerified).toBe(false);
@@ -489,7 +519,7 @@ describe('asset review verification', () => {
       lessonId: 'lesson-1',
       component: 'NetworkTopology',
       provenance: 'generated_proposal',
-      review: { status: 'unreviewed' },
+      review: { status: 'unreviewed' }
     } as unknown as StructuredAssetV1;
     const [verified] = verifyAssetBindings([asset], binding);
     expect(verified.reviewVerified).toBe(false);
@@ -502,7 +532,12 @@ describe('plan projection', () => {
   });
 
   it('carries no source text or learner identity', async () => {
-    const outcome = await planLessonExperience('student', courseId, 'lesson-1', 'valid_mathematics');
+    const outcome = await planLessonExperience(
+      'student',
+      courseId,
+      'lesson-1',
+      'valid_mathematics'
+    );
     if (outcome.status !== 'planned') throw new Error('expected a plan');
     const serialized = JSON.stringify(outcome.plan);
     expect(serialized).not.toContain('Source prose.');

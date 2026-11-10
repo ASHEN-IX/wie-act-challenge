@@ -1,7 +1,7 @@
 import type {
   LanguagePreference,
   LearningMode,
-} from "@ednova/shared/ednova/nardouch";
+} from "@noveris/shared/ednova/nardouch";
 const control =
   "mt-1 block w-full rounded-lg border bg-background px-3 py-2 text-sm";
 export function LearningModeSelector({

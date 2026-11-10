@@ -1,0 +1,29 @@
+digraph architecture {
+ graph [rankdir=TB,bgcolor="white",nodesep=.18,ranksep=.4,pad=.05];
+ node [shape=box,style="rounded,filled",fillcolor="#f2effc",color="#cfc5eb",fontname="Arial",fontsize=10,margin=".11,.08"];
+ edge [fontname="Arial",fontsize=8,color="#5933a7",arrowsize=.6];
+ browser [label="Browser\nReader, lab and room UI"];
+ next [label="Next.js server\nSession and server actions"];
+ api [label="NestJS domains\nBetter Auth + resource grants"];
+ ai [label="FastAPI + LiteLLM\nContext, schema and model alias"];
+ models [label="External providers\nApproved model",fillcolor="#fff7e8"];
+ pg [label="PostgreSQL\nRevisions, attempts, evidence\nAI data + budget ledger"];
+ files [label="Sources + FAISS\nRevision-pinned artifacts"];
+ redis [label="Redis\nEligible response cache"];
+ bus [label="RabbitMQ\nJobs and result queues"];
+ worker [label="Python workers\nIngestion and evaluation"];
+ browser -> next [label="HTTPS actions"];
+ next -> api [label="HTTP + session"];
+ browser -> api [label="WebSocket events",style=dotted];
+ api -> ai [label="HTTP + service credential"];
+ ai -> models [label="Approved inference"];
+ api -> pg [label="Prisma"];
+ ai -> api [label="Reserve / record budget",constraint=false];
+ ai -> files [label="Scoped retrieval"];
+ ai -> redis [label="Opt-in reuse"];
+ api -> bus [label="Publish job",style=dashed];
+ bus -> worker [label="Consume",style=dashed];
+ worker -> bus [label="Result / progress",style=dashed];
+ bus -> api [label="Consume result",style=dashed];
+ worker -> files [label="Write artifacts"];
+}

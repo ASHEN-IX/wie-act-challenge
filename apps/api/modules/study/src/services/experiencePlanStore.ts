@@ -16,14 +16,11 @@
  */
 
 import crypto from 'node:crypto';
-import {
-  ExperiencePlanRecord,
-  type IExperiencePlanRecord,
-} from '../models/ExperiencePlanRecord';
+import { ExperiencePlanRecord, type IExperiencePlanRecord } from '../models/ExperiencePlanRecord';
 import {
   parseExperiencePlanProposal,
   type ExperiencePlanValidationContext,
-  type ValidatedLearningExperiencePlan,
+  type ValidatedLearningExperiencePlan
 } from '../../../../shared/ednova/experiencePlan';
 import { tryValidateExperiencePlan } from '../../../../shared/ednova/experiencePlanValidator';
 import { parsePublishedExperiencePlan } from '../../../../shared/ednova/publishedExperiencePlan';
@@ -53,8 +50,8 @@ export function experiencePlanId(input: {
           input.revisionId,
           input.lessonId,
           input.mode,
-          input.contextFingerprint,
-        ]),
+          input.contextFingerprint
+        ])
       )
       .digest('hex')
       .slice(0, 32)
@@ -95,7 +92,7 @@ export async function storeAcceptedPlan(input: {
     revisionId: projected.revisionId,
     lessonId: projected.lessonId,
     mode: projected.mode,
-    contextFingerprint: projected.contextFingerprint,
+    contextFingerprint: projected.contextFingerprint
   });
 
   const now = new Date();
@@ -107,9 +104,9 @@ export async function storeAcceptedPlan(input: {
       revisionId: projected.revisionId,
       lessonId: projected.lessonId,
       mode: projected.mode,
-      supersededAt: { $exists: false },
+      supersededAt: { $exists: false }
     },
-    { $set: { supersededAt: now, supersededByPlanId: planId } },
+    { $set: { supersededAt: now, supersededByPlanId: planId } }
   );
 
   await ExperiencePlanRecord.findOneAndUpdate(
@@ -118,7 +115,7 @@ export async function storeAcceptedPlan(input: {
       revisionId: projected.revisionId,
       lessonId: projected.lessonId,
       mode: projected.mode,
-      contextFingerprint: projected.contextFingerprint,
+      contextFingerprint: projected.contextFingerprint
     },
     {
       $set: {
@@ -139,11 +136,11 @@ export async function storeAcceptedPlan(input: {
         planDigest: projected.digest,
         plan: projected,
         generatedBy: input.generatedBy,
-        generatedAt: now,
+        generatedAt: now
       },
-      $unset: { supersededAt: 1, supersededByPlanId: 1, invalidatedAt: 1, invalidationReason: 1 },
+      $unset: { supersededAt: 1, supersededByPlanId: 1, invalidatedAt: 1, invalidationReason: 1 }
     },
-    { upsert: true, new: true },
+    { upsert: true, new: true }
   );
 
   return { stored: true, planId };
@@ -203,13 +200,13 @@ export async function checkStoredPlanAvailability(input: {
     revisionId: input.revisionId,
     lessonId: input.lessonId,
     mode: input.mode,
-    supersededAt: { $exists: false },
+    supersededAt: { $exists: false }
   })
     .select({
       invalidatedAt: 1,
       planSchemaVersion: 1,
       registryVersion: 1,
-      presentationSchemaVersion: 1,
+      presentationSchemaVersion: 1
     })
     .lean();
   if (!row) return 'unavailable';
@@ -240,7 +237,7 @@ export async function loadAcceptedPlan(input: {
     lessonId: input.lessonId,
     mode: input.mode,
     supersededAt: { $exists: false },
-    invalidatedAt: { $exists: false },
+    invalidatedAt: { $exists: false }
   }).lean()) as IExperiencePlanRecord | null;
 
   if (!record) return { status: 'absent' };
@@ -272,7 +269,7 @@ export async function loadAcceptedPlan(input: {
   try {
     published = parsePublishedExperiencePlan(
       record.plan,
-      input.validationContext.blocks.map((block) => block.blockId),
+      input.validationContext.blocks.map((block) => block.blockId)
     );
   } catch {
     return { status: 'rejected', code: 'PLAN_SCHEMA_INVALID', stage: 'schema' };
@@ -303,7 +300,7 @@ export async function loadAcceptedPlan(input: {
         mode: published.mode,
         registryVersion: published.registryVersion,
         presentationSchemaVersion: PRESENTATION_SCHEMA_VERSION,
-        contextFingerprint: published.contextFingerprint,
+        contextFingerprint: published.contextFingerprint
       },
       planner: published.planner,
       // Reverse the published flattening precisely: a proposal placement nests
@@ -322,7 +319,7 @@ export async function loadAcceptedPlan(input: {
           ...('interaction' in entry && entry.interaction !== undefined
             ? { interaction: entry.interaction }
             : {}),
-          fallback: entry.fallback,
+          fallback: entry.fallback
         })),
         ...published.supplemental.map((entry) => ({
           placementId: entry.placementId,
@@ -336,11 +333,11 @@ export async function loadAcceptedPlan(input: {
             ? { interaction: entry.interaction }
             : {}),
           fallback: entry.fallback,
-          assetId: (entry as { assetId?: string }).assetId,
-        })),
-      ],
+          assetId: (entry as { assetId?: string }).assetId
+        }))
+      ]
     },
-    input.validationContext,
+    input.validationContext
   );
   if (!outcome.ok) return { status: 'rejected', code: outcome.code, stage: outcome.stage };
 
@@ -360,7 +357,7 @@ export async function invalidateStoredPlans(input: {
 }): Promise<number> {
   const result = await ExperiencePlanRecord.updateMany(
     { courseId: input.courseId, revisionId: input.revisionId, invalidatedAt: { $exists: false } },
-    { $set: { invalidatedAt: new Date(), invalidationReason: input.reason.slice(0, 80) } },
+    { $set: { invalidatedAt: new Date(), invalidationReason: input.reason.slice(0, 80) } }
   );
   if (result.modifiedCount > 0) recordEvent('plan_invalidated', result.modifiedCount);
   return result.modifiedCount;

@@ -1,10 +1,10 @@
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { IUser } from '../models/User';
-import { errorDetails } from '@ednova/shared/errors';
-import { createContracts } from '@ednova/shared/domainContracts';
+import { errorDetails } from '@noveris/shared/errors';
+import { createContracts } from '@noveris/shared/domainContracts';
 import Joi from 'joi';
 import Stripe from 'stripe';
-import { authenticate } from '@ednova/shared/auth';
+import { authenticate } from '@noveris/shared/auth';
 import type { Response } from 'express';
 import User from '../models/User';
 import Payment from '../models/Payment';
@@ -223,7 +223,7 @@ router.post('/subscribe', authenticate, async (req: DomainRequest, res: Response
             currency: 'usd',
             unit_amount: pricing.finalAmountCents,
             product_data: {
-              name: `EdNova ${value.tier === 'vip_plus' ? 'VIP+' : 'VIP'} (${pricing.durationMonths} month${pricing.durationMonths > 1 ? 's' : ''})`,
+              name: `Noveris ${value.tier === 'vip_plus' ? 'VIP+' : 'VIP'} (${pricing.durationMonths} month${pricing.durationMonths > 1 ? 's' : ''})`,
               description: `${pricing.durationMonths} month subscription prepaid${pricing.discountPercentage ? ` with ${pricing.discountPercentage}% discount` : ''}`
             }
           },

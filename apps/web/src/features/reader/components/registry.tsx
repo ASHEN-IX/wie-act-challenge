@@ -8,14 +8,13 @@ import {
   type ReactNode,
 } from "react";
 import { AlertCircle, Layers, LoaderCircle } from "lucide-react";
-import type { LessonBlockV2 } from "@ednova/shared/ednova/learningDocumentV2";
-import type { ComponentType as TrustedComponentType } from "@ednova/shared/ednova/componentRegistry";
+import type { LessonBlockV2 } from "@noveris/shared/ednova/learningDocumentV2";
+import type { ComponentType as TrustedComponentType } from "@noveris/shared/ednova/componentRegistry";
 import type {
   AssetPayload,
   PublishedStructuredAssetV1,
-} from "@ednova/shared/ednova/structuredAsset";
+} from "@noveris/shared/ednova/structuredAsset";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   DefinitionCard,
   ExampleBlock,
@@ -26,7 +25,6 @@ import {
 } from "./semantic";
 import {
   DerivationBlock,
-  FormulaBlock,
   ReviewedFormula,
   SourceMathFallback,
   type MathBlockContext,
@@ -137,14 +135,14 @@ function MathBlock({ block, context }: BlockProps) {
   return <ReviewedFormula block={block} />;
 }
 
-function CodeBlockView({ block, context }: BlockProps) {
+function CodeBlockView({ block }: BlockProps) {
   if (block.type !== "code") return null;
   // Canonical code carries no reviewed annotations, so Explore offers the
   // static viewer. A walkthrough requires a structured fixture.
   return <CodeViewer block={block} />;
 }
 
-function DiagramView({ block, context }: BlockProps) {
+function DiagramView({ block }: BlockProps) {
   if (block.type !== "diagram") return null;
   return <ProcessDiagram block={block} />;
 }

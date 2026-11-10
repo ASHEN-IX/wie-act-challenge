@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { LessonReader } from "@/features/reader/lesson-reader";
 import { previewPresentation, previewAssets } from "@/features/reader/preview-fixture";
-import { isReaderMode, type ReaderMode } from "@ednova/shared/ednova/presentationPlan";
+import { isReaderMode, type ReaderMode } from "@noveris/shared/ednova/presentationPlan";
 
 /**
  * Development-only reader preview. It renders the real `LessonReader` from a

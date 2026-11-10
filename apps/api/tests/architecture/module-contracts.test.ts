@@ -1,9 +1,9 @@
 import type { DomainRequest } from '../../src/framework/contracts';
 import express from 'express';
-import { authenticate } from '@ednova/shared/auth';
+import { authenticate } from '@noveris/shared/auth';
 import { createSession as generateToken } from '../sessionFixtures';
-import client from '@ednova/shared/moduleClient';
-import { requireInternal } from '@ednova/shared';
+import client from '@noveris/shared/moduleClient';
+import { requireInternal } from '@noveris/shared';
 
 const app = express();
 app.use(express.json());

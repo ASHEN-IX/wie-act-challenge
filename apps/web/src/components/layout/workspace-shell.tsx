@@ -32,7 +32,7 @@ export function WorkspaceShell({
   return (
     <div className="min-h-screen lg:pl-64" data-focus-shell>
       <aside data-focus-hide className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-sidebar-border bg-sidebar p-5 lg:flex">
-        <div className="mb-6 flex items-center justify-between px-2">
+        <div className="mb-6 flex flex-col items-start gap-2 px-2">
           <Logo href="/dashboard" />
           <Badge
             variant="outline"

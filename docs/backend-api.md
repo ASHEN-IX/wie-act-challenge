@@ -1,28 +1,41 @@
-# Backend API — CURRENT
+# Noveris backend API
 
-The production entrypoint is `apps/api/src/main.ts`, compiled to `dist/main.js`. It boots NestJS on one Express-backed HTTP listener (:3000), loads seven in-process domains and attaches notification/session WebSockets. `src/app.ts` remains an Express compatibility path used by tests; retain it until usage is proven otherwise.
+`apps/api/src/main.ts` starts the NestJS application, connects PostgreSQL, attaches realtime and initializes domain consumers and pollers. Local development uses port 3001. The Express-compatible application retained under `src/app.ts` is also used by tests. Production lifecycle and route discovery should be checked against the actual launcher and domain definitions.
 
-Authoritative public route mounts are `src/domain-definitions.ts`; generated Nest controllers live under `src/framework/domains/` and dispatch domain contract operations. `shared/moduleClient.ts` handles `module://` calls with identity context; outbound HTTP uses `shared/aiClient.ts`. Domain models/persistence remain in `modules/*` and `shared`.
+## Domain contracts and dispatch
 
-Better Auth's engine is hosted at Next `/api/auth/*`. Backend session guards resolve the same database identity; roles are student/admin and tier/ownership policies add restrictions. This is not active custom JWT login. Some HTTP resource-membership paths still need repair (ED-02). See [permissions](roles-and-permissions.md), [architecture](architecture.md) and [validation](audit/validation.md).
+`src/domain-definitions.ts` mounts domain operations. Generated adapters under `src/framework/domains` connect these contracts to NestJS. Existing handlers remain under `modules/*`. `shared/moduleClient.ts` resolves in-process module calls with request context. Outbound AI HTTP uses the configured service client. Run `pnpm generate:contracts` after relevant route-contract edits.
 
-From root: `pnpm --filter api build`, `pnpm --filter api typecheck`, `pnpm --filter api test`, `pnpm test:integration`, `pnpm test:auth`. Database/broker/test prerequisites are in [development](development.md). Preserve contracts, leases/idempotency, upload checks, session auth, metrics and backup mechanisms. M04-A membership/invitation administration is partially delivered; enrollment, publication and facilitator APIs remain PLANNED.
+Better Auth's web engine is hosted at Next `/api/auth/*`. API guards resolve the same account and session state. Role and entitlement checks are supplemented by institution, course, room and recipient-specific resource policies. Use [permissions](roles-and-permissions.md) for the exact boundaries.
 
-## M04-A/M04-A.1 institution endpoints
+## Study API responsibilities
 
-Mounted at `/api/v1/study/institutions` with the existing Better Auth session. These routes expose membership context only; they do not grant course or source access.
+| Source routes | Responsibility | Authoritative service boundary |
+| --- | --- | --- |
+| `institutions.ts` | Bootstrap, context, metadata, member invitations and suspension | Active institution role and invitation state |
+| `enrollments.ts` | Instructor assignment, course invitations, student enrollment and withdrawal | Course administration plus same-institution eligibility |
+| `courses.ts` | Upload, draft, source review, publication, visibility and public catalog | Owner/teaching/source grants and expected revision |
+| `activities.ts` | Reviewed activity access and private submissions | Pinned public definition, private evaluation and actor receipt |
+| `learning.ts` | Practice selection, diagnostic cues, support and adaptation | Actor and authorized published course |
+| `rooms.ts` | Room participation, controls, facilitator and debrief | Current participant, source grant and room state |
+| `internalBudget.ts` | LLM reservations, usage, activity and revocation | Internal service credential and bound approval identity |
 
-- `GET /` — active institution contexts for the authenticated actor.
-- `POST /bootstrap` — platform-admin-only synthetic institution setup and first `university_admin` membership.
-- `GET /:institutionId` — context for an active member of that institution.
-- `PATCH /:institutionId` — metadata update by an active `university_admin`.
-- `POST /:institutionId/invitations` — issue an independent pending instructor/student invitation; multiple pending invitations per institution/role are allowed, and the raw token is returned once.
-- `DELETE /:institutionId/invitations/:invitationId` — revoke a pending invitation.
-- `POST /invitations/accept` — atomically claim an unexpired pending invitation, then establish membership. Same-actor retries return `200` and reconcile a missing membership; another actor receives `409`; revoked/expired tokens return `410`. No cross-collection transaction or rollback-to-pending is claimed.
-- `DELETE /:institutionId/memberships/:userId` — suspend a non-administrator membership. Reissuing an invitation does not reactivate it.
+Inspect `apps/api/modules/study/src/routes` and the generated domain adapters for exact endpoint signatures. This table describes responsibilities rather than a second endpoint registry.
 
-No enrollment or course-scope route is implemented.
+## Institution versus course operations
 
-## v1.2 implementation scope
+`/api/v1/study/institutions/bootstrap` requires platform-admin authority. Membership acceptance establishes an institution context. `/courses/:courseId/instructors` and `/courses/:courseId/enrollments` establish separate course relationships. Course invitation acceptance is a different workflow from institution invitation acceptance. Public-course reading follows visibility/publication policy and does not populate an institution roster.
 
-Each owner delivers API, frontend and AI together: Habib course/content/access/revision endpoints and ingestion; Tasnim activity/attempt/evidence/progress/reward endpoints and individual tutoring/evaluation; Aziz room/chat/voice/private-help/debrief endpoints and group facilitation. Source authorization Habib, individual evidence Tasnim and room state Aziz are the authoritative boundaries; no backend-only or AI-only member. See [team plan](team-delivery-plan.md) and [backlog](sprint-backlog.md). This update implemented no features.
+## Source and evidence integrity
+
+Publication validates authority, expected revision and source artifacts. ActivityRecord separates the public activity from server evaluation. Private attempts use stable actor/attempt identity, payload hash and pinned revision. Receipt and evidence writes support recoverable processing. Competency and reward are derived state. Source-backed reads recheck current grants, including private results and materialized context where implemented.
+
+## Async and realtime
+
+Typed broker jobs carry message and correlation identity. Result consumers apply supported progress and outcomes. HTTP service availability is separate from worker/broker readiness. Room WebSockets deliver events while PostgreSQL stores command receipts and peer history. The peer journal sequence is distinct from room state sequence.
+
+## Verification and operations
+
+Run `pnpm --filter api build`, `pnpm --filter api typecheck` and the relevant package test commands. `pnpm test:integration` includes infrastructure-dependent API suites. Use disposable PostgreSQL fixture databases and the documented service configuration. The OpenAPI description is exposed at `/api/v1/docs/openapi.json` in the configured runtime.
+
+See [development](development.md), [workflows](workflows.md), [data model](data-model.md) and [evidence](submission/evidence/EDNOVA-CLAIM-TRACEABILITY.md). Test coverage for a resource policy does not certify all inherited endpoints or deployment configurations.

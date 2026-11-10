@@ -43,7 +43,7 @@ export const SEMANTIC_ROLES = [
   'example',
   'exercise',
   'solution',
-  'remark',
+  'remark'
 ] as const;
 export type SemanticRole = (typeof SEMANTIC_ROLES)[number];
 
@@ -92,11 +92,7 @@ export type ComponentType =
 /** How much a component may claim about the source. Components never widen
  * this; the projection decides it and the registry only declares support. */
 export type EvidenceRequirement =
-  | 'none'
-  | 'block_evidence'
-  | 'source_region'
-  | 'reviewed_formula'
-  | 'structured_fixture';
+  'none' | 'block_evidence' | 'source_region' | 'reviewed_formula' | 'structured_fixture';
 
 export type RenderPolicyCompatibility = 'primary' | 'source_faithful';
 
@@ -159,7 +155,7 @@ export type ComponentCapability = {
 const a11y = (
   role: AccessibilityContract['role'],
   visualFallback: AccessibilityContract['visualFallback'] = 'none',
-  keyboardOperable = false,
+  keyboardOperable = false
 ): AccessibilityContract => ({ role, textAlternative: true, keyboardOperable, visualFallback });
 
 const staticLight: PerformanceContract = { tier: 'static', weight: 'light' };
@@ -167,7 +163,7 @@ const staticMedium: PerformanceContract = { tier: 'static', weight: 'medium' };
 const interactive: PerformanceContract = {
   tier: 'interactive',
   weight: 'medium',
-  bounds: { maxPoints: 4000, maxSteps: 200 },
+  bounds: { maxPoints: 4000, maxSteps: 200 }
 };
 
 const definitions: ComponentCapability[] = [
@@ -182,7 +178,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('region'),
     performance: staticLight,
     fallback: 'ConceptExplanation',
-    summary: 'Lesson title, chapter context and optional validated objectives.',
+    summary: 'Lesson title, chapter context and optional validated objectives.'
   },
   {
     type: 'SectionHeading',
@@ -194,7 +190,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('region'),
     performance: staticLight,
     fallback: 'ConceptExplanation',
-    summary: 'In-lesson heading, rendered at a level that never skips rank.',
+    summary: 'In-lesson heading, rendered at a level that never skips rank.'
   },
   {
     type: 'ConceptExplanation',
@@ -206,7 +202,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('article'),
     performance: staticLight,
     fallback: 'ConceptExplanation',
-    summary: 'Educational prose preserving order, emphasis and line breaks.',
+    summary: 'Educational prose preserving order, emphasis and line breaks.'
   },
   {
     type: 'DefinitionCard',
@@ -219,7 +215,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('note'),
     performance: staticLight,
     fallback: 'ImportantNote',
-    summary: 'A source definition with distinct visual treatment.',
+    summary: 'A source definition with distinct visual treatment.'
   },
   {
     type: 'TheoremCard',
@@ -232,7 +228,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('note'),
     performance: staticLight,
     fallback: 'ImportantNote',
-    summary: 'Theorem, proposition, lemma or corollary statement.',
+    summary: 'Theorem, proposition, lemma or corollary statement.'
   },
   {
     type: 'ProofBlock',
@@ -245,7 +241,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('note', 'none', true),
     performance: staticLight,
     fallback: 'ImportantNote',
-    summary: 'Structured proof, collapsible without hiding it from a11y tools.',
+    summary: 'Structured proof, collapsible without hiding it from a11y tools.'
   },
   {
     type: 'ExampleBlock',
@@ -258,7 +254,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('note'),
     performance: staticLight,
     fallback: 'ImportantNote',
-    summary: 'A worked source example with its own hierarchy.',
+    summary: 'A worked source example with its own hierarchy.'
   },
   {
     type: 'ExerciseBlock',
@@ -271,7 +267,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('note'),
     performance: staticLight,
     fallback: 'ImportantNote',
-    summary: 'An original source exercise. Not auto-converted into a graded assessment.',
+    summary: 'An original source exercise. Not auto-converted into a graded assessment.'
   },
   {
     type: 'ImportantNote',
@@ -283,7 +279,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('note'),
     performance: staticLight,
     fallback: 'ConceptExplanation',
-    summary: 'Validated warning, remark or generic source note.',
+    summary: 'Validated warning, remark or generic source note.'
   },
   {
     type: 'SourceReference',
@@ -295,7 +291,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('group', 'none', true),
     performance: staticLight,
     fallback: 'ConceptExplanation',
-    summary: 'Authorized link to the original document and source location.',
+    summary: 'Authorized link to the original document and source location.'
   },
 
   // ---- mathematics --------------------------------------------------------
@@ -309,7 +305,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('figure'),
     performance: { tier: 'static', weight: 'medium' },
     fallback: 'SourceMathFallback',
-    summary: 'Safe KaTeX rendering of a reviewed display expression.',
+    summary: 'Safe KaTeX rendering of a reviewed display expression.'
   },
   {
     type: 'ReviewedFormula',
@@ -321,7 +317,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('figure', 'none', true),
     performance: { tier: 'static', weight: 'medium' },
     fallback: 'SourceMathFallback',
-    summary: 'Instructor-reviewed formula with its review state made explicit.',
+    summary: 'Instructor-reviewed formula with its review state made explicit.'
   },
   {
     type: 'SourceMathFallback',
@@ -333,7 +329,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('figure', 'none', true),
     performance: staticMedium,
     fallback: 'SourceMathFallback',
-    summary: 'Original crop plus preserved text for unreviewed mathematics.',
+    summary: 'Original crop plus preserved text for unreviewed mathematics.'
   },
   {
     type: 'DerivationBlock',
@@ -347,7 +343,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('figure'),
     performance: { tier: 'static', weight: 'medium' },
     fallback: 'SourceMathFallback',
-    summary: 'Multiline derivation in canonical order; no steps are generated.',
+    summary: 'Multiline derivation in canonical order; no steps are generated.'
   },
   {
     type: 'MathematicalDefinition',
@@ -360,7 +356,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('note'),
     performance: { tier: 'static', weight: 'medium' },
     fallback: 'DefinitionCard',
-    summary: 'Explanatory prose combined with reviewed notation.',
+    summary: 'Explanatory prose combined with reviewed notation.'
   },
   {
     type: 'EquationGroup',
@@ -372,7 +368,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('figure'),
     performance: { tier: 'static', weight: 'medium' },
     fallback: 'FormulaBlock',
-    summary: 'Related expressions displayed without altering source order.',
+    summary: 'Related expressions displayed without altering source order.'
   },
 
   // ---- programming --------------------------------------------------------
@@ -386,7 +382,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('figure', 'none', true),
     performance: staticMedium,
     fallback: 'ConceptExplanation',
-    summary: 'Syntax-highlighted source with exact whitespace. Never executed.',
+    summary: 'Syntax-highlighted source with exact whitespace. Never executed.'
   },
   {
     type: 'CodeExplanation',
@@ -398,7 +394,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('article'),
     performance: staticMedium,
     fallback: 'ConceptExplanation',
-    summary: 'Source-backed explanation presented beside code.',
+    summary: 'Source-backed explanation presented beside code.'
   },
   {
     type: 'CodeWalkthrough',
@@ -410,7 +406,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('group', 'text_summary', true),
     performance: interactive,
     fallback: 'CodeViewer',
-    summary: 'Guided line-by-line progression over annotated source.',
+    summary: 'Guided line-by-line progression over annotated source.'
   },
   {
     type: 'InputOutputExample',
@@ -422,7 +418,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('figure'),
     performance: staticMedium,
     fallback: 'CodeViewer',
-    summary: 'Trusted example inputs and outputs. No output is fabricated.',
+    summary: 'Trusted example inputs and outputs. No output is fabricated.'
   },
   {
     type: 'CodeComparison',
@@ -434,7 +430,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('figure'),
     performance: staticMedium,
     fallback: 'CodeViewer',
-    summary: 'Source-backed before/after or alternative implementations.',
+    summary: 'Source-backed before/after or alternative implementations.'
   },
 
   // ---- engineering and diagrams -------------------------------------------
@@ -448,7 +444,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('figure'),
     performance: staticMedium,
     fallback: 'SourceDiagram',
-    summary: 'Captioned source image with reserved dimensions.',
+    summary: 'Captioned source image with reserved dimensions.'
   },
   {
     type: 'SourceDiagram',
@@ -462,7 +458,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('figure'),
     performance: staticMedium,
     fallback: 'FigureViewer',
-    summary: 'Original technical diagram rendered safely as an image.',
+    summary: 'Original technical diagram rendered safely as an image.'
   },
   {
     type: 'AnnotatedDiagram',
@@ -474,7 +470,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('figure', 'text_summary', true),
     performance: { tier: 'interactive', weight: 'medium', bounds: { maxNodes: 60 } },
     fallback: 'SourceDiagram',
-    summary: 'Trusted hotspots over a source diagram with keyboard focus.',
+    summary: 'Trusted hotspots over a source diagram with keyboard focus.'
   },
   {
     type: 'ProcessDiagram',
@@ -488,7 +484,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('group', 'text_summary', true),
     performance: { tier: 'interactive', weight: 'medium', bounds: { maxSteps: 60 } },
     fallback: 'SourceDiagram',
-    summary: 'Validated process steps with guided progression.',
+    summary: 'Validated process steps with guided progression.'
   },
   {
     type: 'ArchitectureDiagram',
@@ -500,7 +496,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('figure', 'text_summary', true),
     performance: { tier: 'interactive', weight: 'medium', bounds: { maxNodes: 80 } },
     fallback: 'ProcessDiagram',
-    summary: 'System-component relationships from validated structured data.',
+    summary: 'System-component relationships from validated structured data.'
   },
   {
     type: 'NetworkTopology',
@@ -512,7 +508,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('figure', 'text_summary', true),
     performance: { tier: 'interactive', weight: 'medium', bounds: { maxNodes: 80 } },
     fallback: 'ProcessDiagram',
-    summary: 'Validated nodes, links and labels. Connectivity is never inferred.',
+    summary: 'Validated nodes, links and labels. Connectivity is never inferred.'
   },
 
   // ---- structured information ---------------------------------------------
@@ -526,7 +522,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('figure'),
     performance: staticLight,
     fallback: 'ConceptExplanation',
-    summary: 'Source table preserving real rows and cells.',
+    summary: 'Source table preserving real rows and cells.'
   },
   {
     type: 'ComparisonTable',
@@ -538,7 +534,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('figure'),
     performance: staticLight,
     fallback: 'EducationalTable',
-    summary: 'Side-by-side comparison table from structured source data.',
+    summary: 'Side-by-side comparison table from structured source data.'
   },
   {
     type: 'KeyValueTable',
@@ -550,7 +546,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('figure'),
     performance: staticLight,
     fallback: 'EducationalTable',
-    summary: 'Two-column reference table from structured source data.',
+    summary: 'Two-column reference table from structured source data.'
   },
   {
     type: 'StepSequence',
@@ -562,7 +558,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('group', 'text_summary', true),
     performance: { tier: 'interactive', weight: 'light', bounds: { maxSteps: 60 } },
     fallback: 'ProcessDiagram',
-    summary: 'Numbered sequence of validated steps.',
+    summary: 'Numbered sequence of validated steps.'
   },
   {
     type: 'Timeline',
@@ -574,7 +570,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('group', 'text_summary', true),
     performance: { tier: 'interactive', weight: 'light', bounds: { maxSteps: 60 } },
     fallback: 'StepSequence',
-    summary: 'Ordered events where the source supplies dated structure.',
+    summary: 'Ordered events where the source supplies dated structure.'
   },
   {
     type: 'ConceptList',
@@ -586,7 +582,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('article'),
     performance: staticLight,
     fallback: 'ConceptExplanation',
-    summary: 'Ordered or unordered concept list.',
+    summary: 'Ordered or unordered concept list.'
   },
   {
     type: 'SourceCitation',
@@ -598,7 +594,7 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('note', 'none', true),
     performance: staticLight,
     fallback: 'SourceReference',
-    summary: 'Inline citation for a source-backed statement.',
+    summary: 'Inline citation for a source-backed statement.'
   },
   {
     type: 'DataChart',
@@ -610,19 +606,19 @@ const definitions: ComponentCapability[] = [
     accessibility: a11y('figure', 'data_table'),
     performance: staticMedium,
     fallback: 'ConceptExplanation',
-    summary: 'Validated series with an always-present data-table alternative.',
-  },
+    summary: 'Validated series with an always-present data-table alternative.'
+  }
 ];
 
 /** Frozen capability table. Keyed by type so resolution is a dictionary
  * lookup, never a dynamic import. */
 export const COMPONENT_CAPABILITIES: Readonly<Record<ComponentType, ComponentCapability>> =
   Object.freeze(
-    Object.fromEntries(definitions.map((entry) => [entry.type, Object.freeze(entry)])),
+    Object.fromEntries(definitions.map((entry) => [entry.type, Object.freeze(entry)]))
   ) as Record<ComponentType, ComponentCapability>;
 
 export const COMPONENT_TYPES = Object.freeze(
-  definitions.map((entry) => entry.type),
+  definitions.map((entry) => entry.type)
 ) as readonly ComponentType[];
 
 export function isComponentType(value: unknown): value is ComponentType {
@@ -661,11 +657,13 @@ export type ResolutionFailure =
 /** Deterministic capability check. Returns the fallback capability on failure
  * rather than throwing, so a bad projection degrades to a trusted component
  * instead of an empty page. Unknown types fall back to ConceptExplanation. */
-export function resolveComponent(
-  request: ComponentResolutionRequest,
-): ComponentResolution {
+export function resolveComponent(request: ComponentResolutionRequest): ComponentResolution {
   if (!isComponentType(request.component))
-    return { ok: false, reason: 'unknown_component', fallback: COMPONENT_CAPABILITIES.ConceptExplanation };
+    return {
+      ok: false,
+      reason: 'unknown_component',
+      fallback: COMPONENT_CAPABILITIES.ConceptExplanation
+    };
   const capability = COMPONENT_CAPABILITIES[request.component];
   const fallback = COMPONENT_CAPABILITIES[capability.fallback];
   if (!capability.accepts.includes(request.blockType))

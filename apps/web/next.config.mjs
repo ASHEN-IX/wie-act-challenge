@@ -8,7 +8,7 @@ export default {
   images: { qualities: [75, 90] },
   experimental: { serverActions: { bodySizeLimit: "26mb" } },
   logging: { incomingRequests: false },
-  transpilePackages: ["@ednova/shared"],
+  transpilePackages: ["@noveris/shared"],
   serverExternalPackages: ["mongodb", "nodemailer"],
   async redirects() {
     return [

@@ -6,11 +6,10 @@
  * missing or insecure defaults are detected in production.
  *
  * Usage:
- *   const { requireEnv } = require('@ednova/shared');
+ *   const { requireEnv } = require('@noveris/shared');
  *   requireEnv(['BETTER_AUTH_SECRET', 'MONGODB_URI']);
  */
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const logger = require('./logger');
+import logger from './logger';
 
 const INSECURE_DEFAULTS: string[] = [
   'your-super-secret-jwt-key-change-in-production',

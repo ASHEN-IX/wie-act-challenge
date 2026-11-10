@@ -1,4 +1,4 @@
-import { errorDetails } from '@ednova/shared/errors';
+import { errorDetails } from '@noveris/shared/errors';
 import { connectDatabase, disconnectDatabase } from '../../../../shared/database';
 import path from 'path';
 import dotenv from 'dotenv';

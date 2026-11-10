@@ -16,7 +16,7 @@ export const TRUSTED_COMPONENTS = [
   'line_chart',
   'diagram_walkthrough',
   'code_walkthrough',
-  'source_check',
+  'source_check'
 ] as const;
 
 export type TrustedComponent = (typeof TRUSTED_COMPONENTS)[number];
@@ -113,8 +113,14 @@ const exactKeys = (value: Record<string, unknown>, allowed: string[]) => {
 export function validatePlannerRequest(value: unknown): PlannerRequest {
   const v = record(value);
   exactKeys(v, [
-    'schemaVersion', 'courseId', 'revisionId', 'lesson', 'sourceReferences',
-    'learnerRequest', 'availableComponents', 'constraints',
+    'schemaVersion',
+    'courseId',
+    'revisionId',
+    'lesson',
+    'sourceReferences',
+    'learnerRequest',
+    'availableComponents',
+    'constraints'
   ]);
   if (v.schemaVersion !== EXPERIENCE_PLAN_VERSION) fail();
   const lesson = record(v.lesson);
@@ -130,14 +136,31 @@ export function validatePlannerRequest(value: unknown): PlannerRequest {
     Number(constraints.maxDataPoints) > 30 ||
     typeof constraints.allowMedia !== 'boolean' ||
     typeof constraints.allowCharts !== 'boolean'
-  ) fail();
+  )
+    fail();
   if (!Array.isArray(v.sourceReferences) || v.sourceReferences.length > 32) fail();
   const sourceReferences = v.sourceReferences.map((entry) => {
     const ref = record(entry);
     exactKeys(ref, ['chunkId', 'documentId', 'pageNumber', 'lineStart', 'lineEnd']);
-    if (ref.pageNumber !== null && (!Number.isSafeInteger(ref.pageNumber) || Number(ref.pageNumber) < 1)) fail();
-    if (!Number.isSafeInteger(ref.lineStart) || !Number.isSafeInteger(ref.lineEnd) || Number(ref.lineStart) < 1 || Number(ref.lineEnd) < Number(ref.lineStart)) fail();
-    return { chunkId: str(ref.chunkId, 128), documentId: str(ref.documentId, 128), pageNumber: ref.pageNumber as number | null, lineStart: ref.lineStart as number, lineEnd: ref.lineEnd as number };
+    if (
+      ref.pageNumber !== null &&
+      (!Number.isSafeInteger(ref.pageNumber) || Number(ref.pageNumber) < 1)
+    )
+      fail();
+    if (
+      !Number.isSafeInteger(ref.lineStart) ||
+      !Number.isSafeInteger(ref.lineEnd) ||
+      Number(ref.lineStart) < 1 ||
+      Number(ref.lineEnd) < Number(ref.lineStart)
+    )
+      fail();
+    return {
+      chunkId: str(ref.chunkId, 128),
+      documentId: str(ref.documentId, 128),
+      pageNumber: ref.pageNumber as number | null,
+      lineStart: ref.lineStart as number,
+      lineEnd: ref.lineEnd as number
+    };
   });
   if (!Array.isArray(v.availableComponents)) fail();
   const availableComponents = v.availableComponents.map((item) => {
@@ -151,7 +174,7 @@ export function validatePlannerRequest(value: unknown): PlannerRequest {
     lesson: {
       topicId: lesson.topicId === null ? null : str(lesson.topicId, 128),
       subtopicId: lesson.subtopicId === null ? null : str(lesson.subtopicId, 128),
-      title: str(lesson.title, 500),
+      title: str(lesson.title, 500)
     },
     sourceReferences,
     learnerRequest: str(v.learnerRequest, 2000),
@@ -161,40 +184,58 @@ export function validatePlannerRequest(value: unknown): PlannerRequest {
       maxDataPoints: constraints.maxDataPoints as number,
       allowMedia: constraints.allowMedia as boolean,
       allowCharts: constraints.allowCharts as boolean,
-      locale: str(constraints.locale, 24),
-    },
+      locale: str(constraints.locale, 24)
+    }
   };
 }
 
 export function validatePlannedExperience(
   value: unknown,
   request: PlannerRequest,
-  document: ReadingDocumentV2,
+  document: ReadingDocumentV2
 ): PlannedExperience {
   const v = record(value);
   exactKeys(v, ['schemaVersion', 'planner', 'components', 'uncertainty']);
-  if (v.schemaVersion !== EXPERIENCE_PLAN_VERSION || v.planner !== 'trusted_component_config') fail();
-  if (!Array.isArray(v.components) || !v.components.length || v.components.length > request.constraints.maxComponents) fail();
+  if (v.schemaVersion !== EXPERIENCE_PLAN_VERSION || v.planner !== 'trusted_component_config')
+    fail();
+  if (
+    !Array.isArray(v.components) ||
+    !v.components.length ||
+    v.components.length > request.constraints.maxComponents
+  )
+    fail();
   const evidence = new Map(
-    document.canonical.mappings.map((mapping) => [mapping.chunkId, mapping]),
+    document.canonical.mappings.map((mapping) => [mapping.chunkId, mapping])
   );
   const requested = new Set(request.sourceReferences.map((ref) => ref.chunkId));
   const allowed = (ids: string[]) => {
-    if (!ids.length || ids.some((id) => !evidence.has(id) || !requested.has(id))) fail('A component referenced unavailable source material.');
+    if (!ids.length || ids.some((id) => !evidence.has(id) || !requested.has(id)))
+      fail('A component referenced unavailable source material.');
     return [...new Set(ids)];
   };
   const components = v.components.map((entry): PlannedComponent => {
     const component = record(entry);
     const type = component.type;
     if (!TRUSTED_COMPONENTS.includes(type as TrustedComponent)) fail('Unknown component.');
-    if (!request.availableComponents.includes(type as TrustedComponent)) fail('Component unavailable for this lesson.');
+    if (!request.availableComponents.includes(type as TrustedComponent))
+      fail('Component unavailable for this lesson.');
     switch (type) {
       case 'explanation':
         exactKeys(component, ['type', 'title', 'text', 'sourceChunkIds']);
-        return { type, title: str(component.title, 300), text: str(component.text, 4000), sourceChunkIds: allowed(strs(component.sourceChunkIds, 8, 128)) };
+        return {
+          type,
+          title: str(component.title, 300),
+          text: str(component.text, 4000),
+          sourceChunkIds: allowed(strs(component.sourceChunkIds, 8, 128))
+        };
       case 'worked_example':
         exactKeys(component, ['type', 'title', 'steps', 'sourceChunkIds']);
-        return { type, title: str(component.title, 300), steps: strs(component.steps, 12, 1200), sourceChunkIds: allowed(strs(component.sourceChunkIds, 8, 128)) };
+        return {
+          type,
+          title: str(component.title, 300),
+          steps: strs(component.steps, 12, 1200),
+          sourceChunkIds: allowed(strs(component.sourceChunkIds, 8, 128))
+        };
       case 'comparison_table': {
         exactKeys(component, ['type', 'title', 'columns', 'rows', 'sourceChunkIds']);
         const columns = strs(component.columns, 8, 200);
@@ -204,29 +245,60 @@ export function validatePlannedExperience(
           if (cells.length !== columns.length) fail();
           return cells;
         });
-        return { type, title: str(component.title, 300), columns, rows, sourceChunkIds: allowed(strs(component.sourceChunkIds, 8, 128)) };
+        return {
+          type,
+          title: str(component.title, 300),
+          columns,
+          rows,
+          sourceChunkIds: allowed(strs(component.sourceChunkIds, 8, 128))
+        };
       }
       case 'bar_chart':
       case 'line_chart': {
         if (!request.constraints.allowCharts) fail('Charts are disabled for this lesson.');
         exactKeys(component, ['type', 'title', 'categories', 'values', 'sourceChunkIds']);
         const categories = strs(component.categories, request.constraints.maxDataPoints, 120);
-        if (!Array.isArray(component.values) || component.values.length !== categories.length) fail();
+        if (!Array.isArray(component.values) || component.values.length !== categories.length)
+          fail();
         const values = component.values.map((number) => {
-          if (typeof number !== 'number' || !Number.isFinite(number) || Math.abs(number) > 1e12) fail();
+          if (typeof number !== 'number' || !Number.isFinite(number) || Math.abs(number) > 1e12)
+            fail();
           return number;
         });
-        return { type, title: str(component.title, 300), categories, values, sourceChunkIds: allowed(strs(component.sourceChunkIds, 8, 128)) };
+        return {
+          type,
+          title: str(component.title, 300),
+          categories,
+          values,
+          sourceChunkIds: allowed(strs(component.sourceChunkIds, 8, 128))
+        };
       }
       case 'diagram_walkthrough':
         exactKeys(component, ['type', 'title', 'steps', 'sourceChunkIds']);
-        return { type, title: str(component.title, 300), steps: strs(component.steps, 12, 1200), sourceChunkIds: allowed(strs(component.sourceChunkIds, 8, 128)) };
+        return {
+          type,
+          title: str(component.title, 300),
+          steps: strs(component.steps, 12, 1200),
+          sourceChunkIds: allowed(strs(component.sourceChunkIds, 8, 128))
+        };
       case 'code_walkthrough':
         exactKeys(component, ['type', 'title', 'language', 'code', 'focus', 'sourceChunkIds']);
-        return { type, title: str(component.title, 300), language: str(component.language, 24), code: str(component.code, 20000), focus: strs(component.focus, 10, 500), sourceChunkIds: allowed(strs(component.sourceChunkIds, 8, 128)) };
+        return {
+          type,
+          title: str(component.title, 300),
+          language: str(component.language, 24),
+          code: str(component.code, 20000),
+          focus: strs(component.focus, 10, 500),
+          sourceChunkIds: allowed(strs(component.sourceChunkIds, 8, 128))
+        };
       case 'source_check':
         exactKeys(component, ['type', 'prompt', 'answerChunkIds', 'sourceChunkIds']);
-        return { type, prompt: str(component.prompt, 1200), answerChunkIds: allowed(strs(component.answerChunkIds, 8, 128)), sourceChunkIds: allowed(strs(component.sourceChunkIds, 8, 128)) };
+        return {
+          type,
+          prompt: str(component.prompt, 1200),
+          answerChunkIds: allowed(strs(component.answerChunkIds, 8, 128)),
+          sourceChunkIds: allowed(strs(component.sourceChunkIds, 8, 128))
+        };
       default:
         return fail();
     }
@@ -235,7 +307,15 @@ export function validatePlannedExperience(
   const uncertainty = v.uncertainty.map((entry) => {
     const item = record(entry);
     exactKeys(item, ['message', 'sourceChunkIds']);
-    return { message: str(item.message, 1000), sourceChunkIds: allowed(strs(item.sourceChunkIds, 8, 128)) };
+    return {
+      message: str(item.message, 1000),
+      sourceChunkIds: allowed(strs(item.sourceChunkIds, 8, 128))
+    };
   });
-  return { schemaVersion: EXPERIENCE_PLAN_VERSION, planner: 'trusted_component_config', components, uncertainty };
+  return {
+    schemaVersion: EXPERIENCE_PLAN_VERSION,
+    planner: 'trusted_component_config',
+    components,
+    uncertainty
+  };
 }

@@ -12,7 +12,7 @@ const { createSession } = require('../../../../tests/sessionFixtures');
 const jwt = { sign: createSession };
 import request from 'supertest';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { authenticate } = require('@ednova/shared/auth');
+const { authenticate } = require('@noveris/shared/auth');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const tasksRouter = require('../routes/tasks');
 
@@ -31,7 +31,7 @@ jest.mock('../models', () => {
     }
   };
 });
-jest.mock('@ednova/shared/moduleClient', () => ({
+jest.mock('@noveris/shared/moduleClient', () => ({
   post: jest.fn().mockResolvedValue({ data: {} })
 }));
 

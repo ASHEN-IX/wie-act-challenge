@@ -8,12 +8,12 @@ import { performance } from 'node:perf_hooks';
 import {
   experienceContextFingerprint,
   parseExperiencePlanProposal,
-  type ExperiencePlanValidationContext,
+  type ExperiencePlanValidationContext
 } from '../shared/ednova/experiencePlan';
 import { validateExperiencePlan } from '../shared/ednova/experiencePlanValidator';
 import {
   planMockExperience,
-  type MockPlannerContext,
+  type MockPlannerContext
 } from '../shared/ednova/mockExperiencePlanner';
 
 const courseId = 'a57d9f30-21c4-58ff-b48c-1e9e140f4c6d';
@@ -32,7 +32,7 @@ function build(blockCount: number): ExperiencePlanValidationContext {
       hasEvidence: true,
       hasSourceRegion: kind === 'math',
       isReviewedFormula: false,
-      hasStructuredFixture: false,
+      hasStructuredFixture: false
     };
   });
   return {
@@ -47,11 +47,11 @@ function build(blockCount: number): ExperiencePlanValidationContext {
       contentHash,
       lessonId: 'lesson-1',
       mode: 'read',
-      blockIds: blocks.map((block) => block.blockId),
+      blockIds: blocks.map((block) => block.blockId)
     }),
     allowedPlanners: [{ implementation: 'mock_experience_planner', version: '1.0.0' }],
     blocks,
-    assets: [],
+    assets: []
   };
 }
 
@@ -69,9 +69,9 @@ function plannerContext(ctx: ExperiencePlanValidationContext): MockPlannerContex
       hasEvidence: block.hasEvidence,
       hasSourceRegion: block.hasSourceRegion,
       isReviewedFormula: block.isReviewedFormula,
-      hasStructuredFixture: block.hasStructuredFixture,
+      hasStructuredFixture: block.hasStructuredFixture
     })),
-    assets: [],
+    assets: []
   };
 }
 
@@ -89,7 +89,7 @@ function time(label: string, iterations: number, run: () => void) {
     `${label.padEnd(46)} n=${String(iterations).padStart(4)}  ` +
       `mean=${mean.toFixed(3)}ms  p50=${samples[Math.floor(iterations * 0.5)].toFixed(3)}ms  ` +
       `p95=${samples[Math.floor(iterations * 0.95)].toFixed(3)}ms  ` +
-      `max=${samples[samples.length - 1].toFixed(3)}ms`,
+      `max=${samples[samples.length - 1].toFixed(3)}ms`
   );
 }
 
@@ -107,8 +107,8 @@ for (const blockCount of [20, 100, 400]) {
       contentHash,
       lessonId: 'lesson-1',
       mode: 'read',
-      blockIds: ctx.blocks.map((block) => block.blockId),
-    }),
+      blockIds: ctx.blocks.map((block) => block.blockId)
+    })
   );
   time('schema parse only', 200, () => parseExperiencePlanProposal(proposal));
   time('full validation', 200, () => validateExperiencePlan(proposal, ctx));
@@ -118,7 +118,7 @@ for (const blockCount of [20, 100, 400]) {
 
   const missing = {
     ...proposal,
-    placements: proposal.placements.slice(0, -1),
+    placements: proposal.placements.slice(0, -1)
   };
   time('worst-case rejection (missing block)', 200, () => {
     try {
@@ -132,8 +132,8 @@ for (const blockCount of [20, 100, 400]) {
     ...proposal,
     placements: Array.from({ length: 400 }, (_, index) => ({
       ...proposal.placements[0],
-      placementId: `p-${index}`,
-    })),
+      placementId: `p-${index}`
+    }))
   };
   time('worst-case rejection (oversized)', 200, () => {
     try {

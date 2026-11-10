@@ -8,7 +8,7 @@ import { performance } from 'node:perf_hooks';
 // Reached through the package export like every other file under `src/`, so the
 // build's rootDir stays `src`.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { prismaClient } = require('@ednova/shared/database');
+const { prismaClient } = require('@noveris/shared/database');
 
 export interface ApiInstanceLease {
   assertActive(): void;

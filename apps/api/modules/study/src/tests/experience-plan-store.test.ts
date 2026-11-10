@@ -13,8 +13,8 @@ jest.mock('../models/ExperiencePlanRecord', () => ({
   ExperiencePlanRecord: {
     findOne: jest.fn(),
     findOneAndUpdate: jest.fn(),
-    updateMany: jest.fn(),
-  },
+    updateMany: jest.fn()
+  }
 }));
 
 import { ExperiencePlanRecord } from '../models/ExperiencePlanRecord';
@@ -22,17 +22,18 @@ import {
   loadAcceptedPlan,
   storeAcceptedPlan,
   experiencePlanId,
-  invalidateStoredPlans,
+  invalidateStoredPlans
 } from '../services/experiencePlanStore';
 import {
   experienceContextFingerprint,
   isValidatedExperiencePlan,
-  type ExperiencePlanValidationContext,
+  type ExperiencePlanValidationContext
 } from '../../../../shared/ednova/experiencePlan';
+import { validateExperiencePlan } from '../../../../shared/ednova/experiencePlanValidator';
 import {
-  validateExperiencePlan,
-} from '../../../../shared/ednova/experiencePlanValidator';
-import { planMockExperience, type MockPlannerContext } from '../../../../shared/ednova/mockExperiencePlanner';
+  planMockExperience,
+  type MockPlannerContext
+} from '../../../../shared/ednova/mockExperiencePlanner';
 import { projectExperiencePlan } from '../services/experiencePlanning';
 import { COMPONENT_REGISTRY_VERSION } from '../../../../shared/ednova/componentRegistry';
 import { EXPERIENCE_PLAN_SCHEMA_VERSION } from '../../../../shared/ednova/experiencePlan';
@@ -54,7 +55,7 @@ const facts: ExperiencePlanValidationContext['blocks'] = [
     hasEvidence: true,
     hasSourceRegion: false,
     isReviewedFormula: false,
-    hasStructuredFixture: false,
+    hasStructuredFixture: false
   },
   {
     blockId: 'p1',
@@ -63,11 +64,13 @@ const facts: ExperiencePlanValidationContext['blocks'] = [
     hasEvidence: true,
     hasSourceRegion: false,
     isReviewedFormula: false,
-    hasStructuredFixture: false,
-  },
+    hasStructuredFixture: false
+  }
 ];
 
-function context(overrides: Partial<ExperiencePlanValidationContext> = {}): ExperiencePlanValidationContext {
+function context(
+  overrides: Partial<ExperiencePlanValidationContext> = {}
+): ExperiencePlanValidationContext {
   const blocks = overrides.blocks ?? facts;
   return {
     courseId,
@@ -81,12 +84,12 @@ function context(overrides: Partial<ExperiencePlanValidationContext> = {}): Expe
       contentHash,
       lessonId: 'lesson-1',
       mode: 'guided',
-      blockIds: blocks.map((b) => b.blockId),
+      blockIds: blocks.map((b) => b.blockId)
     }),
     allowedPlanners: [{ implementation: 'mock_experience_planner', version: '1.0.0' }],
     blocks,
     assets: [],
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -105,9 +108,9 @@ function plannerContext(ctx: ExperiencePlanValidationContext): MockPlannerContex
       hasEvidence: b.hasEvidence,
       hasSourceRegion: b.hasSourceRegion,
       isReviewedFormula: b.isReviewedFormula,
-      hasStructuredFixture: b.hasStructuredFixture,
+      hasStructuredFixture: b.hasStructuredFixture
     })),
-    assets: [],
+    assets: []
   };
 }
 
@@ -128,7 +131,7 @@ function storedRecord(overrides: Record<string, unknown> = {}) {
       revisionId,
       lessonId: 'lesson-1',
       mode: 'guided',
-      contextFingerprint: ctx.contextFingerprint,
+      contextFingerprint: ctx.contextFingerprint
     }),
     courseId,
     revisionId,
@@ -147,7 +150,7 @@ function storedRecord(overrides: Record<string, unknown> = {}) {
     plan: JSON.parse(JSON.stringify(plan)),
     generatedBy: '04b3da2d-ec14-5643-bf49-e43f550168bf',
     generatedAt: new Date(),
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -164,7 +167,7 @@ describe('storing an accepted plan', () => {
       plan,
       generatedBy: 'author',
       contextFingerprint: context().contextFingerprint,
-      mode: 'guided',
+      mode: 'guided'
     });
     expect(outcome.stored).toBe(true);
   });
@@ -177,7 +180,7 @@ describe('storing an accepted plan', () => {
       plan: roundTripped,
       generatedBy: 'author',
       contextFingerprint: context().contextFingerprint,
-      mode: 'guided',
+      mode: 'guided'
     });
     expect(outcome).toEqual({ stored: false, reason: 'not_validated' });
   });
@@ -188,7 +191,7 @@ describe('storing an accepted plan', () => {
       plan,
       generatedBy: 'author',
       contextFingerprint: 'fnv1a64:0000000000000000',
-      mode: 'guided',
+      mode: 'guided'
     });
     expect(outcome).toEqual({ stored: false, reason: 'identity_mismatch' });
   });
@@ -198,7 +201,7 @@ describe('storing an accepted plan', () => {
       plan: validatedPlan(),
       generatedBy: 'author',
       contextFingerprint: context().contextFingerprint,
-      mode: 'guided',
+      mode: 'guided'
     });
     const [filter] = updateMany.mock.calls[0];
     expect(filter.supersededAt).toEqual({ $exists: false });
@@ -209,7 +212,7 @@ describe('storing an accepted plan', () => {
       plan: validatedPlan(),
       generatedBy: 'author',
       contextFingerprint: context().contextFingerprint,
-      mode: 'guided',
+      mode: 'guided'
     });
     const [, update] = findOneAndUpdate.mock.calls[0];
     const set = update.$set;
@@ -220,7 +223,7 @@ describe('storing an accepted plan', () => {
       mode: 'guided',
       contentHash,
       planSchemaVersion: EXPERIENCE_PLAN_SCHEMA_VERSION,
-      registryVersion: COMPONENT_REGISTRY_VERSION,
+      registryVersion: COMPONENT_REGISTRY_VERSION
     });
   });
 });
@@ -235,7 +238,7 @@ describe('reading a stored plan', () => {
       mode: 'guided',
       contentHash: ctx.contentHash,
       contextFingerprint: ctx.contextFingerprint,
-      validationContext: ctx,
+      validationContext: ctx
     });
   };
 
@@ -248,7 +251,7 @@ describe('reading a stored plan', () => {
       mode: 'guided',
       contentHash,
       contextFingerprint: context().contextFingerprint,
-      validationContext: context(),
+      validationContext: context()
     });
     expect(outcome.status).toBe('absent');
   });
@@ -265,7 +268,7 @@ describe('reading a stored plan', () => {
       mode: 'guided',
       contentHash,
       contextFingerprint: context().contextFingerprint,
-      validationContext: context(),
+      validationContext: context()
     });
     expect(outcome.status).toBe('available');
     if (outcome.status === 'available')
@@ -292,7 +295,7 @@ describe('reading a stored plan', () => {
     const record = storedRecord({ planSchemaVersion: '0.9.0' });
     expect(await load(record)).toMatchObject({
       status: 'stale',
-      reason: 'PLAN_SCHEMA_CHANGED',
+      reason: 'PLAN_SCHEMA_CHANGED'
     });
   });
 
@@ -306,7 +309,7 @@ describe('reading a stored plan', () => {
       mode: 'guided',
       contentHash,
       contextFingerprint: context().contextFingerprint,
-      validationContext: context(),
+      validationContext: context()
     });
     expect(outcome).toMatchObject({ status: 'rejected', code: 'PLAN_SCHEMA_INVALID' });
   });
@@ -322,7 +325,7 @@ describe('reading a stored plan', () => {
       mode: 'guided',
       contentHash,
       contextFingerprint: context().contextFingerprint,
-      validationContext: context(),
+      validationContext: context()
     });
     expect(outcome.status).toBe('rejected');
     if (outcome.status === 'rejected') expect(outcome.code).toBe('PLAN_SCHEMA_INVALID');
@@ -341,13 +344,13 @@ describe('reading a stored plan', () => {
           hasEvidence: true,
           hasSourceRegion: false,
           isReviewedFormula: false,
-          hasStructuredFixture: false,
-        },
+          hasStructuredFixture: false
+        }
       ],
-      contextFingerprint: context().contextFingerprint,
+      contextFingerprint: context().contextFingerprint
     });
     findOne.mockReturnValue({
-      lean: async () => ({ ...record, plan: record.plan }),
+      lean: async () => ({ ...record, plan: record.plan })
     });
     const outcome = await loadAcceptedPlan({
       courseId,
@@ -356,7 +359,7 @@ describe('reading a stored plan', () => {
       mode: 'guided',
       contentHash,
       contextFingerprint: grown.contextFingerprint,
-      validationContext: grown,
+      validationContext: grown
     });
     expect(outcome.status).toBe('rejected');
   });
@@ -367,8 +370,8 @@ describe('reading a stored plan', () => {
       lean: async () => ({
         ...record,
         planDigest: 'fnv1a64:0000000000000000',
-        plan: record.plan,
-      }),
+        plan: record.plan
+      })
     });
     const outcome = await loadAcceptedPlan({
       courseId,
@@ -377,7 +380,7 @@ describe('reading a stored plan', () => {
       mode: 'guided',
       contentHash,
       contextFingerprint: context().contextFingerprint,
-      validationContext: context(),
+      validationContext: context()
     });
     expect(outcome).toMatchObject({ status: 'stale', reason: 'PLAN_DIGEST_CHANGED' });
   });
@@ -393,7 +396,7 @@ describe('reading a stored plan', () => {
       mode: 'guided',
       contentHash,
       contextFingerprint: context().contextFingerprint,
-      validationContext: context(),
+      validationContext: context()
     });
     expect(outcome.status).toBe('absent');
   });
@@ -406,14 +409,14 @@ describe('identity and invalidation', () => {
       revisionId,
       lessonId: 'lesson-1',
       mode: 'guided',
-      contextFingerprint: 'fnv1a64:1',
+      contextFingerprint: 'fnv1a64:1'
     });
     const b = experiencePlanId({
       courseId,
       revisionId,
       lessonId: 'lesson-1',
       mode: 'guided',
-      contextFingerprint: 'fnv1a64:1',
+      contextFingerprint: 'fnv1a64:1'
     });
     expect(a).toBe(b);
     expect(a).toMatch(/^plan_[a-f0-9]{32}$/);
@@ -424,10 +427,10 @@ describe('identity and invalidation', () => {
       courseId,
       revisionId,
       lessonId: 'lesson-1',
-      contextFingerprint: 'fnv1a64:1',
+      contextFingerprint: 'fnv1a64:1'
     };
     expect(experiencePlanId({ ...base, mode: 'guided' })).not.toBe(
-      experiencePlanId({ ...base, mode: 'deep_dive' }),
+      experiencePlanId({ ...base, mode: 'deep_dive' })
     );
   });
 
@@ -435,7 +438,7 @@ describe('identity and invalidation', () => {
     const count = await invalidateStoredPlans({
       courseId,
       revisionId,
-      reason: 'REVISION_DEPRECATED',
+      reason: 'REVISION_DEPRECATED'
     });
     expect(count).toBe(1);
     const [, update] = updateMany.mock.calls[0];

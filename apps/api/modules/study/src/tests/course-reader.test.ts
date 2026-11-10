@@ -6,7 +6,10 @@ import { canonicalBlocks, sourceBlocks } from '../services/courseReader';
 describe('universal learning source adapter', () => {
   it('accepts a chapter section with hundreds of blocks, as produced by real PDFs', () => {
     const blocks: LessonBlockV2[] = Array.from({ length: 470 }, (_, i) => ({
-      type: 'paragraph' as const, id: `blk_${i}`, text: `Paragraph ${i}`, evidence: ['chunk'],
+      type: 'paragraph' as const,
+      id: `blk_${i}`,
+      text: `Paragraph ${i}`,
+      evidence: ['chunk']
     }));
     const document = (sectionBlocks: LessonBlockV2[]) => ({
       schemaVersion: '2.0.0',
@@ -14,15 +17,32 @@ describe('universal learning source adapter', () => {
       revisionId: 'rev_test',
       contentHash: 'sha256:' + 'a'.repeat(64),
       title: 'Long chapter',
-      canonical: { extraction: 'deterministic', projectionVersion: '2.0.0', passages: [], mappings: [] },
+      canonical: {
+        extraction: 'deterministic',
+        projectionVersion: '2.0.0',
+        passages: [],
+        mappings: []
+      },
       generated: { summary: '', objectives: [], outline: [] },
-      sections: [{ id: 'chapter', title: 'Chapter', summary: '', blocks: sectionBlocks, evidence: [], mappingStatus: 'exact' }],
+      sections: [
+        {
+          id: 'chapter',
+          title: 'Chapter',
+          summary: '',
+          blocks: sectionBlocks,
+          evidence: [],
+          mappingStatus: 'exact'
+        }
+      ],
       sources: [],
-      warnings: [],
+      warnings: []
     });
     expect(parseReadingDocumentV2(document(blocks)).sections[0].blocks).toHaveLength(470);
     const tooMany = Array.from({ length: 5001 }, (_, i) => ({
-      type: 'paragraph' as const, id: `b_${i}`, text: 'x', evidence: ['chunk'],
+      type: 'paragraph' as const,
+      id: `b_${i}`,
+      text: 'x',
+      evidence: ['chunk']
     }));
     expect(() => parseReadingDocumentV2(document(tooMany))).toThrow('INVALID_LEARNING_DOCUMENT_V2');
   });
@@ -39,19 +59,19 @@ describe('universal learning source adapter', () => {
         '',
         '```sql',
         'SELECT * FROM enrolment;',
-        '```',
+        '```'
       ].join('\n'),
       'section-1',
-      'chunk-1',
+      'chunk-1'
     );
     expect(blocks.map((block) => block.type)).toEqual(['heading', 'paragraph', 'list', 'code']);
     expect(JSON.stringify(blocks)).toContain('<script>alert(1)</script>');
     const code = blocks.find(
-      (value): value is Extract<LessonBlockV2, { type: 'code' }> => value.type === 'code',
+      (value): value is Extract<LessonBlockV2, { type: 'code' }> => value.type === 'code'
     );
     expect(code).toMatchObject({
       language: 'sql',
-      code: 'SELECT * FROM enrolment;',
+      code: 'SELECT * FROM enrolment;'
     });
   });
 
@@ -72,8 +92,8 @@ describe('universal learning source adapter', () => {
         generated: { summary: '', objectives: [], outline: [] },
         sections: [],
         sources: [],
-        warnings: [],
-      }),
+        warnings: []
+      })
     ).toThrow();
   });
 
@@ -81,12 +101,12 @@ describe('universal learning source adapter', () => {
     const first = sourceBlocks(
       '## Compare\n\n$$a^2 + b^2 = c^2$$\n\n| Name | Value |\n| --- | --- |\n| x | 1 |',
       'mixed',
-      'chunk-mixed',
+      'chunk-mixed'
     );
     const second = sourceBlocks(
       '## Compare\n\n$$a^2 + b^2 = c^2$$\n\n| Name | Value |\n| --- | --- |\n| x | 1 |',
       'mixed',
-      'chunk-mixed',
+      'chunk-mixed'
     );
     expect(first).toEqual(second);
     expect(first[0]).toMatchObject({ type: 'heading', id: 'mixed-heading-1' });
@@ -99,41 +119,41 @@ describe('universal learning source adapter', () => {
       documentId: 'doc-course',
       pageNumber: Math.floor(index / 2) + 1,
       lineStart: 1,
-      lineEnd: 4,
+      lineEnd: 4
     }));
     const blocks = canonicalBlocks([
       {
         id: 'source-lesson',
         type: 'source_lesson',
         text: '## Complete lesson\n\nA complete educational paragraph is retained here.',
-        evidence: spans,
+        evidence: spans
       },
       {
         id: 'typed-table',
         type: 'table',
         columns: ['n', 'u_n'],
         rows: [['1', '0.5']],
-        evidence: spans,
+        evidence: spans
       },
       {
         id: 'typed-math',
         type: 'math',
         expression: 'S_n = \\sum_{p=0}^n u_p',
         notation: 'latex',
-        evidence: spans,
-      },
+        evidence: spans
+      }
     ]);
     expect(blocks.find((block) => block.type === 'paragraph')).toMatchObject({
-      provenance: expect.any(Array),
+      provenance: expect.any(Array)
     });
     expect(
-      (blocks.find((block) => block.type === 'paragraph') as { provenance?: unknown[] }).provenance,
+      (blocks.find((block) => block.type === 'paragraph') as { provenance?: unknown[] }).provenance
     ).toHaveLength(8);
     expect(blocks.find((block) => block.type === 'table')).toMatchObject({
-      rows: [['1', '0.5']],
+      rows: [['1', '0.5']]
     });
     expect(blocks.find((block) => block.type === 'math')).toMatchObject({
-      expression: 'S_n = \\sum_{p=0}^n u_p',
+      expression: 'S_n = \\sum_{p=0}^n u_p'
     });
     expect(() =>
       parseReadingDocumentV2({
@@ -142,12 +162,26 @@ describe('universal learning source adapter', () => {
         revisionId: 'rev_test',
         contentHash: 'sha256:' + 'a'.repeat(64),
         title: 'Canonical course',
-        canonical: { extraction: 'deterministic', projectionVersion: '2.0.0', passages: [], mappings: [] },
+        canonical: {
+          extraction: 'deterministic',
+          projectionVersion: '2.0.0',
+          passages: [],
+          mappings: []
+        },
         generated: { summary: '', objectives: [], outline: [] },
-        sections: [{ id: 'chapter', title: 'Chapter', summary: '', blocks, evidence: [], mappingStatus: 'exact' }],
+        sections: [
+          {
+            id: 'chapter',
+            title: 'Chapter',
+            summary: '',
+            blocks,
+            evidence: [],
+            mappingStatus: 'exact'
+          }
+        ],
         sources: [],
-        warnings: [],
-      }),
+        warnings: []
+      })
     ).not.toThrow();
   });
 
@@ -159,56 +193,66 @@ describe('universal learning source adapter', () => {
       extractionMethod: 'vector' as const,
       confidence: 0,
       reviewRequired: true,
-      issues: [],
+      issues: []
     };
-    const blocks = canonicalBlocks([
-      {
-        id: 'source-lesson',
-        type: 'source_lesson',
-        text: 'The same source paragraph must not render twice.',
-        evidence: [{ chunkId: 'chunk-1', documentId: 'doc_1', pageNumber: 2, lineStart: 1, lineEnd: 1 }],
-      },
-      {
-        id: 'paragraph',
-        type: 'paragraph',
-        text: 'The same source paragraph must not render twice.',
-        evidence: [{ chunkId: 'chunk-1', documentId: 'doc_1', pageNumber: 2, lineStart: 1, lineEnd: 1 }],
-        regionId: meta.regionId,
-        page: meta.page,
-        bbox: meta.bbox,
-        extractionMethod: meta.extractionMethod,
-        confidence: meta.confidence,
-        reviewRequired: meta.reviewRequired,
-        issues: meta.issues,
-      },
-      {
-        id: 'definition',
-        type: 'definition',
-        title: 'Definition',
-        text: 'A definition from the source.',
-        evidence: [{ chunkId: 'chunk-2', documentId: 'doc_1', pageNumber: 3, lineStart: 1, lineEnd: 1 }],
-        ...meta,
-        regionId: 'region_' + 'b'.repeat(20),
-      },
-      {
-        id: 'figure',
-        type: 'media',
-        mediaType: 'image',
-        alt: 'Figure on page 2',
-        sourceRegionId: meta.regionId,
-        evidence: [{ chunkId: 'chunk-1', documentId: 'doc_1', pageNumber: 2, lineStart: 1, lineEnd: 1 }],
-        ...meta,
-      },
-    ],
-    { courseId: '01020ca1-fc51-5c10-92c0-16c54abb997f', revisionId: 'rev_test' });
+    const blocks = canonicalBlocks(
+      [
+        {
+          id: 'source-lesson',
+          type: 'source_lesson',
+          text: 'The same source paragraph must not render twice.',
+          evidence: [
+            { chunkId: 'chunk-1', documentId: 'doc_1', pageNumber: 2, lineStart: 1, lineEnd: 1 }
+          ]
+        },
+        {
+          id: 'paragraph',
+          type: 'paragraph',
+          text: 'The same source paragraph must not render twice.',
+          evidence: [
+            { chunkId: 'chunk-1', documentId: 'doc_1', pageNumber: 2, lineStart: 1, lineEnd: 1 }
+          ],
+          regionId: meta.regionId,
+          page: meta.page,
+          bbox: meta.bbox,
+          extractionMethod: meta.extractionMethod,
+          confidence: meta.confidence,
+          reviewRequired: meta.reviewRequired,
+          issues: meta.issues
+        },
+        {
+          id: 'definition',
+          type: 'definition',
+          title: 'Definition',
+          text: 'A definition from the source.',
+          evidence: [
+            { chunkId: 'chunk-2', documentId: 'doc_1', pageNumber: 3, lineStart: 1, lineEnd: 1 }
+          ],
+          ...meta,
+          regionId: 'region_' + 'b'.repeat(20)
+        },
+        {
+          id: 'figure',
+          type: 'media',
+          mediaType: 'image',
+          alt: 'Figure on page 2',
+          sourceRegionId: meta.regionId,
+          evidence: [
+            { chunkId: 'chunk-1', documentId: 'doc_1', pageNumber: 2, lineStart: 1, lineEnd: 1 }
+          ],
+          ...meta
+        }
+      ],
+      { courseId: '01020ca1-fc51-5c10-92c0-16c54abb997f', revisionId: 'rev_test' }
+    );
     expect(blocks.map((block) => block.type)).toEqual(['paragraph', 'callout', 'media']);
     expect(blocks[0]).toMatchObject({ sourceMeta: meta });
     expect(blocks[0].provenance).toEqual([
-      { chunkId: 'chunk-1', documentId: 'doc_1', pageNumber: 2, lineStart: 1, lineEnd: 1 },
+      { chunkId: 'chunk-1', documentId: 'doc_1', pageNumber: 2, lineStart: 1, lineEnd: 1 }
     ]);
     expect(blocks[2]).toMatchObject({
       type: 'media',
-      src: `/api/v1/study/courses/${'01020ca1-fc51-5c10-92c0-16c54abb997f'}/revisions/rev_test/sources/doc_1/regions/${meta.regionId}`,
+      src: `/api/v1/study/courses/${'01020ca1-fc51-5c10-92c0-16c54abb997f'}/revisions/rev_test/sources/doc_1/regions/${meta.regionId}`
     });
   });
 
@@ -231,14 +275,14 @@ describe('universal learning source adapter', () => {
               id: 'p-1',
               text: 'Safe canonical text',
               evidence: ['chunk-1'],
-              dangerouslySetInnerHTML: '<script>alert(1)</script>',
-            },
+              dangerouslySetInnerHTML: '<script>alert(1)</script>'
+            }
           ],
-          evidence: [],
-        },
+          evidence: []
+        }
       ],
       sources: [],
-      warnings: [],
+      warnings: []
     };
     expect(() => parseLearningDocument(valid)).toThrow();
   });
@@ -246,7 +290,36 @@ describe('universal learning source adapter', () => {
 
 describe('immutable reviewed formula projection', () => {
   it('renders the frozen correction while keeping original extraction and proposal separate', () => {
-    const blocks = canonicalBlocks([{id:'math',type:'math',regionId:'region_x',page:1,bbox:[1,2,30,40],expression:'source',notation:'plain',evidence:[{chunkId:'chunk',documentId:'doc',pageNumber:1,lineStart:1,lineEnd:1}],reviewedFormula:{expression:'x^{2}',state:'corrected',originalModelLatex:'x_2',reviewer:'instructor'}}]);
-    expect(blocks[0]).toMatchObject({type:'math',notation:'latex',expression:'x^{2}',review:{state:'corrected',originalExpression:'source',modelExpression:'x_2',reviewer:'instructor'}});
+    const blocks = canonicalBlocks([
+      {
+        id: 'math',
+        type: 'math',
+        regionId: 'region_x',
+        page: 1,
+        bbox: [1, 2, 30, 40],
+        expression: 'source',
+        notation: 'plain',
+        evidence: [
+          { chunkId: 'chunk', documentId: 'doc', pageNumber: 1, lineStart: 1, lineEnd: 1 }
+        ],
+        reviewedFormula: {
+          expression: 'x^{2}',
+          state: 'corrected',
+          originalModelLatex: 'x_2',
+          reviewer: 'instructor'
+        }
+      }
+    ]);
+    expect(blocks[0]).toMatchObject({
+      type: 'math',
+      notation: 'latex',
+      expression: 'x^{2}',
+      review: {
+        state: 'corrected',
+        originalExpression: 'source',
+        modelExpression: 'x_2',
+        reviewer: 'instructor'
+      }
+    });
   });
 });

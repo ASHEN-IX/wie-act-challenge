@@ -1,5 +1,5 @@
 {
-  "name": "@ednova/shared",
+  "name": "@noveris/shared",
   "version": "1.0.0",
   "description": "Shared utilities for EdNova backend services",
   "main": "index.ts",
@@ -7,7 +7,7 @@
     "test": "echo \"No tests yet\""
   },
   "keywords": [
-    "ednova",
+    "noveris",
     "shared",
     "utilities"
   ],

@@ -1,7 +1,7 @@
-jest.mock('@ednova/shared/moduleClient', () => ({ post: jest.fn(), get: jest.fn() }));
+jest.mock('@noveris/shared/moduleClient', () => ({ post: jest.fn(), get: jest.fn() }));
 jest.mock('../models', () => ({ StudySession: { findOne: jest.fn() } }));
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const moduleClient = require('@ednova/shared/moduleClient');
+const moduleClient = require('@noveris/shared/moduleClient');
 import { awardSessionCompletion, calculateChallengeXP } from '../utils/gamificationService';
 
 describe('Completion rewards', () => {

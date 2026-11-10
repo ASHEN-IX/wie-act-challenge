@@ -1,12 +1,12 @@
 import { canReadCourse } from '../../../study/src/services/resourceAccess';
-import moduleClient from '@ednova/shared/moduleClient';
-import { logger } from '@ednova/shared';
+import moduleClient from '@noveris/shared/moduleClient';
+import { logger } from '@noveris/shared';
 import type { Response, NextFunction } from 'express';
 import type { DomainRequest } from '../../../../src/framework/contracts';
-import type { ContractHandler } from '@ednova/shared/domainContracts';
+import type { ContractHandler } from '@noveris/shared/domainContracts';
 import type { Schema } from 'joi';
-import type { ModuleResponse, AxiosRequestConfig } from '@ednova/shared/moduleClient';
-import { errorDetails } from '@ednova/shared/errors';
+import type { ModuleResponse, AxiosRequestConfig } from '@noveris/shared/moduleClient';
+import { errorDetails } from '@noveris/shared/errors';
 
 export const requireOwnedUser = (req: DomainRequest, res: Response, next: NextFunction) => {
   const targetUserId = req.params.userId;
@@ -52,7 +52,7 @@ export function createProxy(options: ProxyOptions): ContractHandler[] {
   const middlewares: ContractHandler[] = [];
   if (tier) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { tierGate } = require('@ednova/shared/tierGate');
+    const { tierGate } = require('@noveris/shared/tierGate');
     middlewares.push(tierGate(...tier));
   }
   if (requireOwnership) {

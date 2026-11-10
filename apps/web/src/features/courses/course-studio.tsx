@@ -631,7 +631,7 @@ export function CourseStudio({
             )}
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            EdNova reads your material and turns it into chapters and lessons.
+            Noveris reads your material and turns it into chapters and lessons.
             Check them, then publish so learners can start.
           </p>
         </div>
@@ -689,7 +689,7 @@ export function CourseStudio({
             </p>
             <p className="mt-1 text-muted-foreground">
               {auto.message ??
-                "EdNova checks this draft, fixes unclear lesson titles and objectives, and publishes when nothing blocks it. Source regions with low confidence always wait for your confirmation."}
+                "Noveris checks this draft, fixes unclear lesson titles and objectives, and publishes when nothing blocks it. Source regions with low confidence always wait for your confirmation."}
             </p>
           </div>
           <div className="flex flex-col items-end gap-2">

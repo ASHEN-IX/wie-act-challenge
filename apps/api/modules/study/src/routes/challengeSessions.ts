@@ -1,7 +1,7 @@
 import type { DomainRequest } from '../../../../src/framework/contracts';
 import type { Response } from 'express';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createContracts } = require('@ednova/shared/domainContracts');
+const { createContracts } = require('@noveris/shared/domainContracts');
 import Joi from 'joi';
 import { StudySession } from '../models';
 import { processSessionCompletionRewards, trackAnalyticsEvent } from '../utils/gamificationService';

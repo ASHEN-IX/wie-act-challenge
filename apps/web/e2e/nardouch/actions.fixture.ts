@@ -3,7 +3,7 @@ import audioFixture from "./audio.fixture.json";
 import type {
   NardouchConversation,
   NardouchInput,
-} from "@ednova/shared/ednova/nardouch";
+} from "@noveris/shared/ednova/nardouch";
 let conversation: NardouchConversation | null = null;
 export async function sendNardouchTurn(input: NardouchInput) {
   if (input.message === "provider down")

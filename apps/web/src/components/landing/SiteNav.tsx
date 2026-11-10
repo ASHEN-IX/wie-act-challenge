@@ -5,7 +5,6 @@ import Link from "next/link";
 import { ArrowRight, Menu, X } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { marketingNavigation } from "@/lib/brand";
-import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
 export function SiteNav() {

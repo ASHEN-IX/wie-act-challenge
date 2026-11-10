@@ -11,17 +11,17 @@ process.env.DATABASE_URL ||=
   process.env.DOCKER_DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/ednova';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { connectDatabase, disconnectDatabase, logger, requireEnv } = require('@ednova/shared');
+const { connectDatabase, disconnectDatabase, logger, requireEnv } = require('@noveris/shared');
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const {
   closeAiMessaging,
   ensureTopologyForType,
   AI_JOB_TYPES
-} = require('@ednova/shared/ai-messaging');
+} = require('@noveris/shared/ai-messaging');
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { registerProcessHandlers } = require('@ednova/shared/processHandlers');
+const { registerProcessHandlers } = require('@noveris/shared/processHandlers');
 
 export interface StartOptions {
   port?: number;
@@ -56,12 +56,12 @@ export async function start({
   if (instanceLease) cleanups.push(() => instanceLease.close());
 
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { attachRealtime } = require('@ednova/notification-service');
+  const { attachRealtime } = require('@noveris/notification-service');
   cleanups.push(attachRealtime(server));
 
   if (workers) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const study = require('@ednova/study-service');
+    const study = require('@noveris/study-service');
     cleanups.push(study.startPoller());
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
     let cancelled = false;
@@ -71,7 +71,7 @@ export async function start({
         await Promise.all([
           study.startConsumers(),
           // eslint-disable-next-line @typescript-eslint/no-require-imports
-          require('@ednova/ai-orchestrator-service').startConsumers(),
+          require('@noveris/ai-orchestrator-service').startConsumers(),
           ...AI_JOB_TYPES.map((type: string) => ensureTopologyForType(type))
         ]);
       } catch (error: unknown) {
@@ -101,7 +101,7 @@ export async function start({
 
   const address = server.address();
   const boundPort = address && typeof address === 'object' ? address.port : port;
-  logger.info(`EdNova API listening on port ${boundPort}`);
+  logger.info(`Noveris API listening on port ${boundPort}`);
 
   let stopping: Promise<void> | null = null;
   const stop = (): Promise<void> => {
@@ -121,9 +121,9 @@ export async function start({
       await nest.close();
       await disconnectDatabase();
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      await require('@ednova/shared/cache').closeCache();
+      await require('@noveris/shared/cache').closeCache();
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      await require('@ednova/shared/middleware').closeRateLimits();
+      await require('@noveris/shared/middleware').closeRateLimits();
     })();
     return stopping;
   };

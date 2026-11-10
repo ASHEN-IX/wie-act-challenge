@@ -1,5 +1,5 @@
 import type { ICourse, ISubtopic } from '../models';
-import type { AiProgressEnvelope, AiResultEnvelope } from '@ednova/shared/ai-messaging/envelope';
+import type { AiProgressEnvelope, AiResultEnvelope } from '@noveris/shared/ai-messaging/envelope';
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object';
@@ -41,9 +41,9 @@ const {
   consumeAiProgress,
   consumeIngestResults,
   closeAiMessaging
-} = require('@ednova/shared/ai-messaging');
+} = require('@noveris/shared/ai-messaging');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { logger } = require('@ednova/shared');
+const { logger } = require('@noveris/shared');
 import { Course, CourseRevision } from '../models';
 import { CourseIngestionOperation } from '../models/CourseIngestionOperation';
 import { INGEST_JOB_TYPE } from './ingestionJob';

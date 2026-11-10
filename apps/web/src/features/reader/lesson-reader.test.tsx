@@ -1,14 +1,14 @@
 vi.mock("@/features/nardouch/course-growth-actions", () => ({ loadCourseNardouch: vi.fn(), finishNardouchLesson: vi.fn() }));
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { LessonBlockV2 } from "@ednova/shared/ednova/learningDocumentV2";
+import type { LessonBlockV2 } from "@noveris/shared/ednova/learningDocumentV2";
 import {
   buildPublishedPresentation,
   type PresentationBuildInput,
-} from "@ednova/shared/ednova/presentationDocument";
+} from "@noveris/shared/ednova/presentationDocument";
 import { LessonReader, lessonHref } from "./lesson-reader";
-import { COMPONENT_REGISTRY_VERSION } from "@ednova/shared/ednova/componentRegistry";
-import type { PublishedExperiencePlanV1 } from "@ednova/shared/ednova/publishedExperiencePlan";
+import { COMPONENT_REGISTRY_VERSION } from "@noveris/shared/ednova/componentRegistry";
+import type { PublishedExperiencePlanV1 } from "@noveris/shared/ednova/publishedExperiencePlan";
 
 const courseId = "a57d9f30-21c4-58ff-b48c-1e9e140f4c6d";
 const revisionId = "rev_formula_test";

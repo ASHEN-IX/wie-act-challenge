@@ -5,7 +5,7 @@ import type {
   LearningGoal,
   SelfReportedLevel,
   StudyTime,
-} from "@ednova/shared/ednova/learningProfile";
+} from "@noveris/shared/ednova/learningProfile";
 
 export const GOAL_OPTIONS: ReadonlyArray<{ value: LearningGoal; label: string }> = [
   { value: "understand_concepts", label: "Understand difficult concepts" },

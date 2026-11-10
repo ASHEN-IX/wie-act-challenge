@@ -1,5 +1,5 @@
-import { errorDetails } from '@ednova/shared/errors';
-import moduleClient from '@ednova/shared/moduleClient';
+import { errorDetails } from '@noveris/shared/errors';
+import moduleClient from '@noveris/shared/moduleClient';
 
 // Temporary logger until shared package is fixed
 const logger = {
@@ -9,7 +9,7 @@ const logger = {
 };
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const aiClient = require('@ednova/shared/aiClient');
+const aiClient = require('@noveris/shared/aiClient');
 const AI_SERVICE_URL =
   (aiClient.getBaseUrl ? aiClient.getBaseUrl() : null) || 'http://localhost:8000';
 

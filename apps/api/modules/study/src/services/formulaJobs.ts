@@ -269,7 +269,8 @@ export async function submit(actor: string, courseId: string, tag: string, body:
 }
 export async function status(actor: string, courseId: string, tag: string, id: string) {
   if (!actor) fail(401, 'UNAUTHENTICATED');
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) fail(422, 'INVALID_JOB');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))
+    fail(422, 'INVALID_JOB');
   if (!(await canManageCourse(actor, courseId))) fail(403, 'FORBIDDEN');
   const job = await Jobs.findOne({ id: id, courseId, revisionTag: tag });
   if (!job || Array.isArray(job)) fail(404, 'NOT_FOUND');
@@ -284,7 +285,8 @@ export async function cancel(actor: string, courseId: string, tag: string, id: s
   return status(actor, courseId, tag, id);
 }
 export async function processJob(id: string) {
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) return;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))
+    return;
   const claim = crypto.randomUUID();
   const job: any = await Jobs.findOneAndUpdate(
     { id: id, state: 'queued' },

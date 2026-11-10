@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { assertApiInstance } from '../../../src/framework/single-instance';
 import type { IncomingMessage, Server } from 'node:http';
-import { logger } from '@ednova/shared';
-import moduleClient from '@ednova/shared/moduleClient';
+import { logger } from '@noveris/shared';
+import moduleClient from '@noveris/shared/moduleClient';
 import { WebSocketServer, WebSocket } from 'ws';
 import { handleChatQuery } from './websocket-handlers/chat-handler';
 import {
@@ -13,7 +13,7 @@ import {
 import { joinParticipant, leaveParticipant } from './services/voiceService';
 import { normalizeSignalPayload } from './utils/rtc-signaling';
 import { verifySessionMembership, verifyVoiceConsent } from './utils/session-access';
-import { errorDetails } from '@ednova/shared/errors';
+import { errorDetails } from '@noveris/shared/errors';
 import type { IStudyRoom, IStudyRoomParticipant } from '../../study/src/models/StudyRoom';
 export { verifySessionMembership } from './utils/session-access';
 
@@ -237,7 +237,7 @@ export async function authenticateWsRequest(
   if (!requestedUserId) return 'userId required';
   try {
     const { resolveIdentity } =
-      require('@ednova/shared/sessionIdentity') as typeof import('@ednova/shared/sessionIdentity');
+      require('@noveris/shared/sessionIdentity') as typeof import('@noveris/shared/sessionIdentity');
     const trustedOrigins = () =>
       (process.env.AUTH_TRUSTED_ORIGINS || 'http://localhost:3000').split(',');
     if (req.headers.origin && !trustedOrigins().includes(req.headers.origin))

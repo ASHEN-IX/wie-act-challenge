@@ -299,17 +299,34 @@ describe('function_plot engine', () => {
   });
 
   it('rejects a = 0, out-of-range values, extra fields and unregistered functions', () => {
-    expect(() => fm.parseFunctionScenario({ functionId: 'quadratic_function', values: { a: 0, b: 1, c: 1 } })).toThrow();
-    expect(() => fm.parseFunctionScenario({ functionId: 'quadratic_function', values: { a: 1, b: 99, c: 1 } })).toThrow();
-    expect(() => fm.parseFunctionScenario({ functionId: 'quadratic_function', values: { a: 1, b: 1, c: 1 }, script: 'x' })).toThrow();
-    expect(() => fm.parseFunctionScenario({ functionId: 'cubic', values: { a: 1, b: 1, c: 1 } })).toThrow();
+    expect(() =>
+      fm.parseFunctionScenario({ functionId: 'quadratic_function', values: { a: 0, b: 1, c: 1 } })
+    ).toThrow();
+    expect(() =>
+      fm.parseFunctionScenario({ functionId: 'quadratic_function', values: { a: 1, b: 99, c: 1 } })
+    ).toThrow();
+    expect(() =>
+      fm.parseFunctionScenario({
+        functionId: 'quadratic_function',
+        values: { a: 1, b: 1, c: 1 },
+        script: 'x'
+      })
+    ).toThrow();
+    expect(() =>
+      fm.parseFunctionScenario({ functionId: 'cubic', values: { a: 1, b: 1, c: 1 } })
+    ).toThrow();
   });
 
   it('derives a check whose answer is the vertex x and withholds nothing wrong', () => {
     const { deriveCheck } = require('../../shared/visualLab/definition');
-    const check = deriveCheck({ engine: 'function_plot', scenario: { functionId: 'quadratic_function', values: { a: 2, b: -8, c: 1 } } });
+    const check = deriveCheck({
+      engine: 'function_plot',
+      scenario: { functionId: 'quadratic_function', values: { a: 2, b: -8, c: 1 } }
+    });
     expect(check.correctOptionId).toBe('correct');
     expect(check.options.find((o: { id: string }) => o.id === 'correct').label).toBe('x = 2');
-    expect(new Set(check.options.map((o: { label: string }) => o.label)).size).toBe(check.options.length);
+    expect(new Set(check.options.map((o: { label: string }) => o.label)).size).toBe(
+      check.options.length
+    );
   });
 });
