@@ -674,6 +674,21 @@ introduced: requests/SQLite are already available; PyAV comes with local Whisper
 and is checked before paid dispatch. MP3 fixtures are synthetic test audio, never
 an ElevenLabs success claim.
 
+### Vibi setup
+
+Set `NARDOUCH_TTS_PROVIDER=vibi`, `NARDOUCH_TTS_DEMO_ENABLED=true`, and the
+account's `VIBI_API_KEY` in the AI service environment. The three
+`VIBI_VOICE_ID_*` settings in the example use Salim for Tunisian Darija,
+Julien for French, and Adam for English. Vibi bills these generations to its
+own account. The model is pinned to `eleven_v4`.
+
+The service submits one single-language task, polls its history within the
+speech request deadline, and returns a validated MP3. Only the prepared spoken
+reply goes to Vibi. The provider can retain the generated clip in account
+history. The local budget reserves once per reply, so a timeout does not
+automatically submit another paid task. The main Docker stack mounts a private
+persistent volume for this accounting.
+
 ### Secure setup
 
 Configure these **only on the Python server**, e.g. in its ignored `.env`:

@@ -28,6 +28,7 @@ services:
       PYTHONPATH: /app:/app/agents/evaluator
       INGEST_UPLOADS_DIR: /app/uploads
       FAISS_INDEX_DIR: /app/faiss
+      NARDOUCH_TTS_BUDGET_DB: /app/tts-state/elevenlabs.sqlite3
       LLM_APPROVALS_JSON: ${LLM_APPROVALS_JSON:-}
     extra_hosts:
     - host.docker.internal:host-gateway
@@ -38,6 +39,7 @@ services:
     # (see .env); otherwise the worker cannot see uploaded originals.
     - ${FAISS_INDEX_DIR:-./var/dev-faiss}:/app/faiss
     - ${INGEST_UPLOADS_DIR:-./var/dev-uploads}:/app/uploads
+    - nardouch_tts_state:/app/tts-state
     depends_on:
       postgres:
         condition: service_healthy
@@ -155,6 +157,7 @@ services:
     - 127.0.0.1:8025:8025
     - 127.0.0.1:1025:1025
 volumes:
+  nardouch_tts_state:
   redis_data:
     name: ednova_redis_data
     external: true

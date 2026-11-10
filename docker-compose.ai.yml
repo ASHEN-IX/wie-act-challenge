@@ -22,7 +22,7 @@ services:
       NARDOUCH_SPEECH_MODEL_DIR: /models/nardouch
       NARDOUCH_TTS_BUDGET_DB: /app/tts-state/elevenlabs.sqlite3
       NARDOUCH_ASR_PROVIDER: local_whisper
-      NARDOUCH_TTS_PROVIDER: ${NARDOUCH_TTS_PROVIDER:-elevenlabs}
+      NARDOUCH_TTS_PROVIDER: ${NARDOUCH_TTS_PROVIDER:-vibi}
       LLM_MOCK: ${LLM_MOCK:-0}
       APP_ENV: production
       REDIS_URL: ${AI_REDIS_URL:?Set the reachable durable AI Redis URI}

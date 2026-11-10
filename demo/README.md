@@ -81,10 +81,11 @@ Instructor insights only show counts when at least 5 learners are on each side o
 | `onboarding` | goals, level, language and preferred formats |
 | `reader` | Deep Focus, *Explain simply* (compact model, progress while waiting, checked sources), *Another example* hitting the usage limit → labelled built-in guidance, lesson completion |
 | `practice` | wrong first attempt → private feedback, six-question hint-style probe, style-aware source hint, correct retry |
-| `nardouch` | question in Darija (Arabizi) → capable-model answer grounded in the course |
+| `nardouch-voice` | **Practice out loud** → Tunisian Darija question with actual Vibi and Eleven v4 playback |
 | `lab` | Visual Lab built from the course: the model proposes, trusted code computes |
 | `room` | two real sessions side by side: invite code, presence, chat sync, shared whiteboard, AI facilitator (peer-first), private attempts, debrief |
 | `progress` | XP and evidence from accepted practice |
+| `tasks` | add a prioritised study task, mark it completed (private to the learner) |
 | `instructor` | teaching workspace, Course Studio, privacy-thresholded insights, upload flow |
 
 Never show `.env` files, keys or terminals with credentials while recording.

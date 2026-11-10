@@ -220,7 +220,7 @@ export function NardouchAssistant({
           }}>Practice out loud</Button>
         )}
         <p className="text-xs text-muted-foreground">
-          Oral practice plays new replies automatically using the configured speech provider. Replies may be sent to ElevenLabs.
+          Oral practice plays new replies automatically using the configured speech provider. Replies may be sent to Vibi or ElevenLabs.
         </p>
       </div>
       {conversation ? (
@@ -310,7 +310,7 @@ export function NardouchAssistant({
           }}
         />
         Enable voice tools. Listening may send the selected answer to
-        ElevenLabs, an external metered voice service. Provider retention terms
+        Vibi or ElevenLabs for speech generation. Provider retention terms
         apply. Recording stays with local Whisper and requires consent below.
       </label>
       {voiceEnabled && (

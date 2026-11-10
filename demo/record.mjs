@@ -1,6 +1,6 @@
 // Records demo scenes into demo/output/takes/<scene>/ (frames + timeline). Edit with demo/edit.mjs.
 // Usage: node demo/record.mjs [scene ...] [--headed]      (no scene = all, in storyboard order)
-import { mkdirSync, rmSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { launch, root } from './lib/app.mjs';
 import { PageRecorder, Timeline } from './lib/recorder.mjs';
@@ -43,6 +43,9 @@ for (const [index, name] of names.entries()) {
     /** Debug screenshot of the current state (not part of the video). */
     async check(page, label) {
       await page.screenshot({ path: path.join(dir, 'checks', `${label}.png`) }).catch(() => {});
+    },
+    saveVoice(audio) {
+      writeFileSync(path.join(dir, 'voice.mp3'), audio);
     },
     log: (msg) => console.log(`  [${name} ${((Date.now() - started) / 1000).toFixed(1)}s] ${msg}`),
   };

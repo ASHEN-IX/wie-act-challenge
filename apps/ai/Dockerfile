@@ -64,6 +64,8 @@ RUN groupadd --gid 10001 ednova \
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')" \
     && chown -R ednova:ednova /home/ednova/.cache
 
+RUN mkdir -p /app/tts-state && chown ednova:ednova /app/tts-state && chmod 750 /app/tts-state
+
 USER 10001:10001
 ENTRYPOINT ["/app/scripts/container-entrypoint.sh"]
 

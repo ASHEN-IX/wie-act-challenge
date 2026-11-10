@@ -8,7 +8,7 @@ export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 const require = createRequire(import.meta.url);
 const { chromium } = require(path.join(root, 'node_modules/.pnpm/playwright-core@1.63.0/node_modules/playwright-core'));
 
-export const BASE = 'http://localhost:3100';
+export const BASE = process.env.DEMO_WEB_URL || 'http://localhost:3100';
 export const PASSWORD = 'EdNovaDemo!2026';
 export const USERS = {
   learner: 'learner@ednova.test', // Tasnim

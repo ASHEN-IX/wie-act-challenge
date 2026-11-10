@@ -218,33 +218,53 @@ export async function answerQuiz(page, scope) {
   }
 }
 
-export async function nardouch({ browser, tl, record, check, log }) {
-  const id = courseId('Relational Database');
+export async function nardouchVoice({ browser, tl, record, check, saveVoice }) {
+  const id = process.env.DEMO_VOICE_COURSE_ID || courseId('Relational Database');
   const page = await ready(browser, USERS.learner, `/courses/${id}/learn`);
   await exitDeepFocus(page);
-  const box = page.getByLabel('Your question or answer');
-  await box.evaluate((el) => el.scrollIntoView({ block: 'center' }));
-  await sleep(400);
+  const tutor = page.getByRole('region', { name: 'Nardouch learning assistant' });
+  await page.evaluate(() => {
+    const createObjectURL = URL.createObjectURL.bind(URL);
+    window.demoVoiceBlobs = new Map();
+    URL.createObjectURL = (blob) => {
+      const url = createObjectURL(blob);
+      if (blob.type?.startsWith('audio/')) window.demoVoiceBlobs.set(url, blob);
+      return url;
+    };
+  });
+  await tutor.getByLabel('Response language').selectOption('darija');
+  await tutor.getByLabel('Darija writing').selectOption('arabic');
+  const start = tutor.getByRole('button', { name: 'Practice out loud', exact: true });
+  await start.scrollIntoViewIfNeeded();
   await record(page, 'main');
   tl.section('ask');
-  tl.caption('Nardouch, the course companion, speaks Darija, French and English');
-  tl.speed(2);
-  await type(page, box, 'Ya Nardouch, mafhemtech 3lech el valeur lazem tkoun atomique fi 1NF?', 30);
-  tl.speed(1);
-  await click(page, page.getByRole('button', { name: /Ask Nardouch/i }));
-  tl.caption('Capable model for reasoning in the learner’s language');
-  tl.speed(4);
-  const answer = page.locator('[data-testid="nardouch-answer"], article').last();
-  await page.waitForFunction(() => /\[doc:|Sources|Source/.test(document.querySelector('main')?.innerText.split('Ask Nardouch')[1] || ''), null, { timeout: 120000 }).catch(() => {});
-  tl.speed(1);
-  log('nardouch answered');
-  tl.section('answer');
-  tl.caption('The answer stays grounded in the course and cites it');
-  await sleep(500);
-  await scrollBy(page, 260);
-  await sleep(4500);
-  await check(page, 'answer');
-  void answer;
+  tl.caption('Choose Tunisian Darija and start oral practice');
+  await click(page, start);
+  tl.section('wait');
+  const audio = tutor.locator('audio[aria-label="Spoken Nardouch answer"]').last();
+  await audio.waitFor({ state: 'attached', timeout: 75000 });
+
+  const recorded = await audio.evaluate(async (element) => {
+    const clip = window.demoVoiceBlobs.get(element.currentSrc || element.src);
+    if (!clip) throw new Error('Could not capture the generated speech blob');
+    return Array.from(new Uint8Array(await clip.arrayBuffer()));
+  });
+  saveVoice(Buffer.from(recorded));
+  const stop = tutor.getByRole('button', { name: 'Stop playback' }).last();
+  const replay = tutor.getByRole('button', { name: 'Replay answer' }).last();
+  await stop.click();
+  await replay.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await sleep(300);
+  tl.section('voice');
+  tl.caption('Nardouch speaks Tunisian Darija · Vibi and Eleven v4');
+  await replay.click();
+  await page.waitForFunction(
+    () => Array.from(document.querySelectorAll('audio[aria-label="Spoken Nardouch answer"]')).at(-1)?.ended,
+    null,
+    { timeout: 30000 }
+  );
+  await sleep(350);
+  await check(page, 'voice');
 }
 
 export async function lab({ browser, tl, record, check, log }) {
@@ -295,4 +315,31 @@ export async function progress({ browser, tl, record, check }) {
   await scrollBy(page, 380, 1100);
   await sleep(2200);
   await check(page, 'progress');
+}
+
+export async function tasks({ browser, tl, record, check }) {
+  const page = await ready(browser, USERS.learner, '/tasks');
+  await exitDeepFocus(page);
+  await record(page, 'main');
+  tl.section('plan');
+  tl.caption('Tasks: Tasnim turns her study goals into a short plan');
+  await sleep(1200);
+  tl.speed(1.6);
+  await type(page, page.getByLabel('What will you work on?'), 'Review 2NF and 3NF before the quiz', 30);
+  await type(page, page.getByLabel('Notes (optional)'), 'Use the hints, not the answer key', 30);
+  tl.speed(1);
+  await page.getByLabel('Priority').selectOption('high');
+  await click(page, page.getByRole('button', { name: 'Add task' }));
+  await page.getByLabel(/Status of Review 2NF/).first().waitFor();
+  await sleep(900);
+  tl.section('done');
+  tl.caption('Update the status as you go; it stays private to the learner');
+  await sleep(1500);
+  const status = page.getByLabel(/Status of Review 2NF/).first();
+  await click(page, status);
+  await status.selectOption('completed');
+  await click(page, page.getByRole('button', { name: 'Update' }).first());
+  await page.getByText('Task updated.').first().waitFor();
+  await sleep(1800);
+  await check(page, 'tasks');
 }

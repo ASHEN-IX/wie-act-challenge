@@ -113,7 +113,7 @@ def finish(identity, state, latency, duration=None):
         )
 
 
-def validate_mp3(data):
+def validate_mp3(data, *, sample_rates=(44100,)):
     import av  # Already part of the local Whisper runtime; CPU decode only.
 
     if not 64 <= len(data) <= 4_000_000 or not (
@@ -127,7 +127,7 @@ def validate_mp3(data):
                 raise ValueError()
             duration = 0.0
             for frame in container.decode(audio=0):
-                if frame.sample_rate != 44100 or len(frame.layout.channels) > 2:
+                if frame.sample_rate not in sample_rates or len(frame.layout.channels) > 2:
                     raise ValueError()
                 duration += frame.samples / frame.sample_rate
                 if duration > 90:

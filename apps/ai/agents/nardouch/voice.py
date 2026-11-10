@@ -111,6 +111,10 @@ def asr_provider() -> ASRProvider:
 
 
 def tts_provider() -> TTSProvider:
+    if os.getenv("NARDOUCH_TTS_PROVIDER") == "vibi":
+        from .vibi import VibiTTSProvider
+
+        return VibiTTSProvider()
     if os.getenv("NARDOUCH_TTS_PROVIDER") == "elevenlabs":
         from .elevenlabs import ElevenLabsTTSProvider
 
@@ -144,7 +148,7 @@ def synthesize(req: SpeechRequest) -> str:
     try:
         with voice_slot():
             provider = tts_provider()
-            if os.getenv("NARDOUCH_TTS_PROVIDER") == "elevenlabs":
+            if os.getenv("NARDOUCH_TTS_PROVIDER") in ("elevenlabs", "vibi"):
                 audio = provider.synthesize(
                     req.speechText, generation_key=req.generationKey, language=req.speechLanguage
                 )

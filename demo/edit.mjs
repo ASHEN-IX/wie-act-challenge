@@ -88,6 +88,7 @@ async function main() {
     mkdirSync(dir, { recursive: true });
     const list = [];
     let n = 0;
+    let voiceCue;
     const still = (png, seconds) => {
       const file = path.join(dir, `${String(n++).padStart(3, '0')}-card.mp4`);
       const fade = Math.min(0.4, seconds / 4);
@@ -119,6 +120,10 @@ async function main() {
           args.push('-vf', `${pace},${finish}`);
         }
         ffmpeg([...args, '-t', length.toFixed(3), '-an', ...ENC, '-crf', '12', target]);
+        if (p.section === spec.voiceSection) {
+          if (speed !== 1 || voiceCue) throw new Error('Expected one voice section at its recorded speed');
+          voiceCue = { index: list.length, file: path.join(takes, spec.scene, 'voice.mp3') };
+        }
         list.push(target);
       });
     }
@@ -126,7 +131,14 @@ async function main() {
     const concat = path.join(dir, 'list.txt');
     writeFileSync(concat, list.map((f) => `file '${f}'`).join('\n'));
     const final = path.join(out, cut.file);
-    ffmpeg(['-f', 'concat', '-safe', '0', '-i', concat, ...ENC, '-crf', String(cut.crf ?? 16), '-movflags', '+faststart', final]);
+    const picture = voiceCue ? path.join(dir, 'picture.mp4') : final;
+    ffmpeg(['-f', 'concat', '-safe', '0', '-i', concat, ...ENC, '-crf', String(cut.crf ?? 16), '-movflags', '+faststart', picture]);
+    if (voiceCue) {
+      const offsetMs = Math.round(list.slice(0, voiceCue.index).reduce((t, file) => t + duration(file), 0) * 1000);
+      ffmpeg(['-i', picture, '-i', voiceCue.file, '-map', '0:v:0', '-map', '1:a:0',
+        '-af', `adelay=${offsetMs}:all=1,apad`, '-c:v', 'copy', '-c:a', 'aac',
+        '-b:a', '128k', '-shortest', '-movflags', '+faststart', final]);
+    }
     const seconds = duration(final);
     const over = cut.maxSeconds && seconds > cut.maxSeconds ? `  ⚠ over the ${cut.maxSeconds} s limit` : '';
     console.log(`${name}: ${path.relative(root, final)} ${seconds.toFixed(1)} s${over}`);

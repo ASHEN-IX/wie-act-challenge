@@ -46,7 +46,7 @@ def speech(req: SpeechRequest):
 
         mime = (
             "audio/mpeg"
-            if os.getenv("NARDOUCH_TTS_PROVIDER") == "elevenlabs"
+            if os.getenv("NARDOUCH_TTS_PROVIDER") in ("elevenlabs", "vibi")
             else "audio/wav"
         )
         return {"audioBase64": synthesize(req), "mimeType": mime}
@@ -84,6 +84,24 @@ def speech_readiness():
                 "external": True,
                 "accountVerified": False,
             }
+    if result["ttsProvider"] == "vibi":
+        from agents.nardouch.elevenlabs import ElevenLabsFailure
+        from agents.nardouch.vibi import LANGUAGES, MODEL, settings
+
+        configured_languages = []
+        for language in LANGUAGES:
+            try:
+                settings(language)
+                configured_languages.append(language)
+            except ElevenLabsFailure:
+                pass
+        result["tts"] = {
+            "configured": len(configured_languages) == len(LANGUAGES),
+            "configuredLanguages": configured_languages,
+            "external": True,
+            "model": MODEL,
+            "accountVerified": False,
+        }
     if result["ttsProvider"] == "local_piper":
         try:
             from agents.nardouch.local_speech import model_path

@@ -210,7 +210,14 @@ export async function submitFeedback(userId: string, id: string, raw: unknown) {
 
 /** Audio is transient; only the corrected text becomes a conversation message. */
 export async function transcribeSpeech(userId: string, raw: unknown) {
-  const body = exactObject(raw, ['courseId', 'revisionId', 'labId', 'audioBase64', 'locale', 'consent']);
+  const body = exactObject(raw, [
+    'courseId',
+    'revisionId',
+    'labId',
+    'audioBase64',
+    'locale',
+    'consent'
+  ]);
   const { labId, courseId, revisionId } = body;
   const labRequest = 'labId' in body;
   const validContext = labRequest
@@ -281,7 +288,7 @@ export async function generateSpeech(userId: string, id: string, raw: unknown) {
       speechLanguage: answer.speechLanguage,
       generationKey: createHash('sha256').update(`${userId}:${id}:${message.id}`).digest('hex')
     },
-    { timeout: 23000 }
+    { timeout: 42000 }
   );
   const result = upstreamObject(response.data, ['audioBase64', 'mimeType']);
   if (
