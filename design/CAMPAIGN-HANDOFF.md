@@ -32,7 +32,7 @@ Nardouch illustrations form the visual system. The five mascot states are an
 asset library, not certifications or claims of learning outcomes.
 
 Typography, layouts, diagrams, shapes, cutting guides are editable; the generated QR code is an embedded image. Original mascot PNGs remain embedded images. The company identity
-cards use the supplied names and initials; illustration use is selective in marketing.
+cards include the supplied names and portraits; illustration use is selective in marketing.
 
 ## Messaging and placeholders
 

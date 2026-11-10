@@ -130,7 +130,5 @@
       ]
     }
   ],
-  "status": "All 22 pages checked; no old-domain text, missing fonts or text overflow.",
-  "qr_decoded": "https://noveris.live",
-  "old_domain_mentions": 0
+  "status": "Structural checks passed. Visual review of all pages required. Draft print proofs require vendor confirmation."
 }
