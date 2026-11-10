@@ -150,3 +150,60 @@ export const lockupPath = new URL(
 
 // Board geometry. Boards are laid out left to right, 120px apart.
 export const board = { width: 1440, pad: 72, gap: 120 };
+
+/**
+ * Print geometry for the brand book: ISO A4 landscape, authored in points.
+ *
+ * FigCraft writes one PDF page per top-level frame at the frame's own size in
+ * points, so 842 × 595 *is* A4 — no scaling step needed and no rescaling drift.
+ * The book is landscape because the system is: every board, post and slide is a
+ * horizontal reading surface.
+ */
+export const page = {
+  w: 842,
+  h: 595,
+  /** 19mm outer margin — inside the safe zone on every office printer. */
+  margin: 54,
+  content: 842 - 54 * 2,
+  gap: 24,
+};
+
+/** Measured WCAG 2.1 contrast ratios, computed from the tokens above. */
+export const contrast = [
+  { pair: "Foreground on background", on: "body", ratio: 17.87, grade: "AAA" },
+  { pair: "Cyan on background", on: "body", ratio: 10.81, grade: "AAA" },
+  { pair: "Amber on background", on: "body", ratio: 10.71, grade: "AAA" },
+  { pair: "Pink on background", on: "body", ratio: 7.82, grade: "AAA" },
+  { pair: "Muted text on background", on: "body", ratio: 7.81, grade: "AAA" },
+  { pair: "Muted text on card", on: "small", ratio: 6.92, grade: "AA" },
+  { pair: "Violet soft on background", on: "body", ratio: 6.8, grade: "AA" },
+  { pair: "White on violet", on: "button", ratio: 5.48, grade: "AA" },
+  { pair: "Primary on card", on: "large", ratio: 3.05, grade: "Large only" },
+];
+
+/**
+ * The design principles the product actually enforces, transcribed from the
+ * shipped behaviour rather than written as aspirational copy.
+ */
+export const principles = [
+  {
+    n: "01",
+    title: "Peers lead, AI facilitates",
+    body: "The facilitator asks and hints before it answers. A study circle works because people explain to each other; the model's job is to keep that loop moving, not to replace it.",
+  },
+  {
+    n: "02",
+    title: "Trusted code decides",
+    body: "Models propose; deterministic server code computes, grades and records. Anything that must be provably correct is never left to a sampling token.",
+  },
+  {
+    n: "03",
+    title: "Graduation is earned",
+    body: "A stage is a record of reviewed work, not a decoration on a dashboard. The Graduate badge is never shown on a course whose objective checks have not passed.",
+  },
+  {
+    n: "04",
+    title: "One language, three scripts",
+    body: "Darija in Arabizi or Arabic script, French, English, and the code-switching between them are all first-class. Translations are not afterthoughts appended to an English product.",
+  },
+];
