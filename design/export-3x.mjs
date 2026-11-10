@@ -3,7 +3,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {execFileSync} from 'node:child_process';
 const dir=path.dirname(fileURLToPath(import.meta.url));
-const cli=process.env.FIGCRAFT_CLI||'C:/Program Files/ArtCraft/FigCraft/figcraft-cli.exe';
+const cli=process.env.FIGCRAFT_CLI||'figcraft-cli';
 const output=path.join(dir,'exports-3x');
 const manifest=JSON.parse(fs.readFileSync(path.join(dir,'campaign.manifest.json')));
 function folder(item){
@@ -16,10 +16,12 @@ function folder(item){
  if(item.name.startsWith('NOVERIS-A5'))return '07-Flyer-A5';
  return '08-Identite-et-guides';
 }
+const only=process.argv[2];
 for(const item of manifest){
+ if(only&&!folder(item).startsWith(only))continue;
  const dest=path.join(output,folder(item));fs.mkdirSync(dest,{recursive:true});
- execFileSync(cli,['export',path.join(dir,'design-noveris-live.figcraft'),'--page',item.page,'--node',item.name,'--out',path.join(dest,item.name+'@3x.png'),'--scale','3'],{stdio:'pipe'});
+ execFileSync(cli,['export',path.join(dir,'design-noveris.figcraft'),'--page',item.page,'--node',item.name,'--out',path.join(dest,item.name+'@3x.png'),'--scale','3'],{stdio:'pipe'});
  console.log(item.name);
 }
-fs.writeFileSync(path.join(output,'inventaire.json'),JSON.stringify(manifest.map(item=>({...item,export:path.posix.join(folder(item),item.name+'@3x.png'),scale:3})),null,2));
+if(!only)fs.writeFileSync(path.join(output,'inventaire.json'),JSON.stringify(manifest.map(item=>({...item,export:path.posix.join(folder(item),item.name+'@3x.png'),scale:3})),null,2));
 console.log(`${manifest.length} exports PNG à 3× : ${output}`);

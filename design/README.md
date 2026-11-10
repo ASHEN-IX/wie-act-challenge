@@ -1,10 +1,8 @@
 # Noveris — startup brand and communication system
 
-Open **[design-noveris-live.figcraft](design-noveris-live.figcraft)** in Figcraft. All **22 pages** now
+Open **[design-noveris.figcraft](design-noveris.figcraft)** in Figcraft. All **22 pages** now
 support Noveris as a professional learning startup and product. This includes
 the original brand foundations and templates, not just the social feed.
-
-The build also writes an identical copy to `design.figcraft` for existing links.
 
 ## File structure
 
@@ -28,28 +26,28 @@ Nine **NOVERIS / STARTUP LAUNCH** pages contain:
 
 ## Build, export and verify
 
-```powershell
-node design/build.mjs             # same as campaign.mjs: build all 22 pages
-node design/export.mjs            # same as campaign-export.mjs: export all artwork
-python design/campaign-qa.py      # Pillow + pypdf: source, export and print checks
+Run from the repository root. `figcraft-cli` must be on your PATH (override with `FIGCRAFT_CLI`).
+
+```bash
+node design/startup-posts.mjs      # rebuild the 12 feed posts in place
+node design/print-materials.mjs    # rebuild badges, stickers, A3 posters and the A5 flyer
+node design/campaign-export.mjs    # 1x PNG/PDF/SVG exports to exports/noveris-startup
+node design/export-3x.mjs          # 3x PNG exports to exports-3x (pass 02, 04... to export one folder)
+node design/brandbook/build.mjs    # brand book PDF to output/pdf/Noveris-Brand-Book.pdf
 ```
 
-Figcraft 0.17.0 and its CLI/MCP are installed at
-`C:/Program Files/ArtCraft/FigCraft/`. Override `FIGCRAFT_CLI` if needed.
-Use the bundled Python runtime if Python is not on PATH.
+Each rebuild script replaces only its own pages and fails if any other layer in the file changes.
+Feed layouts are in `startup-posts.mjs`, print layouts in `print-materials.mjs`, tokens in `tokens.mjs`.
 
-The generator imports the preserved foundation snapshot
-`design.pre-campaign.figcraft`, applies the startup revisions in `campaign.mjs`,
-and builds the communication materials. The feed is authored in
-`startup-posts.mjs`; visual tokens are in `tokens.mjs`. The snapshot is a backup
-and build input, not the current deliverable.
+`campaign.mjs` is the original full generator. It needs the pre-campaign snapshot
+`design.pre-campaign.figcraft`, which is now only in git history.
 
 ## Current outputs
 
-Use **[exports/noveris-startup](exports/noveris-startup/)** for current PNGs,
-sticker SVGs and cut guides, contact sheets, draft print PDFs and the QA report.
-The original 13 reference PNG filenames in `exports/` are refreshed to match
-the updated foundations and templates.
+Use **[exports-3x](exports-3x/)** for 3x PNGs grouped by type, and
+**[exports/noveris-startup](exports/noveris-startup/)** for 1x PNGs, sticker SVGs,
+cut guides and draft print PDFs. `upload-ready/` (git-ignored) holds renamed
+copies ready for upload. The brand book is `output/pdf/Noveris-Brand-Book.pdf`.
 
 Read [CAMPAIGN-HANDOFF.md](CAMPAIGN-HANDOFF.md) for dimensions, editable assets,
 placeholder handling, print limits and release checks. Suggested feed captions

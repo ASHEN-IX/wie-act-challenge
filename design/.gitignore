@@ -10,3 +10,7 @@ startup.pending.figcraft
 *.local.txt
 archive/
 .deps/
+*.local.figcraft
+upload-ready/
+noveris-upload-ready.zip
+brandbook/brand-book.html
