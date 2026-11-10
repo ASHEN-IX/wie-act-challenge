@@ -1,0 +1,136 @@
+{
+  "pages_reviewed": 22,
+  "export_frames": 56,
+  "marketing_frames": 43,
+  "approved_logo_geometry_preserved": true,
+  "shared_typography_styles_preserved": true,
+  "challenge_references": [],
+  "text_overflow": [],
+  "missing_fonts": [],
+  "print_pages": 8,
+  "print_checks": [
+    {
+      "source": "NOVERIS-Team-IDs-Proof.pdf",
+      "trim_mm": [
+        89.99999744722223,
+        119.99999389166666
+      ],
+      "bleed_mm": 3,
+      "fonts": [
+        {
+          "font": "/XMLOPK+Inter-Regular",
+          "embedded": true
+        }
+      ]
+    },
+    {
+      "source": "NOVERIS-Team-IDs-Proof.pdf",
+      "trim_mm": [
+        89.99999744722223,
+        119.99999389166666
+      ],
+      "bleed_mm": 3,
+      "fonts": [
+        {
+          "font": "/XMLOPK+Inter-Regular",
+          "embedded": true
+        }
+      ]
+    },
+    {
+      "source": "NOVERIS-Team-IDs-Proof.pdf",
+      "trim_mm": [
+        89.99999744722223,
+        119.99999389166666
+      ],
+      "bleed_mm": 3,
+      "fonts": [
+        {
+          "font": "/XMLOPK+Inter-Regular",
+          "embedded": true
+        }
+      ]
+    },
+    {
+      "source": "NOVERIS-Team-IDs-Proof.pdf",
+      "trim_mm": [
+        89.99999744722223,
+        119.99999389166666
+      ],
+      "bleed_mm": 3,
+      "fonts": [
+        {
+          "font": "/XMLOPK+Inter-Regular",
+          "embedded": true
+        }
+      ]
+    },
+    {
+      "source": "NOVERIS-A3-Posters-Proof.pdf",
+      "trim_mm": [
+        296.99999972499995,
+        420.00003982777775
+      ],
+      "bleed_mm": 3,
+      "fonts": [
+        {
+          "font": "/ZQVCUJ+Inter-Regular",
+          "embedded": true
+        },
+        {
+          "font": "/OBIHNJ+Inter-Bold",
+          "embedded": true
+        }
+      ]
+    },
+    {
+      "source": "NOVERIS-A3-Posters-Proof.pdf",
+      "trim_mm": [
+        296.99999972499995,
+        420.00003982777775
+      ],
+      "bleed_mm": 3,
+      "fonts": [
+        {
+          "font": "/ZQVCUJ+Inter-Regular",
+          "embedded": true
+        },
+        {
+          "font": "/OBIHNJ+Inter-Bold",
+          "embedded": true
+        }
+      ]
+    },
+    {
+      "source": "NOVERIS-A5-Flyer-Proof.pdf",
+      "trim_mm": [
+        148.00000139166664,
+        210.00001532777776
+      ],
+      "bleed_mm": 3,
+      "fonts": [
+        {
+          "font": "/PAJVXT+Inter-Regular",
+          "embedded": true
+        }
+      ]
+    },
+    {
+      "source": "NOVERIS-A5-Flyer-Proof.pdf",
+      "trim_mm": [
+        148.00000139166664,
+        210.00001532777776
+      ],
+      "bleed_mm": 3,
+      "fonts": [
+        {
+          "font": "/PAJVXT+Inter-Regular",
+          "embedded": true
+        }
+      ]
+    }
+  ],
+  "status": "All 22 pages checked; no old-domain text, missing fonts or text overflow.",
+  "qr_decoded": "https://noveris.live",
+  "old_domain_mentions": 0
+}

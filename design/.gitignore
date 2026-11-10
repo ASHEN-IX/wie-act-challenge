@@ -1,0 +1,12 @@
+# Reproducible campaign intermediates; retain the source and finished exports.
+*.local.json
+campaign.pending.figcraft
+campaign.first-three.figcraft
+campaign.script.json
+campaign.build.log
+startup.pending.figcraft
+*.local.mjs
+*.local.py
+*.local.txt
+archive/
+.deps/

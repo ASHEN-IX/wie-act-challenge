@@ -1,0 +1,562 @@
+[
+  {
+    "name": "NOVERIS-FOUNDATION-01",
+    "page": "01 · Brand colour",
+    "width": 1440,
+    "height": 2020,
+    "kind": "foundation",
+    "transparent": false,
+    "export": "01-Fondations-et-modeles/NOVERIS-FOUNDATION-01@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-FOUNDATION-02",
+    "page": "02 · Brand typography",
+    "width": 1440,
+    "height": 1725,
+    "kind": "foundation",
+    "transparent": false,
+    "export": "01-Fondations-et-modeles/NOVERIS-FOUNDATION-02@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-FOUNDATION-03",
+    "page": "03 · Spacing & surfaces",
+    "width": 1440,
+    "height": 1270,
+    "kind": "foundation",
+    "transparent": false,
+    "export": "01-Fondations-et-modeles/NOVERIS-FOUNDATION-03@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-FOUNDATION-04",
+    "page": "04 · Format & layout system",
+    "width": 1440,
+    "height": 1280,
+    "kind": "foundation",
+    "transparent": false,
+    "export": "01-Fondations-et-modeles/NOVERIS-FOUNDATION-04@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-FOUNDATION-05",
+    "page": "05 · Noveris identity",
+    "width": 1440,
+    "height": 1660,
+    "kind": "foundation",
+    "transparent": false,
+    "export": "01-Fondations-et-modeles/NOVERIS-FOUNDATION-05@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-FOUNDATION-06",
+    "page": "06 · Product components",
+    "width": 1440,
+    "height": 2340,
+    "kind": "foundation",
+    "transparent": false,
+    "export": "01-Fondations-et-modeles/NOVERIS-FOUNDATION-06@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-FOUNDATION-07",
+    "page": "07 · Square brand template",
+    "width": 1080,
+    "height": 1080,
+    "kind": "foundation",
+    "transparent": false,
+    "export": "01-Fondations-et-modeles/NOVERIS-FOUNDATION-07@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-FOUNDATION-08",
+    "page": "08 · Companion introduction",
+    "width": 1080,
+    "height": 1080,
+    "kind": "foundation",
+    "transparent": false,
+    "export": "01-Fondations-et-modeles/NOVERIS-FOUNDATION-08@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-FOUNDATION-09",
+    "page": "09 · Story brand template",
+    "width": 1080,
+    "height": 1920,
+    "kind": "foundation",
+    "transparent": false,
+    "export": "01-Fondations-et-modeles/NOVERIS-FOUNDATION-09@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-FOUNDATION-10",
+    "page": "10 · Product link card",
+    "width": 1200,
+    "height": 630,
+    "kind": "foundation",
+    "transparent": false,
+    "export": "01-Fondations-et-modeles/NOVERIS-FOUNDATION-10@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-FOUNDATION-11",
+    "page": "11 · Product workflow template",
+    "width": 1080,
+    "height": 1350,
+    "kind": "foundation",
+    "transparent": false,
+    "export": "01-Fondations-et-modeles/NOVERIS-FOUNDATION-11@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-FOUNDATION-12",
+    "page": "12 · Company introduction slide",
+    "width": 1920,
+    "height": 1080,
+    "kind": "foundation",
+    "transparent": false,
+    "export": "01-Fondations-et-modeles/NOVERIS-FOUNDATION-12@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-FOUNDATION-13",
+    "page": "13 · Mascot asset library",
+    "width": 1440,
+    "height": 720,
+    "kind": "foundation",
+    "transparent": false,
+    "export": "01-Fondations-et-modeles/NOVERIS-FOUNDATION-13@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-Brand-Components",
+    "page": "NOVERIS / STARTUP LAUNCH / 08 — Reusable Brand Components",
+    "width": 1440,
+    "height": 1760,
+    "kind": "reference",
+    "transparent": false,
+    "export": "08-Identite-et-guides/NOVERIS-Brand-Components@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-POST-01",
+    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
+    "width": 1080,
+    "height": 1350,
+    "kind": "social",
+    "transparent": false,
+    "export": "02-Publications/NOVERIS-POST-01@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-POST-02",
+    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
+    "width": 1080,
+    "height": 1350,
+    "kind": "social",
+    "transparent": false,
+    "export": "02-Publications/NOVERIS-POST-02@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-POST-03",
+    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
+    "width": 1080,
+    "height": 1350,
+    "kind": "social",
+    "transparent": false,
+    "export": "02-Publications/NOVERIS-POST-03@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-POST-04",
+    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
+    "width": 1080,
+    "height": 1350,
+    "kind": "social",
+    "transparent": false,
+    "export": "02-Publications/NOVERIS-POST-04@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-POST-05",
+    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
+    "width": 1080,
+    "height": 1350,
+    "kind": "social",
+    "transparent": false,
+    "export": "02-Publications/NOVERIS-POST-05@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-POST-06",
+    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
+    "width": 1080,
+    "height": 1350,
+    "kind": "social",
+    "transparent": false,
+    "export": "02-Publications/NOVERIS-POST-06@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-POST-07",
+    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
+    "width": 1080,
+    "height": 1350,
+    "kind": "social",
+    "transparent": false,
+    "export": "02-Publications/NOVERIS-POST-07@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-POST-08",
+    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
+    "width": 1080,
+    "height": 1350,
+    "kind": "social",
+    "transparent": false,
+    "export": "02-Publications/NOVERIS-POST-08@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-POST-09",
+    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
+    "width": 1080,
+    "height": 1350,
+    "kind": "social",
+    "transparent": false,
+    "export": "02-Publications/NOVERIS-POST-09@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-POST-10",
+    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
+    "width": 1080,
+    "height": 1350,
+    "kind": "social",
+    "transparent": false,
+    "export": "02-Publications/NOVERIS-POST-10@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-POST-11",
+    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
+    "width": 1080,
+    "height": 1350,
+    "kind": "social",
+    "transparent": false,
+    "export": "02-Publications/NOVERIS-POST-11@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-POST-12",
+    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
+    "width": 1080,
+    "height": 1350,
+    "kind": "social",
+    "transparent": false,
+    "export": "02-Publications/NOVERIS-POST-12@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-STORY-01",
+    "page": "NOVERIS / STARTUP LAUNCH / 03 — Product Stories (12)",
+    "width": 1080,
+    "height": 1920,
+    "kind": "social",
+    "transparent": false,
+    "export": "03-Stories/NOVERIS-STORY-01@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-STORY-02",
+    "page": "NOVERIS / STARTUP LAUNCH / 03 — Product Stories (12)",
+    "width": 1080,
+    "height": 1920,
+    "kind": "social",
+    "transparent": false,
+    "export": "03-Stories/NOVERIS-STORY-02@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-STORY-03",
+    "page": "NOVERIS / STARTUP LAUNCH / 03 — Product Stories (12)",
+    "width": 1080,
+    "height": 1920,
+    "kind": "social",
+    "transparent": false,
+    "export": "03-Stories/NOVERIS-STORY-03@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-STORY-04",
+    "page": "NOVERIS / STARTUP LAUNCH / 03 — Product Stories (12)",
+    "width": 1080,
+    "height": 1920,
+    "kind": "social",
+    "transparent": false,
+    "export": "03-Stories/NOVERIS-STORY-04@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-STORY-05",
+    "page": "NOVERIS / STARTUP LAUNCH / 03 — Product Stories (12)",
+    "width": 1080,
+    "height": 1920,
+    "kind": "social",
+    "transparent": false,
+    "export": "03-Stories/NOVERIS-STORY-05@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-STORY-06",
+    "page": "NOVERIS / STARTUP LAUNCH / 03 — Product Stories (12)",
+    "width": 1080,
+    "height": 1920,
+    "kind": "social",
+    "transparent": false,
+    "export": "03-Stories/NOVERIS-STORY-06@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-STORY-07",
+    "page": "NOVERIS / STARTUP LAUNCH / 03 — Product Stories (12)",
+    "width": 1080,
+    "height": 1920,
+    "kind": "social",
+    "transparent": false,
+    "export": "03-Stories/NOVERIS-STORY-07@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-STORY-08",
+    "page": "NOVERIS / STARTUP LAUNCH / 03 — Product Stories (12)",
+    "width": 1080,
+    "height": 1920,
+    "kind": "social",
+    "transparent": false,
+    "export": "03-Stories/NOVERIS-STORY-08@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-STORY-09",
+    "page": "NOVERIS / STARTUP LAUNCH / 03 — Product Stories (12)",
+    "width": 1080,
+    "height": 1920,
+    "kind": "social",
+    "transparent": false,
+    "export": "03-Stories/NOVERIS-STORY-09@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-STORY-10",
+    "page": "NOVERIS / STARTUP LAUNCH / 03 — Product Stories (12)",
+    "width": 1080,
+    "height": 1920,
+    "kind": "social",
+    "transparent": false,
+    "export": "03-Stories/NOVERIS-STORY-10@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-STORY-11",
+    "page": "NOVERIS / STARTUP LAUNCH / 03 — Product Stories (12)",
+    "width": 1080,
+    "height": 1920,
+    "kind": "social",
+    "transparent": false,
+    "export": "03-Stories/NOVERIS-STORY-11@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-STORY-12",
+    "page": "NOVERIS / STARTUP LAUNCH / 03 — Product Stories (12)",
+    "width": 1080,
+    "height": 1920,
+    "kind": "social",
+    "transparent": false,
+    "export": "03-Stories/NOVERIS-STORY-12@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-ID-TEAM-1-FRONT",
+    "page": "NOVERIS / STARTUP LAUNCH / 04 — Team Identity Cards (3)",
+    "width": 255.11811023622047,
+    "height": 340.15748031496065,
+    "kind": "print",
+    "transparent": false,
+    "export": "04-Badges-equipe/NOVERIS-ID-TEAM-1-FRONT@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-ID-TEAM-2-FRONT",
+    "page": "NOVERIS / STARTUP LAUNCH / 04 — Team Identity Cards (3)",
+    "width": 255.11811023622047,
+    "height": 340.15748031496065,
+    "kind": "print",
+    "transparent": false,
+    "export": "04-Badges-equipe/NOVERIS-ID-TEAM-2-FRONT@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-ID-TEAM-3-FRONT",
+    "page": "NOVERIS / STARTUP LAUNCH / 04 — Team Identity Cards (3)",
+    "width": 255.11811023622047,
+    "height": 340.15748031496065,
+    "kind": "print",
+    "transparent": false,
+    "export": "04-Badges-equipe/NOVERIS-ID-TEAM-3-FRONT@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-ID-SHARED-BACK",
+    "page": "NOVERIS / STARTUP LAUNCH / 04 — Team Identity Cards (3)",
+    "width": 255.11811023622047,
+    "height": 340.15748031496065,
+    "kind": "print",
+    "transparent": false,
+    "export": "04-Badges-equipe/NOVERIS-ID-SHARED-BACK@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-STICKER-01",
+    "page": "NOVERIS / STARTUP LAUNCH / 05 — Brand Stickers (7)",
+    "width": 600,
+    "height": 600,
+    "kind": "sticker",
+    "transparent": true,
+    "export": "05-Stickers/NOVERIS-STICKER-01@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-STICKER-02",
+    "page": "NOVERIS / STARTUP LAUNCH / 05 — Brand Stickers (7)",
+    "width": 600,
+    "height": 600,
+    "kind": "sticker",
+    "transparent": true,
+    "export": "05-Stickers/NOVERIS-STICKER-02@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-STICKER-03",
+    "page": "NOVERIS / STARTUP LAUNCH / 05 — Brand Stickers (7)",
+    "width": 600,
+    "height": 600,
+    "kind": "sticker",
+    "transparent": true,
+    "export": "05-Stickers/NOVERIS-STICKER-03@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-STICKER-04",
+    "page": "NOVERIS / STARTUP LAUNCH / 05 — Brand Stickers (7)",
+    "width": 600,
+    "height": 600,
+    "kind": "sticker",
+    "transparent": true,
+    "export": "05-Stickers/NOVERIS-STICKER-04@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-STICKER-05",
+    "page": "NOVERIS / STARTUP LAUNCH / 05 — Brand Stickers (7)",
+    "width": 600,
+    "height": 600,
+    "kind": "sticker",
+    "transparent": true,
+    "export": "05-Stickers/NOVERIS-STICKER-05@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-STICKER-06",
+    "page": "NOVERIS / STARTUP LAUNCH / 05 — Brand Stickers (7)",
+    "width": 600,
+    "height": 600,
+    "kind": "sticker",
+    "transparent": true,
+    "export": "05-Stickers/NOVERIS-STICKER-06@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-STICKER-07",
+    "page": "NOVERIS / STARTUP LAUNCH / 05 — Brand Stickers (7)",
+    "width": 600,
+    "height": 600,
+    "kind": "sticker",
+    "transparent": true,
+    "export": "05-Stickers/NOVERIS-STICKER-07@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-Sticker-Sheet",
+    "page": "NOVERIS / STARTUP LAUNCH / 05 — Brand Stickers (7)",
+    "width": 1440,
+    "height": 1640,
+    "kind": "reference",
+    "transparent": false,
+    "export": "05-Stickers/NOVERIS-Sticker-Sheet@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-A3-01-BRAND",
+    "page": "NOVERIS / STARTUP LAUNCH / 06 — Product Posters (2)",
+    "width": 841.8897637795276,
+    "height": 1190.5511811023623,
+    "kind": "print",
+    "transparent": false,
+    "export": "06-Affiches-A3/NOVERIS-A3-01-BRAND@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-A3-02-WORKFLOW",
+    "page": "NOVERIS / STARTUP LAUNCH / 06 — Product Posters (2)",
+    "width": 841.8897637795276,
+    "height": 1190.5511811023623,
+    "kind": "print",
+    "transparent": false,
+    "export": "06-Affiches-A3/NOVERIS-A3-02-WORKFLOW@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-A5-FLYER-FRONT",
+    "page": "NOVERIS / STARTUP LAUNCH / 07 — Company Flyer (Front + Back)",
+    "width": 419.52755905511816,
+    "height": 595.2755905511812,
+    "kind": "print",
+    "transparent": false,
+    "export": "07-Flyer-A5/NOVERIS-A5-FLYER-FRONT@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-A5-FLYER-BACK",
+    "page": "NOVERIS / STARTUP LAUNCH / 07 — Company Flyer (Front + Back)",
+    "width": 419.52755905511816,
+    "height": 595.2755905511812,
+    "kind": "print",
+    "transparent": false,
+    "export": "07-Flyer-A5/NOVERIS-A5-FLYER-BACK@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-Startup-Overview",
+    "page": "NOVERIS / STARTUP LAUNCH / 01 — Startup Brand Overview",
+    "width": 1600,
+    "height": 1200,
+    "kind": "reference",
+    "transparent": false,
+    "export": "08-Identite-et-guides/NOVERIS-Startup-Overview@3x.png",
+    "scale": 3
+  },
+  {
+    "name": "NOVERIS-Production-Guidelines",
+    "page": "NOVERIS / STARTUP LAUNCH / 09 — Production & Brand Guidelines",
+    "width": 1440,
+    "height": 1900,
+    "kind": "reference",
+    "transparent": false,
+    "export": "08-Identite-et-guides/NOVERIS-Production-Guidelines@3x.png",
+    "scale": 3
+  }
+]

@@ -135,7 +135,7 @@ export function templateBoards(doc) {
       props: { fill: "none", strokes: ["rgba(169,135,255,0.28)"], strokeWeight: 2, strokeCap: "round" },
     });
 
-    eyebrow(doc, root, { x: 80, y: 96, text: `${brand.challenge} · ${brand.event}` });
+    eyebrow(doc, root, { x: 80, y: 96, text: `${brand.name} · Peer learning` });
     doc.text({
       name: "post/headline",
       text: "Learn\ntogether.",
@@ -311,7 +311,7 @@ export function templateBoards(doc) {
     });
 
     // Story safe areas: keep copy between 250 and 1670.
-    eyebrow(doc, root, { x: 96, y: 250, text: `${brand.challenge} · ${brand.event}` });
+    eyebrow(doc, root, { x: 96, y: 250, text: `${brand.name} · Peer learning` });
     doc.text({
       name: "story/headline",
       text: "Study smarter\ntogether.",
@@ -352,7 +352,7 @@ export function templateBoards(doc) {
     });
     doc.text({
       name: "story/cta/label",
-      text: "Join the challenge",
+      text: "Explore Noveris",
       x: 0,
       y: 32,
       width: 420,
@@ -488,7 +488,7 @@ export function templateBoards(doc) {
     const root = b.root({ width: W, height: H, fill: color.mBg });
     ground(doc, root, { width: W, height: H });
 
-    eyebrow(doc, root, { x: 120, y: 132, text: `${brand.challenge} · ${brand.event}` });
+    eyebrow(doc, root, { x: 120, y: 132, text: `${brand.name} · Peer learning` });
     doc.text({
       name: "slide/headline",
       text: "Noveris",

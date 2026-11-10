@@ -125,15 +125,13 @@ export const stages = [
   { id: "learner", name: "Learner", threshold: "First lesson", accent: color.cyan, copy: "Curiosity becomes a habit." },
   { id: "explorer", name: "Explorer", threshold: "40% of lessons", accent: color.amber, copy: "Momentum takes hold." },
   { id: "expert", name: "Expert", threshold: "75% of lessons", accent: color.pink, copy: "Range and depth begin to show." },
-  { id: "graduate", name: "Graduate", threshold: "Finish & pass checks", accent: color.violet, copy: "Every objective proven." },
+  { id: "graduate", name: "Graduate", threshold: "Finish & pass checks", accent: color.violet, copy: "A moment to reflect." },
 ];
 
 export const brand = {
   name: "Noveris",
   slogan: "Learn Together. Grow Further.",
   product: "GenAI peer-learning companion",
-  challenge: "EdNova Challenge",
-  event: "IEEE WIE ACT 5.0",
   description:
     "Study with your peers, get AI guidance, and turn every course into a shared breakthrough.",
 };
