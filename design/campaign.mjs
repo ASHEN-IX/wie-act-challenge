@@ -10,6 +10,7 @@ const dir=path.dirname(fileURLToPath(import.meta.url));
 const cli=process.env.FIGCRAFT_CLI || 'C:/Program Files/ArtCraft/FigCraft/figcraft-cli.exe';
 const source=path.join(dir,'design.pre-campaign.figcraft');
 const target=path.join(dir,'design-noveris-live.figcraft');
+const compatibilityTarget=path.join(dir,'design.figcraft');
 const first=process.argv.includes('--first-three');
 const out=path.join(dir,first?'campaign.first-three.figcraft':'campaign.pending.figcraft');
 const ops=[], manifest=[];
@@ -203,4 +204,8 @@ fs.writeFileSync(path.join(dir,'startup.manifest.json'),JSON.stringify(startup.f
 const result=execFileSync(cli,['run',path.join(dir,'campaign.script.json'),'--in',source,'--out',out],{encoding:'utf8',maxBuffer:30*1024*1024});
 fs.writeFileSync(path.join(dir,'campaign.build.log'),result);
 console.log(`Built ${manifest.length} export frames across all 22 Noveris pages: ${out}`);
-if(!first){fs.copyFileSync(out,target);console.log('Updated the complete Noveris startup design system and marketing file.');}
+if (!first) {
+  fs.copyFileSync(out, target);
+  fs.copyFileSync(out, compatibilityTarget);
+  console.log('Updated both filenames for the Noveris startup design.');
+}

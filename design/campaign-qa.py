@@ -6,6 +6,7 @@ import os,json,re,subprocess
 root=Path(__file__).resolve().parent
 out=root/'exports/noveris-startup'
 cli=os.environ.get('FIGCRAFT_CLI',r'C:\Program Files\ArtCraft\FigCraft\figcraft-cli.exe')
+assert (root/'design.figcraft').read_bytes() == (root/'design-noveris-live.figcraft').read_bytes(), 'The compatibility file differs from the live design'
 subprocess.run([cli,'convert',str(root/'design-noveris-live.figcraft'),str(root/'campaign.document.local.json')],check=True,capture_output=True)
 subprocess.run([cli,'convert',str(root/'design.pre-campaign.figcraft'),str(root/'foundations.local.json')],check=True,capture_output=True)
 d=json.loads((root/'campaign.document.local.json').read_text(encoding='utf-8'))

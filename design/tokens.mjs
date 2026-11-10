@@ -203,7 +203,7 @@ export const principles = [
   },
   {
     n: "04",
-    title: "One language, three scripts",
-    body: "Darija in Arabizi or Arabic script, French, English, and the code-switching between them are all first-class. Translations are not afterthoughts appended to an English product.",
+    title: "Three languages, two Darija scripts",
+    body: "The tutor supports Darija in Arabizi or Arabic script, French, and English. Written replies can code-switch. Each spoken reply uses one language.",
   },
 ];

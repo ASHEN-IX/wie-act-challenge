@@ -4,6 +4,8 @@ Open **[design-noveris-live.figcraft](design-noveris-live.figcraft)** in Figcraf
 support Noveris as a professional learning startup and product. This includes
 the original brand foundations and templates, not just the social feed.
 
+The build also writes an identical copy to `design.figcraft` for existing links.
+
 ## File structure
 
 The first 13 pages cover colour, typography, spacing, formats, the approved
