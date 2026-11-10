@@ -77,12 +77,20 @@ def _respond(req, vector_store):
         )
     )
     prompts = json.loads(prompt_path.read_text())
+    preferred_speech = {"darija": "ar", "fr": "fr", "en": "en"}.get(req.language.language)
+    speech_target = preferred_speech or "ar, fr, or en based on the dominant language of the answer"
     system = "\n".join(
         [
             prompts["persona"],
             prompts["modes"][req.mode],
             language_instruction(req.language, req.grounding.question),
-            "Return ONLY JSON: {displayText: string, sourceIds: integer[], followups: string[]}. "
+            "Return ONLY JSON: {displayText: string, sourceIds: integer[], followups: string[], "
+            "speechText: string, speechLanguage: string}. "
+            f"Set speechLanguage to {speech_target}. Write speechText entirely in that one language, "
+            "without code-switching or changing languages mid-sentence. For ar use Tunisian Darija in Arabic "
+            "script, never Arabizi. Use plain speech of at most 500 characters, preserving the answer's "
+            "meaning and any exact identifiers or formulas. Keep the same question or hint and do not "
+            "introduce new facts. Omit URLs, citations and stage directions from speechText. "
             "sourceIds are 1-based indices of the supplied passages that support the explanation. "
             "Use at least one source when relevant passages are supplied; do not cite unrelated passages. "
             "When no passage supports the question, use no sourceIds and explicitly say course evidence is missing. "
@@ -142,9 +150,20 @@ def _respond(req, vector_store):
         )
         for i in answer.sourceIds
     ]
+    spoken = (answer.speechText or "").strip()
+    spoken_language = answer.speechLanguage
+    contains_arabic = bool(re.search(r"[\u0621-\u064a]", spoken))
+    valid_speech = (
+        spoken
+        and spoken_language
+        and (preferred_speech is None or preferred_speech == spoken_language)
+        and contains_arabic == (spoken_language == "ar")
+        and not re.search(r"https?://|\[|```", spoken)
+    )
     return TurnResponse(
         displayText=answer.displayText,
-        speechText=answer.displayText,
+        speechText=spoken if valid_speech else answer.displayText,
+        speechLanguage=spoken_language if valid_speech else None,
         followups=answer.followups,
         citations=citations,
         evidenceStatus="source_linked" if citations else "missing_context",

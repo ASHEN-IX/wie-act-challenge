@@ -67,7 +67,11 @@ def speech_readiness():
         from agents.nardouch.elevenlabs import settings, ElevenLabsFailure
 
         try:
-            _, _, model = settings()
+            _, _, model = settings("en")
+            settings("fr")
+            settings("ar")
+            if model != "eleven_v4":
+                raise ElevenLabsFailure("configuration")
             result["tts"] = {
                 "configured": True,
                 "external": True,

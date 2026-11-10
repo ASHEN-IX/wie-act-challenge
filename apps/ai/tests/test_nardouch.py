@@ -62,6 +62,8 @@ def test_real_retrieval_continuity_and_mode(artifacts, monkeypatch, mode):
             text=json.dumps(
                 {
                     "displayText": "factorial(0) = 1. 3lech nest7a9ou base case?",
+                    "speechText": "علاش نحتاجو نقطة توقّف؟",
+                    "speechLanguage": "ar",
                     "sourceIds": [1],
                     "followups": ["And factorial(1)?"],
                 }
@@ -84,7 +86,9 @@ def test_real_retrieval_continuity_and_mode(artifacts, monkeypatch, mode):
         ],
     )
     result = n.respond(req, store)
-    assert result.speechText == result.displayText
+    assert result.speechText == "علاش نحتاجو نقطة توقّف؟"
+    assert result.speechLanguage == "ar"
+    assert result.displayText == "factorial(0) = 1. 3lech nest7a9ou base case?"
     assert (
         result.citations[0].quote == "Recursion requires a base case. factorial(0) = 1."
     )

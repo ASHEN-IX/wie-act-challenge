@@ -105,6 +105,8 @@ test(
             );
           return res.end(JSON.stringify(planReply));
         }
+        if (req.url === '/api/ai/nardouch/transcribe')
+          return res.end(JSON.stringify({ transcript: 'I predict the route changes.' }));
         if (req.url === '/api/ai/visual-lab/guide')
           return res.end(
             JSON.stringify({
@@ -407,6 +409,22 @@ test(
       assert.ok(labs.some((entry) => entry.labId === labId));
       assert.ok(!JSON.stringify(mine.body).includes('correctOptionId'));
       assert.deepEqual((await request(outsider, 'GET', '/api/v1/study/visual-lab')).body.labs, []);
+    });
+
+    await t.test('voice transcription is scoped to the owned lab', async () => {
+      const endpoint = '/api/v1/study/nardouch/transcribe';
+      const audio = { audioBase64: 'AA==', locale: 'en-US', consent: true };
+      const before = seen.length;
+      assert.equal((await request(outsider, 'POST', endpoint, { ...audio, labId })).status, 404);
+      assert.equal(
+        (await request(student, 'POST', endpoint, { ...audio, labId, courseId })).status,
+        400
+      );
+      assert.equal(seen.length, before);
+      const response = await request(student, 'POST', endpoint, { ...audio, labId });
+      assert.equal(response.status, 200);
+      assert.deepEqual(response.body, { transcript: 'I predict the route changes.' });
+      assert.deepEqual(seen.slice(before), [{ url: '/api/ai/nardouch/transcribe', body: audio }]);
     });
 
     await t.test('discovery finds explorable course sections and enforces access', async () => {

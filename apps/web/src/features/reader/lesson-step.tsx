@@ -4,6 +4,8 @@ import { useRef, useState, type ReactNode } from "react";
 import { Check, ChevronDown, Lightbulb, MessageCircleQuestion, Sparkles } from "lucide-react";
 import type { LessonBlockV2 } from "@noveris/shared/ednova/learningDocumentV2";
 import { Button } from "@/components/ui/button";
+import { DevicePlayback } from "@/features/nardouch/device-playback";
+import { VoiceRecorder } from "@/features/nardouch/voice-recorder";
 import { askLearningTutor } from "@/features/learning/journey-actions";
 import { learningErrorMessage } from "@/features/learning/learning-errors";
 import {
@@ -201,11 +203,14 @@ function HelpPanel({
   help,
   sourceHref,
   title,
+  tutor,
 }: {
   help: ReturnType<typeof useStepHelp>;
   sourceHref: (c: TutorCitation) => string;
   title: string;
+  tutor: TutorTarget;
 }) {
+  const [talking, setTalking] = useState(false);
   const [text, setText] = useState("");
   const { thread } = help;
   return (
@@ -221,6 +226,17 @@ function HelpPanel({
           </Button>
         ))}
       </div>
+      <Button type="button" size="sm" variant="outline" aria-expanded={talking} onClick={() => setTalking(!talking)}>
+        Talk through this step
+      </Button>
+      {talking && (
+        <VoiceRecorder
+          courseId={tutor.courseId}
+          revisionId={tutor.revisionId}
+          disabled={thread.asking}
+          onTranscript={(transcript) => setText(transcript.slice(0, 500))}
+        />
+      )}
       <form
         className="flex gap-2"
         onSubmit={(e) => { e.preventDefault(); if (text.trim()) { help.free(text); setText(""); } }}
@@ -243,6 +259,7 @@ function HelpPanel({
         sourceHref={sourceHref}
         onFollowUp={(followUp) => help.free(followUp)}
       />
+      {talking && thread.answer?.answer && <DevicePlayback text={thread.answer.answer} />}
     </section>
   );
 }
@@ -293,7 +310,7 @@ export function StepView({
         <Items items={step.items} context={context} onHelp={onHelp} />
       </div>
       <RecallCheck step={step} />
-      {tutor && <HelpPanel help={help} sourceHref={sourceHref} title={step.title} />}
+      {tutor && <HelpPanel key={step.id} help={help} sourceHref={sourceHref} title={step.title} tutor={tutor} />}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 import { unwrapAction } from "./action-result";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { cachedSpeech, sessionSpeech } from "./speech-cache";
 import { Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,14 +8,18 @@ import { speakNardouchAnswer } from "./actions";
 export function AudioPlayer({
   conversationId,
   messageId,
+  autoRequest = false,
 }: {
   conversationId: string;
   messageId: string;
+  autoRequest?: boolean;
 }) {
   const [url, setUrl] = useState(""),
     [pending, setPending] = useState(false),
     [error, setError] = useState("");
   const generating = useRef(false);
+  const autoRequested = useRef(false);
+  const autoAllowed = useRef(autoRequest);
   const playRequested = useRef(false);
   const cacheKey = `${conversationId}:${messageId}`;
   const audio = useRef<HTMLAudioElement>(null),
@@ -44,7 +48,7 @@ export function AudioPlayer({
     }
     return () => element?.pause();
   }, [url]);
-  async function generate() {
+  const generate = useCallback(async (automatic = false) => {
     if (generating.current) return;
     generating.current = true;
     setPending(true);
@@ -63,7 +67,7 @@ export function AudioPlayer({
       if (current.current) URL.revokeObjectURL(current.current);
       const next = URL.createObjectURL(blob);
       current.current = next;
-      playRequested.current = true;
+      playRequested.current = !automatic || autoAllowed.current;
       setUrl(next);
     } catch {
       if (alive.current)
@@ -74,7 +78,15 @@ export function AudioPlayer({
       generating.current = false;
       if (alive.current) setPending(false);
     }
-  }
+  }, [cacheKey, conversationId, messageId]);
+  useEffect(() => {
+    autoAllowed.current = autoRequest;
+    if (autoRequest && !autoRequested.current) {
+      autoRequested.current = true;
+      void generate(true);
+    }
+    if (!autoRequest && autoRequested.current) audio.current?.pause();
+  }, [autoRequest, generate]);
   return (
     <div className="space-y-2">
       {url ? (
@@ -128,7 +140,7 @@ export function AudioPlayer({
           size="sm"
           variant="outline"
           disabled={pending}
-          onClick={generate}
+          onClick={() => void generate()}
         >
           <Volume2 />
           {pending ? "Preparing audio…" : "Listen to this answer"}

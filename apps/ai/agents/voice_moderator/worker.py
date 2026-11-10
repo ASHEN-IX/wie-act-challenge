@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import os
+import re
 import time
 
 from livekit import rtc
@@ -40,17 +41,27 @@ async def moderate(ctx: JobContext) -> None:
         nonlocal speech, next_intervention
         if time.monotonic() < next_intervention or (speech and not speech.done()):
             return
+        command = re.match(r"^\s*(?:hey[,. ]+)?moderator[,. ]+(hint|recap)\b", transcript, re.IGNORECASE)
+        action = command.group(1).lower() if command else None
+        if action == "recap":
+            next_intervention = time.monotonic() + 15
+            speech = asyncio.create_task(speak(
+                "Let's recap together. Can someone state the group's current conclusion, "
+                "the reason for it, and one point that is still unresolved?"
+            ))
+            return
         proposal = evaluate_rules(FacilitatorObservationInput(
             roomId=ctx.room.name,
             speakerUserId=participant.identity,
             speakerName=participant.name or "A learner",
-            transcriptText=transcript[-2000:],
+            transcriptText="" if action == "hint" else transcript[-2000:],
             participants=[
                 ParticipantSnapshot(userId=peer.identity, name=peer.name or "A learner", role="participant")
                 for peer in ctx.room.remote_participants.values()
                 if peer.kind == rtc.ParticipantKind.PARTICIPANT_KIND_STANDARD
             ],
-            actionType="audio_utterance",
+            actionType="request_hint" if action == "hint" else "audio_utterance",
+            hintLevel=1,
         ))
         if proposal and proposal.shouldIntervene and proposal.messageText:
             next_intervention = time.monotonic() + max(8, proposal.cooldownSeconds)

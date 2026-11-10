@@ -25,16 +25,20 @@ class ElevenLabsFailure(VoiceUnavailable):
         )
 
 
-def settings():
+def settings(language=None):
     key = os.getenv("ELEVENLABS_API_KEY", "")
-    voice = os.getenv("ELEVENLABS_VOICE_ID", "")
-    model = os.getenv("ELEVENLABS_MODEL_ID", "eleven_flash_v2_5")
+    voice = (
+        os.getenv(f"ELEVENLABS_VOICE_ID_{language.upper()}", "")
+        if language
+        else os.getenv("ELEVENLABS_VOICE_ID") or os.getenv("ELEVENLABS_VOICE_ID_EN", "")
+    )
+    model = os.getenv("ELEVENLABS_MODEL_ID", "eleven_v4")
     if os.getenv("NARDOUCH_TTS_DEMO_ENABLED", "false").lower() != "true":
         raise ElevenLabsFailure("disabled")
     if not key or not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", voice):
         raise ElevenLabsFailure("configuration")
     if (
-        model not in ("eleven_flash_v2_5", "eleven_multilingual_v2", "eleven_v3")
+        model not in ("eleven_flash_v2_5", "eleven_multilingual_v2", "eleven_v3", "eleven_v4")
         or os.getenv("ELEVENLABS_OUTPUT_FORMAT", "mp3_44100_128") != "mp3_44100_128"
     ):
         raise ElevenLabsFailure("configuration")
@@ -142,9 +146,14 @@ def prepare_text(text):
 
 
 class ElevenLabsTTSProvider:
-    def synthesize(self, text, generation_key=None):
-        key, voice, model = settings()
+    def synthesize(self, text, generation_key=None, language=None):
+        key, voice, model = settings(language)
+        if language is not None and model != "eleven_v4":
+            raise ElevenLabsFailure("configuration")
         text = prepare_text(text)
+        payload = {"text": text, "model_id": model}
+        if language:
+            payload["language_code"] = language
         maximum = min(600, max(1, int(os.getenv("NARDOUCH_TTS_MAX_CHARACTERS", "600"))))
         if not text.strip() or len(text) > maximum:
             raise ElevenLabsFailure("text_limit")
@@ -166,7 +175,7 @@ class ElevenLabsTTSProvider:
                     "Content-Type": "application/json",
                 },
                 params={"output_format": "mp3_44100_128"},
-                json={"text": text, "model_id": model},
+                json=payload,
                 timeout=(3, 15),
                 stream=True,
                 allow_redirects=False,

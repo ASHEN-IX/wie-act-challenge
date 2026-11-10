@@ -22,9 +22,11 @@ export interface NardouchCitation {
   quote: string;
   verified: boolean;
 }
+export type SpeechLanguage = 'ar' | 'fr' | 'en';
 export interface NardouchAnswer {
   displayText: string;
   speechText: string;
+  speechLanguage?: SpeechLanguage | null;
   followups: string[];
   citations: NardouchCitation[];
   evidenceStatus: 'source_linked' | 'missing_context';
@@ -126,6 +128,7 @@ export function parseNardouchAnswer(value: unknown, { allowMock = false } = {}):
     const v = exactObject(value, [
       'displayText',
       'speechText',
+      'speechLanguage',
       'followups',
       'citations',
       'evidenceStatus',
@@ -137,7 +140,14 @@ export function parseNardouchAnswer(value: unknown, { allowMock = false } = {}):
       typeof v.displayText !== 'string' ||
       !v.displayText.trim() ||
       v.displayText.length > 12000 ||
-      v.speechText !== v.displayText ||
+      typeof v.speechText !== 'string' ||
+      (v.speechLanguage == null
+        ? v.speechText !== v.displayText
+        : (typeof v.speechLanguage !== 'string' ||
+          !['ar', 'fr', 'en'].includes(v.speechLanguage) ||
+          !v.speechText.trim() ||
+          v.speechText.length > 600 ||
+          /https?:\/\/|\[/.test(v.speechText))) ||
       /https?:\/\/|\[doc:/.test(v.displayText) ||
       !Array.isArray(v.followups) ||
       v.followups.length > 3 ||

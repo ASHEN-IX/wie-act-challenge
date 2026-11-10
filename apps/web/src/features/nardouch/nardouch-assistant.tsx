@@ -36,12 +36,15 @@ export function NardouchAssistant({
     script: "auto",
   });
   const [needsReload, setNeedsReload] = useState(false);
+  const [oralPractice, setOralPractice] = useState(false);
+  const [spokenMessageId, setSpokenMessageId] = useState<string | null>(null);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [restoreId, setRestoreId] = useState<string | null>(null);
   const [draft, setDraft] = useState(""),
     [busy, setBusy] = useState(false),
     [restoring, setRestoring] = useState(true),
     [error, setError] = useState("");
+  const sending = useRef(false);
   const inputId = useId(),
     inputRef = useRef<HTMLTextAreaElement>(null);
   const storageKey = `nardouch:${userId}:${courseId}:${revisionId}`;
@@ -94,6 +97,7 @@ export function NardouchAssistant({
       setConversation(data.conversation);
       setMode(data.conversation.mode);
       setLanguage(data.conversation.language);
+      setNeedsReload(false);
       setError("");
     } catch {
       setError(
@@ -103,8 +107,10 @@ export function NardouchAssistant({
       setBusy(false);
     }
   }
-  async function send() {
-    if (!draft.trim() || busy || restoring) return;
+  async function send(message = draft, practice = oralPractice) {
+    if (!message.trim() || busy || sending.current || restoring || needsReload) return;
+    sending.current = true;
+    setSpokenMessageId(null);
     setBusy(true);
     setError("");
     try {
@@ -115,14 +121,16 @@ export function NardouchAssistant({
           objectiveId,
           conversationId: conversation?.id,
           expectedVersion: conversation?.version || 0,
-          message: draft,
-          mode,
+          message,
+          mode: practice ? "practice" : mode,
           language,
         }),
       );
       setConversation(data.conversation);
       setRestoreId(data.conversation.id);
       setDraft("");
+      const reply = data.conversation.messages.at(-1);
+      if (practice && reply?.role === "assistant") setSpokenMessageId(reply.id);
       setNeedsReload(false);
       try {
         localStorage.setItem(storageKey, data.conversation.id);
@@ -137,6 +145,7 @@ export function NardouchAssistant({
           : "Nardouch is unavailable. Please retry.",
       );
     } finally {
+      sending.current = false;
       setBusy(false);
     }
   }
@@ -161,6 +170,9 @@ export function NardouchAssistant({
           size="sm"
           disabled={disabled}
           onClick={() => {
+            setOralPractice(false);
+            setSpokenMessageId(null);
+            setNeedsReload(false);
             setConversation(null);
             setRestoreId(null);
             setError("");
@@ -177,7 +189,11 @@ export function NardouchAssistant({
       <div className="grid gap-3 sm:grid-cols-3">
         <LearningModeSelector
           value={mode}
-          onChange={setMode}
+          onChange={(next) => {
+            setOralPractice(false);
+            setSpokenMessageId(null);
+            setMode(next);
+          }}
           disabled={disabled}
         />
         <LanguageSelector
@@ -185,6 +201,27 @@ export function NardouchAssistant({
           onChange={setLanguage}
           disabled={disabled}
         />
+      </div>
+      <div className="space-y-2">
+        {oralPractice ? (
+          <Button type="button" variant="outline" disabled={disabled} onClick={() => {
+            setOralPractice(false);
+            setSpokenMessageId(null);
+          }}>End oral practice</Button>
+        ) : (
+          <Button type="button" variant="outline" disabled={disabled || needsReload} onClick={() => {
+            setVoiceEnabled(true);
+            setOralPractice(true);
+            setMode("practice");
+            const prompt =
+              "Start oral practice on the current course objective. Ask one short question and wait for my explanation. On later turns, give one targeted hint and one follow-up question. Keep each reply under 500 characters. Save the full solution for when I ask to review it.";
+            setDraft(prompt);
+            void send(prompt, true);
+          }}>Practice out loud</Button>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Oral practice plays new replies automatically using the configured speech provider. Replies may be sent to ElevenLabs.
+        </p>
       </div>
       {conversation ? (
         <ConversationPanel
@@ -196,6 +233,7 @@ export function NardouchAssistant({
             voiceEnabled
               ? (message) => (
                   <AudioPlayer
+                    autoRequest={oralPractice && message.id === spokenMessageId}
                     conversationId={conversation.id}
                     messageId={message.id}
                   />
@@ -246,7 +284,7 @@ export function NardouchAssistant({
           </p>
           <Button type="submit" disabled={disabled || !draft.trim()}>
             <Send className="size-4" />
-            {busy ? "Thinking…" : "Ask Nardouch"}
+            {busy ? "Thinking…" : oralPractice ? "Send practice turn" : "Ask Nardouch"}
           </Button>
         </div>
       </form>
@@ -257,6 +295,10 @@ export function NardouchAssistant({
           disabled={disabled}
           onChange={(e) => {
             setVoiceEnabled(e.target.checked);
+            if (!e.target.checked) {
+              setOralPractice(false);
+              setSpokenMessageId(null);
+            }
             try {
               localStorage.setItem(
                 storageKey + ":voice",
@@ -275,10 +317,12 @@ export function NardouchAssistant({
         <VoiceRecorder
           courseId={courseId}
           revisionId={revisionId}
-          disabled={disabled}
+          disabled={disabled || needsReload}
+          transcriptUseLabel={oralPractice ? "Send reviewed answer" : undefined}
           onTranscript={(text) => {
             setDraft(text);
-            inputRef.current?.focus();
+            if (oralPractice) void send(text);
+            else inputRef.current?.focus();
           }}
         />
       )}

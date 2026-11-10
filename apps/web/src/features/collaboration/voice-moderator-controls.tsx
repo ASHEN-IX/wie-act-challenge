@@ -106,7 +106,14 @@ export function VoiceModeratorControls({
       <p className="text-sm text-muted-foreground" role="status">
         {message || (state === "connected" ? (mic ? "Microphone on" : "Microphone muted") : state === "reconnecting" ? "Reconnecting voice…" : state === "connecting" ? "Connecting voice…" : "Join to listen. Your microphone starts muted.")}
       </p>
-      {moderatorOnline && <p className="text-sm">Voice moderator joined</p>}
+      {moderatorOnline && (
+        <div className="space-y-1 text-sm">
+          <p>Voice moderator joined</p>
+          {mic && <p className="text-muted-foreground">
+            Say “Moderator, hint” for a group hint or “Moderator, recap” to start a group recap.
+          </p>}
+        </div>
+      )}
       <div ref={audio} />
       {state === "disconnected" ? (
         <>

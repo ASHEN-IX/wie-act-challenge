@@ -5,6 +5,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { DevicePlayback } from "@/features/nardouch/device-playback";
+import { VoiceRecorder } from "@/features/nardouch/voice-recorder";
 import { AiModeNote, AiWaitStatus } from "@/features/ai-status/ai-status-view";
 import type { PublicVisualLab } from "./contracts";
 import { askLabGuide, submitLabCheck } from "./actions";
@@ -29,6 +31,7 @@ const GUIDANCE_MODES = [
 
 export function LabWorkspace({ lab }: { lab: PublicVisualLab }) {
   const [parameters, setParameters] = useState<unknown>(undefined);
+  const [voicePhase, setVoicePhase] = useState<"predict" | "explain" | null>(null);
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<GuideMessage[]>([]);
   const [check, setCheck] = useState<CheckState>({
@@ -57,9 +60,11 @@ export function LabWorkspace({ lab }: { lab: PublicVisualLab }) {
             (lab.definition.scenario as { values: unknown }).values,
           );
 
+  const latestGuideReply = messages.findLastIndex((message) => message.role === "guide");
   const fallbackExample = lab.generationMode === "DETERMINISTIC_FALLBACK";
 
-  function ask(mode: (typeof GUIDANCE_MODES)[number]["id"], text?: string) {
+  function ask(mode: (typeof GUIDANCE_MODES)[number]["id"], text?: string, prediction?: boolean) {
+    if (pending) return;
     const asked = (text ?? question).trim();
     if (!asked) {
       setError("Type a question or choose a prompt.");
@@ -72,10 +77,13 @@ export function LabWorkspace({ lab }: { lab: PublicVisualLab }) {
     startTransition(async () => {
       try {
         const reply = await askLabGuide(lab.labId, {
-          question: asked,
+          question: prediction
+            ? `Give one thing to test without revealing the outcome. Prompt: ${lab.guidance.predictionPrompt} Prediction: ${asked}`.slice(0, 1000)
+            : asked,
           guidanceMode: mode,
           parameters,
         });
+        if (prediction) setVoicePhase((phase) => phase === "predict" ? "explain" : phase);
         setMessages((all) => [
           ...all,
           { role: "guide", text: reply.text, mode: reply.executionMode },
@@ -267,11 +275,31 @@ export function LabWorkspace({ lab }: { lab: PublicVisualLab }) {
               </Button>
             ))}
           </div>
+          <Button type="button" size="sm" variant="outline" aria-expanded={voicePhase !== null} disabled={pending} onClick={() => setVoicePhase(voicePhase ? null : "predict")}>
+            {voicePhase ? "End lab walkthrough" : "Predict, try, and explain"}
+          </Button>
+          {voicePhase && (
+            <div className="space-y-2">
+              <p className="text-sm">
+                {voicePhase === "predict"
+                  ? lab.guidance.predictionPrompt
+                  : "Try your prediction in the simulation, then explain what you observed."}
+              </p>
+              {voicePhase === "predict" && latestGuideReply === -1 && (
+                <DevicePlayback text={lab.guidance.predictionPrompt} />
+              )}
+              <VoiceRecorder
+                labId={lab.labId}
+                disabled={pending}
+                onTranscript={(transcript) => setQuestion(transcript.slice(0, 1000))}
+              />
+            </div>
+          )}
           <form
             className="flex flex-col gap-2"
             onSubmit={(event) => {
               event.preventDefault();
-              ask("explain");
+              ask(voicePhase === "predict" ? "hint" : "explain", undefined, voicePhase === "predict");
             }}
           >
             <label htmlFor="lab-question" className="text-xs font-medium">
@@ -287,7 +315,7 @@ export function LabWorkspace({ lab }: { lab: PublicVisualLab }) {
             />
             <Button type="submit" size="sm" disabled={pending}>
               <MessageCircleQuestion className="size-4" aria-hidden />
-              Ask why
+              {voicePhase === "predict" ? "Send prediction" : voicePhase === "explain" ? "Discuss what happened" : "Ask why"}
             </Button>
           </form>
           {pending && <AiWaitStatus />}
@@ -309,6 +337,7 @@ export function LabWorkspace({ lab }: { lab: PublicVisualLab }) {
                 {message.role === "guide" ? (
                   <>
                     <p>{message.text}</p>
+                    {voicePhase && index === latestGuideReply && <DevicePlayback text={message.text} />}
                     {message.mode && <AiModeNote mode={message.mode} />}
                   </>
                 ) : (

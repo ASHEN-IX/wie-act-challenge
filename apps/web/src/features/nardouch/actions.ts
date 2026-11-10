@@ -49,9 +49,9 @@ export async function sendNardouchFeedback(
     }),
   );
 }
-export async function transcribeNardouchAudio(input: {
-  courseId: string;
-  revisionId: string;
+export type SpeechContext = { courseId: string; revisionId: string } | { labId: string };
+
+export async function transcribeNardouchAudio(input: SpeechContext & {
   audioBase64: string;
   locale: "ar-TN" | "fr-FR" | "en-US";
   consent: true;

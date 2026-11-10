@@ -48,7 +48,7 @@ def test_payload_auth_and_only_text(monkeypatch):
         assert kwargs["headers"]["xi-api-key"] == "test-secret-never-log"
         assert kwargs["json"] == {
             "text": "شنوة stack و queue؟ LIFO x=3",
-            "model_id": "eleven_flash_v2_5",
+            "model_id": "eleven_v4",
         }
         assert kwargs["allow_redirects"] is False
         return Response()
@@ -59,6 +59,34 @@ def test_payload_auth_and_only_text(monkeypatch):
     with pytest.raises(e.ElevenLabsFailure):
         tts_provider().synthesize("again", KEY)
     assert len(seen) == 1
+
+
+@needs_av
+@pytest.mark.parametrize(("language", "text"), [
+    ("ar", "شنوّة تبدّل كي نزيدو في الوزن؟"),
+    ("fr", "Que se passe-t-il si le poids augmente ?"),
+    ("en", "What changes if the weight increases?"),
+])
+def test_v4_routes_each_language_to_one_voice(monkeypatch, language, text):
+    voice = f"configured-{language}"
+    monkeypatch.setenv(f"ELEVENLABS_VOICE_ID_{language.upper()}", voice)
+
+    def post(url, **kwargs):
+        assert url == f"https://api.elevenlabs.io/v1/text-to-speech/{voice}"
+        assert kwargs["json"] == {
+            "text": text, "model_id": "eleven_v4", "language_code": language,
+        }
+        return Response()
+
+    monkeypatch.setattr(e.requests, "post", post)
+    assert e.ElevenLabsTTSProvider().synthesize(text, KEY, language) == AUDIO
+
+
+def test_missing_language_voice_does_not_fall_back(monkeypatch):
+    monkeypatch.delenv("ELEVENLABS_VOICE_ID_FR", raising=False)
+    with pytest.raises(e.ElevenLabsFailure) as error:
+        e.settings("fr")
+    assert error.value.category == "configuration"
 
 
 @needs_av

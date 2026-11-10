@@ -4,6 +4,7 @@ import { NardouchConversationModel as Conversations } from '../models/NardouchCo
 import { CourseRevision } from '../models';
 import { canReadCourse } from './resourceAccess';
 import { getPublishedCourseContext, PublicationForbiddenError } from './coursePublication';
+import { getVisualLab, VisualLabNotFoundError } from './visualLabPlanning';
 import { verifyRevisionArtifact } from './revisionSources';
 import aiClient from '../../../../shared/aiClient';
 import {
@@ -209,14 +210,17 @@ export async function submitFeedback(userId: string, id: string, raw: unknown) {
 
 /** Audio is transient; only the corrected text becomes a conversation message. */
 export async function transcribeSpeech(userId: string, raw: unknown) {
-  const body = exactObject(raw, ['courseId', 'revisionId', 'audioBase64', 'locale', 'consent']);
+  const body = exactObject(raw, ['courseId', 'revisionId', 'labId', 'audioBase64', 'locale', 'consent']);
+  const { labId, courseId, revisionId } = body;
+  const labRequest = 'labId' in body;
+  const validContext = labRequest
+    ? typeof labId === 'string' && !('courseId' in body) && !('revisionId' in body)
+    : typeof courseId === 'string' &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(courseId) &&
+      typeof revisionId === 'string' &&
+      revisionId.length <= 128;
   if (
-    typeof body.courseId !== 'string' ||
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-      body.courseId
-    ) ||
-    typeof body.revisionId !== 'string' ||
-    body.revisionId.length > 128 ||
+    !validContext ||
     typeof body.audioBase64 !== 'string' ||
     body.audioBase64.length > 1_300_000 ||
     !body.audioBase64.length ||
@@ -227,7 +231,21 @@ export async function transcribeSpeech(userId: string, raw: unknown) {
       400,
       'Invalid recording. Record at most 30 seconds and confirm speech-provider consent.'
     );
-  await getPublishedCourseContext(userId, body.courseId, body.revisionId);
+
+  async function requireAccess() {
+    if (typeof labId === 'string') {
+      try {
+        await getVisualLab(userId, labId);
+      } catch (error) {
+        if (error instanceof VisualLabNotFoundError)
+          throw new NardouchError(404, 'Visual Lab not found');
+        throw error;
+      }
+    } else if (typeof courseId === 'string' && typeof revisionId === 'string') {
+      await getPublishedCourseContext(userId, courseId, revisionId);
+    }
+  }
+  await requireAccess();
   const response = await aiClient.post(
     '/api/ai/nardouch/transcribe',
     {
@@ -244,8 +262,7 @@ export async function transcribeSpeech(userId: string, raw: unknown) {
     result.transcript.length > 4000
   )
     throw new NardouchError(503, 'No usable transcript. Type your question or retry.');
-  if (!(await canReadCourse(userId, body.courseId)))
-    throw new PublicationForbiddenError('Course access revoked');
+  await requireAccess();
   return { transcript: result.transcript };
 }
 export async function generateSpeech(userId: string, id: string, raw: unknown) {
@@ -255,10 +272,13 @@ export async function generateSpeech(userId: string, id: string, raw: unknown) {
   const message = record.messages.find((m) => m.id === body.messageId && m.role === 'assistant');
   if (!message?.answer) throw new NardouchError(404, 'Response not found');
   const answer = parseNardouchAnswer(message.answer);
+  if (!answer.speechLanguage)
+    throw new NardouchError(422, 'This reply has no single-language audio. Ask Nardouch again.');
   const response = await aiClient.post(
     '/api/ai/nardouch/speech',
     {
       speechText: answer.speechText,
+      speechLanguage: answer.speechLanguage,
       generationKey: createHash('sha256').update(`${userId}:${id}:${message.id}`).digest('hex')
     },
     { timeout: 23000 }

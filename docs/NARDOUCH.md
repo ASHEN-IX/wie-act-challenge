@@ -684,7 +684,10 @@ NARDOUCH_TTS_PROVIDER=elevenlabs
 NARDOUCH_TTS_DEMO_ENABLED=true
 ELEVENLABS_API_KEY=YOUR_PRIVATE_ACCOUNT_KEY
 ELEVENLABS_VOICE_ID=AUTHORIZED_VOICE_FROM_YOUR_ACCOUNT
-ELEVENLABS_MODEL_ID=eleven_flash_v2_5
+ELEVENLABS_VOICE_ID_AR=YOUR_AUTHORIZED_SALIM_VOICE_ID
+ELEVENLABS_VOICE_ID_FR=YOUR_AUTHORIZED_JULIEN_VOICE_ID
+ELEVENLABS_VOICE_ID_EN=pNInz6obpgDQGcFmaJgB
+ELEVENLABS_MODEL_ID=eleven_v4
 ELEVENLABS_OUTPUT_FORMAT=mp3_44100_128
 NARDOUCH_TTS_MAX_CHARACTERS=600
 NARDOUCH_TTS_DAILY_CHARACTERS=3000
@@ -692,17 +695,22 @@ NARDOUCH_TTS_DAILY_REQUESTS=10
 NARDOUCH_TTS_BUDGET_DB=/absolute/persistent/private-directory/elevenlabs.sqlite3
 ```
 
-The placeholders above are not credentials or invented voice IDs. In the account's
-voice library choose an authorized existing voice and copy its ID. Audition for
-warm, clear young-adult academic speech and French/Arabic transitions; availability
-or an Arabic label does not establish a Tunisian accent. No voice is chosen
-silently. Flash v2.5 is the configured demo candidate; Multilingual v2 can be
-selected through `ELEVENLABS_MODEL_ID` for a separate deliberate A/B request.
-Only these two model IDs and MP3 44.1 kHz/128 kbps are accepted in this adapter.
-Account access, model availability and subscription compatibility are unverified
-until the operator runs preflight and an explicit generation. Unsupported output
-formats/plans fail safely; the adapter never upgrades a format or invokes a new
-provider automatically.
+Nardouch sends one `language_code` per clip. New replies include a short spoken
+version in English, French, or Tunisian Darija in Arabic script. For Auto or Mixed
+chat, the model chooses the dominant language of the reply for audio. Text and
+citations are displayed as before. Replies saved before language metadata was
+introduced remain readable and need a new turn for speech.
+
+These settings use the direct ElevenLabs API. Voice IDs must be accessible to
+that account. Vibi credits and Vibi API keys are separate from this configuration.
+
+
+Choose voices in the ElevenLabs account's library and audition each with
+course vocabulary. Salim and Julien are catalog candidates whose availability
+on the direct account needs verification. The in-app route uses Eleven v4 and
+MP3 at 44.1 kHz/128 kbps. The separate audition command can still use other
+allowed models for comparison. Run an explicit generation to verify account
+access and output-format support.
 
 Create the private budget directory before starting the service (`mkdir -p` and
 `chmod 700`, owned by its service user). The Compose example mounts

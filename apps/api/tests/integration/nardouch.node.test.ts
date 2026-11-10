@@ -2,6 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
+import { createHash } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 import fs from 'node:fs/promises';
 import os from 'node:os';
@@ -22,6 +23,8 @@ test(
     await connectDatabase();
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'nardouch-integration-'));
     const seen: Array<{ history: unknown[] }> = [];
+    const spokenRequests: unknown[] = [];
+    const spokenText = 'علاش نحتاجو نقطة توقّف؟';
     const source = 'Recursion requires a base case. factorial(0) = 1.';
     const ai = createServer((req, res) => {
       const chunks: Buffer[] = [];
@@ -29,12 +32,17 @@ test(
       req.on('end', () => {
         assert.equal(req.headers.authorization, 'Bearer ' + 'n'.repeat(40));
         const body = JSON.parse(Buffer.concat(chunks).toString());
-        seen.push(body);
         res.setHeader('content-type', 'application/json');
+        if (req.url === '/api/ai/nardouch/speech') {
+          spokenRequests.push(body);
+          return res.end(JSON.stringify({ audioBase64: 'AA==', mimeType: 'audio/mpeg' }));
+        }
+        seen.push(body);
         const text = 'El récursivité test7a9 base case. factorial(0) = 1.';
         const answer = {
           displayText: text,
-          speechText: text,
+          speechText: spokenText,
+          speechLanguage: 'ar',
           followups: ['3lech base case?'],
           citations: [
             {
@@ -181,7 +189,7 @@ test(
         body: (await response.json()) as {
           conversation: {
             id: string;
-            messages: Array<{ answer: { citations: Array<{ documentId: string }> } }>;
+            messages: Array<{ id: string; answer: { citations: Array<{ documentId: string }> } }>;
             version: number;
             userId?: never;
             feedback?: never;
@@ -217,6 +225,21 @@ test(
       assert.equal(saved?.messages.length, 2);
       assert.equal(saved?.version, 1);
       assert.ok(!saved?.lockToken);
+    });
+    await t.test('speech dispatch uses the stored single-language rendering', async () => {
+      const conversation = await call(0, 'GET', `/conversations/${id}`);
+      const messageId = conversation.body.conversation.messages[1].id;
+      const endpoint = `/conversations/${id}/speech`;
+      assert.equal((await call(1, 'POST', endpoint, { messageId })).status, 404);
+      assert.equal(spokenRequests.length, 0);
+      assert.equal((await call(0, 'POST', endpoint, { messageId })).status, 200);
+      assert.deepEqual(spokenRequests, [
+        {
+          speechText: spokenText,
+          speechLanguage: 'ar',
+          generationKey: createHash('sha256').update(`${actorIds[0]}:${id}:${messageId}`).digest('hex')
+        }
+      ]);
     });
     await t.test('retrieval and continuation cannot cross owners', async () => {
       assert.equal((await call(1, 'GET', `/conversations/${id}`)).status, 404);

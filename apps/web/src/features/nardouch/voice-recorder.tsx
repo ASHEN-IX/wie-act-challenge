@@ -3,7 +3,7 @@ import { unwrapAction } from "./action-result";
 import { useEffect, useId, useRef, useState } from "react";
 import { Mic, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { transcribeNardouchAudio } from "./actions";
+import { transcribeNardouchAudio, type SpeechContext } from "./actions";
 import { startRecording, type Recording } from "./recording";
 
 export function TranscriptReview({
@@ -11,11 +11,15 @@ export function TranscriptReview({
   onChange,
   onUse,
   onDiscard,
+  useLabel = "Use edited transcript",
+  disabled = false,
 }: {
   value: string;
   onChange: (text: string) => void;
   onUse: () => void;
   onDiscard: () => void;
+  useLabel?: string;
+  disabled?: boolean;
 }) {
   const id = useId();
   return (
@@ -38,10 +42,10 @@ export function TranscriptReview({
         <Button
           type="button"
           size="sm"
-          disabled={!value.trim()}
+          disabled={disabled || !value.trim()}
           onClick={onUse}
         >
-          Use edited transcript
+          {useLabel}
         </Button>
         <Button type="button" variant="ghost" size="sm" onClick={onDiscard}>
           Discard
@@ -51,15 +55,14 @@ export function TranscriptReview({
   );
 }
 export function VoiceRecorder({
-  courseId,
-  revisionId,
   onTranscript,
   disabled,
-}: {
-  courseId: string;
-  revisionId: string;
+  transcriptUseLabel,
+  ...context
+}: SpeechContext & {
   onTranscript: (text: string) => void;
   disabled: boolean;
+  transcriptUseLabel?: string;
 }) {
   const [consent, setConsent] = useState(false),
     [recording, setRecording] = useState(false),
@@ -84,8 +87,7 @@ export function VoiceRecorder({
     try {
       const result = unwrapAction(
         await transcribeNardouchAudio({
-          courseId,
-          revisionId,
+          ...context,
           audioBase64: encoded,
           locale,
           consent: true,
@@ -227,6 +229,8 @@ export function VoiceRecorder({
       {transcript !== null && (
         <TranscriptReview
           value={transcript}
+          useLabel={transcriptUseLabel}
+          disabled={disabled}
           onChange={setTranscript}
           onUse={() => {
             onTranscript(transcript);

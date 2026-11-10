@@ -42,6 +42,7 @@ class TranscriptionRequest(StrictModel):
 class SpeechRequest(StrictModel):
     # Only the private gateway may supply a previously validated stored answer.
     speechText: str = Field(min_length=1, max_length=12000)
+    speechLanguage: Literal["ar", "fr", "en"] | None = None
     generationKey: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
 
 
@@ -145,9 +146,11 @@ def synthesize(req: SpeechRequest) -> str:
             provider = tts_provider()
             if os.getenv("NARDOUCH_TTS_PROVIDER") == "elevenlabs":
                 audio = provider.synthesize(
-                    req.speechText, generation_key=req.generationKey
+                    req.speechText, generation_key=req.generationKey, language=req.speechLanguage
                 )
             else:
+                if req.speechLanguage in ("en", "fr"):
+                    raise VoiceUnavailable("The local voice supports Arabic only.")
                 audio = provider.synthesize(req.speechText)
             return base64.b64encode(audio).decode("ascii")
     except (OSError, ValueError, sqlite3.Error, ImportError):
