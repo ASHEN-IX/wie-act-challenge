@@ -1,5 +1,4 @@
 import { connectDatabase, disconnectDatabase } from '../../../../shared/database';
-import { newId } from '../../../../shared/ids';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -12,11 +11,7 @@ import { getLearningDocument } from '../services/courseReader';
 import { getPublishedPresentation } from '../services/presentationReader';
 import { publishCourseRevision } from '../services/coursePublication';
 import { activityDigest } from '../services/activityIdentity';
-import {
-  verifyRevisionArtifact,
-  canonicalUnitsForIndex,
-  prepareRevisionSources
-} from '../services/revisionSources';
+import { verifyRevisionArtifact, prepareRevisionSources } from '../services/revisionSources';
 const hash = (b: Buffer | string) =>
   'sha256:' + crypto.createHash('sha256').update(b).digest('hex');
 let root: string, course: any, draft: any, doc: any;

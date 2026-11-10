@@ -9,9 +9,7 @@ import { StudyRoom } from '../../modules/study/src/models/StudyRoom';
 import {
   generateLiveKitToken,
   generateLiveKitAdminToken,
-  getLiveKitConfig,
-  revokeLiveKitPublishPermissions,
-  removeLiveKitParticipant
+  getLiveKitConfig
 } from '../../modules/study/src/services/livekitControl';
 
 test('ED-17 & ED-25: Step 9 LiveKit Media SFU Integration and Permission Enforcement', async (t) => {
@@ -138,13 +136,19 @@ test('ED-17 & ED-25: Step 9 LiveKit Media SFU Integration and Permission Enforce
   t.after(() => {
     try {
       wsAlice?.close();
-    } catch {}
+    } catch {
+      /* already closed */
+    }
     try {
       wsBob?.close();
-    } catch {}
+    } catch {
+      /* already closed */
+    }
     try {
       wsCharlie?.close();
-    } catch {}
+    } catch {
+      /* already closed */
+    }
   });
 
   await t.test(
@@ -231,8 +235,6 @@ test('ED-17 & ED-25: Step 9 LiveKit Media SFU Integration and Permission Enforce
 
       // Permissions check
       const getCanPublish = (p: any) => p?.permission?.can_publish ?? p?.permission?.canPublish;
-      const getCanSubscribe = (p: any) =>
-        p?.permission?.can_subscribe ?? p?.permission?.canSubscribe;
 
       assert.equal(getCanPublish(pAlice), true, 'Alice has canPublish=true');
       assert.equal(getCanPublish(pBob), false, 'Bob has canPublish=false (no consent)');
@@ -271,10 +273,8 @@ test('ED-17 & ED-25: Step 9 LiveKit Media SFU Integration and Permission Enforce
   await t.test('4. Force server-side disconnect when participant leaves room', async () => {
     // Setup listener for Bob's WebSocket close event
     let bobWsClosed = false;
-    let bobCloseCode = 0;
-    wsBob!.onclose = (ev) => {
+    wsBob!.onclose = () => {
       bobWsClosed = true;
-      bobCloseCode = ev.code;
     };
 
     // Bob leaves the room via API
@@ -381,12 +381,6 @@ test('ED-17 & ED-25: Step 9 LiveKit Media SFU Integration and Permission Enforce
     await new Promise((r) => setTimeout(r, 10));
     // Simulate policy evaluation
     const tPolicyStart = performance.now();
-    const policyResult = {
-      shouldIntervene: true,
-      strategy: 'PEER_CHALLENGE',
-      reasoning: 'Address misconception to peer',
-      messageText: 'Charlie, how does 1NF handle repeating groups?'
-    };
     const tPolicyEnd = performance.now();
     const policyDurationMs = tPolicyEnd - tPolicyStart;
     const totalLatencyMs = performance.now() - t0;

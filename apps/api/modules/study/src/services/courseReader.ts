@@ -1,11 +1,7 @@
 import { CourseRevision } from '../models';
 import { getPublishedCourseContext } from './coursePublication';
 import { verifyRevisionArtifact, type SourcePassage } from './revisionSources';
-import {
-  parseLearningDocument,
-  type LearningBlock,
-  type LearningDocument
-} from '../../../../shared/ednova/learningDocument';
+import { type LearningBlock } from '../../../../shared/ednova/learningDocument';
 import {
   parseReadingDocumentV2,
   type CanonicalDocumentV1,
@@ -35,13 +31,18 @@ export class LearningDocumentVersionError extends Error {
   readonly status = 422;
 }
 
+type ReviewedFormula =
+  | {
+      expression?: string;
+      state?: unknown;
+      originalModelLatex?: unknown;
+      reviewer?: unknown;
+    }
+  | null
+  | undefined;
+
 function compact(value: unknown, max: number): string {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
-}
-
-function blockNumber(sectionId: string): () => string {
-  let index = 0;
-  return () => `${sectionId}-block-${++index}`;
 }
 
 function semanticToLearningBlock(
@@ -424,17 +425,17 @@ function canonicalBlockShape(
             ...base,
             type: 'math',
             expression: compact(
-              (block.reviewedFormula as any)?.expression || block.expression,
+              (block.reviewedFormula as ReviewedFormula)?.expression || block.expression,
               8000
             ),
             notation: block.reviewedFormula || block.notation === 'latex' ? 'latex' : 'plain',
             ...(block.reviewedFormula
               ? {
                   review: {
-                    state: (block.reviewedFormula as any).state,
+                    state: (block.reviewedFormula as ReviewedFormula)?.state,
                     originalExpression: block.expression,
-                    modelExpression: (block.reviewedFormula as any).originalModelLatex,
-                    reviewer: (block.reviewedFormula as any).reviewer
+                    modelExpression: (block.reviewedFormula as ReviewedFormula)?.originalModelLatex,
+                    reviewer: (block.reviewedFormula as ReviewedFormula)?.reviewer
                   }
                 }
               : {})
@@ -466,7 +467,7 @@ function canonicalBlockShape(
             code: compact(block.code, 20_000)
           }
         : null;
-    case 'media':
+    case 'media': {
       if (typeof block.alt !== 'string') return null;
       const span = canonicalSpans(block.evidence)[0];
       const regionId = compact(block.sourceRegionId || block.regionId, 128);
@@ -483,6 +484,7 @@ function canonicalBlockShape(
         alt: compact(block.alt, 500),
         ...(src ? { src } : {})
       };
+    }
     default:
       return null;
   }
@@ -638,7 +640,7 @@ function legacySections(
 
 export type PublishedReadingBundle = {
   context: Awaited<ReturnType<typeof getPublishedCourseContext>>;
-  revision: any;
+  revision: NonNullable<Awaited<ReturnType<typeof CourseRevision.findOne>>>;
   artifact: Awaited<ReturnType<typeof verifyRevisionArtifact>>;
   canonical: CanonicalDocumentV1 | null;
 };
@@ -677,7 +679,8 @@ export async function loadPublishedReading(
     throw new LearningDocumentVersionError('Frozen reviewed representation checksum mismatch');
   if (storedCanonical && !revision.formulaPublication?.sourceDraftId)
     for (const c of storedCanonical.chapters)
-      for (const l of c.lessons) for (const b of l.blocks) delete (b as any).reviewedFormula;
+      for (const l of c.lessons)
+        for (const b of l.blocks) delete (b as { reviewedFormula?: unknown }).reviewedFormula;
   return { context, revision, artifact, canonical: storedCanonical };
 }
 

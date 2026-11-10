@@ -143,11 +143,11 @@ export function parseNardouchAnswer(value: unknown, { allowMock = false } = {}):
       typeof v.speechText !== 'string' ||
       (v.speechLanguage == null
         ? v.speechText !== v.displayText
-        : (typeof v.speechLanguage !== 'string' ||
+        : typeof v.speechLanguage !== 'string' ||
           !['ar', 'fr', 'en'].includes(v.speechLanguage) ||
           !v.speechText.trim() ||
           v.speechText.length > 600 ||
-          /https?:\/\/|\[/.test(v.speechText))) ||
+          /https?:\/\/|\[/.test(v.speechText)) ||
       /https?:\/\/|\[doc:/.test(v.displayText) ||
       !Array.isArray(v.followups) ||
       v.followups.length > 3 ||

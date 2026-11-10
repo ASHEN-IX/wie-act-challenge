@@ -121,6 +121,8 @@ export class PlanningContextError extends Error {
 function compact(value: unknown, max: number): string {
   if (typeof value !== 'string') return '';
   const cleaned = value
+    // Strip control characters from untrusted planning text.
+    // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();

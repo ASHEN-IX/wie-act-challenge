@@ -236,11 +236,6 @@ const str = (value: unknown, max: number, min = 1): string => {
   return value;
 };
 
-const bool = (value: unknown): boolean => {
-  if (typeof value !== 'boolean') return fail('INVALID_STRUCTURED_ASSET');
-  return value;
-};
-
 const int = (value: unknown, min: number, max: number): number => {
   if (!Number.isSafeInteger(value) || (value as number) < min || (value as number) > max)
     return fail('INVALID_STRUCTURED_ASSET');

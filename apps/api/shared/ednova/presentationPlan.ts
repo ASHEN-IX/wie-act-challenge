@@ -141,7 +141,7 @@ function isFigure(block: Extract<LessonBlockV2, { type: 'media' }>): boolean {
 
 function select(
   entry: PlanLessonInput['blocks'][number],
-  mode: ReaderMode
+  _mode: ReaderMode
 ): { component: ComponentType; selection: SelectionRule } {
   const block = entry.block;
   // A source-faithful policy always wins: unreviewed or unattributable content

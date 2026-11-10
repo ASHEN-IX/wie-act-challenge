@@ -40,7 +40,19 @@
             "argsIgnorePattern": "^_"
           }
         ],
-        "@typescript-eslint/no-explicit-any": "error"
+        "@typescript-eslint/no-explicit-any": "error",
+        "no-undef": "off"
+      }
+    },
+    {
+      "files": [
+        "tests/**/*.ts",
+        "**/tests/**/*.ts",
+        "**/*.test.ts",
+        "scripts/**/*.ts"
+      ],
+      "rules": {
+        "@typescript-eslint/no-explicit-any": "warn"
       }
     }
   ],

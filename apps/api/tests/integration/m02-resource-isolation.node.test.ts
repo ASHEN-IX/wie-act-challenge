@@ -410,7 +410,7 @@ test(
       assert.equal(
         (
           await request(outsider, '/api/v1/study/sessions/team/join-by-code', 'POST', {
-            inviteCode: 'M02SAFE'
+            inviteCode: `M02${runId.slice(-10)}`
           })
         ).status,
         403

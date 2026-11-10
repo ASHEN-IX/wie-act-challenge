@@ -237,7 +237,9 @@ test(
         {
           speechText: spokenText,
           speechLanguage: 'ar',
-          generationKey: createHash('sha256').update(`${actorIds[0]}:${id}:${messageId}`).digest('hex')
+          generationKey: createHash('sha256')
+            .update(`${actorIds[0]}:${id}:${messageId}`)
+            .digest('hex')
         }
       ]);
     });

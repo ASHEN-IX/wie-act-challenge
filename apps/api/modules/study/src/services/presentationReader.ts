@@ -118,7 +118,7 @@ export async function getPublishedPresentation(
     courseId,
     revisionId: context.revisionId,
     contentHash: context.contentHash,
-    canonicalContentHash: revision.contentDocumentHash,
+    canonicalContentHash: revision.contentDocumentHash ?? '',
     title: context.title,
     summary: compact(
       revision.summary || canonical.chapters.map((chapter) => chapter.title).join(' · '),

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { connectDatabase, disconnectDatabase } from '../../shared/database';
 import { newId } from '../../shared/ids';
-import express, { type Response, type NextFunction } from 'express';
+import express from 'express';
 import request from 'supertest';
 import crypto from 'node:crypto';
 
@@ -17,7 +17,6 @@ import {
 } from '../../modules/study/src/models';
 import {
   canReadCourse,
-  canAuthorCourse,
   getCourseAccessRole
 } from '../../modules/study/src/services/resourceAccess';
 import { selectLearningActivity } from '../../modules/study/src/services/learningJourney';
@@ -28,9 +27,7 @@ import {
   cleanupCourseFixtures,
   reviewActivityFixture
 } from '../helpers/reviewedActivityFixture';
-import { materializeRevisionFixture } from '../helpers/revisionArtifactFixture';
 import coursesRouter from '../../modules/study/src/routes/courses';
-import type { DomainRequest } from '../../src/framework/contracts';
 
 test('Step 10 Learning Closure: ED-06 Source Isolation, ED-21 Unofficial Flow, and ED-28 Activity Safety', async (t) => {
   await connectDatabase();
@@ -66,6 +63,7 @@ test('Step 10 Learning Closure: ED-06 Source Isolation, ED-21 Unofficial Flow, a
       await CourseEnrollment.deleteMany({ userId: { $in: [userA, userB] } });
       await Subject.deleteMany({ id: subjectId });
     } catch {
+      /* best-effort cleanup */
     } finally {
       await disconnectDatabase();
     }

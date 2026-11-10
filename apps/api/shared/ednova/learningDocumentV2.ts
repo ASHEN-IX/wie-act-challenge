@@ -217,8 +217,6 @@ const str = (value: unknown, max: number) => {
   if (typeof value !== 'string' || value.length > max) fail();
   return value as string;
 };
-const optional = <T>(value: unknown, check: (v: unknown) => T): T | undefined =>
-  value === undefined ? undefined : check(value);
 const nullableInt = (value: unknown) => {
   if (value === null) return null;
   if (!Number.isSafeInteger(value) || (value as number) < 1) fail();
@@ -702,7 +700,7 @@ export function migrateReadingDocumentV1(value: {
   warnings: string[];
 }): ReadingDocumentV2 {
   const sourceSection = value.sections.find((section) => section.id === 'course-source');
-  const passages = (sourceSection?.blocks || []).flatMap((entry, index) =>
+  const passages = (sourceSection?.blocks || []).flatMap((entry) =>
     entry.type === 'paragraph' ||
     entry.type === 'list' ||
     entry.type === 'quote' ||

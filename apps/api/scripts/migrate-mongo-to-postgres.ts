@@ -228,6 +228,8 @@ let strippedNullBytes = 0;
 function sanitizeText(text: string): string {
   if (!text.includes('\u0000')) return text;
   strippedNullBytes += text.split('\u0000').length - 1;
+  // NUL bytes cannot be stored in PostgreSQL text columns.
+  // eslint-disable-next-line no-control-regex
   return text.replace(/\u0000/g, '');
 }
 
@@ -313,10 +315,11 @@ function coerceScalar(value: unknown, field: FieldInfo): CoerceResult {
       return { ok: true, value: text };
     }
     case 'string':
-    default:
+    default: {
       const text = sanitizeText(idOf(value) ?? '');
       const isLegacyReference = /(?:^id$|Ids?$)/.test(field.name) && /^[0-9a-f]{24}$/i.test(text);
       return { ok: true, value: field.isUuid || isLegacyReference ? migratedId(text) : text };
+    }
   }
 }
 

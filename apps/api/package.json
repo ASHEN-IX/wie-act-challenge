@@ -13,7 +13,7 @@
     "start": "node dist/main.js",
     "build": "prisma generate && tsc",
     "lint": "eslint modules shared scripts tests src --ignore-pattern \"**/node_modules/**\" --ext .ts",
-    "test": "pnpm test:routes && NODE_OPTIONS=--experimental-vm-modules jest --runInBand && pnpm test:node && pnpm test:node:integration && pnpm test:auth",
+    "test": "pnpm test:routes && NODE_OPTIONS=--experimental-vm-modules jest --runInBand --forceExit && pnpm test:node && pnpm test:node:integration && pnpm test:auth",
     "test:unit": "NODE_OPTIONS=--experimental-vm-modules jest modules src shared --runInBand",
     "test:integration": "NODE_OPTIONS=--experimental-vm-modules jest tests/integration --runInBand && pnpm test:node:integration",
     "format": "prettier --write \"{src,modules,shared,scripts,tests}/**/*.{ts,json,md}\"",

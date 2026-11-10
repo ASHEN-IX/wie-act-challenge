@@ -1,7 +1,6 @@
 // Isolated real-service QA harness. Only the Gemini SDK is mocked in Python.
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import os from 'node:os';
 import crypto from 'node:crypto';
 import { spawn, execFileSync } from 'node:child_process';
 import { config } from 'dotenv';
@@ -142,7 +141,7 @@ async function main() {
   if (process.env.FINAL_QA_DOCKER_NETWORK)
     args.push('--network', process.env.FINAL_QA_DOCKER_NETWORK);
   for (const [k, v] of Object.entries(env)) args.push('-e', k + '=' + v);
-  const py = spawn(
+  spawn(
     'docker',
     [
       ...args,
@@ -159,7 +158,8 @@ async function main() {
     ],
     { stdio: 'inherit' }
   );
-  let runtime: any, worker: any, ingestion: any;
+  let runtime: { stop(): Promise<unknown> } | undefined = undefined;
+  let worker: ReturnType<typeof spawn> | undefined = undefined;
   require('./helpers/provision-test-database')
     .provision(name)
     .catch(() => process.exit(1));
@@ -172,11 +172,15 @@ async function main() {
     if (worker) worker.kill('SIGTERM');
     try {
       run(['stop', '-t', '5', container]);
-    } catch {}
+    } catch {
+      /* best-effort cleanup */
+    }
     if (runtime) await Promise.race([runtime.stop(), new Promise((r) => setTimeout(r, 5000))]);
     try {
       run(['exec', broker, 'rabbitmqctl', 'delete_vhost', name]);
-    } catch {}
+    } catch {
+      /* best-effort cleanup */
+    }
     await fs.rm(root, { recursive: true, force: true });
     process.exit(0);
   }
@@ -185,7 +189,9 @@ async function main() {
   for (let i = 0; i < 120; i++) {
     try {
       if ((await fetch('http://127.0.0.1:5362/health')).ok) break;
-    } catch {}
+    } catch {
+      /* best-effort cleanup */
+    }
     await new Promise((r) => setTimeout(r, 500));
     if (i === 119) throw Error('QA Python unavailable');
   }
@@ -262,11 +268,9 @@ async function main() {
       projectId: 'not-a-real-provider-project'
     }
   });
-  ingestion = spawn(
-    'docker',
-    ['exec', container, '/opt/venv/bin/python', '-m', 'workers.ingestion_worker'],
-    { stdio: 'inherit' }
-  );
+  spawn('docker', ['exec', container, '/opt/venv/bin/python', '-m', 'workers.ingestion_worker'], {
+    stdio: 'inherit'
+  });
   worker = spawn(process.execPath, ['--import', 'tsx', 'scripts/formula-recognition-worker.ts'], {
     env: process.env,
     stdio: 'inherit'

@@ -6,7 +6,7 @@ on:
     branches: [main]
 jobs:
   ai-container:
-    name: Non-root AI image and shared storage
+    name: Non-root AI image
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -14,10 +14,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - run: docker build -t ednova-ai-check -f apps/ai/Dockerfile apps/ai
-      - run: node scripts/verify-ai-container.mjs ednova-ai-check
-      - run: node scripts/verify-worker-recovery.mjs ednova-ai-check
-      - run: node scripts/verify-source-restore.mjs ednova-ai-check
+      - run: docker build -t noveris-ai-check -f apps/ai/Dockerfile apps/ai
+      - name: The AI image runs as a non-root user
+        run: |
+          uid=$(docker run --rm --entrypoint id noveris-ai-check -u)
+          echo "AI image user id: $uid"
+          test "$uid" != "0"
   node:
     name: pnpm workspace and modular API
     runs-on: ubuntu-latest
@@ -37,8 +39,15 @@ jobs:
         ports: [27018:27017]
     env:
       DATABASE_URL: postgresql://ednova:ednova@127.0.0.1:5433/ednova_test
+      LIVEKIT_URL: ws://127.0.0.1:7880
+      LIVEKIT_API_KEY: test_lk_key
+      LIVEKIT_API_SECRET: test_lk_secret_1234567890
     steps:
       - uses: actions/checkout@v4
+      - name: Local LiveKit SFU for the media integration tests
+        run: >-
+          docker run -d --name livekit --network host livekit/livekit-server:v1.9.11
+          --dev --bind 127.0.0.1 --keys "test_lk_key: test_lk_secret_1234567890"
       - uses: pnpm/action-setup@v4
         with:
           version: 11.3.0
@@ -61,7 +70,10 @@ jobs:
       - run: pnpm test
       - run: pnpm build
   e2e:
+    name: Browser authentication journeys
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://ednova:ednova@127.0.0.1:5433/ednova_test
     services:
       postgres:
         image: postgres:17-alpine

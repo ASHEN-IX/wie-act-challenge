@@ -22,7 +22,6 @@ const MODEL = 'gemini/gemini-3.6-flash';
 const MAX = 1_000_000;
 const RESERVED = 32_768;
 const EXPIRES = Math.floor(Date.now() / 1000) + 3600;
-const BACKEND = path.resolve(__dirname, '..');
 
 type Row = {
   scenario: string;

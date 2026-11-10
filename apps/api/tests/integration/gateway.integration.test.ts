@@ -10,11 +10,7 @@
  */
 
 const request = require('supertest');
-const {
-  connectDatabase,
-  disconnectDatabase,
-  isConnectedToDatabase
-} = require('../../shared/database');
+const { connectDatabase, disconnectDatabase } = require('../../shared/database');
 const { newId } = require('../../shared/ids');
 
 jest.setTimeout(30000);

@@ -7,6 +7,21 @@ import { activityDigest } from './activityIdentity';
 import { canAuthorCourse } from './resourceAccess';
 import aiClient from '../../../../shared/aiClient';
 import { parseCanonicalDocument } from '../../../../shared/ednova/canonicalDocument';
+type FormulaIndexBlock = {
+  id?: unknown;
+  type?: unknown;
+  expression?: unknown;
+  evidence?: Array<{ documentId: string; chunkId: string }>;
+  reviewedFormula?: {
+    expression: string;
+    state: string;
+    proposalIdentity: string;
+    documentHash: string;
+    cropHash: string;
+    reviewer: string;
+  };
+};
+
 export class SourceIntegrityError extends Error {
   readonly status = 503;
   readonly code = 'SOURCE_INTEGRITY_UNAVAILABLE';
@@ -94,7 +109,7 @@ export function canonicalUnitsForIndex(value: unknown): CanonicalIndexUnit[] {
     for (const lesson of chapter.lessons) {
       const source = lesson.blocks.find((block) => block.type === 'source_lesson');
       const text = typeof source?.text === 'string' ? source.text : '';
-      for (const b of lesson.blocks as Array<Record<string, any>>) {
+      for (const b of lesson.blocks as FormulaIndexBlock[]) {
         if (b.type !== 'math' || (!b.reviewedFormula && source)) continue;
         const expression = b.reviewedFormula
           ? 'Instructor-reviewed representation: ' +
@@ -119,9 +134,9 @@ export function canonicalUnitsForIndex(value: unknown): CanonicalIndexUnit[] {
                   }
                 : {}),
               text: expression.slice(offset, offset + 1800).trim(),
-              documentIds: [...new Set<string>(spans.map((s: any) => s.documentId))],
+              documentIds: [...new Set<string>(spans.map((s) => s.documentId))],
               blockIds: [String(b.id)],
-              chunkIds: spans.map((s: any) => s.chunkId),
+              chunkIds: spans.map((s) => s.chunkId),
               lessonId: lesson.id
             });
       }

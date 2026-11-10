@@ -12,20 +12,13 @@ import { spawn, ChildProcess } from 'node:child_process';
 import amqp from 'amqplib';
 import { Course, CourseRevision } from '../models';
 import { FormulaRecognitionJob as Jobs } from '../models/FormulaRecognitionJob';
-import { FormulaProposal } from '../models/FormulaProposal';
 process.env.FORMULA_QUEUE = 'ai.test.formula.jobs.' + process.pid;
 const { dispatch, processJob, recover, FORMULA_QUEUE } =
   require('../services/formulaJobs') as typeof import('../services/formulaJobs');
 const routes = require('../routes/courses');
 const docId = 'doc_' + 'a'.repeat(16),
   regionId = 'region_' + 'b'.repeat(20);
-let dbName: string,
-  root: string,
-  course: any,
-  draft: any,
-  hash: string,
-  server: http.Server,
-  worker: ChildProcess;
+let root: string, course: any, draft: any, hash: string, server: http.Server, worker: ChildProcess;
 let calls = 0,
   mode = 'ok',
   base: string,

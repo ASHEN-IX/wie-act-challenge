@@ -14,6 +14,8 @@ export function validateCorrection(value: unknown): string {
     typeof value !== 'string' ||
     !value.trim() ||
     value.length > 8000 ||
+    // Control characters are rejected on purpose.
+    // eslint-disable-next-line no-control-regex
     /[<>\x00-\x08\x0b\x0c\x0e-\x1f]/.test(value) ||
     /\\(?:html\w*|href|url|includegraphics|input|write|def|gdef|edef|newcommand|renewcommand)\b/i.test(
       value
@@ -74,7 +76,12 @@ export async function reviewContext(
   return { draft, proposal };
 }
 
-export async function ensureSnapshot(actor: string, draft: any) {
+export async function ensureSnapshot(
+  actor: string,
+  // Same legacy revision shape as reviewedPublication; see formulaPublication.ts.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  draft: any
+) {
   if (
     !(await canManageCourse(actor, String(draft.courseId))) ||
     String((await findEditableDraft(String(draft.courseId)))?.id) !== String(draft.id) ||

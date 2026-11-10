@@ -145,7 +145,11 @@ async function prerequisites(actor: string, courseId: string, docHash: string, m
     fail(503, 'OPERATOR_APPROVAL_OR_BUDGET_UNAVAILABLE');
   }
 }
-async function inspect(draft: any, documentId: string, regionId: string) {
+async function inspect(
+  draft: Awaited<ReturnType<typeof snapshot>>,
+  documentId: string,
+  regionId: string
+) {
   if (!/^doc_[a-f0-9]{16}$/.test(documentId) || !/^region_[a-f0-9]{20}$/.test(regionId))
     fail(422, 'INVALID_REGION');
   const documents = draft.sourceManifest as SourceDocument[];
@@ -215,13 +219,18 @@ export async function dispatch(id: string) {
     await conn.close();
   }
 }
-export async function submit(actor: string, courseId: string, tag: string, body: any) {
+export async function submit(
+  actor: string,
+  courseId: string,
+  tag: string,
+  body: Record<string, unknown> | null | undefined
+) {
   if (
     !body ||
     Object.keys(body).some((k) => !['documentId', 'regionId', 'draftVersion'].includes(k))
   )
     fail(422, 'INVALID_REQUEST');
-  const draft = await snapshot(actor, courseId, tag, body.draftVersion);
+  const draft = await snapshot(actor, courseId, tag, body.draftVersion as number);
   const { region } = await inspect(draft, String(body.documentId), String(body.regionId));
   const model = process.env.FORMULA_RECOGNITION_MODEL || 'gemini/gemini-2.5-flash';
   await prerequisites(actor, courseId, region.documentHash, model);
@@ -288,7 +297,7 @@ export async function processJob(id: string) {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))
     return;
   const claim = crypto.randomUUID();
-  const job: any = await Jobs.findOneAndUpdate(
+  const job = await Jobs.findOneAndUpdate(
     { id: id, state: 'queued' },
     { $set: { state: 'running', claim, startedAt: new Date() } },
     { new: true }
@@ -335,7 +344,7 @@ export async function processJob(id: string) {
     await prerequisites(job.actor, job.courseId, job.documentHash, job.model);
     if (!(await Jobs.exists({ id: id, state: 'running', claim }))) return;
     const identity = digest([job.identity, p.proposal_sha256]);
-    const saved: any = await FormulaProposal.findOneAndUpdate(
+    const saved = await FormulaProposal.findOneAndUpdate(
       { identity },
       {
         $setOnInsert: {
@@ -370,14 +379,14 @@ export async function processJob(id: string) {
       {
         $set: {
           state: 'completed',
-          proposalId: String(saved.id),
+          proposalId: String(saved?.id),
           usage: data.usage,
           finishedAt: new Date()
         }
       }
     );
   } catch (e) {
-    const status = (e as any).status;
+    const status = (e as { status?: number }).status;
     await Jobs.updateOne(
       { id: id, state: 'running', claim },
       {

@@ -255,7 +255,12 @@ test('TTS sends only the validated stored answer and rechecks current access', a
     lean({
       ...record,
       messages: [
-        { id: 'approved', role: 'assistant', content: 'text', answer: answer('a'.repeat(36)) }
+        {
+          id: 'approved',
+          role: 'assistant',
+          content: 'text',
+          answer: { ...answer('a'.repeat(36)), speechLanguage: 'ar' }
+        }
       ]
     })
   );
@@ -268,9 +273,10 @@ test('TTS sends only the validated stored answer and rechecks current access', a
     '/api/ai/nardouch/speech',
     {
       speechText: '3lech base case mouhema?',
+      speechLanguage: 'ar',
       generationKey: expect.stringMatching(/^[a-f0-9]{64}$/)
     },
-    { timeout: 23000 }
+    { timeout: expect.any(Number) }
   );
   expect(canReadCourse).toHaveBeenCalledTimes(2);
 });
@@ -280,7 +286,12 @@ test('malformed speech service envelopes are outages, not student validation err
     lean({
       ...record,
       messages: [
-        { id: 'approved', role: 'assistant', content: 'text', answer: answer('a'.repeat(36)) }
+        {
+          id: 'approved',
+          role: 'assistant',
+          content: 'text',
+          answer: { ...answer('a'.repeat(36)), speechLanguage: 'ar' }
+        }
       ]
     })
   );

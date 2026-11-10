@@ -13,11 +13,26 @@ import { findEditableDraft } from './courseDraft';
 import { canPublishCourse } from './resourceAccess';
 import aiClient from '../../../../shared/aiClient';
 
-const conflict = (message: string): never => {
+const conflict: (message: string) => never = (message) => {
   throw Object.assign(new Error(message), { status: 409, code: 'FORMULA_SNAPSHOT_CHANGED' });
 };
 /** Freeze a reviewed source snapshot into a new immutable publication identity. */
-export async function reviewedPublication(actor: string, draft: any): Promise<string | null> {
+type MathBlock = {
+  type?: unknown;
+  regionId?: unknown;
+  page?: unknown;
+  bbox?: unknown;
+  expression?: unknown;
+  evidence?: Array<{ documentId?: unknown }>;
+  reviewedFormula?: unknown;
+};
+
+export async function reviewedPublication(
+  actor: string,
+  // The publication flow mutates several legacy revision fields that the model type does not yet describe.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  draft: any
+): Promise<string | null> {
   if (draft.formulaPublication?.sourceDraftId) {
     if (draft.contentDocumentHash !== draft.formulaPublication.projectionHash)
       conflict('Frozen formula publication checksum changed');
@@ -40,7 +55,7 @@ export async function reviewedPublication(actor: string, draft: any): Promise<st
   }
   let receipt = draft.formulaPublication;
   if (!receipt?.targetTag) {
-    const proposals: any[] = await FormulaProposal.find({
+    const proposals = await FormulaProposal.find({
       courseId: draft.courseId,
       revisionId: draft.id,
       revisionTag: draft.revisionTag,
@@ -53,7 +68,9 @@ export async function reviewedPublication(actor: string, draft: any): Promise<st
     if (String((await findEditableDraft(String(draft.courseId)))?.id) !== String(draft.id))
       conflict('Only the current draft can publish formula reviews');
     const canonical = parseCanonicalDocument(draft.contentDocument);
-    const blocks = canonical.chapters.flatMap((c) => c.lessons.flatMap((l) => l.blocks)) as any[];
+    const blocks = canonical.chapters.flatMap((c) =>
+      c.lessons.flatMap((l) => l.blocks)
+    ) as MathBlock[];
     const used = new Set<string>();
     for (const p of proposals) {
       const last = p.history[p.history.length - 1];
@@ -70,9 +87,11 @@ export async function reviewedPublication(actor: string, draft: any): Promise<st
         (b) =>
           b.type === 'math' &&
           b.regionId === p.regionId &&
-          b.evidence?.some((s: any) => s.documentId === p.documentId)
+          b.evidence?.some((s) => s.documentId === p.documentId)
       );
-      const doc = draft.sourceManifest?.find((d: any) => d.documentId === p.documentId);
+      const doc = (draft.sourceManifest as SourceDocument[] | undefined)?.find(
+        (d) => d.documentId === p.documentId
+      );
       if (
         !block ||
         !doc ||

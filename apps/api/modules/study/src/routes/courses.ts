@@ -798,7 +798,10 @@ router.post('/:courseId/drafts/:revisionId/approve', async (req: DomainRequest, 
       courseId = String(req.params.courseId),
       tag = String(req.params.revisionId);
     const draft = await formulaJobs.snapshot(actor, courseId, tag, req.body?.draftVersion);
-    const canonical = draft.contentDocument as any;
+    const canonical = draft.contentDocument as {
+      quality?: { publicationState?: string };
+      extractionReview?: { acknowledged?: boolean };
+    } | null;
     if (
       canonical?.quality?.publicationState === 'review_required' &&
       !canonical.extractionReview?.acknowledged &&
@@ -825,9 +828,9 @@ router.post('/:courseId/drafts/:revisionId/approve', async (req: DomainRequest, 
     if (!changed.matchedCount) return res.status(409).json({ error: 'DRAFT_CHANGED' });
     return res.status(200).json({ approved: true });
   } catch (e) {
-    return res
-      .status((e as any).status || 503)
-      .json({ error: (e as any).status ? (e as Error).message : 'APPROVAL_UNAVAILABLE' });
+    return res.status((e as { status?: number }).status || 503).json({
+      error: (e as { status?: number }).status ? (e as Error).message : 'APPROVAL_UNAVAILABLE'
+    });
   }
 });
 
@@ -856,7 +859,7 @@ router.post('/:courseId/publish', async (req: DomainRequest, res: Response) => {
       return res.status(400).json({ error: error.code, message: error.message });
     }
     if (error instanceof SourceIntegrityError) return res.status(503).json({ error: error.code });
-    if ((error as any).code === 'FORMULA_SNAPSHOT_CHANGED')
+    if ((error as { code?: string }).code === 'FORMULA_SNAPSHOT_CHANGED')
       return res.status(409).json({
         error: 'Formula source or draft changed. Reload Studio and review this draft again.',
         code: 'FORMULA_SNAPSHOT_CHANGED'
@@ -1083,7 +1086,13 @@ router.get(
             lesson.blocks
               .filter((b) => b.type === 'math')
               .map((b) => {
-                const block = b as Record<string, any>;
+                const block = b as {
+                  regionId?: unknown;
+                  page?: unknown;
+                  expression?: unknown;
+                  issues?: unknown;
+                  evidence?: Array<{ documentId?: unknown }>;
+                };
                 const documentId = block.evidence?.[0]?.documentId;
                 return {
                   regionId: block.regionId,
@@ -1137,8 +1146,10 @@ router.get(
         })
       });
     } catch (e) {
-      return res.status((e as any).status || 503).json({
-        error: (e as any).status ? (e as Error).message : 'FORMULA_WORKSPACE_UNAVAILABLE'
+      return res.status((e as { status?: number }).status || 503).json({
+        error: (e as { status?: number }).status
+          ? (e as Error).message
+          : 'FORMULA_WORKSPACE_UNAVAILABLE'
       });
     }
   }
@@ -1161,7 +1172,7 @@ router.post(
         )
       );
     } catch (e) {
-      const status = (e as any).status || 503;
+      const status = (e as { status?: number }).status || 503;
       return res
         .status(status)
         .json({ error: status === 503 ? 'CONSENT_UNAVAILABLE' : (e as Error).message });
@@ -1180,10 +1191,10 @@ router.post(
       );
       return res.status(202).json({ job });
     } catch (e) {
-      const status = (e as any).status || 503;
-      return res
-        .status(status)
-        .json({ error: (e as any).status ? (e as Error).message : 'RECOGNITION_UNAVAILABLE' });
+      const status = (e as { status?: number }).status || 503;
+      return res.status(status).json({
+        error: (e as { status?: number }).status ? (e as Error).message : 'RECOGNITION_UNAVAILABLE'
+      });
     }
   }
 );
@@ -1200,7 +1211,7 @@ router.get(
         )
       });
     } catch (e) {
-      const status = (e as any).status || 503;
+      const status = (e as { status?: number }).status || 503;
       return res
         .status(status)
         .json({ error: status === 503 ? 'JOB_UNAVAILABLE' : (e as Error).message });
@@ -1220,7 +1231,7 @@ router.post(
         )
       });
     } catch (e) {
-      const status = (e as any).status || 503;
+      const status = (e as { status?: number }).status || 503;
       return res
         .status(status)
         .json({ error: status === 503 ? 'JOB_UNAVAILABLE' : (e as Error).message });
@@ -1393,7 +1404,11 @@ router.post(
           'model',
           'latex',
           'sourceText'
-        ].some((key) => String((saved as any)[key]) !== String((payload as any)[key])) ||
+        ].some(
+          (key) =>
+            String((saved as unknown as Record<string, unknown>)[key]) !==
+            String((payload as unknown as Record<string, unknown>)[key])
+        ) ||
         JSON.stringify(saved.bbox) !== JSON.stringify(payload.bbox)
       )
         return res.status(409).json({ error: 'PROPOSAL_IDENTITY_CONFLICT' });

@@ -18,7 +18,6 @@
 import crypto from 'node:crypto';
 import { ExperiencePlanRecord, type IExperiencePlanRecord } from '../models/ExperiencePlanRecord';
 import {
-  parseExperiencePlanProposal,
   type ExperiencePlanValidationContext,
   type ValidatedLearningExperiencePlan
 } from '../../../../shared/ednova/experiencePlan';

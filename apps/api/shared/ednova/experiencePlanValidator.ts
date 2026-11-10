@@ -38,7 +38,6 @@ import {
   type ExperiencePlanValidationContext,
   type ProposedPlacement,
   type UntrustedExperiencePlanProposal,
-  type ValidatedAssetBinding,
   type ValidatedLearningExperiencePlan,
   type ValidatedPlacement
 } from './experiencePlan';

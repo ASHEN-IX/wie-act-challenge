@@ -3,8 +3,7 @@ import {
   StructuredAssetError,
   parseStructuredAsset,
   projectStructuredAsset,
-  projectStructuredAssets,
-  type StructuredAssetV1
+  projectStructuredAssets
 } from '../../../../shared/ednova/structuredAsset';
 import { COMPONENT_REGISTRY_VERSION } from '../../../../shared/ednova/componentRegistry';
 

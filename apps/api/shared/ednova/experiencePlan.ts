@@ -697,7 +697,6 @@ export function experienceContextFingerprint(input: {
   ]);
   let hash = 0n;
   const prime = 1099511628211n;
-  const offset = 14695981039346656037n;
   for (let index = 0; index < payload.length; index += 1) {
     hash ^= BigInt(payload.charCodeAt(index));
     hash = (hash * prime) & 0xffffffffffffffffn;

@@ -8,7 +8,6 @@ import * as reviewModule from '../services/formulaReview';
 import aiClient from '../../../../shared/aiClient';
 import { connectDatabase } from '../../../../shared/database';
 import { Course, CourseRevision } from '../models';
-import { FormulaProposal } from '../models/FormulaProposal';
 import { prisma } from '../../../../shared/database';
 
 const courses = require('../routes/courses');
