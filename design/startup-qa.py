@@ -4,8 +4,8 @@ from PIL import Image, ImageDraw
 import json,subprocess,os,re
 p=Path(__file__).resolve().parent
 out=p/'exports/noveris-startup'
-cli=os.environ.get('FIGCRAFT_CLI',r'C:\Program Files\ArtCraft\FigCraft\figcraft-cli.exe')
-subprocess.run([cli,'convert',str(p/'design-noveris-live.figcraft'),str(p/'startup.after.local.json')],capture_output=True,check=True)
+cli=os.environ.get('FIGCRAFT_CLI','figcraft-cli')
+subprocess.run([cli,'convert',str(p/'design-noveris.figcraft'),str(p/'startup.after.local.json')],capture_output=True,check=True)
 d=json.loads((p/'startup.after.local.json').read_text(encoding='utf-8'))
 m=json.loads((p/'startup.manifest.json').read_text(encoding='utf-8'))
 issues=[]

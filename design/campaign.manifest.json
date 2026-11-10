@@ -112,102 +112,6 @@
     "transparent": false
   },
   {
-    "name": "NOVERIS-POST-01",
-    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
-    "width": 1080,
-    "height": 1350,
-    "kind": "social",
-    "transparent": false
-  },
-  {
-    "name": "NOVERIS-POST-02",
-    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
-    "width": 1080,
-    "height": 1350,
-    "kind": "social",
-    "transparent": false
-  },
-  {
-    "name": "NOVERIS-POST-03",
-    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
-    "width": 1080,
-    "height": 1350,
-    "kind": "social",
-    "transparent": false
-  },
-  {
-    "name": "NOVERIS-POST-04",
-    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
-    "width": 1080,
-    "height": 1350,
-    "kind": "social",
-    "transparent": false
-  },
-  {
-    "name": "NOVERIS-POST-05",
-    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
-    "width": 1080,
-    "height": 1350,
-    "kind": "social",
-    "transparent": false
-  },
-  {
-    "name": "NOVERIS-POST-06",
-    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
-    "width": 1080,
-    "height": 1350,
-    "kind": "social",
-    "transparent": false
-  },
-  {
-    "name": "NOVERIS-POST-07",
-    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
-    "width": 1080,
-    "height": 1350,
-    "kind": "social",
-    "transparent": false
-  },
-  {
-    "name": "NOVERIS-POST-08",
-    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
-    "width": 1080,
-    "height": 1350,
-    "kind": "social",
-    "transparent": false
-  },
-  {
-    "name": "NOVERIS-POST-09",
-    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
-    "width": 1080,
-    "height": 1350,
-    "kind": "social",
-    "transparent": false
-  },
-  {
-    "name": "NOVERIS-POST-10",
-    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
-    "width": 1080,
-    "height": 1350,
-    "kind": "social",
-    "transparent": false
-  },
-  {
-    "name": "NOVERIS-POST-11",
-    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
-    "width": 1080,
-    "height": 1350,
-    "kind": "social",
-    "transparent": false
-  },
-  {
-    "name": "NOVERIS-POST-12",
-    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
-    "width": 1080,
-    "height": 1350,
-    "kind": "social",
-    "transparent": false
-  },
-  {
     "name": "NOVERIS-STORY-01",
     "page": "NOVERIS / STARTUP LAUNCH / 03 — Product Stories (12)",
     "width": 1080,
@@ -445,6 +349,102 @@
     "width": 1440,
     "height": 1900,
     "kind": "reference",
+    "transparent": false
+  },
+  {
+    "name": "NOVERIS-POST-01",
+    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
+    "width": 1080,
+    "height": 1350,
+    "kind": "social",
+    "transparent": false
+  },
+  {
+    "name": "NOVERIS-POST-02",
+    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
+    "width": 1080,
+    "height": 1350,
+    "kind": "social",
+    "transparent": false
+  },
+  {
+    "name": "NOVERIS-POST-03",
+    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
+    "width": 1080,
+    "height": 1350,
+    "kind": "social",
+    "transparent": false
+  },
+  {
+    "name": "NOVERIS-POST-04",
+    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
+    "width": 1080,
+    "height": 1350,
+    "kind": "social",
+    "transparent": false
+  },
+  {
+    "name": "NOVERIS-POST-05",
+    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
+    "width": 1080,
+    "height": 1350,
+    "kind": "social",
+    "transparent": false
+  },
+  {
+    "name": "NOVERIS-POST-06",
+    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
+    "width": 1080,
+    "height": 1350,
+    "kind": "social",
+    "transparent": false
+  },
+  {
+    "name": "NOVERIS-POST-07",
+    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
+    "width": 1080,
+    "height": 1350,
+    "kind": "social",
+    "transparent": false
+  },
+  {
+    "name": "NOVERIS-POST-08",
+    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
+    "width": 1080,
+    "height": 1350,
+    "kind": "social",
+    "transparent": false
+  },
+  {
+    "name": "NOVERIS-POST-09",
+    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
+    "width": 1080,
+    "height": 1350,
+    "kind": "social",
+    "transparent": false
+  },
+  {
+    "name": "NOVERIS-POST-10",
+    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
+    "width": 1080,
+    "height": 1350,
+    "kind": "social",
+    "transparent": false
+  },
+  {
+    "name": "NOVERIS-POST-11",
+    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
+    "width": 1080,
+    "height": 1350,
+    "kind": "social",
+    "transparent": false
+  },
+  {
+    "name": "NOVERIS-POST-12",
+    "page": "NOVERIS / STARTUP LAUNCH / Feed Posts (12)",
+    "width": 1080,
+    "height": 1350,
+    "kind": "social",
     "transparent": false
   }
 ]
