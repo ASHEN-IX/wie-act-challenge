@@ -6,7 +6,7 @@ Noveris is a GenAI peer-learning companion built for the **EdNova Challenge** (I
 
 > **Naming.** *Noveris* is the product. *EdNova* is the name of the challenge. A few internal identifiers (database user, Docker/Compose project names, `EDNOVA_*` environment variables, `ednova-v1` contract names, demo e-mail domain) keep the old name for compatibility.
 
-**Submission material:** [Technical report (PDF, 6 pages)](docs/submission/NOVERIS-TECHNICAL-REPORT.pdf) · [Submission checklist](docs/submission/README.md) · [Demo kit](demo/README.md) · [Demo video (90 s)](demo/output/noveris-demo-90s.mp4) · [Full walkthrough (4 min)](demo/output/noveris-demo-master.mp4) · [Business model](docs/business-model.md) · [All documentation](docs/README.md)
+**Submission material:** [Technical report (PDF, 6 pages)](docs/submission/NOVERIS-TECHNICAL-REPORT.pdf) · [Submission checklist](docs/submission/README.md) · [Demo kit](demo/README.md) · [Demo video (90 s)](demo/output/noveris-demo-90s.mp4) · [Full walkthrough (4 min)](demo/output/noveris-demo-master.mp4) · [Business model](docs/business-model.md) · [Design system](design/README.md) · [All documentation](docs/README.md)
 
 ![Course reader with the guided tutor](docs/submission/screenshots/course-learn-desktop.png)
 
